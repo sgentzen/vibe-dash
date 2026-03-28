@@ -1,3 +1,5 @@
 .superpowers/
 node_modules/
 .claude/.last-code-review
+dist/
+*.db
