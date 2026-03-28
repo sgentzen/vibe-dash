@@ -260,6 +260,13 @@ export function registerAgent(
   return parseAgent(row);
 }
 
+export function listAgents(db: Database.Database): Agent[] {
+  const rows = db
+    .prepare("SELECT * FROM agents ORDER BY registered_at ASC")
+    .all() as Record<string, unknown>[];
+  return rows.map(parseAgent);
+}
+
 export function getAgentByName(
   db: Database.Database,
   name: string
