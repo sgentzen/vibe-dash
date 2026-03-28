@@ -106,6 +106,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           </span>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: "none",
               border: "none",

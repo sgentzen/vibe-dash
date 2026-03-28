@@ -123,10 +123,12 @@ const DispatchContext = createContext<React.Dispatch<AppAction> | undefined>(
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  return React.createElement(
-    StateContext.Provider,
-    { value: state },
-    React.createElement(DispatchContext.Provider, { value: dispatch }, children)
+  return (
+    <StateContext.Provider value={state}>
+      <DispatchContext.Provider value={dispatch}>
+        {children}
+      </DispatchContext.Provider>
+    </StateContext.Provider>
   );
 }
 

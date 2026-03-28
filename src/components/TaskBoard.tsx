@@ -11,6 +11,13 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "done", label: "DONE" },
 ];
 
+const COLUMN_COLORS: Record<TaskStatus, string> = {
+  planned: "var(--text-muted)",
+  in_progress: "var(--accent-green)",
+  done: "var(--accent-blue)",
+  blocked: "var(--accent-yellow)",
+};
+
 export function TaskBoard() {
   const { tasks, projects, selectedProjectId, activity } = useAppState();
   const dispatch = useAppDispatch();
@@ -31,6 +38,9 @@ export function TaskBoard() {
   function handleDrop(status: TaskStatus) {
     const id = dragTaskId.current;
     if (!id) return;
+    // Skip no-op drops (same column)
+    const currentTask = tasks.find((t) => t.id === id);
+    if (currentTask?.status === status) return;
     api.updateTask(id, { status }).then((updated) => {
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
     }).catch(() => {});
@@ -138,13 +148,6 @@ function KanbanColumn({
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const canAdd = (status === "planned" || status === "in_progress") && selectedProjectId !== null;
-
-  const COLUMN_COLORS: Record<TaskStatus, string> = {
-    planned: "var(--text-muted)",
-    in_progress: "var(--accent-green)",
-    done: "var(--accent-blue)",
-    blocked: "var(--accent-yellow)",
-  };
 
   async function handleCreate() {
     const title = newTaskTitle.trim();

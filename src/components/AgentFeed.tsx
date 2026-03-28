@@ -1,8 +1,10 @@
 import { useAppState } from "../store";
 
+const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
 function relativeTime(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime();
-  const secs = Math.floor(diff / 1000);
+  const secs = Math.max(0, Math.floor(diff / 1000));
   if (secs < 60) return `${secs}s ago`;
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}m ago`;
@@ -16,7 +18,7 @@ export function AgentFeed() {
 
   const activeAgents = agents.filter((a) => {
     const diff = Date.now() - new Date(a.last_seen_at).getTime();
-    return diff < 5 * 60 * 1000; // seen within 5 minutes
+    return diff < AGENT_ACTIVE_WINDOW_MS;
   });
 
   const recentActivity = activity.slice(0, 30);
