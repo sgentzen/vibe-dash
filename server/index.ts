@@ -3,6 +3,8 @@ import { createServer } from "http";
 import { openDb } from "./db.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { createMcpServer } from "./mcp/server.js";
 
 const PORT = parseInt(process.env.PORT ?? "3001");
 const DB_PATH = process.env.DB_PATH ?? "vibe-dash.db";
@@ -13,12 +15,31 @@ app.use(express.json());
 const db = openDb(DB_PATH);
 app.use(createRouter(db));
 
+// MCP SSE transport
+const transports = new Map<string, SSEServerTransport>();
+
+app.get("/sse", async (req, res) => {
+  const mcpServer = createMcpServer(db);
+  const transport = new SSEServerTransport("/messages", res);
+  transports.set(transport.sessionId, transport);
+  res.on("close", () => { transports.delete(transport.sessionId); });
+  await mcpServer.connect(transport);
+});
+
+app.post("/messages", async (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const transport = transports.get(sessionId);
+  if (!transport) { res.status(400).json({ error: "Unknown session" }); return; }
+  await transport.handlePostMessage(req, res);
+});
+
 const server = createServer(app);
 initWebSocket(server);
 
 server.listen(PORT, () => {
   console.log(`Vibe Dash server running on http://localhost:${PORT}`);
   console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
+  console.log(`MCP SSE at http://localhost:${PORT}/sse`);
 });
 
 export { app, db, server };
