@@ -1,4 +1,6 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { openDb } from "./db.js";
 import { initWebSocket } from "./websocket.js";
@@ -6,8 +8,11 @@ import { createRouter } from "./routes.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpServer } from "./mcp/server.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+
 const PORT = parseInt(process.env.PORT ?? "3001");
-const DB_PATH = process.env.DB_PATH ?? "vibe-dash.db";
+const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
 
 const app = express();
 app.use(express.json());
@@ -33,11 +38,18 @@ app.post("/messages", async (req, res) => {
   await transport.handlePostMessage(req, res);
 });
 
+// Serve built frontend in production (npm start)
+const distDir = path.join(PROJECT_ROOT, "dist");
+app.use(express.static(distDir));
+app.get("/{*splat}", (_req, res) => {
+  res.sendFile(path.join(distDir, "index.html"));
+});
+
 const server = createServer(app);
 initWebSocket(server);
 
 server.listen(PORT, () => {
-  console.log(`Vibe Dash server running on http://localhost:${PORT}`);
+  console.log(`Vibe Dash running on http://localhost:${PORT}`);
   console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
   console.log(`MCP SSE at http://localhost:${PORT}/sse`);
 });

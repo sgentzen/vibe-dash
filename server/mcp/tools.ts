@@ -11,9 +11,38 @@ import {
   logActivity,
   createBlocker,
   resolveBlocker,
-  getAgentByName,
+  touchAgent,
+  createSprint,
+  listSprints,
+  updateSprint,
 } from "../db.js";
+
 import { broadcast } from "../websocket.js";
+
+/** Auto-log activity and broadcast it for any mutation */
+function autoLog(
+  db: Parameters<typeof logActivity>[0],
+  taskId: string,
+  message: string,
+  agentName?: string
+): void {
+  let agentId: string | null = null;
+  if (agentName) {
+    const agent = touchAgent(db, agentName);
+    broadcast({ type: "agent_registered", payload: agent });
+    agentId = agent.id;
+  }
+  const entry = logActivity(db, { task_id: taskId, agent_id: agentId, message });
+  const task = getTask(db, taskId);
+  broadcast({
+    type: "agent_activity",
+    payload: {
+      ...entry,
+      agent_name: agentName ?? null,
+      task_title: task?.title ?? null,
+    },
+  });
+}
 
 type ToolResult = { content: [{ type: "text"; text: string }] };
 
@@ -24,8 +53,11 @@ function ok(data: unknown): ToolResult {
 export async function handleTool(
   db: Database.Database,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  defaultAgentName?: string
 ): Promise<ToolResult> {
+  // Use the MCP client identity as fallback when agent_name is not provided
+  const agentName = (args.agent_name as string | undefined) ?? defaultAgentName;
   switch (toolName) {
     case "register_agent": {
       const agent = registerAgent(db, {
@@ -55,12 +87,14 @@ export async function handleTool(
       const task = createTask(db, {
         project_id: args.project_id as string,
         parent_task_id: (args.parent_task_id as string | undefined) ?? null,
+        sprint_id: (args.sprint_id as string | undefined) ?? null,
         title: args.title as string,
         description: (args.description as string | undefined) ?? null,
         priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
         status: (args.status as "planned" | "in_progress" | "blocked" | "done" | undefined) ?? "planned",
       });
       broadcast({ type: "task_created", payload: task });
+      autoLog(db, task.id, `Created task: ${task.title}`, agentName);
       return ok({ task_id: task.id });
     }
 
@@ -86,9 +120,18 @@ export async function handleTool(
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,
+        sprint_id: args.sprint_id as string | null | undefined,
       });
       if (updated) {
         broadcast({ type: "task_updated", payload: updated });
+        const changes: string[] = [];
+        if (args.status) changes.push(`status → ${args.status}`);
+        if (args.progress !== undefined) changes.push(`progress → ${args.progress}%`);
+        if (args.title) changes.push(`title → "${args.title}"`);
+        const msg = changes.length > 0
+          ? `Updated "${updated.title}": ${changes.join(", ")}`
+          : `Updated "${updated.title}"`;
+        autoLog(db, updated.id, msg, agentName);
       }
       return ok({ success: true });
     }
@@ -97,33 +140,13 @@ export async function handleTool(
       const completed = completeTask(db, args.task_id as string);
       if (completed) {
         broadcast({ type: "task_completed", payload: completed });
+        autoLog(db, completed.id, `Completed "${completed.title}"`, agentName);
       }
       return ok({ success: true });
     }
 
     case "log_activity": {
-      const agentName = args.agent_name as string | undefined;
-      let agentId: string | null = null;
-
-      if (agentName) {
-        let agent = getAgentByName(db, agentName);
-        if (!agent) {
-          agent = registerAgent(db, {
-            name: agentName,
-            model: null,
-            capabilities: [],
-          });
-          broadcast({ type: "agent_registered", payload: agent });
-        }
-        agentId = agent.id;
-      }
-
-      const entry = logActivity(db, {
-        task_id: args.task_id as string,
-        agent_id: agentId,
-        message: args.message as string,
-      });
-      broadcast({ type: "agent_activity", payload: entry });
+      autoLog(db, args.task_id as string, args.message as string, agentName);
       return ok({ success: true });
     }
 
@@ -137,6 +160,7 @@ export async function handleTool(
       if (task) {
         broadcast({ type: "task_updated", payload: task });
       }
+      autoLog(db, blocker.task_id, `Blocker reported: ${blocker.reason}`, agentName);
       return ok({ blocker_id: blocker.id });
     }
 
@@ -144,6 +168,39 @@ export async function handleTool(
       const blocker = resolveBlocker(db, args.blocker_id as string);
       if (blocker) {
         broadcast({ type: "blocker_resolved", payload: blocker });
+        autoLog(db, blocker.task_id, `Blocker resolved: ${blocker.reason}`, agentName);
+      }
+      return ok({ success: true });
+    }
+
+    case "create_sprint": {
+      const sprint = createSprint(db, {
+        project_id: args.project_id as string,
+        name: args.name as string,
+        description: (args.description as string | undefined) ?? null,
+        status: args.status as "planned" | "active" | "completed" | undefined,
+        start_date: (args.start_date as string | undefined) ?? null,
+        end_date: (args.end_date as string | undefined) ?? null,
+      });
+      broadcast({ type: "sprint_created", payload: sprint });
+      return ok({ sprint_id: sprint.id });
+    }
+
+    case "list_sprints": {
+      const sprints = listSprints(db, args.project_id as string | undefined);
+      return ok({ sprints });
+    }
+
+    case "update_sprint": {
+      const updated = updateSprint(db, args.sprint_id as string, {
+        name: args.name as string | undefined,
+        description: args.description as string | null | undefined,
+        status: args.status as "planned" | "active" | "completed" | undefined,
+        start_date: args.start_date as string | null | undefined,
+        end_date: args.end_date as string | null | undefined,
+      });
+      if (updated) {
+        broadcast({ type: "sprint_updated", payload: updated });
       }
       return ok({ success: true });
     }

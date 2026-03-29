@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAppDispatch } from "../store";
+import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import type { Task, TaskStatus, TaskPriority } from "../types";
 
@@ -9,6 +9,7 @@ interface TaskEditDrawerProps {
 }
 
 export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
+  const { sprints } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -17,7 +18,10 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [progress, setProgress] = useState(task.progress);
+  const [sprintId, setSprintId] = useState<string | null>(task.sprint_id);
   const [saving, setSaving] = useState(false);
+
+  const taskSprints = sprints.filter((s) => s.project_id === task.project_id);
 
   // Keep local state fresh if task changes externally
   useEffect(() => {
@@ -26,6 +30,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setStatus(task.status);
     setPriority(task.priority);
     setProgress(task.progress);
+    setSprintId(task.sprint_id);
   }, [task]);
 
   async function handleSave() {
@@ -37,6 +42,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         status,
         priority,
         progress,
+        sprint_id: sprintId,
       });
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
       onClose();
@@ -171,6 +177,23 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             <option value="urgent">Urgent</option>
           </select>
         </div>
+
+        {/* Sprint */}
+        {taskSprints.length > 0 && (
+          <div>
+            <label style={labelStyle}>Sprint</label>
+            <select
+              value={sprintId ?? ""}
+              onChange={(e) => setSprintId(e.target.value || null)}
+              style={inputStyle}
+            >
+              <option value="">No Sprint</option>
+              {taskSprints.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Progress */}
         <div>

@@ -3,7 +3,7 @@ import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDrawer } from "./TaskEditDrawer";
-import type { Task, TaskStatus } from "../types";
+import type { Task, Sprint, TaskStatus } from "../types";
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "planned", label: "PLANNED" },
@@ -19,7 +19,7 @@ const COLUMN_COLORS: Record<TaskStatus, string> = {
 };
 
 export function TaskBoard() {
-  const { tasks, projects, selectedProjectId, activity } = useAppState();
+  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -28,17 +28,22 @@ export function TaskBoard() {
   const filteredTasks = tasks.filter(
     (t) =>
       t.parent_task_id === null &&
-      (selectedProjectId === null || t.project_id === selectedProjectId)
+      (selectedProjectId === null || t.project_id === selectedProjectId) &&
+      (selectedSprintId === null || t.sprint_id === selectedSprintId)
   );
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
     : null;
 
+  // Get sprints for the selected project
+  const projectSprints = selectedProjectId
+    ? sprints.filter((s) => s.project_id === selectedProjectId)
+    : sprints;
+
   function handleDrop(status: TaskStatus) {
     const id = dragTaskId.current;
     if (!id) return;
-    // Skip no-op drops (same column)
     const currentTask = tasks.find((t) => t.id === id);
     if (currentTask?.status === status) return;
     api.updateTask(id, { status }).then((updated) => {
@@ -78,6 +83,18 @@ export function TaskBoard() {
             <span style={{ color: "var(--text-muted)" }}>All Projects</span>
           )}
         </span>
+
+        {/* Sprint filter */}
+        {projectSprints.length > 0 && (
+          <>
+            <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
+            <SprintFilter
+              sprints={projectSprints}
+              selectedSprintId={selectedSprintId}
+              onSelect={(id) => dispatch({ type: "SELECT_SPRINT", payload: id })}
+            />
+          </>
+        )}
       </div>
 
       {/* Columns */}
@@ -96,8 +113,11 @@ export function TaskBoard() {
             status={key}
             label={label}
             tasks={filteredTasks.filter((t) => t.status === key)}
+            allTasks={tasks}
+            sprints={projectSprints}
             activity={activity}
             selectedProjectId={selectedProjectId}
+            selectedSprintId={selectedSprintId}
             onDragStart={(id) => { dragTaskId.current = id; }}
             onDrop={() => handleDrop(key)}
             onClickTask={setEditingTask}
@@ -119,12 +139,62 @@ export function TaskBoard() {
   );
 }
 
+/* ─── Sprint Filter ──────────────────────────────────────────────────────── */
+
+function SprintFilter({
+  sprints,
+  selectedSprintId,
+  onSelect,
+}: {
+  sprints: Sprint[];
+  selectedSprintId: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  const statusOrder: Record<string, number> = { active: 0, planned: 1, completed: 2 };
+  const sorted = [...sprints].sort(
+    (a, b) => (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1)
+  );
+
+  return (
+    <select
+      value={selectedSprintId ?? ""}
+      onChange={(e) => onSelect(e.target.value || null)}
+      style={{
+        background: "var(--bg-tertiary)",
+        border: "1px solid var(--border)",
+        borderRadius: "6px",
+        color: selectedSprintId ? "var(--accent-blue)" : "var(--text-secondary)",
+        padding: "4px 8px",
+        fontSize: "12px",
+        outline: "none",
+        cursor: "pointer",
+        maxWidth: "250px",
+      }}
+    >
+      <option value="">All Sprints ({sprints.length})</option>
+      {sorted.map((s) => {
+        const icon = s.status === "completed" ? "\u2713" : s.status === "active" ? "\u25cf" : "\u25cb";
+        return (
+          <option key={s.id} value={s.id}>
+            {icon} {s.name}
+          </option>
+        );
+      })}
+    </select>
+  );
+}
+
+/* ─── Kanban Column ──────────────────────────────────────────────────────── */
+
 interface ColumnProps {
   status: TaskStatus;
   label: string;
   tasks: Task[];
+  allTasks: Task[];
+  sprints: Sprint[];
   activity: ReturnType<typeof useAppState>["activity"];
   selectedProjectId: string | null;
+  selectedSprintId: string | null;
   onDragStart: (id: string) => void;
   onDrop: () => void;
   onClickTask: (task: Task) => void;
@@ -136,8 +206,11 @@ function KanbanColumn({
   status,
   label,
   tasks,
+  allTasks,
+  sprints,
   activity,
   selectedProjectId,
+  selectedSprintId,
   onDragStart,
   onDrop,
   onClickTask,
@@ -159,7 +232,6 @@ function KanbanColumn({
         title,
         priority: "medium",
       });
-      // If column is in_progress, immediately update status
       if (status === "in_progress") {
         const updated = await api.updateTask(task.id, { status: "in_progress" });
         onTaskCreated(updated);
@@ -173,6 +245,10 @@ function KanbanColumn({
       setCreating(false);
     }
   }
+
+  // Group tasks by sprint when no specific sprint is selected
+  const shouldGroup = selectedSprintId === null && sprints.length > 0;
+  const sprintGroups = shouldGroup ? groupBySprint(tasks, sprints) : null;
 
   return (
     <div
@@ -234,15 +310,30 @@ function KanbanColumn({
           gap: "8px",
         }}
       >
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            activity={activity}
-            onClick={() => onClickTask(task)}
-            onDragStart={onDragStart}
-          />
-        ))}
+        {sprintGroups ? (
+          sprintGroups.map((group) => (
+            <SprintGroup
+              key={group.sprint?.id ?? "no-sprint"}
+              sprint={group.sprint}
+              tasks={group.tasks}
+              allTasks={allTasks}
+              activity={activity}
+              onClickTask={onClickTask}
+              onDragStart={onDragStart}
+            />
+          ))
+        ) : (
+          tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              allTasks={allTasks}
+              activity={activity}
+              onClick={() => onClickTask(task)}
+              onDragStart={onDragStart}
+            />
+          ))
+        )}
 
         {/* Add task input */}
         {canAdd && (
@@ -254,7 +345,7 @@ function KanbanColumn({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleCreate();
                 }}
-                placeholder="Add task…"
+                placeholder="Add task\u2026"
                 style={{
                   flex: 1,
                   background: "var(--bg-secondary)",
@@ -284,6 +375,134 @@ function KanbanColumn({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Sprint Group ───────────────────────────────────────────────────────── */
+
+interface SprintGroupData {
+  sprint: Sprint | null;
+  tasks: Task[];
+}
+
+function groupBySprint(tasks: Task[], sprints: Sprint[]): SprintGroupData[] {
+  const sprintMap = new Map<string, Sprint>();
+  for (const s of sprints) sprintMap.set(s.id, s);
+
+  const grouped = new Map<string | null, Task[]>();
+  for (const task of tasks) {
+    const key = task.sprint_id;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(task);
+  }
+
+  const result: SprintGroupData[] = [];
+
+  // Active sprints first, then planned, then completed
+  const statusOrder: Record<string, number> = { active: 0, planned: 1, completed: 2 };
+  const sortedSprints = [...sprints].sort(
+    (a, b) => (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1)
+  );
+
+  for (const sprint of sortedSprints) {
+    const sprintTasks = grouped.get(sprint.id);
+    if (sprintTasks && sprintTasks.length > 0) {
+      result.push({ sprint, tasks: sprintTasks });
+    }
+  }
+
+  // Unassigned tasks at the end
+  const unassigned = grouped.get(null);
+  if (unassigned && unassigned.length > 0) {
+    result.push({ sprint: null, tasks: unassigned });
+  }
+
+  return result;
+}
+
+function SprintGroup({
+  sprint,
+  tasks,
+  allTasks,
+  activity,
+  onClickTask,
+  onDragStart,
+}: {
+  sprint: Sprint | null;
+  tasks: Task[];
+  allTasks: Task[];
+  activity: ReturnType<typeof useAppState>["activity"];
+  onClickTask: (task: Task) => void;
+  onDragStart: (id: string) => void;
+}) {
+  const statusIcon =
+    sprint?.status === "completed" ? "\u2713" : sprint?.status === "active" ? "\u25cf" : "\u25cb";
+  const statusColor =
+    sprint?.status === "active"
+      ? "var(--accent-green)"
+      : sprint?.status === "completed"
+        ? "var(--accent-blue)"
+        : "var(--text-muted)";
+
+  return (
+    <div style={{ marginBottom: "4px" }}>
+      {/* Sprint header */}
+      <div
+        style={{
+          padding: "6px 8px",
+          fontSize: "11px",
+          fontWeight: 600,
+          color: statusColor,
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          borderBottom: "1px solid var(--border)",
+          marginBottom: "6px",
+        }}
+      >
+        <span>{sprint ? statusIcon : ""}</span>
+        <span>{sprint ? sprint.name : "No Sprint"}</span>
+        <span
+          style={{
+            fontSize: "10px",
+            color: "var(--text-muted)",
+            fontWeight: 400,
+          }}
+        >
+          ({tasks.length})
+        </span>
+      </div>
+
+      {/* Sprint description (truncated) */}
+      {sprint?.description && (
+        <div
+          style={{
+            fontSize: "10px",
+            color: "var(--text-muted)",
+            padding: "0 8px 6px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {sprint.description.slice(0, 100)}{sprint.description.length > 100 ? "\u2026" : ""}
+        </div>
+      )}
+
+      {/* Tasks */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            allTasks={allTasks}
+            activity={activity}
+            onClick={() => onClickTask(task)}
+            onDragStart={onDragStart}
+          />
+        ))}
       </div>
     </div>
   );

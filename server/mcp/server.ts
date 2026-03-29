@@ -2,12 +2,38 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
+import { registerAgent } from "../db.js";
+import { broadcast } from "../websocket.js";
 
 const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
 const PRIORITY_ENUM = z.enum(["low", "medium", "high", "urgent"]);
+const SPRINT_STATUS_ENUM = z.enum(["planned", "active", "completed"]);
 
 export function createMcpServer(db: Database.Database): McpServer {
   const server = new McpServer({ name: "vibe-dash", version: "0.1.0" });
+
+  // Register the MCP client as an agent as soon as it connects
+  server.server.oninitialized = () => {
+    const info = server.server.getClientVersion();
+    if (info) {
+      const agent = registerAgent(db, {
+        name: info.name,
+        model: info.version ? `${info.name}/${info.version}` : null,
+        capabilities: [],
+      });
+      broadcast({ type: "agent_registered", payload: agent });
+    }
+  };
+
+  /** Resolve connected MCP client name for automatic agent registration */
+  function clientName(): string | undefined {
+    return server.server.getClientVersion()?.name;
+  }
+
+  function call(toolName: string) {
+    return async (args: Record<string, unknown>) =>
+      handleTool(db, toolName, args, clientName());
+  }
 
   server.tool(
     "register_agent",
@@ -17,7 +43,7 @@ export function createMcpServer(db: Database.Database): McpServer {
       model: z.string().optional(),
       capabilities: z.array(z.string()).optional(),
     },
-    async (args) => handleTool(db, "register_agent", args)
+    call("register_agent")
   );
 
   server.tool(
@@ -27,14 +53,14 @@ export function createMcpServer(db: Database.Database): McpServer {
       name: z.string(),
       description: z.string().optional(),
     },
-    async (args) => handleTool(db, "create_project", args)
+    call("create_project")
   );
 
   server.tool(
     "list_projects",
     "List all projects",
     {},
-    async (args) => handleTool(db, "list_projects", args)
+    call("list_projects")
   );
 
   server.tool(
@@ -43,12 +69,14 @@ export function createMcpServer(db: Database.Database): McpServer {
     {
       project_id: z.string(),
       parent_task_id: z.string().optional(),
+      sprint_id: z.string().optional(),
       title: z.string(),
       description: z.string().optional(),
       status: STATUS_ENUM.optional(),
       priority: PRIORITY_ENUM.optional(),
+      agent_name: z.string().optional(),
     },
-    async (args) => handleTool(db, "create_task", args)
+    call("create_task")
   );
 
   server.tool(
@@ -57,7 +85,7 @@ export function createMcpServer(db: Database.Database): McpServer {
     {
       task_id: z.string(),
     },
-    async (args) => handleTool(db, "get_task", args)
+    call("get_task")
   );
 
   server.tool(
@@ -68,7 +96,7 @@ export function createMcpServer(db: Database.Database): McpServer {
       status: STATUS_ENUM.optional(),
       parent_task_id: z.string().optional(),
     },
-    async (args) => handleTool(db, "list_tasks", args)
+    call("list_tasks")
   );
 
   server.tool(
@@ -82,8 +110,10 @@ export function createMcpServer(db: Database.Database): McpServer {
       priority: PRIORITY_ENUM.optional(),
       progress: z.number().min(0).max(100).optional(),
       parent_task_id: z.string().nullable().optional(),
+      sprint_id: z.string().nullable().optional(),
+      agent_name: z.string().optional(),
     },
-    async (args) => handleTool(db, "update_task", args)
+    call("update_task")
   );
 
   server.tool(
@@ -91,19 +121,20 @@ export function createMcpServer(db: Database.Database): McpServer {
     "Mark a task as done with 100% progress",
     {
       task_id: z.string(),
+      agent_name: z.string().optional(),
     },
-    async (args) => handleTool(db, "complete_task", args)
+    call("complete_task")
   );
 
   server.tool(
     "log_activity",
-    "Log an activity entry for a task, auto-registering the agent if needed",
+    "Log an activity entry for a task",
     {
       task_id: z.string(),
       agent_name: z.string().optional(),
       message: z.string(),
     },
-    async (args) => handleTool(db, "log_activity", args)
+    call("log_activity")
   );
 
   server.tool(
@@ -113,7 +144,7 @@ export function createMcpServer(db: Database.Database): McpServer {
       task_id: z.string(),
       reason: z.string(),
     },
-    async (args) => handleTool(db, "report_blocker", args)
+    call("report_blocker")
   );
 
   server.tool(
@@ -122,7 +153,44 @@ export function createMcpServer(db: Database.Database): McpServer {
     {
       blocker_id: z.string(),
     },
-    async (args) => handleTool(db, "resolve_blocker", args)
+    call("resolve_blocker")
+  );
+
+  server.tool(
+    "create_sprint",
+    "Create a sprint for a project",
+    {
+      project_id: z.string(),
+      name: z.string(),
+      description: z.string().optional(),
+      status: SPRINT_STATUS_ENUM.optional(),
+      start_date: z.string().optional(),
+      end_date: z.string().optional(),
+    },
+    call("create_sprint")
+  );
+
+  server.tool(
+    "list_sprints",
+    "List sprints, optionally filtered by project",
+    {
+      project_id: z.string().optional(),
+    },
+    call("list_sprints")
+  );
+
+  server.tool(
+    "update_sprint",
+    "Update sprint fields",
+    {
+      sprint_id: z.string(),
+      name: z.string().optional(),
+      description: z.string().nullable().optional(),
+      status: SPRINT_STATUS_ENUM.optional(),
+      start_date: z.string().nullable().optional(),
+      end_date: z.string().nullable().optional(),
+    },
+    call("update_sprint")
   );
 
   return server;

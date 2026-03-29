@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import type { TaskStatus } from "./types.js";
+import type { TaskStatus, SprintStatus } from "./types.js";
 import {
   listProjects,
   createProject,
@@ -14,6 +14,12 @@ import {
   getActiveBlockers,
   createBlocker,
   resolveBlocker,
+  listSprints,
+  createSprint,
+  getSprint,
+  updateSprint,
+  logActivity,
+  getAgentCurrentTask,
 } from "./db.js";
 import { broadcast } from "./websocket.js";
 
@@ -33,7 +39,9 @@ export function createRouter(db: Database.Database): Router {
       }
     ).count;
     const activeAgents = (
-      db.prepare("SELECT COUNT(*) AS count FROM agents").get() as {
+      db.prepare(
+        "SELECT COUNT(*) AS count FROM agents WHERE last_seen_at >= datetime('now', '-15 minutes')"
+      ).get() as {
         count: number;
       }
     ).count;
@@ -93,10 +101,11 @@ export function createRouter(db: Database.Database): Router {
 
   // POST /api/tasks
   router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, title, description, priority, status } =
+    const { project_id, parent_task_id, sprint_id, title, description, priority, status } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
+        sprint_id?: string | null;
         title: string;
         description?: string | null;
         priority: string;
@@ -109,6 +118,7 @@ export function createRouter(db: Database.Database): Router {
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
+      sprint_id: sprint_id ?? null,
       title,
       description: description ?? null,
       priority: priority as Parameters<typeof createTask>[1]["priority"],
@@ -135,8 +145,24 @@ export function createRouter(db: Database.Database): Router {
       res.status(404).json({ error: "Task not found" });
       return;
     }
-    const updated = updateTask(db, req.params.id, req.body as Parameters<typeof updateTask>[2]);
+    const body = req.body as Parameters<typeof updateTask>[2];
+    const updated = updateTask(db, req.params.id, body);
     broadcast({ type: "task_updated", payload: updated! });
+    // Auto-log the change
+    const changes: string[] = [];
+    if (body.status && body.status !== task.status) changes.push(`status → ${body.status}`);
+    if (body.progress !== undefined && body.progress !== task.progress) changes.push(`progress → ${body.progress}%`);
+    if (changes.length > 0) {
+      const entry = logActivity(db, {
+        task_id: updated!.id,
+        agent_id: null,
+        message: `${changes.join(", ")} on "${updated!.title}"`,
+      });
+      broadcast({
+        type: "agent_activity",
+        payload: { ...entry, agent_name: null, task_title: updated!.title },
+      });
+    }
     res.json(updated);
   });
 
@@ -149,12 +175,28 @@ export function createRouter(db: Database.Database): Router {
     }
     const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
+    const entry = logActivity(db, {
+      task_id: completed!.id,
+      agent_id: null,
+      message: `Completed "${completed!.title}"`,
+    });
+    broadcast({
+      type: "agent_activity",
+      payload: { ...entry, agent_name: null, task_title: completed!.title },
+    });
     res.json(completed);
   });
 
   // GET /api/agents
   router.get("/api/agents", (_req, res) => {
-    res.json(listAgents(db));
+    const agents = listAgents(db);
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const withActive = agents.map((a) => ({
+      ...a,
+      active: a.last_seen_at >= fifteenMinAgo,
+      current_task_title: getAgentCurrentTask(db, a.id),
+    }));
+    res.json(withActive);
   });
 
   // GET /api/activity
@@ -196,6 +238,51 @@ export function createRouter(db: Database.Database): Router {
     broadcast({ type: "blocker_resolved", payload: resolved });
     if (task) broadcast({ type: "task_updated", payload: task });
     res.json(resolved);
+  });
+
+  // GET /api/sprints
+  router.get("/api/sprints", (req, res) => {
+    const { project_id } = req.query as { project_id?: string };
+    res.json(listSprints(db, project_id));
+  });
+
+  // POST /api/sprints
+  router.post("/api/sprints", (req, res) => {
+    const { project_id, name, description, status, start_date, end_date } =
+      req.body as {
+        project_id: string;
+        name: string;
+        description?: string | null;
+        status?: string;
+        start_date?: string | null;
+        end_date?: string | null;
+      };
+    if (!project_id || !name) {
+      res.status(400).json({ error: "project_id and name are required" });
+      return;
+    }
+    const sprint = createSprint(db, {
+      project_id,
+      name,
+      description: description ?? null,
+      status: status as SprintStatus | undefined,
+      start_date: start_date ?? null,
+      end_date: end_date ?? null,
+    });
+    broadcast({ type: "sprint_created", payload: sprint });
+    res.status(201).json(sprint);
+  });
+
+  // PATCH /api/sprints/:id
+  router.patch("/api/sprints/:id", (req, res) => {
+    const sprint = getSprint(db, req.params.id);
+    if (!sprint) {
+      res.status(404).json({ error: "Sprint not found" });
+      return;
+    }
+    const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
+    broadcast({ type: "sprint_updated", payload: updated! });
+    res.json(updated);
   });
 
   return router;

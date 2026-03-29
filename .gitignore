@@ -3,3 +3,5 @@ node_modules/
 .claude/.last-code-review
 dist/
 *.db
+*.db-shm
+*.db-wal

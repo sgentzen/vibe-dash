@@ -1,4 +1,5 @@
-import type { Project, Task, Agent, ActivityEntry, Blocker } from "../types";
+import { useMemo } from "react";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -59,7 +60,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id">>
 ): Promise<Task> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -97,8 +98,47 @@ async function getBlockers(): Promise<Blocker[]> {
   return res.json();
 }
 
+async function getSprints(projectId?: string): Promise<Sprint[]> {
+  const url = projectId
+    ? `/api/sprints?project_id=${encodeURIComponent(projectId)}`
+    : "/api/sprints";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`getSprints failed: ${res.status}`);
+  return res.json();
+}
+
+async function createSprint(data: {
+  project_id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<Sprint> {
+  const res = await fetch("/api/sprints", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`createSprint failed: ${res.status}`);
+  return res.json();
+}
+
+async function updateSprint(
+  id: string,
+  data: Partial<Pick<Sprint, "name" | "description" | "status" | "start_date" | "end_date">>
+): Promise<Sprint> {
+  const res = await fetch(`/api/sprints/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`updateSprint failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
-  return {
+  return useMemo(() => ({
     getStats,
     getProjects,
     createProject,
@@ -109,5 +149,8 @@ export function useApi() {
     getAgents,
     getActivity,
     getBlockers,
-  };
+    getSprints,
+    createSprint,
+    updateSprint,
+  }), []);
 }

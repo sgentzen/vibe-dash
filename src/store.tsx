@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useReducer } from "react";
-import type { Project, Task, Agent, ActivityEntry, Blocker, WsEvent } from "./types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, WsEvent } from "./types";
 
 export interface AppState {
   projects: Project[];
+  sprints: Sprint[];
   tasks: Task[];
   agents: Agent[];
   activity: ActivityEntry[];
   blockers: Blocker[];
   selectedProjectId: string | null;
+  selectedSprintId: string | null;
   stats: {
     projects: number;
     tasks: number;
@@ -18,28 +20,34 @@ export interface AppState {
 
 const initialState: AppState = {
   projects: [],
+  sprints: [],
   tasks: [],
   agents: [],
   activity: [],
   blockers: [],
   selectedProjectId: null,
+  selectedSprintId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
 };
 
 export type AppAction =
   | { type: "SET_PROJECTS"; payload: Project[] }
+  | { type: "SET_SPRINTS"; payload: Sprint[] }
   | { type: "SET_TASKS"; payload: Task[] }
   | { type: "SET_AGENTS"; payload: Agent[] }
   | { type: "SET_ACTIVITY"; payload: ActivityEntry[] }
   | { type: "SET_BLOCKERS"; payload: Blocker[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
+  | { type: "SELECT_SPRINT"; payload: string | null }
   | { type: "WS_EVENT"; payload: WsEvent };
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SET_PROJECTS":
       return { ...state, projects: action.payload };
+    case "SET_SPRINTS":
+      return { ...state, sprints: action.payload };
     case "SET_TASKS":
       return { ...state, tasks: action.payload };
     case "SET_AGENTS":
@@ -51,7 +59,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "SET_STATS":
       return { ...state, stats: action.payload };
     case "SELECT_PROJECT":
-      return { ...state, selectedProjectId: action.payload };
+      return { ...state, selectedProjectId: action.payload, selectedSprintId: null };
+    case "SELECT_SPRINT":
+      return { ...state, selectedSprintId: action.payload };
     case "WS_EVENT": {
       const event = action.payload;
       switch (event.type) {
@@ -81,7 +91,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
           return {
             ...state,
             agents: exists
-              ? state.agents.map((a) => (a.id === agent.id ? agent : a))
+              ? state.agents.map((a) => (a.id === agent.id ? { ...a, ...agent } : a))
               : [...state.agents, agent],
           };
         }
@@ -105,6 +115,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
               ...state.stats,
               alerts: Math.max(0, state.stats.alerts - 1),
             },
+          };
+        }
+        case "sprint_created":
+          return {
+            ...state,
+            sprints: [...state.sprints, event.payload as Sprint],
+          };
+        case "sprint_updated": {
+          const updatedSprint = event.payload as Sprint;
+          return {
+            ...state,
+            sprints: state.sprints.map((s) =>
+              s.id === updatedSprint.id ? updatedSprint : s
+            ),
           };
         }
         default:

@@ -1,5 +1,6 @@
 export type TaskStatus = "planned" | "in_progress" | "blocked" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type SprintStatus = "planned" | "active" | "completed";
 
 export interface Project {
   id: string;
@@ -9,10 +10,23 @@ export interface Project {
   updated_at: string;
 }
 
+export interface Sprint {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  status: SprintStatus;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Task {
   id: string;
   project_id: string;
   parent_task_id: string | null;
+  sprint_id: string | null;
   title: string;
   description: string | null;
   status: TaskStatus;
@@ -29,6 +43,7 @@ export interface Agent {
   capabilities: string[];
   registered_at: string;
   last_seen_at: string;
+  current_task_title?: string | null;
 }
 
 export interface ActivityEntry {
@@ -37,6 +52,8 @@ export interface ActivityEntry {
   agent_id: string | null;
   message: string;
   timestamp: string;
+  agent_name?: string | null;
+  task_title?: string | null;
 }
 
 export interface Blocker {
@@ -55,9 +72,11 @@ export type WsEventType =
   | "agent_registered"
   | "agent_activity"
   | "blocker_reported"
-  | "blocker_resolved";
+  | "blocker_resolved"
+  | "sprint_created"
+  | "sprint_updated";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint;
 }

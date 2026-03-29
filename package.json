@@ -14,7 +14,7 @@
     "build": "vite build && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "tsx server/index.ts",
+    "start": "vite build && tsx server/index.ts",
     "mcp:stdio": "tsx server/mcp/stdio.ts"
   },
   "bin": {
