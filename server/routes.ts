@@ -20,11 +20,25 @@ import {
   updateSprint,
   logActivity,
   getAgentCurrentTask,
+  getAgentHealthStatus,
+  createTag,
+  listTags,
+  addTagToTask,
+  removeTagFromTask,
+  getTaskTags,
 } from "./db.js";
 import { broadcast } from "./websocket.js";
 
 export function createRouter(db: Database.Database): Router {
   const router = Router();
+
+  // GET /api/first-run — returns true if no projects exist
+  router.get("/api/first-run", (_req, res) => {
+    const count = (
+      db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number }
+    ).count;
+    res.json({ firstRun: count === 0 });
+  });
 
   // GET /api/stats
   router.get("/api/stats", (_req, res) => {
@@ -85,16 +99,18 @@ export function createRouter(db: Database.Database): Router {
 
   // GET /api/tasks
   router.get("/api/tasks", (req, res) => {
-    const { project_id, status, parent_task_id } = req.query as {
+    const { project_id, status, parent_task_id, assigned_agent_id } = req.query as {
       project_id?: string;
       status?: string;
       parent_task_id?: string;
+      assigned_agent_id?: string;
     };
     res.json(
       listTasks(db, {
         project_id,
         status: status as TaskStatus | undefined,
         parent_task_id,
+        assigned_agent_id,
       })
     );
   });
@@ -190,13 +206,16 @@ export function createRouter(db: Database.Database): Router {
   // GET /api/agents
   router.get("/api/agents", (_req, res) => {
     const agents = listAgents(db);
-    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-    const withActive = agents.map((a) => ({
-      ...a,
-      active: a.last_seen_at >= fifteenMinAgo,
-      current_task_title: getAgentCurrentTask(db, a.id),
-    }));
-    res.json(withActive);
+    const withStatus = agents.map((a) => {
+      const health_status = getAgentHealthStatus(a.last_seen_at);
+      return {
+        ...a,
+        health_status,
+        active: health_status === "active",
+        current_task_title: getAgentCurrentTask(db, a.id),
+      };
+    });
+    res.json(withStatus);
   });
 
   // GET /api/activity
@@ -283,6 +302,55 @@ export function createRouter(db: Database.Database): Router {
     const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
     broadcast({ type: "sprint_updated", payload: updated! });
     res.json(updated);
+  });
+
+  // ─── Tags ────────────────────────────────────────────────────────────────
+
+  // GET /api/projects/:projectId/tags
+  router.get("/api/projects/:projectId/tags", (req, res) => {
+    res.json(listTags(db, req.params.projectId));
+  });
+
+  // POST /api/projects/:projectId/tags
+  router.post("/api/projects/:projectId/tags", (req, res) => {
+    const { name, color } = req.body as { name: string; color?: string };
+    if (!name) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+      res.status(400).json({ error: "color must be a hex color like #ff0000" });
+      return;
+    }
+    const tag = createTag(db, { project_id: req.params.projectId, name, color });
+    broadcast({ type: "tag_created", payload: tag });
+    res.status(201).json(tag);
+  });
+
+  // GET /api/tasks/:id/tags
+  router.get("/api/tasks/:id/tags", (req, res) => {
+    res.json(getTaskTags(db, req.params.id));
+  });
+
+  // POST /api/tasks/:id/tags
+  router.post("/api/tasks/:id/tags", (req, res) => {
+    const { tag_id } = req.body as { tag_id: string };
+    if (!tag_id) {
+      res.status(400).json({ error: "tag_id is required" });
+      return;
+    }
+    const taskTag = addTagToTask(db, req.params.id, tag_id);
+    broadcast({ type: "tag_added", payload: taskTag });
+    res.status(201).json(taskTag);
+  });
+
+  // DELETE /api/tasks/:id/tags/:tagId
+  router.delete("/api/tasks/:id/tags/:tagId", (req, res) => {
+    const removed = removeTagFromTask(db, req.params.id, req.params.tagId);
+    if (removed) {
+      broadcast({ type: "tag_removed", payload: { id: "", task_id: req.params.id, tag_id: req.params.tagId } });
+    }
+    res.json({ success: removed });
   });
 
   return router;

@@ -27,11 +27,13 @@ export interface Task {
   project_id: string;
   parent_task_id: string | null;
   sprint_id: string | null;
+  assigned_agent_id: string | null;
   title: string;
   description: string | null;
   status: TaskStatus;
   priority: TaskPriority;
   progress: number;
+  due_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +58,22 @@ export interface ActivityEntry {
   task_title?: string | null;
 }
 
+export type AgentHealthStatus = "active" | "idle" | "offline";
+
+export interface Tag {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+export interface TaskTag {
+  id: string;
+  task_id: string;
+  tag_id: string;
+}
+
 export interface Blocker {
   id: string;
   task_id: string;
@@ -69,14 +87,19 @@ export type WsEventType =
   | "task_created"
   | "task_updated"
   | "task_completed"
+  | "task_assigned"
+  | "task_unassigned"
   | "agent_registered"
   | "agent_activity"
   | "blocker_reported"
   | "blocker_resolved"
   | "sprint_created"
-  | "sprint_updated";
+  | "sprint_updated"
+  | "tag_created"
+  | "tag_added"
+  | "tag_removed";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag;
 }

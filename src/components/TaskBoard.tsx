@@ -3,7 +3,7 @@ import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDrawer } from "./TaskEditDrawer";
-import type { Task, Sprint, TaskStatus } from "../types";
+import type { Task, Sprint, TaskStatus, Agent, Tag } from "../types";
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "planned", label: "PLANNED" },
@@ -19,7 +19,7 @@ const COLUMN_COLORS: Record<TaskStatus, string> = {
 };
 
 export function TaskBoard() {
-  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity } = useAppState();
+  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -116,6 +116,9 @@ export function TaskBoard() {
             allTasks={tasks}
             sprints={projectSprints}
             activity={activity}
+            agents={agents}
+            tags={tags}
+            taskTagMap={taskTagMap}
             selectedProjectId={selectedProjectId}
             selectedSprintId={selectedSprintId}
             onDragStart={(id) => { dragTaskId.current = id; }}
@@ -193,6 +196,9 @@ interface ColumnProps {
   allTasks: Task[];
   sprints: Sprint[];
   activity: ReturnType<typeof useAppState>["activity"];
+  agents: Agent[];
+  tags: Tag[];
+  taskTagMap: Record<string, string[]>;
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   onDragStart: (id: string) => void;
@@ -209,6 +215,9 @@ function KanbanColumn({
   allTasks,
   sprints,
   activity,
+  agents,
+  tags,
+  taskTagMap,
   selectedProjectId,
   selectedSprintId,
   onDragStart,
@@ -318,6 +327,9 @@ function KanbanColumn({
               tasks={group.tasks}
               allTasks={allTasks}
               activity={activity}
+              agents={agents}
+              tags={tags}
+              taskTagMap={taskTagMap}
               onClickTask={onClickTask}
               onDragStart={onDragStart}
             />
@@ -329,6 +341,8 @@ function KanbanColumn({
               task={task}
               allTasks={allTasks}
               activity={activity}
+              agents={agents}
+              taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
               onClick={() => onClickTask(task)}
               onDragStart={onDragStart}
             />
@@ -422,11 +436,20 @@ function groupBySprint(tasks: Task[], sprints: Sprint[]): SprintGroupData[] {
   return result;
 }
 
+function resolveTaskTags(taskId: string, taskTagMap: Record<string, string[]>, tags: Tag[]): Tag[] {
+  const tagIds = taskTagMap[taskId];
+  if (!tagIds || tagIds.length === 0) return [];
+  return tagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => t !== undefined);
+}
+
 function SprintGroup({
   sprint,
   tasks,
   allTasks,
   activity,
+  agents,
+  tags,
+  taskTagMap,
   onClickTask,
   onDragStart,
 }: {
@@ -434,6 +457,9 @@ function SprintGroup({
   tasks: Task[];
   allTasks: Task[];
   activity: ReturnType<typeof useAppState>["activity"];
+  agents: Agent[];
+  tags: Tag[];
+  taskTagMap: Record<string, string[]>;
   onClickTask: (task: Task) => void;
   onDragStart: (id: string) => void;
 }) {
@@ -499,6 +525,8 @@ function SprintGroup({
             task={task}
             allTasks={allTasks}
             activity={activity}
+            agents={agents}
+            taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
             onClick={() => onClickTask(task)}
             onDragStart={onDragStart}
           />

@@ -95,6 +95,7 @@ export function createMcpServer(db: Database.Database): McpServer {
       project_id: z.string().optional(),
       status: STATUS_ENUM.optional(),
       parent_task_id: z.string().optional(),
+      assigned_agent_id: z.string().optional(),
     },
     call("list_tasks")
   );
@@ -111,9 +112,32 @@ export function createMcpServer(db: Database.Database): McpServer {
       progress: z.number().min(0).max(100).optional(),
       parent_task_id: z.string().nullable().optional(),
       sprint_id: z.string().nullable().optional(),
+      assigned_agent_id: z.string().nullable().optional(),
+      due_date: z.string().nullable().optional(),
       agent_name: z.string().optional(),
     },
     call("update_task")
+  );
+
+  server.tool(
+    "assign_task",
+    "Assign a task to an agent",
+    {
+      task_id: z.string(),
+      agent_id: z.string(),
+      agent_name: z.string().optional(),
+    },
+    call("assign_task")
+  );
+
+  server.tool(
+    "unassign_task",
+    "Remove agent assignment from a task",
+    {
+      task_id: z.string(),
+      agent_name: z.string().optional(),
+    },
+    call("unassign_task")
   );
 
   server.tool(
@@ -191,6 +215,55 @@ export function createMcpServer(db: Database.Database): McpServer {
       end_date: z.string().nullable().optional(),
     },
     call("update_sprint")
+  );
+
+  server.tool(
+    "create_tag",
+    "Create a project-scoped tag with a color",
+    {
+      project_id: z.string(),
+      name: z.string(),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    },
+    call("create_tag")
+  );
+
+  server.tool(
+    "list_tags",
+    "List tags for a project",
+    {
+      project_id: z.string(),
+    },
+    call("list_tags")
+  );
+
+  server.tool(
+    "add_tag",
+    "Add a tag to a task",
+    {
+      task_id: z.string(),
+      tag_id: z.string(),
+    },
+    call("add_tag")
+  );
+
+  server.tool(
+    "remove_tag",
+    "Remove a tag from a task",
+    {
+      task_id: z.string(),
+      tag_id: z.string(),
+    },
+    call("remove_tag")
+  );
+
+  server.tool(
+    "get_task_tags",
+    "Get all tags for a task",
+    {
+      task_id: z.string(),
+    },
+    call("get_task_tags")
   );
 
   return server;

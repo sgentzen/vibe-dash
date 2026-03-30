@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -60,7 +60,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id" | "assigned_agent_id" | "due_date">>
 ): Promise<Task> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -137,6 +137,45 @@ async function updateSprint(
   return res.json();
 }
 
+async function getTags(projectId: string): Promise<Tag[]> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/tags`);
+  if (!res.ok) throw new Error(`getTags failed: ${res.status}`);
+  return res.json();
+}
+
+async function createTag(projectId: string, data: { name: string; color?: string }): Promise<Tag> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/tags`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`createTag failed: ${res.status}`);
+  return res.json();
+}
+
+async function getTaskTags(taskId: string): Promise<Tag[]> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`);
+  if (!res.ok) throw new Error(`getTaskTags failed: ${res.status}`);
+  return res.json();
+}
+
+async function addTagToTask(taskId: string, tagId: string): Promise<TaskTag> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ tag_id: tagId }),
+  });
+  if (!res.ok) throw new Error(`addTagToTask failed: ${res.status}`);
+  return res.json();
+}
+
+async function removeTagFromTask(taskId: string, tagId: string): Promise<void> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`removeTagFromTask failed: ${res.status}`);
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -152,5 +191,10 @@ export function useApi() {
     getSprints,
     createSprint,
     updateSprint,
+    getTags,
+    createTag,
+    getTaskTags,
+    addTagToTask,
+    removeTagFromTask,
   }), []);
 }

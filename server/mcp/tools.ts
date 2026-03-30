@@ -15,6 +15,11 @@ import {
   createSprint,
   listSprints,
   updateSprint,
+  createTag,
+  listTags,
+  addTagToTask,
+  removeTagFromTask,
+  getTaskTags,
 } from "../db.js";
 
 import { broadcast } from "../websocket.js";
@@ -108,8 +113,31 @@ export async function handleTool(
         project_id: args.project_id as string | undefined,
         status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
         parent_task_id: args.parent_task_id as string | undefined,
+        assigned_agent_id: args.assigned_agent_id as string | undefined,
       });
       return ok({ tasks });
+    }
+
+    case "assign_task": {
+      const updated = updateTask(db, args.task_id as string, {
+        assigned_agent_id: args.agent_id as string,
+      });
+      if (updated) {
+        broadcast({ type: "task_assigned", payload: updated });
+        autoLog(db, updated.id, `Assigned to agent`, agentName);
+      }
+      return ok({ success: true });
+    }
+
+    case "unassign_task": {
+      const updated = updateTask(db, args.task_id as string, {
+        assigned_agent_id: null,
+      });
+      if (updated) {
+        broadcast({ type: "task_unassigned", payload: updated });
+        autoLog(db, updated.id, `Unassigned from agent`, agentName);
+      }
+      return ok({ success: true });
     }
 
     case "update_task": {
@@ -121,6 +149,8 @@ export async function handleTool(
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,
         sprint_id: args.sprint_id as string | null | undefined,
+        assigned_agent_id: args.assigned_agent_id as string | null | undefined,
+        due_date: args.due_date as string | null | undefined,
       });
       if (updated) {
         broadcast({ type: "task_updated", payload: updated });
@@ -203,6 +233,48 @@ export async function handleTool(
         broadcast({ type: "sprint_updated", payload: updated });
       }
       return ok({ success: true });
+    }
+
+    case "create_tag": {
+      const tag = createTag(db, {
+        project_id: args.project_id as string,
+        name: args.name as string,
+        color: args.color as string | undefined,
+      });
+      broadcast({ type: "tag_created", payload: tag });
+      return ok({ tag_id: tag.id });
+    }
+
+    case "list_tags": {
+      const tags = listTags(db, args.project_id as string);
+      return ok({ tags });
+    }
+
+    case "add_tag": {
+      const taskTag = addTagToTask(
+        db,
+        args.task_id as string,
+        args.tag_id as string
+      );
+      broadcast({ type: "tag_added", payload: taskTag });
+      return ok({ success: true });
+    }
+
+    case "remove_tag": {
+      const removed = removeTagFromTask(
+        db,
+        args.task_id as string,
+        args.tag_id as string
+      );
+      if (removed) {
+        broadcast({ type: "tag_removed", payload: { id: "", task_id: args.task_id as string, tag_id: args.tag_id as string } });
+      }
+      return ok({ success: removed });
+    }
+
+    case "get_task_tags": {
+      const tags = getTaskTags(db, args.task_id as string);
+      return ok({ tags });
     }
 
     default:

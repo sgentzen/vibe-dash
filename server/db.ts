@@ -7,9 +7,12 @@ import type {
   Agent,
   ActivityEntry,
   Blocker,
+  Tag,
+  TaskTag,
   TaskStatus,
   TaskPriority,
   SprintStatus,
+  AgentHealthStatus,
 } from "./types.js";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
@@ -53,6 +56,19 @@ const SCHEMA = [
   "  task_id TEXT NOT NULL REFERENCES tasks(id),",
   "  reason TEXT NOT NULL, reported_at TEXT NOT NULL, resolved_at TEXT",
   ");",
+  "CREATE TABLE IF NOT EXISTS tags (",
+  "  id TEXT PRIMARY KEY,",
+  "  project_id TEXT NOT NULL REFERENCES projects(id),",
+  "  name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#6366f1',",
+  "  created_at TEXT NOT NULL,",
+  "  UNIQUE(project_id, name)",
+  ");",
+  "CREATE TABLE IF NOT EXISTS task_tags (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  tag_id TEXT NOT NULL REFERENCES tags(id),",
+  "  UNIQUE(task_id, tag_id)",
+  ");",
 ].join("\n");
 
 export function initDb(db: Database.Database): void {
@@ -63,10 +79,15 @@ export function initDb(db: Database.Database): void {
 }
 
 function migrate(db: Database.Database): void {
-  // Add sprint_id column to tasks if missing (existing DBs before sprints feature)
   const cols = db.pragma("table_info(tasks)") as { name: string }[];
   if (!cols.some((c) => c.name === "sprint_id")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN sprint_id TEXT REFERENCES sprints(id)").run();
+  }
+  if (!cols.some((c) => c.name === "assigned_agent_id")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN assigned_agent_id TEXT REFERENCES agents(id)").run();
+  }
+  if (!cols.some((c) => c.name === "due_date")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN due_date TEXT").run();
   }
 }
 
@@ -201,10 +222,12 @@ export interface CreateTaskInput {
   project_id: string;
   parent_task_id?: string | null;
   sprint_id?: string | null;
+  assigned_agent_id?: string | null;
   title: string;
   description: string | null;
   priority: TaskPriority;
   status?: TaskStatus;
+  due_date?: string | null;
 }
 
 export function createTask(
@@ -214,20 +237,20 @@ export function createTask(
   const id = randomUUID();
   const ts = now();
   const status: TaskStatus = input.status ?? "planned";
-  const parent = input.parent_task_id ?? null;
-  const sprint = input.sprint_id ?? null;
   db.prepare(
-    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, title, description, status, priority, progress, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)"
+    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, status, priority, progress, due_date, created_at, updated_at)" +
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
   ).run(
     id,
     input.project_id,
-    parent,
-    sprint,
+    input.parent_task_id ?? null,
+    input.sprint_id ?? null,
+    input.assigned_agent_id ?? null,
     input.title,
     input.description ?? null,
     status,
     input.priority,
+    input.due_date ?? null,
     ts,
     ts
   );
@@ -247,6 +270,7 @@ export interface ListTasksFilter {
   status?: TaskStatus;
   parent_task_id?: string;
   sprint_id?: string;
+  assigned_agent_id?: string;
 }
 
 export function listTasks(
@@ -272,6 +296,10 @@ export function listTasks(
     conditions.push("sprint_id = ?");
     params.push(filter.sprint_id);
   }
+  if (filter?.assigned_agent_id !== undefined) {
+    conditions.push("assigned_agent_id = ?");
+    params.push(filter.assigned_agent_id);
+  }
 
   const where =
     conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
@@ -288,6 +316,8 @@ export interface UpdateTaskInput {
   progress?: number;
   parent_task_id?: string | null;
   sprint_id?: string | null;
+  assigned_agent_id?: string | null;
+  due_date?: string | null;
 }
 
 export function updateTask(
@@ -325,6 +355,14 @@ export function updateTask(
   if (input.sprint_id !== undefined) {
     sets.push("sprint_id = ?");
     params.push(input.sprint_id);
+  }
+  if (input.assigned_agent_id !== undefined) {
+    sets.push("assigned_agent_id = ?");
+    params.push(input.assigned_agent_id);
+  }
+  if (input.due_date !== undefined) {
+    sets.push("due_date = ?");
+    params.push(input.due_date);
   }
 
   if (sets.length === 0) return getTask(db, id);
@@ -497,4 +535,78 @@ export function getActiveBlockers(db: Database.Database): Blocker[] {
       "SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY reported_at ASC"
     )
     .all() as Blocker[];
+}
+
+// ─── Agent Health ────────────────────────────────────────────────────────────
+
+const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
+const IDLE_THRESHOLD_MS = 30 * 60 * 1000;
+
+export function getAgentHealthStatus(lastSeenAt: string): AgentHealthStatus {
+  const elapsed = Date.now() - new Date(lastSeenAt).getTime();
+  if (elapsed < ACTIVE_THRESHOLD_MS) return "active";
+  if (elapsed < IDLE_THRESHOLD_MS) return "idle";
+  return "offline";
+}
+
+// ─── Tags ────────────────────────────────────────────────────────────────────
+
+export interface CreateTagInput {
+  project_id: string;
+  name: string;
+  color?: string;
+}
+
+export function createTag(db: Database.Database, input: CreateTagInput): Tag {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO tags (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(id, input.project_id, input.name, input.color ?? "#6366f1", ts);
+  return db.prepare("SELECT * FROM tags WHERE id = ?").get(id) as Tag;
+}
+
+export function listTags(db: Database.Database, projectId: string): Tag[] {
+  return db
+    .prepare("SELECT * FROM tags WHERE project_id = ? ORDER BY name ASC")
+    .all(projectId) as Tag[];
+}
+
+export function addTagToTask(
+  db: Database.Database,
+  taskId: string,
+  tagId: string
+): TaskTag {
+  const id = randomUUID();
+  db.prepare(
+    "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)"
+  ).run(id, taskId, tagId);
+  return db
+    .prepare("SELECT * FROM task_tags WHERE task_id = ? AND tag_id = ?")
+    .get(taskId, tagId) as TaskTag;
+}
+
+export function removeTagFromTask(
+  db: Database.Database,
+  taskId: string,
+  tagId: string
+): boolean {
+  const result = db
+    .prepare("DELETE FROM task_tags WHERE task_id = ? AND tag_id = ?")
+    .run(taskId, tagId);
+  return result.changes > 0;
+}
+
+export function getTaskTags(db: Database.Database, taskId: string): Tag[] {
+  return db
+    .prepare(
+      "SELECT t.* FROM tags t JOIN task_tags tt ON t.id = tt.tag_id WHERE tt.task_id = ? ORDER BY t.name ASC"
+    )
+    .all(taskId) as Tag[];
+}
+
+export function getTag(db: Database.Database, id: string): Tag | null {
+  return (
+    (db.prepare("SELECT * FROM tags WHERE id = ?").get(id) as Tag | undefined) ?? null
+  );
 }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, WsEvent } from "./types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, WsEvent } from "./types";
 
 export interface AppState {
   projects: Project[];
@@ -8,6 +8,8 @@ export interface AppState {
   agents: Agent[];
   activity: ActivityEntry[];
   blockers: Blocker[];
+  tags: Tag[];
+  taskTagMap: Record<string, string[]>; // task_id -> tag_id[]
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   stats: {
@@ -25,6 +27,8 @@ const initialState: AppState = {
   agents: [],
   activity: [],
   blockers: [],
+  tags: [],
+  taskTagMap: {},
   selectedProjectId: null,
   selectedSprintId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
@@ -37,6 +41,8 @@ export type AppAction =
   | { type: "SET_AGENTS"; payload: Agent[] }
   | { type: "SET_ACTIVITY"; payload: ActivityEntry[] }
   | { type: "SET_BLOCKERS"; payload: Blocker[] }
+  | { type: "SET_TAGS"; payload: Tag[] }
+  | { type: "SET_TASK_TAG_MAP"; payload: Record<string, string[]> }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_SPRINT"; payload: string | null }
@@ -56,6 +62,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, activity: action.payload };
     case "SET_BLOCKERS":
       return { ...state, blockers: action.payload };
+    case "SET_TAGS":
+      return { ...state, tags: action.payload };
+    case "SET_TASK_TAG_MAP":
+      return { ...state, taskTagMap: action.payload };
     case "SET_STATS":
       return { ...state, stats: action.payload };
     case "SELECT_PROJECT":
@@ -129,6 +139,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
             sprints: state.sprints.map((s) =>
               s.id === updatedSprint.id ? updatedSprint : s
             ),
+          };
+        }
+        case "tag_created": {
+          const tag = event.payload as Tag;
+          return {
+            ...state,
+            tags: [...state.tags, tag],
+          };
+        }
+        case "tag_added": {
+          const tt = event.payload as TaskTag;
+          const existing = state.taskTagMap[tt.task_id] ?? [];
+          if (existing.includes(tt.tag_id)) return state;
+          return {
+            ...state,
+            taskTagMap: { ...state.taskTagMap, [tt.task_id]: [...existing, tt.tag_id] },
+          };
+        }
+        case "tag_removed": {
+          const tt = event.payload as TaskTag;
+          const current = state.taskTagMap[tt.task_id] ?? [];
+          return {
+            ...state,
+            taskTagMap: { ...state.taskTagMap, [tt.task_id]: current.filter((id) => id !== tt.tag_id) },
           };
         }
         default:
