@@ -47,6 +47,8 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS agents (",
   "  id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, model TEXT,",
   "  capabilities TEXT NOT NULL DEFAULT '[]',",
+  "  role TEXT NOT NULL DEFAULT 'agent',",
+  "  parent_agent_id TEXT REFERENCES agents(id),",
   "  registered_at TEXT NOT NULL, last_seen_at TEXT NOT NULL",
   ");",
   "CREATE TABLE IF NOT EXISTS activity_log (",
@@ -117,6 +119,15 @@ function migrate(db: Database.Database): void {
   if (!cols.some((c) => c.name === "estimate")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN estimate INTEGER").run();
   }
+
+  // Agent migrations
+  const agentCols = db.pragma("table_info(agents)") as { name: string }[];
+  if (!agentCols.some((c) => c.name === "role")) {
+    db.prepare("ALTER TABLE agents ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'").run();
+  }
+  if (!agentCols.some((c) => c.name === "parent_agent_id")) {
+    db.prepare("ALTER TABLE agents ADD COLUMN parent_agent_id TEXT REFERENCES agents(id)").run();
+  }
 }
 
 export function openDb(path: string): Database.Database {
@@ -133,8 +144,10 @@ function now(): string {
 
 function parseAgent(row: Record<string, unknown>): Agent {
   return {
-    ...(row as Omit<Agent, "capabilities">),
+    ...(row as Omit<Agent, "capabilities" | "role">),
     capabilities: JSON.parse(row.capabilities as string) as string[],
+    role: (row.role as Agent["role"]) ?? "agent",
+    parent_agent_id: (row.parent_agent_id as string) ?? null,
   };
 }
 
@@ -422,6 +435,8 @@ export interface RegisterAgentInput {
   name: string;
   model: string | null;
   capabilities: string[];
+  role?: Agent["role"];
+  parent_agent_name?: string;
 }
 
 export function registerAgent(
@@ -430,19 +445,28 @@ export function registerAgent(
 ): Agent {
   const ts = now();
   const capJson = JSON.stringify(input.capabilities);
+  const role = input.role ?? "agent";
+
+  // Resolve parent agent by name
+  let parentAgentId: string | null = null;
+  if (input.parent_agent_name) {
+    const parent = getAgentByName(db, input.parent_agent_name);
+    if (parent) parentAgentId = parent.id;
+  }
+
   const existing = db
     .prepare("SELECT * FROM agents WHERE name = ?")
     .get(input.name) as Record<string, unknown> | undefined;
 
   if (existing) {
     db.prepare(
-      "UPDATE agents SET model = ?, capabilities = ?, last_seen_at = ? WHERE name = ?"
-    ).run(input.model ?? null, capJson, ts, input.name);
+      "UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), last_seen_at = ? WHERE name = ?"
+    ).run(input.model ?? null, capJson, role, parentAgentId, ts, input.name);
   } else {
     const id = randomUUID();
     db.prepare(
-      "INSERT INTO agents (id, name, model, capabilities, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run(id, input.name, input.model ?? null, capJson, ts, ts);
+      "INSERT INTO agents (id, name, model, capabilities, role, parent_agent_id, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(id, input.name, input.model ?? null, capJson, role, parentAgentId, ts, ts);
   }
 
   const row = db

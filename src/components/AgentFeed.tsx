@@ -1,6 +1,6 @@
 import { useAppState } from "../store";
-import { agentColor } from "../utils/agentColors";
-import type { AgentHealthStatus } from "../types";
+import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
+import type { Agent, AgentHealthStatus } from "../types";
 
 const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
@@ -38,10 +38,7 @@ const HEALTH_LABELS: Record<AgentHealthStatus, string> = {
 
 export function AgentFeed() {
   const { agents, activity } = useAppState();
-
-  const sortedAgents = [...agents].sort(
-    (a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime()
-  );
+  const groups = groupAgents(agents);
 
   const now = Date.now();
   const recentActivity = activity.filter(
@@ -80,7 +77,7 @@ export function AgentFeed() {
           Active Agents
         </div>
 
-        {sortedAgents.length === 0 ? (
+        {groups.length === 0 ? (
           <div
             style={{
               color: "var(--text-muted)",
@@ -92,83 +89,29 @@ export function AgentFeed() {
             No active agents
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {sortedAgents.map((agent) => {
-              const health = getHealthStatus(agent.last_seen_at);
-              const healthColor = HEALTH_COLORS[health];
-              const color = agentColor(agent.name);
-              const isActive = health === "active";
-              return (
-                <div
-                  key={agent.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "8px",
-                    opacity: health === "offline" ? 0.5 : 1,
-                  }}
-                >
-                  <span
-                    className={isActive ? "pulse-dot" : undefined}
-                    title={HEALTH_LABELS[health]}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {groups.map(({ parent, children }) => (
+              <div key={parent.id}>
+                <AgentRow agent={parent} indent={false} />
+                {children.length > 0 && (
+                  <div
                     style={{
+                      marginLeft: "16px",
+                      borderLeft: `2px solid ${agentColor(parent.name)}`,
+                      paddingLeft: "8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
                       marginTop: "4px",
-                      flexShrink: 0,
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: healthColor,
-                      display: "inline-block",
                     }}
-                  />
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        color: isActive ? color : health === "idle" ? "var(--text-secondary)" : "var(--text-muted)",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {agent.name}
-                    </div>
-                    {agent.model && (
-                      <div
-                        style={{
-                          color: "var(--text-muted)",
-                          fontSize: "11px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {agent.model}
-                      </div>
-                    )}
-                    {agent.current_task_title && isActive && (
-                      <div
-                        style={{
-                          color: "var(--text-muted)",
-                          fontSize: "11px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          marginTop: "1px",
-                        }}
-                      >
-                        <span style={{ color: "var(--text-muted)", opacity: 0.7 }}>Working on: </span>
-                        <span style={{ color: "var(--text-primary)" }}>{agent.current_task_title}</span>
-                      </div>
-                    )}
-                    <div style={{ color: "var(--text-muted)", fontSize: "10px" }}>
-                      {HEALTH_LABELS[health]} · {relativeTime(agent.last_seen_at)}
-                    </div>
+                  >
+                    {children.map((child) => (
+                      <AgentRow key={child.id} agent={child} indent={true} />
+                    ))}
                   </div>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -258,5 +201,125 @@ export function AgentFeed() {
         </div>
       </div>
     </aside>
+  );
+}
+
+function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
+  const health = getHealthStatus(agent.last_seen_at);
+  const healthColor = HEALTH_COLORS[health];
+  const color = agentColor(agent.name);
+  const isActive = health === "active";
+  const roleColor = ROLE_COLORS[agent.role ?? "agent"];
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "8px",
+        opacity: health === "offline" ? 0.5 : 1,
+      }}
+    >
+      {/* Avatar with initial */}
+      <div
+        style={{
+          width: indent ? "22px" : "26px",
+          height: indent ? "22px" : "26px",
+          borderRadius: "50%",
+          background: color,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontWeight: 700,
+          fontSize: indent ? "10px" : "11px",
+          flexShrink: 0,
+          position: "relative",
+        }}
+      >
+        {agent.name.charAt(0).toUpperCase()}
+        {/* Health dot overlay */}
+        <span
+          className={isActive ? "pulse-dot" : undefined}
+          style={{
+            position: "absolute",
+            bottom: "-1px",
+            right: "-1px",
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            background: healthColor,
+            border: "2px solid var(--bg-secondary)",
+          }}
+        />
+      </div>
+
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span
+            style={{
+              color: isActive ? color : health === "idle" ? "var(--text-secondary)" : "var(--text-muted)",
+              fontSize: indent ? "12px" : "13px",
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {agent.name}
+          </span>
+          {/* Role badge */}
+          {agent.role && agent.role !== "agent" && (
+            <span
+              style={{
+                fontSize: "9px",
+                padding: "0 4px",
+                borderRadius: "3px",
+                background: `color-mix(in srgb, ${roleColor} 15%, transparent)`,
+                color: roleColor,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                whiteSpace: "nowrap",
+                lineHeight: "16px",
+              }}
+            >
+              {agent.role}
+            </span>
+          )}
+        </div>
+        {agent.model && (
+          <div
+            style={{
+              color: "var(--text-muted)",
+              fontSize: "11px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {agent.model}
+          </div>
+        )}
+        {agent.current_task_title && isActive && (
+          <div
+            style={{
+              color: "var(--text-muted)",
+              fontSize: "11px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              marginTop: "1px",
+            }}
+          >
+            <span style={{ color: "var(--text-muted)", opacity: 0.7 }}>Working on: </span>
+            <span style={{ color: "var(--text-primary)" }}>{agent.current_task_title}</span>
+          </div>
+        )}
+        <div style={{ color: "var(--text-muted)", fontSize: "10px" }}>
+          {HEALTH_LABELS[health]} · {relativeTime(agent.last_seen_at)}
+        </div>
+      </div>
+    </div>
   );
 }
