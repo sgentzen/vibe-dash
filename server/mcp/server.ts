@@ -2,12 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
-import { registerAgent } from "../db.js";
+import { registerAgent, touchAgent } from "../db.js";
 import { broadcast } from "../websocket.js";
 
 const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
 const PRIORITY_ENUM = z.enum(["low", "medium", "high", "urgent"]);
 const SPRINT_STATUS_ENUM = z.enum(["planned", "active", "completed"]);
+const AGENT_ROLE_ENUM = z.enum(["orchestrator", "coder", "reviewer", "explorer", "planner", "agent"]);
 
 export function createMcpServer(db: Database.Database): McpServer {
   const server = new McpServer({ name: "vibe-dash", version: "0.1.0" });
@@ -31,8 +32,14 @@ export function createMcpServer(db: Database.Database): McpServer {
   }
 
   function call(toolName: string) {
-    return async (args: Record<string, unknown>) =>
-      handleTool(db, toolName, args, clientName());
+    return async (args: Record<string, unknown>) => {
+      // Touch agent on every tool call to keep last_seen_at fresh
+      const name = clientName();
+      if (name) {
+        touchAgent(db, name);
+      }
+      return handleTool(db, toolName, args, name);
+    };
   }
 
   server.tool(
@@ -42,6 +49,8 @@ export function createMcpServer(db: Database.Database): McpServer {
       name: z.string(),
       model: z.string().optional(),
       capabilities: z.array(z.string()).optional(),
+      role: AGENT_ROLE_ENUM.optional(),
+      parent_agent_name: z.string().optional(),
     },
     call("register_agent")
   );

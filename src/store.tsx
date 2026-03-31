@@ -107,18 +107,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
             projects: [...state.projects, event.payload as Project],
             stats: { ...state.stats, projects: state.stats.projects + 1 },
           };
-        case "task_created":
+        case "task_created": {
+          const newTask = event.payload as Task;
           return {
             ...state,
-            tasks: [...state.tasks, event.payload as Task],
-            stats: { ...state.stats, tasks: state.stats.tasks + 1 },
+            tasks: [...state.tasks, newTask],
+            stats: {
+              ...state.stats,
+              tasks: newTask.status === "done" ? state.stats.tasks : state.stats.tasks + 1,
+            },
           };
+        }
         case "task_updated":
         case "task_completed": {
           const updated = event.payload as Task;
+          const prev = state.tasks.find((t) => t.id === updated.id);
+          const wasDone = prev?.status === "done";
+          const nowDone = updated.status === "done";
+          let tasksDelta = 0;
+          if (!wasDone && nowDone) tasksDelta = -1;
+          if (wasDone && !nowDone) tasksDelta = 1;
           return {
             ...state,
             tasks: state.tasks.map((t) => (t.id === updated.id ? updated : t)),
+            stats: { ...state.stats, tasks: state.stats.tasks + tasksDelta },
           };
         }
         case "agent_registered": {
