@@ -1,0 +1,48 @@
+{
+  "mcpServers": {
+    "vibe-dash": {
+      "command": "npx",
+      "args": ["tsx", "C:/Users/sgent/projects/vibe-dash/server/mcp/stdio.ts"]
+    }
+  },
+    "memory": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/local-directory:/local-directory",
+        "mcp/memory"
+      ]
+    },
+    "mcp-python-refactoring": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp/mcp-python-refactoring"
+      ]
+    },
+    "context7": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp/context7"
+      ]
+    },
+    "git": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/local-directory:/local-directory",
+        "mcp/git"
+      ]
+    }
+}
