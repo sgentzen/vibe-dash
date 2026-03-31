@@ -9,7 +9,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
 const db = openDb(DB_PATH);
-const server = createMcpServer(db);
+const handle = createMcpServer(db);
 
 const transport = new StdioServerTransport();
-await server.connect(transport);
+process.on("exit", () => handle.cleanup());
+await handle.server.connect(transport);

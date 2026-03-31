@@ -24,11 +24,14 @@ app.use(createRouter(db));
 const transports = new Map<string, SSEServerTransport>();
 
 app.get("/sse", async (req, res) => {
-  const mcpServer = createMcpServer(db);
   const transport = new SSEServerTransport("/messages", res);
+  const handle = createMcpServer(db, transport.sessionId);
   transports.set(transport.sessionId, transport);
-  res.on("close", () => { transports.delete(transport.sessionId); });
-  await mcpServer.connect(transport);
+  res.on("close", () => {
+    transports.delete(transport.sessionId);
+    handle.cleanup();
+  });
+  await handle.server.connect(transport);
 });
 
 app.post("/messages", async (req, res) => {

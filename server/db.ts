@@ -735,11 +735,25 @@ export function startOrGetSession(db: Database.Database, agentId: string): Agent
   return db.prepare("SELECT * FROM agent_sessions WHERE id = ?").get(id) as AgentSession;
 }
 
+export function closeAgentSessions(db: Database.Database, agentId: string): void {
+  db.prepare("UPDATE agent_sessions SET ended_at = ? WHERE agent_id = ? AND ended_at IS NULL").run(now(), agentId);
+}
+
 export function closeStaleSession(db: Database.Database): number {
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
   const result = db.prepare(
     "UPDATE agent_sessions SET ended_at = ? WHERE ended_at IS NULL AND started_at < ?"
   ).run(now(), cutoff);
+  return result.changes;
+}
+
+/** Remove agents with no open sessions whose last_seen_at is older than the idle threshold */
+export function cleanupStaleAgents(db: Database.Database): number {
+  const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
+  const result = db.prepare(
+    `DELETE FROM agents WHERE last_seen_at < ?
+     AND id NOT IN (SELECT agent_id FROM agent_sessions WHERE ended_at IS NULL)`
+  ).run(cutoff);
   return result.changes;
 }
 

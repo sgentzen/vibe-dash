@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
-import { registerAgent, touchAgent } from "../db.js";
+import { registerAgent, touchAgent, startOrGetSession, closeAgentSessions, closeStaleSession, cleanupStaleAgents } from "../db.js";
 import { broadcast } from "../websocket.js";
 
 const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
@@ -10,36 +10,57 @@ const PRIORITY_ENUM = z.enum(["low", "medium", "high", "urgent"]);
 const SPRINT_STATUS_ENUM = z.enum(["planned", "active", "completed"]);
 const AGENT_ROLE_ENUM = z.enum(["orchestrator", "coder", "reviewer", "explorer", "planner", "agent"]);
 
-export function createMcpServer(db: Database.Database): McpServer {
+export interface McpServerHandle {
+  server: McpServer;
+  /** Call on transport close to end the agent session */
+  cleanup: () => void;
+}
+
+export function createMcpServer(db: Database.Database, connectionId?: string): McpServerHandle {
   const server = new McpServer({ name: "vibe-dash", version: "0.1.0" });
+
+  // Connection-unique suffix so each MCP client gets its own agent record
+  const suffix = connectionId ? connectionId.slice(0, 8) : Math.random().toString(36).slice(2, 10);
+  let agentName: string | undefined;
+  let agentId: string | undefined;
 
   // Register the MCP client as an agent as soon as it connects
   server.server.oninitialized = () => {
+    // Housekeeping: close stale sessions and remove orphaned agents
+    closeStaleSession(db);
+    cleanupStaleAgents(db);
+
     const info = server.server.getClientVersion();
     if (info) {
+      agentName = `${info.name}-${suffix}`;
       const agent = registerAgent(db, {
-        name: info.name,
+        name: agentName,
         model: info.version ? `${info.name}/${info.version}` : null,
         capabilities: [],
       });
+      agentId = agent.id;
+      startOrGetSession(db, agent.id);
       broadcast({ type: "agent_registered", payload: agent });
     }
   };
 
-  /** Resolve connected MCP client name for automatic agent registration */
-  function clientName(): string | undefined {
-    return server.server.getClientVersion()?.name;
-  }
-
   function call(toolName: string) {
     return async (args: Record<string, unknown>) => {
       // Touch agent on every tool call to keep last_seen_at fresh
-      const name = clientName();
-      if (name) {
-        touchAgent(db, name);
+      if (agentName) {
+        touchAgent(db, agentName);
       }
-      return handleTool(db, toolName, args, name);
+      if (agentId) {
+        startOrGetSession(db, agentId);
+      }
+      return handleTool(db, toolName, args, agentName);
     };
+  }
+
+  function cleanup() {
+    if (agentId) {
+      closeAgentSessions(db, agentId);
+    }
   }
 
   server.tool(
@@ -347,5 +368,5 @@ export function createMcpServer(db: Database.Database): McpServer {
     call("get_agent_detail")
   );
 
-  return server;
+  return { server, cleanup };
 }
