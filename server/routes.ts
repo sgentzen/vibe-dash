@@ -40,6 +40,22 @@ import {
   createSavedFilter,
   listSavedFilters,
   deleteSavedFilter,
+  addComment,
+  listComments,
+  reportWorkingOn,
+  releaseFileLocks,
+  getActiveFileLocks,
+  getFileConflicts,
+  createAlertRule,
+  listAlertRules,
+  toggleAlertRule,
+  deleteAlertRule,
+  listNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  getUnreadNotificationCount,
+  evaluateAlertRules,
+  bulkUpdateTasks,
 } from "./db.js";
 import { broadcast } from "./websocket.js";
 
@@ -158,6 +174,16 @@ export function createRouter(db: Database.Database): Router {
     res.status(201).json(task);
   });
 
+  // PATCH /api/tasks/bulk (must be before :id param route)
+  router.patch("/api/tasks/bulk", (req, res) => {
+    const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
+    if (!task_ids?.length || !updates) { res.status(400).json({ error: "task_ids and updates are required" }); return; }
+    if (task_ids.length > 200) { res.status(400).json({ error: "Maximum 200 tasks per bulk update" }); return; }
+    const tasks = bulkUpdateTasks(db, task_ids, updates as any);
+    for (const t of tasks) broadcast({ type: "task_updated", payload: t });
+    res.json({ updated: tasks.length, tasks });
+  });
+
   // GET /api/tasks/search (must be before :id param route)
   router.get("/api/tasks/search", (req, res) => {
     const q = req.query as Record<string, string | undefined>;
@@ -221,6 +247,8 @@ export function createRouter(db: Database.Database): Router {
     }
     const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
+    const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
+    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     const entry = logActivity(db, {
       task_id: completed!.id,
       agent_id: null,
@@ -273,6 +301,8 @@ export function createRouter(db: Database.Database): Router {
     const task = getTask(db, task_id);
     broadcast({ type: "blocker_reported", payload: blocker });
     if (task) broadcast({ type: "task_updated", payload: task });
+    const alertNotifs = evaluateAlertRules(db, "blocker_reported", { task_id, priority: task?.priority });
+    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     res.status(201).json(blocker);
   });
 
@@ -463,6 +493,93 @@ export function createRouter(db: Database.Database): Router {
 
   router.delete("/api/filters/:id", (req, res) => {
     res.json({ success: deleteSavedFilter(db, req.params.id) });
+  });
+
+  // ─── R3: Task Comments ──────────────────────────────────────────────
+
+  router.get("/api/tasks/:id/comments", (req, res) => {
+    res.json(listComments(db, req.params.id));
+  });
+
+  router.post("/api/tasks/:id/comments", (req, res) => {
+    const { message, author_name, agent_id } = req.body as { message: string; author_name: string; agent_id?: string };
+    if (!message || !author_name) { res.status(400).json({ error: "message and author_name are required" }); return; }
+    const comment = addComment(db, req.params.id, message, author_name, agent_id);
+    broadcast({ type: "comment_added", payload: comment });
+
+    // Evaluate alert rules for comment events
+    const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id });
+    for (const n of notifications) broadcast({ type: "notification_created", payload: n });
+
+    res.status(201).json(comment);
+  });
+
+  // ─── R3: Agent File Locks ──────────────────────────────────────────
+
+  router.post("/api/agents/:id/file-locks", (req, res) => {
+    const { task_id, file_paths } = req.body as { task_id: string; file_paths: string[] };
+    if (!task_id || !file_paths?.length) { res.status(400).json({ error: "task_id and file_paths are required" }); return; }
+    const locks = reportWorkingOn(db, req.params.id, task_id, file_paths);
+    for (const lock of locks) broadcast({ type: "file_lock_acquired", payload: lock });
+    const conflicts = getFileConflicts(db);
+    for (const c of conflicts) broadcast({ type: "file_conflict_detected", payload: c });
+    res.status(201).json({ locks, conflicts });
+  });
+
+  router.delete("/api/agents/:id/file-locks", (req, res) => {
+    const taskId = req.query.task_id as string | undefined;
+    const released = releaseFileLocks(db, req.params.id, taskId);
+    res.json({ released });
+  });
+
+  router.get("/api/file-locks", (_req, res) => {
+    res.json(getActiveFileLocks(db));
+  });
+
+  router.get("/api/file-locks/conflicts", (_req, res) => {
+    res.json(getFileConflicts(db));
+  });
+
+  // ─── R3: Alert Rules ───────────────────────────────────────────────
+
+  router.get("/api/alert-rules", (_req, res) => {
+    res.json(listAlertRules(db));
+  });
+
+  router.post("/api/alert-rules", (req, res) => {
+    const { event_type, filter_json } = req.body as { event_type: string; filter_json?: string };
+    if (!event_type) { res.status(400).json({ error: "event_type is required" }); return; }
+    res.status(201).json(createAlertRule(db, event_type, filter_json));
+  });
+
+  router.patch("/api/alert-rules/:id", (req, res) => {
+    const { enabled } = req.body as { enabled: boolean };
+    const rule = toggleAlertRule(db, req.params.id, enabled);
+    if (!rule) { res.status(404).json({ error: "Rule not found" }); return; }
+    res.json(rule);
+  });
+
+  router.delete("/api/alert-rules/:id", (req, res) => {
+    res.json({ success: deleteAlertRule(db, req.params.id) });
+  });
+
+  // ─── R3: Notifications ─────────────────────────────────────────────
+
+  router.get("/api/notifications", (req, res) => {
+    const limit = parseInt((req.query.limit as string) ?? "50", 10);
+    res.json(listNotifications(db, isNaN(limit) ? 50 : limit));
+  });
+
+  router.get("/api/notifications/unread-count", (_req, res) => {
+    res.json({ count: getUnreadNotificationCount(db) });
+  });
+
+  router.patch("/api/notifications/:id/read", (req, res) => {
+    res.json({ success: markNotificationRead(db, req.params.id) });
+  });
+
+  router.post("/api/notifications/mark-all-read", (_req, res) => {
+    res.json({ marked: markAllNotificationsRead(db) });
   });
 
   return router;

@@ -107,6 +107,44 @@ export interface SprintCapacity {
   completed_count: number;
 }
 
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  agent_id: string | null;
+  author_name: string;
+  message: string;
+  created_at: string;
+}
+
+export interface AgentFileLock {
+  id: string;
+  agent_id: string;
+  task_id: string;
+  file_path: string;
+  started_at: string;
+}
+
+export interface FileConflict {
+  file_path: string;
+  agents: { agent_id: string; agent_name: string; task_id: string }[];
+}
+
+export interface AlertRule {
+  id: string;
+  event_type: string;
+  filter_json: string;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  rule_id: string | null;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
 export interface Blocker {
   id: string;
   task_id: string;
@@ -134,9 +172,13 @@ export type WsEventType =
   | "dependency_added"
   | "dependency_removed"
   | "session_started"
-  | "session_ended";
+  | "session_ended"
+  | "comment_added"
+  | "file_lock_acquired"
+  | "file_conflict_detected"
+  | "notification_created";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification;
 }

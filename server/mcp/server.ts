@@ -338,5 +338,75 @@ export function createMcpServer(db: Database.Database): McpServer {
     call("get_agent_detail")
   );
 
+  // ─── R3: Comments ───────────────────────────────────────────────────────
+
+  server.tool(
+    "add_comment",
+    "Add a comment to a task",
+    {
+      task_id: z.string(),
+      message: z.string(),
+      agent_name: z.string(),
+      agent_id: z.string().optional(),
+    },
+    call("add_comment")
+  );
+
+  server.tool(
+    "list_comments",
+    "List comments for a task",
+    {
+      task_id: z.string(),
+    },
+    call("list_comments")
+  );
+
+  // ─── R3: File Locks ────────────────────────────────────────────────────
+
+  server.tool(
+    "report_working_on",
+    "Declare files an agent is working on for conflict detection",
+    {
+      agent_id: z.string(),
+      task_id: z.string(),
+      file_paths: z.array(z.string()),
+    },
+    call("report_working_on")
+  );
+
+  // ─── R3: Notifications ─────────────────────────────────────────────────
+
+  server.tool(
+    "list_notifications",
+    "List recent notifications",
+    {
+      limit: z.number().int().min(1).max(200).optional(),
+    },
+    call("list_notifications")
+  );
+
+  server.tool(
+    "mark_notification_read",
+    "Mark a notification as read",
+    {
+      notification_id: z.string(),
+    },
+    call("mark_notification_read")
+  );
+
+  // ─── R3: Bulk Update ───────────────────────────────────────────────────
+
+  server.tool(
+    "bulk_update_tasks",
+    "Update multiple tasks at once",
+    {
+      task_ids: z.array(z.string()),
+      status: STATUS_ENUM.optional(),
+      priority: PRIORITY_ENUM.optional(),
+      assigned_agent_id: z.string().nullable().optional(),
+    },
+    call("bulk_update_tasks")
+  );
+
   return server;
 }

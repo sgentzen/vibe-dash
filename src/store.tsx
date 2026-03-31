@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, WsEvent } from "./types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, TaskComment, FileConflict, AppNotification, WsEvent } from "./types";
 
 export interface AppState {
   projects: Project[];
@@ -11,8 +11,11 @@ export interface AppState {
   tags: Tag[];
   taskTagMap: Record<string, string[]>; // task_id -> tag_id[]
   taskDepsMap: Record<string, string[]>; // task_id -> depends_on_task_id[]
+  notifications: AppNotification[];
+  unreadCount: number;
+  fileConflicts: FileConflict[];
   searchQuery: string;
-  activeView: "board" | "agents";
+  activeView: "board" | "agents" | "list";
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   stats: {
@@ -33,6 +36,9 @@ const initialState: AppState = {
   tags: [],
   taskTagMap: {},
   taskDepsMap: {},
+  notifications: [],
+  unreadCount: 0,
+  fileConflicts: [],
   searchQuery: "",
   activeView: "board",
   selectedProjectId: null,
@@ -51,7 +57,10 @@ export type AppAction =
   | { type: "SET_TASK_TAG_MAP"; payload: Record<string, string[]> }
   | { type: "SET_TASK_DEPS_MAP"; payload: Record<string, string[]> }
   | { type: "SET_SEARCH_QUERY"; payload: string }
-  | { type: "SET_ACTIVE_VIEW"; payload: "board" | "agents" }
+  | { type: "SET_ACTIVE_VIEW"; payload: "board" | "agents" | "list" }
+  | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
+  | { type: "SET_UNREAD_COUNT"; payload: number }
+  | { type: "SET_FILE_CONFLICTS"; payload: FileConflict[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_SPRINT"; payload: string | null }
@@ -81,6 +90,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, searchQuery: action.payload };
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
+    case "SET_NOTIFICATIONS":
+      return { ...state, notifications: action.payload };
+    case "SET_UNREAD_COUNT":
+      return { ...state, unreadCount: action.payload };
+    case "SET_FILE_CONFLICTS":
+      return { ...state, fileConflicts: action.payload };
     case "SET_STATS":
       return { ...state, stats: action.payload };
     case "SELECT_PROJECT":
@@ -189,6 +204,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
             taskDepsMap: { ...state.taskDepsMap, [dep.task_id]: [...existing, dep.depends_on_task_id] },
           };
         }
+        case "comment_added":
+          return state; // comments are loaded on demand per task
+        case "notification_created": {
+          const notif = event.payload as AppNotification;
+          return {
+            ...state,
+            notifications: [notif, ...state.notifications],
+            unreadCount: state.unreadCount + 1,
+          };
+        }
+        case "file_conflict_detected": {
+          const conflict = event.payload as FileConflict;
+          const existing = state.fileConflicts.filter((c) => c.file_path !== conflict.file_path);
+          return { ...state, fileConflicts: [...existing, conflict] };
+        }
+        case "file_lock_acquired":
+          return state; // locks managed via conflicts
         case "dependency_removed": {
           const dep = event.payload as TaskDependency;
           const deps = state.taskDepsMap[dep.task_id] ?? [];

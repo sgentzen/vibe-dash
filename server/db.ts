@@ -13,6 +13,11 @@ import type {
   TaskDependency,
   SavedFilter,
   SprintCapacity,
+  TaskComment,
+  AgentFileLock,
+  FileConflict,
+  AlertRule,
+  AppNotification,
   TaskStatus,
   TaskPriority,
   SprintStatus,
@@ -92,6 +97,36 @@ const SCHEMA = [
   "  id TEXT PRIMARY KEY,",
   "  name TEXT NOT NULL,",
   "  filter_json TEXT NOT NULL,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS task_comments (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  agent_id TEXT REFERENCES agents(id),",
+  "  author_name TEXT NOT NULL,",
+  "  message TEXT NOT NULL,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS agent_file_locks (",
+  "  id TEXT PRIMARY KEY,",
+  "  agent_id TEXT NOT NULL REFERENCES agents(id),",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  file_path TEXT NOT NULL,",
+  "  started_at TEXT NOT NULL,",
+  "  UNIQUE(agent_id, file_path)",
+  ");",
+  "CREATE TABLE IF NOT EXISTS alert_rules (",
+  "  id TEXT PRIMARY KEY,",
+  "  event_type TEXT NOT NULL,",
+  "  filter_json TEXT NOT NULL DEFAULT '{}',",
+  "  enabled INTEGER NOT NULL DEFAULT 1,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS notifications (",
+  "  id TEXT PRIMARY KEY,",
+  "  rule_id TEXT REFERENCES alert_rules(id),",
+  "  message TEXT NOT NULL,",
+  "  read INTEGER NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
 ].join("\n");
@@ -860,4 +895,179 @@ export function getAgentCompletedToday(db: Database.Database, agentId: string): 
     )
     .get(agentId, todayStart.toISOString()) as { count: number };
   return row.count;
+}
+
+// ─── Task Comments ───────────────────────────────────────────────────────────
+
+export function addComment(
+  db: Database.Database,
+  taskId: string,
+  message: string,
+  authorName: string,
+  agentId?: string | null
+): TaskComment {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO task_comments (id, task_id, agent_id, author_name, message, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, taskId, agentId ?? null, authorName, message, ts);
+  return db.prepare("SELECT * FROM task_comments WHERE id = ?").get(id) as TaskComment;
+}
+
+export function listComments(db: Database.Database, taskId: string): TaskComment[] {
+  return db
+    .prepare("SELECT * FROM task_comments WHERE task_id = ? ORDER BY created_at ASC")
+    .all(taskId) as TaskComment[];
+}
+
+// ─── Agent File Locks ────────────────────────────────────────────────────────
+
+export function reportWorkingOn(
+  db: Database.Database,
+  agentId: string,
+  taskId: string,
+  filePaths: string[]
+): AgentFileLock[] {
+  const ts = now();
+  const locks: AgentFileLock[] = [];
+  for (const fp of filePaths) {
+    const id = randomUUID();
+    db.prepare(
+      "INSERT OR REPLACE INTO agent_file_locks (id, agent_id, task_id, file_path, started_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, agentId, taskId, fp, ts);
+    locks.push(
+      db.prepare("SELECT * FROM agent_file_locks WHERE agent_id = ? AND file_path = ?").get(agentId, fp) as AgentFileLock
+    );
+  }
+  return locks;
+}
+
+export function releaseFileLocks(db: Database.Database, agentId: string, taskId?: string): number {
+  if (taskId) {
+    return db.prepare("DELETE FROM agent_file_locks WHERE agent_id = ? AND task_id = ?").run(agentId, taskId).changes;
+  }
+  return db.prepare("DELETE FROM agent_file_locks WHERE agent_id = ?").run(agentId).changes;
+}
+
+export function getActiveFileLocks(db: Database.Database): AgentFileLock[] {
+  return db.prepare("SELECT * FROM agent_file_locks ORDER BY started_at DESC").all() as AgentFileLock[];
+}
+
+export function getFileConflicts(db: Database.Database): FileConflict[] {
+  const rows = db.prepare(
+    `SELECT fl.file_path, fl.agent_id, a.name AS agent_name, fl.task_id
+     FROM agent_file_locks fl
+     JOIN agents a ON fl.agent_id = a.id
+     WHERE fl.file_path IN (
+       SELECT file_path FROM agent_file_locks GROUP BY file_path HAVING COUNT(DISTINCT agent_id) > 1
+     )
+     ORDER BY fl.file_path, a.name`
+  ).all() as { file_path: string; agent_id: string; agent_name: string; task_id: string }[];
+
+  const map = new Map<string, FileConflict>();
+  for (const row of rows) {
+    if (!map.has(row.file_path)) {
+      map.set(row.file_path, { file_path: row.file_path, agents: [] });
+    }
+    map.get(row.file_path)!.agents.push({
+      agent_id: row.agent_id,
+      agent_name: row.agent_name,
+      task_id: row.task_id,
+    });
+  }
+  return [...map.values()];
+}
+
+// ─── Alert Rules & Notifications ─────────────────────────────────────────────
+
+export function createAlertRule(
+  db: Database.Database,
+  eventType: string,
+  filterJson = "{}"
+): AlertRule {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO alert_rules (id, event_type, filter_json, enabled, created_at) VALUES (?, ?, ?, 1, ?)"
+  ).run(id, eventType, filterJson, ts);
+  return db.prepare("SELECT * FROM alert_rules WHERE id = ?").get(id) as AlertRule;
+}
+
+export function listAlertRules(db: Database.Database): AlertRule[] {
+  return db.prepare("SELECT * FROM alert_rules ORDER BY created_at DESC").all() as AlertRule[];
+}
+
+export function toggleAlertRule(db: Database.Database, id: string, enabled: boolean): AlertRule | null {
+  db.prepare("UPDATE alert_rules SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
+  return db.prepare("SELECT * FROM alert_rules WHERE id = ?").get(id) as AlertRule | null;
+}
+
+export function deleteAlertRule(db: Database.Database, id: string): boolean {
+  return db.prepare("DELETE FROM alert_rules WHERE id = ?").run(id).changes > 0;
+}
+
+export function createNotification(db: Database.Database, message: string, ruleId?: string | null): AppNotification {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO notifications (id, rule_id, message, read, created_at) VALUES (?, ?, ?, 0, ?)"
+  ).run(id, ruleId ?? null, message, ts);
+  return db.prepare("SELECT * FROM notifications WHERE id = ?").get(id) as AppNotification;
+}
+
+export function listNotifications(db: Database.Database, limit = 50): AppNotification[] {
+  return db
+    .prepare("SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?")
+    .all(limit) as AppNotification[];
+}
+
+export function markNotificationRead(db: Database.Database, id: string): boolean {
+  return db.prepare("UPDATE notifications SET read = 1 WHERE id = ?").run(id).changes > 0;
+}
+
+export function markAllNotificationsRead(db: Database.Database): number {
+  return db.prepare("UPDATE notifications SET read = 1 WHERE read = 0").run().changes;
+}
+
+export function getUnreadNotificationCount(db: Database.Database): number {
+  const row = db.prepare("SELECT COUNT(*) AS count FROM notifications WHERE read = 0").get() as { count: number };
+  return row.count;
+}
+
+export function evaluateAlertRules(db: Database.Database, eventType: string, eventPayload: Record<string, unknown>): AppNotification[] {
+  const rules = db
+    .prepare("SELECT * FROM alert_rules WHERE event_type = ? AND enabled = 1")
+    .all(eventType) as AlertRule[];
+
+  const notifications: AppNotification[] = [];
+  for (const rule of rules) {
+    let filterMatch = true;
+    try {
+      const filter = JSON.parse(rule.filter_json) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(filter)) {
+        if (eventPayload[key] !== value) { filterMatch = false; break; }
+      }
+    } catch { filterMatch = true; }
+
+    if (filterMatch) {
+      const msg = `Alert: ${eventType} event triggered (rule ${rule.id})`;
+      notifications.push(createNotification(db, msg, rule.id));
+    }
+  }
+  return notifications;
+}
+
+// ─── Bulk Update ─────────────────────────────────────────────────────────────
+
+export function bulkUpdateTasks(
+  db: Database.Database,
+  taskIds: string[],
+  updates: UpdateTaskInput
+): Task[] {
+  const results: Task[] = [];
+  for (const id of taskIds) {
+    const updated = updateTask(db, id, updates);
+    if (updated) results.push(updated);
+  }
+  return results;
 }
