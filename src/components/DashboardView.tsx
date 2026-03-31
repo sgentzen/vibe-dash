@@ -81,7 +81,11 @@ export function DashboardView() {
         <KpiCard label="Active Sprint" value={activeSprint?.name ?? "None"} color="var(--accent-blue)" />
         <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--accent-red)" : "var(--accent-green)"} />
         <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--accent-yellow)" : "var(--accent-green)"} />
+<<<<<<< HEAD
         <KpiCard label="Active Tasks" value={String(tasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
+=======
+        <KpiCard label="Total Tasks" value={String(tasks.length)} color="var(--text-secondary)" />
+>>>>>>> master
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>

@@ -27,7 +27,10 @@ export interface AppState {
   fileConflicts: FileConflict[];
   searchQuery: string;
   activeView: "board" | "agents" | "list" | "dashboard";
+<<<<<<< HEAD
   theme: Theme;
+=======
+>>>>>>> master
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   stats: {
@@ -53,7 +56,10 @@ const initialState: AppState = {
   fileConflicts: [],
   searchQuery: "",
   activeView: "board",
+<<<<<<< HEAD
   theme: getInitialTheme(),
+=======
+>>>>>>> master
   selectedProjectId: null,
   selectedSprintId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },

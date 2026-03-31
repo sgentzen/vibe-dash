@@ -4,7 +4,11 @@ import { useApi } from "../hooks/useApi";
 import { useAppDispatch } from "../store";
 
 export function TopBar() {
+<<<<<<< HEAD
   const { stats, theme, activeView, searchQuery, unreadCount, notifications } = useAppState();
+=======
+  const { stats, activeView, searchQuery, unreadCount, notifications } = useAppState();
+>>>>>>> master
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -128,25 +132,92 @@ export function TopBar() {
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Theme Toggle */}
-      <button
-        onClick={() => dispatch({ type: "SET_THEME", payload: theme === "dark" ? "light" : "dark" })}
-        aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        style={{
-          background: "transparent",
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          padding: "4px 8px",
-          cursor: "pointer",
-          color: "var(--text-secondary)",
-          fontSize: "16px",
-          lineHeight: 1,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        {theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
-      </button>
+      {/* Notification Bell */}
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => setShowNotifications(!showNotifications)}
+          style={{
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            padding: "4px 8px",
+            cursor: "pointer",
+            color: "var(--text-secondary)",
+            fontSize: "14px",
+            position: "relative",
+          }}
+        >
+          {"\uD83D\uDD14"}
+          {unreadCount > 0 && (
+            <span style={{
+              position: "absolute", top: "-4px", right: "-4px",
+              background: "var(--accent-red)", color: "#fff",
+              fontSize: "10px", fontWeight: 700, borderRadius: "50%",
+              width: "16px", height: "16px", display: "flex",
+              alignItems: "center", justifyContent: "center",
+            }}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {showNotifications && (
+          <div style={{
+            position: "absolute", top: "100%", right: 0, marginTop: "4px",
+            background: "var(--bg-secondary)", border: "1px solid var(--border)",
+            borderRadius: "8px", width: "320px", maxHeight: "400px",
+            overflowY: "auto", zIndex: 100, boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          }}>
+            <div style={{
+              padding: "8px 12px", borderBottom: "1px solid var(--border)",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Notifications</span>
+              {unreadCount > 0 && (
+                <button
+                  onClick={async () => {
+                    await api.markAllRead();
+                    dispatch({ type: "SET_UNREAD_COUNT", payload: 0 });
+                    dispatch({ type: "SET_NOTIFICATIONS", payload: notifications.map((n) => ({ ...n, read: true })) });
+                  }}
+                  style={{ background: "transparent", border: "none", color: "var(--accent-blue)", fontSize: "11px", cursor: "pointer" }}
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+            {notifications.length === 0 ? (
+              <div style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: "12px" }}>
+                No notifications
+              </div>
+            ) : (
+              notifications.slice(0, 20).map((n) => (
+                <div
+                  key={n.id}
+                  onClick={async () => {
+                    if (!n.read) {
+                      await api.markNotificationRead(n.id);
+                      dispatch({ type: "SET_UNREAD_COUNT", payload: Math.max(0, unreadCount - 1) });
+                      dispatch({ type: "SET_NOTIFICATIONS", payload: notifications.map((x) => x.id === n.id ? { ...x, read: true } : x) });
+                    }
+                  }}
+                  style={{
+                    padding: "8px 12px", borderBottom: "1px solid var(--border)",
+                    cursor: "pointer", background: n.read ? "transparent" : "rgba(99,102,241,0.05)",
+                  }}
+                >
+                  <div style={{ fontSize: "12px", color: n.read ? "var(--text-muted)" : "var(--text-primary)" }}>
+                    {n.message}
+                  </div>
+                  <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
+                    {new Date(n.created_at).toLocaleString()}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Notification Bell */}
       <div style={{ position: "relative" }}>
