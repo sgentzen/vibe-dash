@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useReducer } from "react";
 import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, TaskComment, FileConflict, AppNotification, WsEvent } from "./types";
 
+export type Theme = "dark" | "light";
+
+const THEME_STORAGE_KEY = "vibe-dash-theme";
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  return "dark";
+}
+
 export interface AppState {
   projects: Project[];
   sprints: Sprint[];
@@ -64,6 +75,7 @@ export type AppAction =
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_SPRINT"; payload: string | null }
+  | { type: "SET_THEME"; payload: Theme }
   | { type: "WS_EVENT"; payload: WsEvent };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -102,6 +114,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedProjectId: action.payload, selectedSprintId: null };
     case "SELECT_SPRINT":
       return { ...state, selectedSprintId: action.payload };
+    case "SET_THEME":
+      localStorage.setItem(THEME_STORAGE_KEY, action.payload);
+      return { ...state, theme: action.payload };
     case "WS_EVENT": {
       const event = action.payload;
       switch (event.type) {
@@ -111,18 +126,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
             projects: [...state.projects, event.payload as Project],
             stats: { ...state.stats, projects: state.stats.projects + 1 },
           };
-        case "task_created":
+        case "task_created": {
+          const newTask = event.payload as Task;
           return {
             ...state,
-            tasks: [...state.tasks, event.payload as Task],
-            stats: { ...state.stats, tasks: state.stats.tasks + 1 },
+            tasks: [...state.tasks, newTask],
+            stats: {
+              ...state.stats,
+              tasks: newTask.status === "done" ? state.stats.tasks : state.stats.tasks + 1,
+            },
           };
+        }
         case "task_updated":
         case "task_completed": {
           const updated = event.payload as Task;
+          const prev = state.tasks.find((t) => t.id === updated.id);
+          const wasDone = prev?.status === "done";
+          const nowDone = updated.status === "done";
+          let tasksDelta = 0;
+          if (!wasDone && nowDone) tasksDelta = -1;
+          if (wasDone && !nowDone) tasksDelta = 1;
           return {
             ...state,
             tasks: state.tasks.map((t) => (t.id === updated.id ? updated : t)),
+            stats: { ...state.stats, tasks: state.stats.tasks + tasksDelta },
           };
         }
         case "agent_registered": {

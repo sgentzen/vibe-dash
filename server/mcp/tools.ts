@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import type { Agent } from "../types.js";
 import {
   registerAgent,
   createProject,
@@ -88,6 +89,8 @@ export async function handleTool(
         name: args.name as string,
         model: (args.model as string | undefined) ?? null,
         capabilities: (args.capabilities as string[] | undefined) ?? [],
+        role: args.role as Agent["role"] | undefined,
+        parent_agent_name: args.parent_agent_name as string | undefined,
       });
       broadcast({ type: "agent_registered", payload: agent });
       return ok({ agent_id: agent.id });

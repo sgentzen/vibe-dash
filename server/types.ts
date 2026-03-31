@@ -39,11 +39,15 @@ export interface Task {
   updated_at: string;
 }
 
+export type AgentRole = "orchestrator" | "coder" | "reviewer" | "explorer" | "planner" | "agent";
+
 export interface Agent {
   id: string;
   name: string;
   model: string | null;
   capabilities: string[];
+  role: AgentRole;
+  parent_agent_id: string | null;
   registered_at: string;
   last_seen_at: string;
   current_task_title?: string | null;

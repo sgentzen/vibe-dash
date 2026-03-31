@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
-import { agentColor } from "../utils/agentColors";
+import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
 interface AgentDetail {
@@ -62,6 +62,8 @@ export function AgentDashboard() {
     );
   }
 
+  const groups = groupAgents(agents);
+
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
       <h2 style={{ color: "var(--text-primary)", fontSize: "16px", marginBottom: "16px", fontWeight: 600 }}>
@@ -72,58 +74,34 @@ export function AgentDashboard() {
           No agents registered yet
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "12px" }}>
-          {agents.map((agent) => {
-            const d = details[agent.id];
-            const color = agentColor(agent.name);
-            const healthColor = d?.health_status === "active" ? "var(--accent-green)"
-              : d?.health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
-
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {groups.map(({ parent, children }) => {
             return (
-              <div
-                key={agent.id}
-                onClick={() => setSelectedAgentId(agent.id)}
-                style={{
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "8px",
-                  padding: "16px",
-                  cursor: "pointer",
-                  borderLeft: `3px solid ${color}`,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
-                  <span style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px" }}>{agent.name}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "11px", marginLeft: "auto" }}>{d?.health_status ?? "..."}</span>
-                </div>
-
-                {d?.current_task_title && (
-                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
-                    Working on: <span style={{ color: "var(--text-primary)" }}>{d.current_task_title}</span>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
-                  <span>Completed today: <strong style={{ color: "var(--accent-green)" }}>{d?.completed_today ?? 0}</strong></span>
-                  <span>Sessions: <strong>{d?.sessions.length ?? 0}</strong></span>
-                </div>
-
-                {agent.model && (
-                  <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "8px" }}>
-                    Model: {agent.model}
-                  </div>
-                )}
-
-                {agent.capabilities && agent.capabilities.length > 0 && (
-                  <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
-                    {agent.capabilities.map((cap) => (
-                      <span key={cap} style={{
-                        fontSize: "10px", padding: "1px 6px", borderRadius: "4px",
-                        background: "rgba(99,102,241,0.1)", color: "#6366f1",
-                      }}>
-                        {cap}
-                      </span>
+              <div key={parent.id}>
+                <AgentCard
+                  agent={parent}
+                  detail={details[parent.id]}
+                  onClick={() => setSelectedAgentId(parent.id)}
+                />
+                {children.length > 0 && (
+                  <div
+                    style={{
+                      marginLeft: "20px",
+                      borderLeft: `2px solid ${agentColor(parent.name)}`,
+                      paddingLeft: "12px",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: "8px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    {children.map((child) => (
+                      <AgentCard
+                        key={child.id}
+                        agent={child}
+                        detail={details[child.id]}
+                        onClick={() => setSelectedAgentId(child.id)}
+                      />
                     ))}
                   </div>
                 )}
@@ -136,9 +114,108 @@ export function AgentDashboard() {
   );
 }
 
+function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDetail; onClick: () => void }) {
+  const color = agentColor(agent.name);
+  const role = agent.role ?? "agent";
+  const roleColor = ROLE_COLORS[role];
+  const healthColor = detail?.health_status === "active" ? "var(--accent-green)"
+    : detail?.health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "16px",
+        cursor: "pointer",
+        borderLeft: `3px solid ${color}`,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+        {/* Avatar */}
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "50%",
+            background: color,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "12px",
+            flexShrink: 0,
+          }}
+        >
+          {agent.name.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px" }}>{agent.name}</span>
+            {role !== "agent" && (
+              <span
+                style={{
+                  fontSize: "9px",
+                  padding: "0 4px",
+                  borderRadius: "3px",
+                  background: `color-mix(in srgb, ${roleColor} 15%, transparent)`,
+                  color: roleColor,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  lineHeight: "16px",
+                }}
+              >
+                {role}
+              </span>
+            )}
+          </div>
+        </div>
+        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
+        <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{detail?.health_status ?? "..."}</span>
+      </div>
+
+      {detail?.current_task_title && (
+        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+          Working on: <span style={{ color: "var(--text-primary)" }}>{detail.current_task_title}</span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
+        <span>Completed today: <strong style={{ color: "var(--accent-green)" }}>{detail?.completed_today ?? 0}</strong></span>
+        <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
+      </div>
+
+      {agent.model && (
+        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "8px" }}>
+          Model: {agent.model}
+        </div>
+      )}
+
+      {agent.capabilities && agent.capabilities.length > 0 && (
+        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
+          {agent.capabilities.map((cap) => (
+            <span key={cap} style={{
+              fontSize: "10px", padding: "1px 6px", borderRadius: "4px",
+              background: "rgba(99,102,241,0.1)", color: "#6366f1",
+            }}>
+              {cap}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () => void }) {
   const { agent, health_status, completed_today, current_task_title, activity, sessions } = detail;
   const color = agentColor(agent.name);
+  const role = agent.role ?? "agent";
+  const roleColor = ROLE_COLORS[role];
   const healthColor = health_status === "active" ? "var(--accent-green)"
     : health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
 
@@ -156,7 +233,24 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
           {agent.name.charAt(0).toUpperCase()}
         </div>
         <div>
-          <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "18px" }}>{agent.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "18px" }}>{agent.name}</span>
+            {role !== "agent" && (
+              <span
+                style={{
+                  fontSize: "10px",
+                  padding: "1px 6px",
+                  borderRadius: "3px",
+                  background: `color-mix(in srgb, ${roleColor} 15%, transparent)`,
+                  color: roleColor,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}
+              >
+                {role}
+              </span>
+            )}
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-muted)" }}>
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor }} />
             {health_status} {agent.model && ` | ${agent.model}`}

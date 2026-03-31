@@ -25,6 +25,10 @@ export function App() {
   usePolling();
 
   useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadInitialData(retries = 10, delayMs = 500) {
