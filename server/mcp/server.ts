@@ -95,6 +95,7 @@ export function createMcpServer(db: Database.Database): McpServer {
       project_id: z.string().optional(),
       status: STATUS_ENUM.optional(),
       parent_task_id: z.string().optional(),
+      assigned_agent_id: z.string().optional(),
     },
     call("list_tasks")
   );
@@ -111,9 +112,33 @@ export function createMcpServer(db: Database.Database): McpServer {
       progress: z.number().min(0).max(100).optional(),
       parent_task_id: z.string().nullable().optional(),
       sprint_id: z.string().nullable().optional(),
+      assigned_agent_id: z.string().nullable().optional(),
+      due_date: z.string().nullable().optional(),
+      estimate: z.number().int().min(0).nullable().optional(),
       agent_name: z.string().optional(),
     },
     call("update_task")
+  );
+
+  server.tool(
+    "assign_task",
+    "Assign a task to an agent",
+    {
+      task_id: z.string(),
+      agent_id: z.string(),
+      agent_name: z.string().optional(),
+    },
+    call("assign_task")
+  );
+
+  server.tool(
+    "unassign_task",
+    "Remove agent assignment from a task",
+    {
+      task_id: z.string(),
+      agent_name: z.string().optional(),
+    },
+    call("unassign_task")
   );
 
   server.tool(
@@ -191,6 +216,126 @@ export function createMcpServer(db: Database.Database): McpServer {
       end_date: z.string().nullable().optional(),
     },
     call("update_sprint")
+  );
+
+  server.tool(
+    "create_tag",
+    "Create a project-scoped tag with a color",
+    {
+      project_id: z.string(),
+      name: z.string(),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    },
+    call("create_tag")
+  );
+
+  server.tool(
+    "list_tags",
+    "List tags for a project",
+    {
+      project_id: z.string(),
+    },
+    call("list_tags")
+  );
+
+  server.tool(
+    "add_tag",
+    "Add a tag to a task",
+    {
+      task_id: z.string(),
+      tag_id: z.string(),
+    },
+    call("add_tag")
+  );
+
+  server.tool(
+    "remove_tag",
+    "Remove a tag from a task",
+    {
+      task_id: z.string(),
+      tag_id: z.string(),
+    },
+    call("remove_tag")
+  );
+
+  server.tool(
+    "get_task_tags",
+    "Get all tags for a task",
+    {
+      task_id: z.string(),
+    },
+    call("get_task_tags")
+  );
+
+  // ─── R2: Dependencies ──────────────────────────────────────────────────────
+
+  server.tool(
+    "add_dependency",
+    "Add a blocking dependency between tasks",
+    {
+      task_id: z.string(),
+      depends_on_task_id: z.string(),
+    },
+    call("add_dependency")
+  );
+
+  server.tool(
+    "remove_dependency",
+    "Remove a task dependency",
+    {
+      dependency_id: z.string(),
+    },
+    call("remove_dependency")
+  );
+
+  server.tool(
+    "list_dependencies",
+    "List dependencies for a task",
+    {
+      task_id: z.string(),
+    },
+    call("list_dependencies")
+  );
+
+  // ─── R2: Agent Sessions ────────────────────────────────────────────────────
+
+  server.tool(
+    "list_agent_sessions",
+    "List sessions for an agent",
+    {
+      agent_id: z.string(),
+    },
+    call("list_agent_sessions")
+  );
+
+  // ─── R2: Search ────────────────────────────────────────────────────────────
+
+  server.tool(
+    "search_tasks",
+    "Search tasks with filters",
+    {
+      query: z.string().optional(),
+      project_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+      status: STATUS_ENUM.optional(),
+      priority: PRIORITY_ENUM.optional(),
+      assigned_agent_id: z.string().optional(),
+      tag_id: z.string().optional(),
+      due_before: z.string().optional(),
+      due_after: z.string().optional(),
+    },
+    call("search_tasks")
+  );
+
+  // ─── R2: Agent Detail ──────────────────────────────────────────────────────
+
+  server.tool(
+    "get_agent_detail",
+    "Get detailed info about an agent including health, activity, and sessions",
+    {
+      agent_id: z.string(),
+    },
+    call("get_agent_detail")
   );
 
   return server;

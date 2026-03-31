@@ -20,11 +20,39 @@ import {
   updateSprint,
   logActivity,
   getAgentCurrentTask,
+  getAgentHealthStatus,
+  createTag,
+  listTags,
+  addTagToTask,
+  removeTagFromTask,
+  getTaskTags,
+  getSprintCapacity,
+  getTimeSpent,
+  addDependency,
+  removeDependency,
+  listDependencies,
+  getBlockingTasks,
+  listAgentSessions,
+  searchTasks,
+  getAgentById,
+  getAgentActivity,
+  getAgentCompletedToday,
+  createSavedFilter,
+  listSavedFilters,
+  deleteSavedFilter,
 } from "./db.js";
 import { broadcast } from "./websocket.js";
 
 export function createRouter(db: Database.Database): Router {
   const router = Router();
+
+  // GET /api/first-run — returns true if no projects exist
+  router.get("/api/first-run", (_req, res) => {
+    const count = (
+      db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number }
+    ).count;
+    res.json({ firstRun: count === 0 });
+  });
 
   // GET /api/stats
   router.get("/api/stats", (_req, res) => {
@@ -85,16 +113,18 @@ export function createRouter(db: Database.Database): Router {
 
   // GET /api/tasks
   router.get("/api/tasks", (req, res) => {
-    const { project_id, status, parent_task_id } = req.query as {
+    const { project_id, status, parent_task_id, assigned_agent_id } = req.query as {
       project_id?: string;
       status?: string;
       parent_task_id?: string;
+      assigned_agent_id?: string;
     };
     res.json(
       listTasks(db, {
         project_id,
         status: status as TaskStatus | undefined,
         parent_task_id,
+        assigned_agent_id,
       })
     );
   });
@@ -126,6 +156,22 @@ export function createRouter(db: Database.Database): Router {
     });
     broadcast({ type: "task_created", payload: task });
     res.status(201).json(task);
+  });
+
+  // GET /api/tasks/search (must be before :id param route)
+  router.get("/api/tasks/search", (req, res) => {
+    const q = req.query as Record<string, string | undefined>;
+    res.json(searchTasks(db, {
+      query: q.q,
+      project_id: q.project_id,
+      sprint_id: q.sprint_id,
+      status: q.status as any,
+      priority: q.priority as any,
+      assigned_agent_id: q.assigned_agent_id,
+      tag_id: q.tag_id,
+      due_before: q.due_before,
+      due_after: q.due_after,
+    }));
   });
 
   // GET /api/tasks/:id
@@ -190,13 +236,16 @@ export function createRouter(db: Database.Database): Router {
   // GET /api/agents
   router.get("/api/agents", (_req, res) => {
     const agents = listAgents(db);
-    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-    const withActive = agents.map((a) => ({
-      ...a,
-      active: a.last_seen_at >= fifteenMinAgo,
-      current_task_title: getAgentCurrentTask(db, a.id),
-    }));
-    res.json(withActive);
+    const withStatus = agents.map((a) => {
+      const health_status = getAgentHealthStatus(a.last_seen_at);
+      return {
+        ...a,
+        health_status,
+        active: health_status === "active",
+        current_task_title: getAgentCurrentTask(db, a.id),
+      };
+    });
+    res.json(withStatus);
   });
 
   // GET /api/activity
@@ -283,6 +332,137 @@ export function createRouter(db: Database.Database): Router {
     const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
     broadcast({ type: "sprint_updated", payload: updated! });
     res.json(updated);
+  });
+
+  // ─── Tags ────────────────────────────────────────────────────────────────
+
+  // GET /api/projects/:projectId/tags
+  router.get("/api/projects/:projectId/tags", (req, res) => {
+    res.json(listTags(db, req.params.projectId));
+  });
+
+  // POST /api/projects/:projectId/tags
+  router.post("/api/projects/:projectId/tags", (req, res) => {
+    const { name, color } = req.body as { name: string; color?: string };
+    if (!name) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+      res.status(400).json({ error: "color must be a hex color like #ff0000" });
+      return;
+    }
+    const tag = createTag(db, { project_id: req.params.projectId, name, color });
+    broadcast({ type: "tag_created", payload: tag });
+    res.status(201).json(tag);
+  });
+
+  // GET /api/tasks/:id/tags
+  router.get("/api/tasks/:id/tags", (req, res) => {
+    res.json(getTaskTags(db, req.params.id));
+  });
+
+  // POST /api/tasks/:id/tags
+  router.post("/api/tasks/:id/tags", (req, res) => {
+    const { tag_id } = req.body as { tag_id: string };
+    if (!tag_id) {
+      res.status(400).json({ error: "tag_id is required" });
+      return;
+    }
+    const taskTag = addTagToTask(db, req.params.id, tag_id);
+    broadcast({ type: "tag_added", payload: taskTag });
+    res.status(201).json(taskTag);
+  });
+
+  // DELETE /api/tasks/:id/tags/:tagId
+  router.delete("/api/tasks/:id/tags/:tagId", (req, res) => {
+    const removed = removeTagFromTask(db, req.params.id, req.params.tagId);
+    if (removed) {
+      broadcast({ type: "tag_removed", payload: { id: "", task_id: req.params.id, tag_id: req.params.tagId } });
+    }
+    res.json({ success: removed });
+  });
+
+  // ─── R2: Sprint Capacity ─────────────────────────────────────────────────
+
+  router.get("/api/sprints/:id/capacity", (req, res) => {
+    const sprint = getSprint(db, req.params.id);
+    if (!sprint) { res.status(404).json({ error: "Sprint not found" }); return; }
+    res.json(getSprintCapacity(db, req.params.id));
+  });
+
+  // ─── R2: Task time spent ────────────────────────────────────────────────
+
+  router.get("/api/tasks/:id/time-spent", (req, res) => {
+    const task = getTask(db, req.params.id);
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+    res.json({ time_spent_seconds: getTimeSpent(db, req.params.id) });
+  });
+
+  // ─── R2: Dependencies ──────────────────────────────────────────────────
+
+  router.get("/api/tasks/:id/dependencies", (req, res) => {
+    res.json(listDependencies(db, req.params.id));
+  });
+
+  router.get("/api/tasks/:id/blocking", (req, res) => {
+    res.json(getBlockingTasks(db, req.params.id));
+  });
+
+  router.post("/api/tasks/:id/dependencies", (req, res) => {
+    const { depends_on_task_id } = req.body as { depends_on_task_id: string };
+    if (!depends_on_task_id) { res.status(400).json({ error: "depends_on_task_id is required" }); return; }
+    const dep = addDependency(db, req.params.id, depends_on_task_id);
+    broadcast({ type: "dependency_added", payload: dep });
+    res.status(201).json(dep);
+  });
+
+  router.delete("/api/dependencies/:id", (req, res) => {
+    // Read before delete so we can broadcast
+    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as any;
+    const removed = removeDependency(db, req.params.id);
+    if (removed && dep) {
+      broadcast({ type: "dependency_removed", payload: dep });
+    }
+    res.json({ success: removed });
+  });
+
+  // ─── R2: Agent Detail ──────────────────────────────────────────────────
+
+  router.get("/api/agents/:id", (req, res) => {
+    const agent = getAgentById(db, req.params.id);
+    if (!agent) { res.status(404).json({ error: "Agent not found" }); return; }
+    res.json({
+      ...agent,
+      health_status: getAgentHealthStatus(agent.last_seen_at),
+      completed_today: getAgentCompletedToday(db, agent.id),
+      current_task_title: getAgentCurrentTask(db, agent.id),
+    });
+  });
+
+  router.get("/api/agents/:id/activity", (req, res) => {
+    const limit = parseInt((req.query.limit as string) ?? "50", 10);
+    res.json(getAgentActivity(db, req.params.id, isNaN(limit) ? 50 : limit));
+  });
+
+  router.get("/api/agents/:id/sessions", (req, res) => {
+    res.json(listAgentSessions(db, req.params.id));
+  });
+
+  // ─── R2: Saved Filters ────────────────────────────────────────────────
+
+  router.get("/api/filters", (_req, res) => {
+    res.json(listSavedFilters(db));
+  });
+
+  router.post("/api/filters", (req, res) => {
+    const { name, filter_json } = req.body as { name: string; filter_json: string };
+    if (!name || !filter_json) { res.status(400).json({ error: "name and filter_json are required" }); return; }
+    res.status(201).json(createSavedFilter(db, name, filter_json));
+  });
+
+  router.delete("/api/filters/:id", (req, res) => {
+    res.json({ success: deleteSavedFilter(db, req.params.id) });
   });
 
   return router;

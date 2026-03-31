@@ -1,19 +1,43 @@
 import { useState } from "react";
-import type { Task, ActivityEntry } from "../types";
+import type { Task, ActivityEntry, Agent, Tag } from "../types";
+import { agentColor } from "../utils/agentColors";
 
 interface TaskCardProps {
   task: Task;
   allTasks: Task[];
   activity: ActivityEntry[];
+  agents: Agent[];
+  taskTags?: Tag[];
+  blockingCount?: number;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
 }
 
-export function TaskCard({ task, allTasks, activity, onClick, onDragStart }: TaskCardProps) {
+function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week" | null {
+  if (!dueDate) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const due = new Date(dueDate);
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const diffMs = dueDay.getTime() - today.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return "overdue";
+  if (diffDays === 0) return "today";
+  if (diffDays <= 7) return "this-week";
+  return null;
+}
+
+export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
   const isBlocked = task.status === "blocked";
+
+  const assignedAgent = task.assigned_agent_id
+    ? agents.find((a) => a.id === task.assigned_agent_id)
+    : null;
+
+  const dueUrgency = isDone ? null : getDueUrgency(task.due_date);
 
   const childTasks = allTasks.filter((t) => t.parent_task_id === task.id);
   const hasChildren = childTasks.length > 0;
@@ -36,6 +60,11 @@ export function TaskCard({ task, allTasks, activity, onClick, onDragStart }: Tas
     background = "var(--green-bg)";
     boxShadow = "0 0 8px rgba(63, 185, 80, 0.2)";
   } else if (isBlocked) {
+    borderColor = "var(--accent-yellow)";
+  } else if (dueUrgency === "overdue") {
+    borderColor = "var(--accent-red)";
+    boxShadow = "0 0 6px rgba(248, 81, 73, 0.15)";
+  } else if (dueUrgency === "today") {
     borderColor = "var(--accent-yellow)";
   }
 
@@ -132,9 +161,10 @@ export function TaskCard({ task, allTasks, activity, onClick, onDragStart }: Tas
           </>
         )}
 
-        {/* Priority badge */}
-        {task.priority === "urgent" || task.priority === "high" ? (
-          <div style={{ marginTop: "6px" }}>
+        {/* Badges row: priority, due date, agent, tags */}
+        <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
+          {/* Priority badge */}
+          {(task.priority === "urgent" || task.priority === "high") && (
             <span
               style={{
                 fontSize: "10px",
@@ -151,8 +181,111 @@ export function TaskCard({ task, allTasks, activity, onClick, onDragStart }: Tas
             >
               {task.priority}
             </span>
-          </div>
-        ) : null}
+          )}
+
+          {/* Due date indicator */}
+          {dueUrgency && (
+            <span
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: dueUrgency === "overdue" ? "rgba(248,81,73,0.15)"
+                  : dueUrgency === "today" ? "rgba(210,153,34,0.15)"
+                  : "rgba(139,148,158,0.1)",
+                color: dueUrgency === "overdue" ? "var(--accent-red)"
+                  : dueUrgency === "today" ? "var(--accent-yellow)"
+                  : "var(--text-muted)",
+                border: `1px solid ${
+                  dueUrgency === "overdue" ? "var(--accent-red)"
+                  : dueUrgency === "today" ? "var(--accent-yellow)"
+                  : "var(--border)"
+                }`,
+              }}
+            >
+              {dueUrgency === "overdue" ? "Overdue" : dueUrgency === "today" ? "Due today" : "Due soon"}
+            </span>
+          )}
+          {task.due_date && !dueUrgency && !isDone && (
+            <span
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                color: "var(--text-muted)",
+                background: "rgba(139,148,158,0.1)",
+              }}
+            >
+              Due {task.due_date}
+            </span>
+          )}
+
+          {/* Assigned agent badge */}
+          {assignedAgent && (
+            <span
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: `${agentColor(assignedAgent.name)}20`,
+                color: agentColor(assignedAgent.name),
+                border: `1px solid ${agentColor(assignedAgent.name)}40`,
+              }}
+            >
+              {assignedAgent.name}
+            </span>
+          )}
+
+          {/* Estimate badge */}
+          {task.estimate != null && (
+            <span
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: "rgba(99,102,241,0.1)",
+                color: "#6366f1",
+                border: "1px solid rgba(99,102,241,0.3)",
+              }}
+            >
+              {task.estimate}pt
+            </span>
+          )}
+
+          {/* Dependency badge */}
+          {blockingCount != null && blockingCount > 0 && (
+            <span
+              title={`Blocked by ${blockingCount} task${blockingCount > 1 ? "s" : ""}`}
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: "rgba(248,81,73,0.1)",
+                color: "var(--accent-red)",
+                border: "1px solid rgba(248,81,73,0.3)",
+              }}
+            >
+              Blocked by {blockingCount}
+            </span>
+          )}
+
+          {/* Tag pills */}
+          {taskTags && taskTags.map((tag) => (
+            <span
+              key={tag.id}
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: `${tag.color}20`,
+                color: tag.color,
+                border: `1px solid ${tag.color}40`,
+              }}
+            >
+              {tag.name}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Sub-tasks toggle */}

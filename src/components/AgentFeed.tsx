@@ -1,28 +1,10 @@
 import { useAppState } from "../store";
+import { agentColor } from "../utils/agentColors";
+import type { AgentHealthStatus } from "../types";
 
 const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 const EVENT_AGE_OUT_MS = 10 * 60 * 1000; // 10 minutes
-
-const AGENT_COLORS = [
-  "#6366f1", // indigo
-  "#f59e0b", // amber
-  "#10b981", // emerald
-  "#ef4444", // red
-  "#8b5cf6", // violet
-  "#06b6d4", // cyan
-  "#f97316", // orange
-  "#ec4899", // pink
-  "#14b8a6", // teal
-  "#84cc16", // lime
-];
-
-function agentColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length];
-}
 
 function relativeTime(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime();
@@ -34,6 +16,25 @@ function relativeTime(ts: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 }
+
+function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
+  const elapsed = Date.now() - new Date(lastSeenAt).getTime();
+  if (elapsed < AGENT_ACTIVE_WINDOW_MS) return "active";
+  if (elapsed < IDLE_THRESHOLD_MS) return "idle";
+  return "offline";
+}
+
+const HEALTH_COLORS: Record<AgentHealthStatus, string> = {
+  active: "#3fb950",
+  idle: "#d2992a",
+  offline: "#8b949e",
+};
+
+const HEALTH_LABELS: Record<AgentHealthStatus, string> = {
+  active: "Active",
+  idle: "Idle",
+  offline: "Offline",
+};
 
 export function AgentFeed() {
   const { agents, activity } = useAppState();
@@ -93,9 +94,10 @@ export function AgentFeed() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {sortedAgents.map((agent) => {
-              const isActive =
-                Date.now() - new Date(agent.last_seen_at).getTime() < AGENT_ACTIVE_WINDOW_MS;
+              const health = getHealthStatus(agent.last_seen_at);
+              const healthColor = HEALTH_COLORS[health];
               const color = agentColor(agent.name);
+              const isActive = health === "active";
               return (
                 <div
                   key={agent.id}
@@ -103,25 +105,26 @@ export function AgentFeed() {
                     display: "flex",
                     alignItems: "flex-start",
                     gap: "8px",
-                    opacity: isActive ? 1 : 0.5,
+                    opacity: health === "offline" ? 0.5 : 1,
                   }}
                 >
                   <span
                     className={isActive ? "pulse-dot" : undefined}
+                    title={HEALTH_LABELS[health]}
                     style={{
                       marginTop: "4px",
                       flexShrink: 0,
                       width: "8px",
                       height: "8px",
                       borderRadius: "50%",
-                      background: isActive ? color : "var(--text-muted)",
+                      background: healthColor,
                       display: "inline-block",
                     }}
                   />
                   <div style={{ minWidth: 0 }}>
                     <div
                       style={{
-                        color: isActive ? color : "var(--text-muted)",
+                        color: isActive ? color : health === "idle" ? "var(--text-secondary)" : "var(--text-muted)",
                         fontSize: "13px",
                         fontWeight: 500,
                         overflow: "hidden",
@@ -160,7 +163,7 @@ export function AgentFeed() {
                       </div>
                     )}
                     <div style={{ color: "var(--text-muted)", fontSize: "10px" }}>
-                      {relativeTime(agent.last_seen_at)}
+                      {HEALTH_LABELS[health]} · {relativeTime(agent.last_seen_at)}
                     </div>
                   </div>
                 </div>

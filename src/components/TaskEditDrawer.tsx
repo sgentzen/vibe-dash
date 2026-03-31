@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
-import type { Task, TaskStatus, TaskPriority } from "../types";
+import type { Task, TaskStatus, TaskPriority, Tag } from "../types";
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -9,7 +9,7 @@ interface TaskEditDrawerProps {
 }
 
 export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
-  const { sprints } = useAppState();
+  const { sprints, agents, tags, taskTagMap } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -19,9 +19,16 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [progress, setProgress] = useState(task.progress);
   const [sprintId, setSprintId] = useState<string | null>(task.sprint_id);
+  const [assignedAgentId, setAssignedAgentId] = useState<string | null>(task.assigned_agent_id);
+  const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
+  const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
   const [saving, setSaving] = useState(false);
 
   const taskSprints = sprints.filter((s) => s.project_id === task.project_id);
+  const projectTags = tags.filter((t) => t.project_id === task.project_id);
+  const currentTagIds = taskTagMap[task.id] ?? [];
+  const currentTags = currentTagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => !!t);
+  const availableTags = projectTags.filter((t) => !currentTagIds.includes(t.id));
 
   // Keep local state fresh if task changes externally
   useEffect(() => {
@@ -31,6 +38,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setPriority(task.priority);
     setProgress(task.progress);
     setSprintId(task.sprint_id);
+    setAssignedAgentId(task.assigned_agent_id);
+    setDueDate(task.due_date ?? "");
+    setEstimate(task.estimate != null ? String(task.estimate) : "");
   }, [task]);
 
   async function handleSave() {
@@ -43,6 +53,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         priority,
         progress,
         sprint_id: sprintId,
+        assigned_agent_id: assignedAgentId,
+        due_date: dueDate || null,
+        estimate: estimate ? parseInt(estimate, 10) : null,
       });
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
       onClose();
@@ -194,6 +207,114 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             </select>
           </div>
         )}
+
+        {/* Assigned Agent */}
+        {agents.length > 0 && (
+          <div>
+            <label style={labelStyle}>Assigned Agent</label>
+            <select
+              value={assignedAgentId ?? ""}
+              onChange={(e) => setAssignedAgentId(e.target.value || null)}
+              style={inputStyle}
+            >
+              <option value="">Unassigned</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Due Date */}
+        <div>
+          <label style={labelStyle}>Due Date</label>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Estimate */}
+        <div>
+          <label style={labelStyle}>Estimate (story points)</label>
+          <input
+            type="number"
+            min={0}
+            value={estimate}
+            onChange={(e) => setEstimate(e.target.value)}
+            placeholder="0"
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label style={labelStyle}>Tags</label>
+          {currentTags.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+              {currentTags.map((tag) => (
+                <span
+                  key={tag.id}
+                  style={{
+                    fontSize: "11px",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    background: `${tag.color}20`,
+                    color: tag.color,
+                    border: `1px solid ${tag.color}40`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {tag.name}
+                  <button
+                    onClick={async () => {
+                      await api.removeTagFromTask(task.id, tag.id);
+                      dispatch({
+                        type: "WS_EVENT",
+                        payload: { type: "tag_removed", payload: { id: "", task_id: task.id, tag_id: tag.id } },
+                      });
+                    }}
+                    style={{
+                      background: "none", border: "none", color: tag.color,
+                      cursor: "pointer", padding: "0", fontSize: "13px", lineHeight: 1,
+                    }}
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {availableTags.length > 0 && (
+            <select
+              value=""
+              onChange={async (e) => {
+                const tagId = e.target.value;
+                if (!tagId) return;
+                const taskTag = await api.addTagToTask(task.id, tagId);
+                dispatch({
+                  type: "WS_EVENT",
+                  payload: { type: "tag_added", payload: taskTag },
+                });
+              }}
+              style={inputStyle}
+            >
+              <option value="">Add tag...</option>
+              {availableTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
+              ))}
+            </select>
+          )}
+          {projectTags.length === 0 && (
+            <div style={{ color: "var(--text-muted)", fontSize: "11px", fontStyle: "italic" }}>
+              No tags in this project yet
+            </div>
+          )}
+        </div>
 
         {/* Progress */}
         <div>

@@ -3,7 +3,7 @@ import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDrawer } from "./TaskEditDrawer";
-import type { Task, Sprint, TaskStatus } from "../types";
+import type { Task, Sprint, TaskStatus, Agent, Tag } from "../types";
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "planned", label: "PLANNED" },
@@ -19,17 +19,19 @@ const COLUMN_COLORS: Record<TaskStatus, string> = {
 };
 
 export function TaskBoard() {
-  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity } = useAppState();
+  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const dragTaskId = useRef<string>("");
 
+  const lowerSearch = searchQuery.toLowerCase();
   const filteredTasks = tasks.filter(
     (t) =>
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedSprintId === null || t.sprint_id === selectedSprintId)
+      (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
+      (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
   );
 
   const selectedProject = selectedProjectId
@@ -116,6 +118,10 @@ export function TaskBoard() {
             allTasks={tasks}
             sprints={projectSprints}
             activity={activity}
+            agents={agents}
+            tags={tags}
+            taskTagMap={taskTagMap}
+            taskDepsMap={taskDepsMap}
             selectedProjectId={selectedProjectId}
             selectedSprintId={selectedSprintId}
             onDragStart={(id) => { dragTaskId.current = id; }}
@@ -193,6 +199,10 @@ interface ColumnProps {
   allTasks: Task[];
   sprints: Sprint[];
   activity: ReturnType<typeof useAppState>["activity"];
+  agents: Agent[];
+  tags: Tag[];
+  taskTagMap: Record<string, string[]>;
+  taskDepsMap: Record<string, string[]>;
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   onDragStart: (id: string) => void;
@@ -209,6 +219,10 @@ function KanbanColumn({
   allTasks,
   sprints,
   activity,
+  agents,
+  tags,
+  taskTagMap,
+  taskDepsMap,
   selectedProjectId,
   selectedSprintId,
   onDragStart,
@@ -318,6 +332,10 @@ function KanbanColumn({
               tasks={group.tasks}
               allTasks={allTasks}
               activity={activity}
+              agents={agents}
+              tags={tags}
+              taskTagMap={taskTagMap}
+              taskDepsMap={taskDepsMap}
               onClickTask={onClickTask}
               onDragStart={onDragStart}
             />
@@ -329,6 +347,9 @@ function KanbanColumn({
               task={task}
               allTasks={allTasks}
               activity={activity}
+              agents={agents}
+              taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
+              blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
               onClick={() => onClickTask(task)}
               onDragStart={onDragStart}
             />
@@ -422,11 +443,30 @@ function groupBySprint(tasks: Task[], sprints: Sprint[]): SprintGroupData[] {
   return result;
 }
 
+function getBlockingCount(taskId: string, taskDepsMap: Record<string, string[]>, allTasks: Task[]): number {
+  const depIds = taskDepsMap[taskId];
+  if (!depIds || depIds.length === 0) return 0;
+  return depIds.filter((depId) => {
+    const t = allTasks.find((task) => task.id === depId);
+    return t && t.status !== "done";
+  }).length;
+}
+
+function resolveTaskTags(taskId: string, taskTagMap: Record<string, string[]>, tags: Tag[]): Tag[] {
+  const tagIds = taskTagMap[taskId];
+  if (!tagIds || tagIds.length === 0) return [];
+  return tagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => t !== undefined);
+}
+
 function SprintGroup({
   sprint,
   tasks,
   allTasks,
   activity,
+  agents,
+  tags,
+  taskTagMap,
+  taskDepsMap,
   onClickTask,
   onDragStart,
 }: {
@@ -434,6 +474,10 @@ function SprintGroup({
   tasks: Task[];
   allTasks: Task[];
   activity: ReturnType<typeof useAppState>["activity"];
+  agents: Agent[];
+  tags: Tag[];
+  taskTagMap: Record<string, string[]>;
+  taskDepsMap: Record<string, string[]>;
   onClickTask: (task: Task) => void;
   onDragStart: (id: string) => void;
 }) {
@@ -499,6 +543,9 @@ function SprintGroup({
             task={task}
             allTasks={allTasks}
             activity={activity}
+            agents={agents}
+            taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
+            blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
             onClick={() => onClickTask(task)}
             onDragStart={onDragStart}
           />
