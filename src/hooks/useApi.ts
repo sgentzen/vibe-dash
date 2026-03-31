@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -261,6 +261,133 @@ async function deleteSavedFilter(id: string): Promise<void> {
   await fetch(`/api/filters/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+// ─── R3: Comments ────────────────────────────────────────────────────
+
+async function getComments(taskId: string): Promise<TaskComment[]> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`);
+  if (!res.ok) throw new Error(`getComments failed: ${res.status}`);
+  return res.json();
+}
+
+async function addCommentApi(taskId: string, message: string, authorName: string): Promise<TaskComment> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ message, author_name: authorName }),
+  });
+  if (!res.ok) throw new Error(`addComment failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R3: File Locks ──────────────────────────────────────────────────
+
+async function getFileConflicts(): Promise<FileConflict[]> {
+  const res = await fetch("/api/file-locks/conflicts");
+  if (!res.ok) throw new Error(`getFileConflicts failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R3: Notifications ──────────────────────────────────────────────
+
+async function getNotifications(limit = 50): Promise<AppNotification[]> {
+  const res = await fetch(`/api/notifications?limit=${limit}`);
+  if (!res.ok) throw new Error(`getNotifications failed: ${res.status}`);
+  return res.json();
+}
+
+async function getUnreadCount(): Promise<number> {
+  const res = await fetch("/api/notifications/unread-count");
+  if (!res.ok) throw new Error(`getUnreadCount failed: ${res.status}`);
+  const data = await res.json();
+  return data.count;
+}
+
+async function markNotificationReadApi(id: string): Promise<void> {
+  await fetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+}
+
+async function markAllRead(): Promise<void> {
+  await fetch("/api/notifications/mark-all-read", { method: "POST" });
+}
+
+// ─── R3: Alert Rules ────────────────────────────────────────────────
+
+async function getAlertRules(): Promise<AlertRule[]> {
+  const res = await fetch("/api/alert-rules");
+  if (!res.ok) throw new Error(`getAlertRules failed: ${res.status}`);
+  return res.json();
+}
+
+async function createAlertRule(eventType: string, filterJson?: string): Promise<AlertRule> {
+  const res = await fetch("/api/alert-rules", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ event_type: eventType, filter_json: filterJson }),
+  });
+  if (!res.ok) throw new Error(`createAlertRule failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R3: Bulk Update ────────────────────────────────────────────────
+
+async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknown>): Promise<{ updated: number; tasks: Task[] }> {
+  const res = await fetch("/api/tasks/bulk", {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ task_ids: taskIds, updates }),
+  });
+  if (!res.ok) throw new Error(`bulkUpdateTasks failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R4: Agent Stats ─────────────────────────────────────────────────
+
+async function getAgentStats(agentId: string, sprintId?: string): Promise<AgentStats> {
+  const qs = sprintId ? `?sprint_id=${encodeURIComponent(sprintId)}` : "";
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/stats${qs}`);
+  if (!res.ok) throw new Error(`getAgentStats failed: ${res.status}`);
+  return res.json();
+}
+
+async function getSprintContributions(sprintId: string): Promise<AgentContribution[]> {
+  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/contributions`);
+  if (!res.ok) throw new Error(`getSprintContributions failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R4: Burndown & Velocity ─────────────────────────────────────────
+
+async function getSprintBurndown(sprintId: string): Promise<SprintDailyStats[]> {
+  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/burndown`);
+  if (!res.ok) throw new Error(`getSprintBurndown failed: ${res.status}`);
+  return res.json();
+}
+
+async function getVelocityTrend(limit = 5): Promise<VelocityData[]> {
+  const res = await fetch(`/api/velocity?limit=${limit}`);
+  if (!res.ok) throw new Error(`getVelocityTrend failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R4: Heatmap & Reports ──────────────────────────────────────────
+
+async function getActivityHeatmap(): Promise<ActivityHeatmapEntry[]> {
+  const res = await fetch("/api/activity-heatmap");
+  if (!res.ok) throw new Error(`getActivityHeatmap failed: ${res.status}`);
+  return res.json();
+}
+
+async function generateReportApi(projectId: string, period: "day" | "week" | "sprint"): Promise<string> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/report`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ period }),
+  });
+  if (!res.ok) throw new Error(`generateReport failed: ${res.status}`);
+  const data = await res.json();
+  return data.report;
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -293,5 +420,21 @@ export function useApi() {
     getSavedFilters,
     createSavedFilter,
     deleteSavedFilter,
+    getComments,
+    addComment: addCommentApi,
+    getFileConflicts,
+    getNotifications,
+    getUnreadCount,
+    markNotificationRead: markNotificationReadApi,
+    markAllRead,
+    getAlertRules,
+    createAlertRule,
+    bulkUpdateTasks,
+    getAgentStats,
+    getSprintContributions,
+    getSprintBurndown,
+    getVelocityTrend,
+    getActivityHeatmap,
+    generateReport: generateReportApi,
   }), []);
 }
