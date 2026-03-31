@@ -19,17 +19,19 @@ const COLUMN_COLORS: Record<TaskStatus, string> = {
 };
 
 export function TaskBoard() {
-  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap } = useAppState();
+  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const dragTaskId = useRef<string>("");
 
+  const lowerSearch = searchQuery.toLowerCase();
   const filteredTasks = tasks.filter(
     (t) =>
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedSprintId === null || t.sprint_id === selectedSprintId)
+      (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
+      (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
   );
 
   const selectedProject = selectedProjectId
@@ -119,6 +121,7 @@ export function TaskBoard() {
             agents={agents}
             tags={tags}
             taskTagMap={taskTagMap}
+            taskDepsMap={taskDepsMap}
             selectedProjectId={selectedProjectId}
             selectedSprintId={selectedSprintId}
             onDragStart={(id) => { dragTaskId.current = id; }}
@@ -199,6 +202,7 @@ interface ColumnProps {
   agents: Agent[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>;
+  taskDepsMap: Record<string, string[]>;
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   onDragStart: (id: string) => void;
@@ -218,6 +222,7 @@ function KanbanColumn({
   agents,
   tags,
   taskTagMap,
+  taskDepsMap,
   selectedProjectId,
   selectedSprintId,
   onDragStart,
@@ -330,6 +335,7 @@ function KanbanColumn({
               agents={agents}
               tags={tags}
               taskTagMap={taskTagMap}
+              taskDepsMap={taskDepsMap}
               onClickTask={onClickTask}
               onDragStart={onDragStart}
             />
@@ -343,6 +349,7 @@ function KanbanColumn({
               activity={activity}
               agents={agents}
               taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
+              blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
               onClick={() => onClickTask(task)}
               onDragStart={onDragStart}
             />
@@ -436,6 +443,15 @@ function groupBySprint(tasks: Task[], sprints: Sprint[]): SprintGroupData[] {
   return result;
 }
 
+function getBlockingCount(taskId: string, taskDepsMap: Record<string, string[]>, allTasks: Task[]): number {
+  const depIds = taskDepsMap[taskId];
+  if (!depIds || depIds.length === 0) return 0;
+  return depIds.filter((depId) => {
+    const t = allTasks.find((task) => task.id === depId);
+    return t && t.status !== "done";
+  }).length;
+}
+
 function resolveTaskTags(taskId: string, taskTagMap: Record<string, string[]>, tags: Tag[]): Tag[] {
   const tagIds = taskTagMap[taskId];
   if (!tagIds || tagIds.length === 0) return [];
@@ -450,6 +466,7 @@ function SprintGroup({
   agents,
   tags,
   taskTagMap,
+  taskDepsMap,
   onClickTask,
   onDragStart,
 }: {
@@ -460,6 +477,7 @@ function SprintGroup({
   agents: Agent[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>;
+  taskDepsMap: Record<string, string[]>;
   onClickTask: (task: Task) => void;
   onDragStart: (id: string) => void;
 }) {
@@ -527,6 +545,7 @@ function SprintGroup({
             activity={activity}
             agents={agents}
             taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
+            blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
             onClick={() => onClickTask(task)}
             onDragStart={onDragStart}
           />

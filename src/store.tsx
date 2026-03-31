@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, WsEvent } from "./types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, WsEvent } from "./types";
 
 export interface AppState {
   projects: Project[];
@@ -10,6 +10,9 @@ export interface AppState {
   blockers: Blocker[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>; // task_id -> tag_id[]
+  taskDepsMap: Record<string, string[]>; // task_id -> depends_on_task_id[]
+  searchQuery: string;
+  activeView: "board" | "agents";
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   stats: {
@@ -29,6 +32,9 @@ const initialState: AppState = {
   blockers: [],
   tags: [],
   taskTagMap: {},
+  taskDepsMap: {},
+  searchQuery: "",
+  activeView: "board",
   selectedProjectId: null,
   selectedSprintId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
@@ -43,6 +49,9 @@ export type AppAction =
   | { type: "SET_BLOCKERS"; payload: Blocker[] }
   | { type: "SET_TAGS"; payload: Tag[] }
   | { type: "SET_TASK_TAG_MAP"; payload: Record<string, string[]> }
+  | { type: "SET_TASK_DEPS_MAP"; payload: Record<string, string[]> }
+  | { type: "SET_SEARCH_QUERY"; payload: string }
+  | { type: "SET_ACTIVE_VIEW"; payload: "board" | "agents" }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_SPRINT"; payload: string | null }
@@ -66,6 +75,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, tags: action.payload };
     case "SET_TASK_TAG_MAP":
       return { ...state, taskTagMap: action.payload };
+    case "SET_TASK_DEPS_MAP":
+      return { ...state, taskDepsMap: action.payload };
+    case "SET_SEARCH_QUERY":
+      return { ...state, searchQuery: action.payload };
+    case "SET_ACTIVE_VIEW":
+      return { ...state, activeView: action.payload };
     case "SET_STATS":
       return { ...state, stats: action.payload };
     case "SELECT_PROJECT":
@@ -163,6 +178,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
           return {
             ...state,
             taskTagMap: { ...state.taskTagMap, [tt.task_id]: current.filter((id) => id !== tt.tag_id) },
+          };
+        }
+        case "dependency_added": {
+          const dep = event.payload as TaskDependency;
+          const existing = state.taskDepsMap[dep.task_id] ?? [];
+          if (existing.includes(dep.depends_on_task_id)) return state;
+          return {
+            ...state,
+            taskDepsMap: { ...state.taskDepsMap, [dep.task_id]: [...existing, dep.depends_on_task_id] },
+          };
+        }
+        case "dependency_removed": {
+          const dep = event.payload as TaskDependency;
+          const deps = state.taskDepsMap[dep.task_id] ?? [];
+          return {
+            ...state,
+            taskDepsMap: { ...state.taskDepsMap, [dep.task_id]: deps.filter((id) => id !== dep.depends_on_task_id) },
           };
         }
         default:

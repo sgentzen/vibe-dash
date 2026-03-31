@@ -114,6 +114,7 @@ export function createMcpServer(db: Database.Database): McpServer {
       sprint_id: z.string().nullable().optional(),
       assigned_agent_id: z.string().nullable().optional(),
       due_date: z.string().nullable().optional(),
+      estimate: z.number().int().min(0).nullable().optional(),
       agent_name: z.string().optional(),
     },
     call("update_task")
@@ -264,6 +265,77 @@ export function createMcpServer(db: Database.Database): McpServer {
       task_id: z.string(),
     },
     call("get_task_tags")
+  );
+
+  // ─── R2: Dependencies ──────────────────────────────────────────────────────
+
+  server.tool(
+    "add_dependency",
+    "Add a blocking dependency between tasks",
+    {
+      task_id: z.string(),
+      depends_on_task_id: z.string(),
+    },
+    call("add_dependency")
+  );
+
+  server.tool(
+    "remove_dependency",
+    "Remove a task dependency",
+    {
+      dependency_id: z.string(),
+    },
+    call("remove_dependency")
+  );
+
+  server.tool(
+    "list_dependencies",
+    "List dependencies for a task",
+    {
+      task_id: z.string(),
+    },
+    call("list_dependencies")
+  );
+
+  // ─── R2: Agent Sessions ────────────────────────────────────────────────────
+
+  server.tool(
+    "list_agent_sessions",
+    "List sessions for an agent",
+    {
+      agent_id: z.string(),
+    },
+    call("list_agent_sessions")
+  );
+
+  // ─── R2: Search ────────────────────────────────────────────────────────────
+
+  server.tool(
+    "search_tasks",
+    "Search tasks with filters",
+    {
+      query: z.string().optional(),
+      project_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+      status: STATUS_ENUM.optional(),
+      priority: PRIORITY_ENUM.optional(),
+      assigned_agent_id: z.string().optional(),
+      tag_id: z.string().optional(),
+      due_before: z.string().optional(),
+      due_after: z.string().optional(),
+    },
+    call("search_tasks")
+  );
+
+  // ─── R2: Agent Detail ──────────────────────────────────────────────────────
+
+  server.tool(
+    "get_agent_detail",
+    "Get detailed info about an agent including health, activity, and sessions",
+    {
+      agent_id: z.string(),
+    },
+    call("get_agent_detail")
   );
 
   return server;

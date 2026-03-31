@@ -7,13 +7,14 @@ import { usePolling } from "./hooks/usePolling";
 import { TopBar } from "./components/TopBar";
 import { ProjectList } from "./components/ProjectList";
 import { TaskBoard } from "./components/TaskBoard";
+import { AgentDashboard } from "./components/AgentDashboard";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export function App() {
   const dispatch = useAppDispatch();
-  const { blockers } = useAppState();
+  const { blockers, activeView } = useAppState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -66,6 +67,19 @@ export function App() {
           }
           dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
 
+          // Load task dependencies for all tasks
+          const depsEntries = await Promise.all(
+            tasks.map(async (t) => {
+              const deps = await api.getDependencies(t.id);
+              return [t.id, deps.map((d) => d.depends_on_task_id)] as [string, string[]];
+            })
+          );
+          const depsMap: Record<string, string[]> = {};
+          for (const [taskId, depIds] of depsEntries) {
+            if (depIds.length > 0) depsMap[taskId] = depIds;
+          }
+          dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
+
           // Show onboarding wizard on first run (no projects)
           if (projects.length === 0) {
             setShowOnboarding(true);
@@ -112,7 +126,7 @@ export function App() {
       <TopBar />
       <div className="main-content">
         <ProjectList />
-        <TaskBoard />
+        {activeView === "board" ? <TaskBoard /> : <AgentDashboard />}
         <AgentFeed />
       </div>
       {blockers.length > 0 && <AlertBanner />}

@@ -8,6 +8,7 @@ interface TaskCardProps {
   activity: ActivityEntry[];
   agents: Agent[];
   taskTags?: Tag[];
+  blockingCount?: number;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
 }
@@ -26,7 +27,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export function TaskCard({ task, allTasks, activity, agents, taskTags, onClick, onDragStart }: TaskCardProps) {
+export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -232,6 +233,39 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, onClick, 
               }}
             >
               {assignedAgent.name}
+            </span>
+          )}
+
+          {/* Estimate badge */}
+          {task.estimate != null && (
+            <span
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: "rgba(99,102,241,0.1)",
+                color: "#6366f1",
+                border: "1px solid rgba(99,102,241,0.3)",
+              }}
+            >
+              {task.estimate}pt
+            </span>
+          )}
+
+          {/* Dependency badge */}
+          {blockingCount != null && blockingCount > 0 && (
+            <span
+              title={`Blocked by ${blockingCount} task${blockingCount > 1 ? "s" : ""}`}
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: "rgba(248,81,73,0.1)",
+                color: "var(--accent-red)",
+                border: "1px solid rgba(248,81,73,0.3)",
+              }}
+            >
+              Blocked by {blockingCount}
             </span>
           )}
 

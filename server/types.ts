@@ -34,6 +34,7 @@ export interface Task {
   priority: TaskPriority;
   progress: number;
   due_date: string | null;
+  estimate: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +75,38 @@ export interface TaskTag {
   tag_id: string;
 }
 
+export interface AgentSession {
+  id: string;
+  agent_id: string;
+  started_at: string;
+  ended_at: string | null;
+  last_activity_at: string;
+  tasks_touched: number;
+  activity_count: number;
+}
+
+export interface TaskDependency {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+  created_at: string;
+}
+
+export interface SavedFilter {
+  id: string;
+  name: string;
+  filter_json: string;
+  created_at: string;
+}
+
+export interface SprintCapacity {
+  total_estimated: number;
+  completed_points: number;
+  remaining_points: number;
+  task_count: number;
+  completed_count: number;
+}
+
 export interface Blocker {
   id: string;
   task_id: string;
@@ -97,9 +130,13 @@ export type WsEventType =
   | "sprint_updated"
   | "tag_created"
   | "tag_added"
-  | "tag_removed";
+  | "tag_removed"
+  | "dependency_added"
+  | "dependency_removed"
+  | "session_started"
+  | "session_ended";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency;
 }
