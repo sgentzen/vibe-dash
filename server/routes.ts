@@ -62,7 +62,7 @@ export function createRouter(db: Database.Database): Router {
       }
     ).count;
     const tasks = (
-      db.prepare("SELECT COUNT(*) AS count FROM tasks").get() as {
+      db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status != 'done'").get() as {
         count: number;
       }
     ).count;

@@ -18,6 +18,8 @@ const COLUMN_COLORS: Record<TaskStatus, string> = {
   blocked: "var(--accent-yellow)",
 };
 
+const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
+
 export function TaskBoard() {
   const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
   const dispatch = useAppDispatch();
@@ -25,14 +27,21 @@ export function TaskBoard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const dragTaskId = useRef<string>("");
 
+  const now = Date.now();
   const lowerSearch = searchQuery.toLowerCase();
-  const filteredTasks = tasks.filter(
-    (t) =>
+
+  const filteredTasks = tasks.filter((t) => {
+    if (t.status === "done") {
+      const completedAt = new Date(t.updated_at).getTime();
+      if (now - completedAt > DONE_AGE_OFF_MS) return false;
+    }
+    return (
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
       (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
       (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
-  );
+    );
+  });
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
