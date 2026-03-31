@@ -4,7 +4,7 @@ import { useApi } from "../hooks/useApi";
 import { useAppDispatch } from "../store";
 
 export function TopBar() {
-  const { stats } = useAppState();
+  const { stats, theme } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showForm, setShowForm] = useState(false);
@@ -64,6 +64,26 @@ export function TopBar() {
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
+
+      {/* Theme Toggle */}
+      <button
+        onClick={() => dispatch({ type: "SET_THEME", payload: theme === "dark" ? "light" : "dark" })}
+        aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+        style={{
+          background: "transparent",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          padding: "4px 8px",
+          cursor: "pointer",
+          color: "var(--text-secondary)",
+          fontSize: "16px",
+          lineHeight: 1,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
+      </button>
 
       {/* Add Project */}
       {showForm ? (

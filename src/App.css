@@ -15,6 +15,23 @@
   --yellow-bg: #2a1a0a;
 }
 
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #e8ecf0;
+  --border: #d0d7de;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #8b949e;
+  --accent-red: #cf222e;
+  --accent-green: #1a7f37;
+  --accent-blue: #0969da;
+  --accent-yellow: #9a6700;
+  --green-bg: #dafbe1;
+  --green-border: #1a7f37;
+  --yellow-bg: #fff8c5;
+}
+
 *,
 *::before,
 *::after {

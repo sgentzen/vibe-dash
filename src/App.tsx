@@ -13,13 +13,17 @@ import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export function App() {
   const dispatch = useAppDispatch();
-  const { blockers } = useAppState();
+  const { blockers, theme } = useAppState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useWebSocket();
   usePolling();
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;

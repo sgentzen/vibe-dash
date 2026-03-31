@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useReducer } from "react";
 import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, WsEvent } from "./types";
 
+export type Theme = "dark" | "light";
+
+const THEME_STORAGE_KEY = "vibe-dash-theme";
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  return "dark";
+}
+
 export interface AppState {
   projects: Project[];
   sprints: Sprint[];
@@ -10,6 +21,7 @@ export interface AppState {
   blockers: Blocker[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>; // task_id -> tag_id[]
+  theme: Theme;
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   stats: {
@@ -29,6 +41,7 @@ const initialState: AppState = {
   blockers: [],
   tags: [],
   taskTagMap: {},
+  theme: getInitialTheme(),
   selectedProjectId: null,
   selectedSprintId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
@@ -46,6 +59,7 @@ export type AppAction =
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_SPRINT"; payload: string | null }
+  | { type: "SET_THEME"; payload: Theme }
   | { type: "WS_EVENT"; payload: WsEvent };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -72,6 +86,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedProjectId: action.payload, selectedSprintId: null };
     case "SELECT_SPRINT":
       return { ...state, selectedSprintId: action.payload };
+    case "SET_THEME":
+      localStorage.setItem(THEME_STORAGE_KEY, action.payload);
+      return { ...state, theme: action.payload };
     case "WS_EVENT": {
       const event = action.payload;
       switch (event.type) {
