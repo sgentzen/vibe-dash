@@ -20,6 +20,15 @@ import {
   addTagToTask,
   removeTagFromTask,
   getTaskTags,
+  addDependency,
+  removeDependency,
+  listDependencies,
+  listAgentSessions,
+  searchTasks,
+  getAgentById,
+  getAgentActivity,
+  getAgentCompletedToday,
+  getAgentHealthStatus,
 } from "../db.js";
 
 import { broadcast } from "../websocket.js";
@@ -151,6 +160,7 @@ export async function handleTool(
         sprint_id: args.sprint_id as string | null | undefined,
         assigned_agent_id: args.assigned_agent_id as string | null | undefined,
         due_date: args.due_date as string | null | undefined,
+        estimate: args.estimate as number | null | undefined,
       });
       if (updated) {
         broadcast({ type: "task_updated", payload: updated });
@@ -275,6 +285,54 @@ export async function handleTool(
     case "get_task_tags": {
       const tags = getTaskTags(db, args.task_id as string);
       return ok({ tags });
+    }
+
+    case "add_dependency": {
+      const dep = addDependency(db, args.task_id as string, args.depends_on_task_id as string);
+      broadcast({ type: "dependency_added", payload: dep });
+      return ok({ dependency_id: dep.id });
+    }
+
+    case "remove_dependency": {
+      const removed = removeDependency(db, args.dependency_id as string);
+      return ok({ success: removed });
+    }
+
+    case "list_dependencies": {
+      const deps = listDependencies(db, args.task_id as string);
+      return ok({ dependencies: deps });
+    }
+
+    case "list_agent_sessions": {
+      const sessions = listAgentSessions(db, args.agent_id as string);
+      return ok({ sessions });
+    }
+
+    case "search_tasks": {
+      const results = searchTasks(db, {
+        query: args.query as string | undefined,
+        project_id: args.project_id as string | undefined,
+        sprint_id: args.sprint_id as string | undefined,
+        status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
+        priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
+        assigned_agent_id: args.assigned_agent_id as string | undefined,
+        tag_id: args.tag_id as string | undefined,
+        due_before: args.due_before as string | undefined,
+        due_after: args.due_after as string | undefined,
+      });
+      return ok({ tasks: results });
+    }
+
+    case "get_agent_detail": {
+      const agent = getAgentById(db, args.agent_id as string);
+      if (!agent) return ok({ error: "Agent not found" });
+      return ok({
+        agent,
+        health_status: getAgentHealthStatus(agent.last_seen_at),
+        completed_today: getAgentCompletedToday(db, agent.id),
+        recent_activity: getAgentActivity(db, agent.id, 20),
+        sessions: listAgentSessions(db, agent.id),
+      });
     }
 
     default:

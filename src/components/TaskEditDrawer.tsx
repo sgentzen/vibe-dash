@@ -21,6 +21,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [sprintId, setSprintId] = useState<string | null>(task.sprint_id);
   const [assignedAgentId, setAssignedAgentId] = useState<string | null>(task.assigned_agent_id);
   const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
+  const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
   const [saving, setSaving] = useState(false);
 
   const taskSprints = sprints.filter((s) => s.project_id === task.project_id);
@@ -39,6 +40,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setSprintId(task.sprint_id);
     setAssignedAgentId(task.assigned_agent_id);
     setDueDate(task.due_date ?? "");
+    setEstimate(task.estimate != null ? String(task.estimate) : "");
   }, [task]);
 
   async function handleSave() {
@@ -53,6 +55,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         sprint_id: sprintId,
         assigned_agent_id: assignedAgentId,
         due_date: dueDate || null,
+        estimate: estimate ? parseInt(estimate, 10) : null,
       });
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
       onClose();
@@ -229,6 +232,19 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Estimate */}
+        <div>
+          <label style={labelStyle}>Estimate (story points)</label>
+          <input
+            type="number"
+            min={0}
+            value={estimate}
+            onChange={(e) => setEstimate(e.target.value)}
+            placeholder="0"
             style={inputStyle}
           />
         </div>

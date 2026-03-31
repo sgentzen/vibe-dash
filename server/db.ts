@@ -9,6 +9,10 @@ import type {
   Blocker,
   Tag,
   TaskTag,
+  AgentSession,
+  TaskDependency,
+  SavedFilter,
+  SprintCapacity,
   TaskStatus,
   TaskPriority,
   SprintStatus,
@@ -69,6 +73,27 @@ const SCHEMA = [
   "  tag_id TEXT NOT NULL REFERENCES tags(id),",
   "  UNIQUE(task_id, tag_id)",
   ");",
+  "CREATE TABLE IF NOT EXISTS agent_sessions (",
+  "  id TEXT PRIMARY KEY,",
+  "  agent_id TEXT NOT NULL REFERENCES agents(id),",
+  "  started_at TEXT NOT NULL, ended_at TEXT,",
+  "  last_activity_at TEXT NOT NULL,",
+  "  tasks_touched INTEGER NOT NULL DEFAULT 0,",
+  "  activity_count INTEGER NOT NULL DEFAULT 0",
+  ");",
+  "CREATE TABLE IF NOT EXISTS task_dependencies (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  depends_on_task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  created_at TEXT NOT NULL,",
+  "  UNIQUE(task_id, depends_on_task_id)",
+  ");",
+  "CREATE TABLE IF NOT EXISTS saved_filters (",
+  "  id TEXT PRIMARY KEY,",
+  "  name TEXT NOT NULL,",
+  "  filter_json TEXT NOT NULL,",
+  "  created_at TEXT NOT NULL",
+  ");",
 ].join("\n");
 
 export function initDb(db: Database.Database): void {
@@ -88,6 +113,9 @@ function migrate(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === "due_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN due_date TEXT").run();
+  }
+  if (!cols.some((c) => c.name === "estimate")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN estimate INTEGER").run();
   }
 }
 
@@ -228,6 +256,7 @@ export interface CreateTaskInput {
   priority: TaskPriority;
   status?: TaskStatus;
   due_date?: string | null;
+  estimate?: number | null;
 }
 
 export function createTask(
@@ -238,8 +267,8 @@ export function createTask(
   const ts = now();
   const status: TaskStatus = input.status ?? "planned";
   db.prepare(
-    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, status, priority, progress, due_date, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
+    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, status, priority, progress, due_date, estimate, created_at, updated_at)" +
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)"
   ).run(
     id,
     input.project_id,
@@ -251,6 +280,7 @@ export function createTask(
     status,
     input.priority,
     input.due_date ?? null,
+    input.estimate ?? null,
     ts,
     ts
   );
@@ -318,6 +348,7 @@ export interface UpdateTaskInput {
   sprint_id?: string | null;
   assigned_agent_id?: string | null;
   due_date?: string | null;
+  estimate?: number | null;
 }
 
 export function updateTask(
@@ -363,6 +394,10 @@ export function updateTask(
   if (input.due_date !== undefined) {
     sets.push("due_date = ?");
     params.push(input.due_date);
+  }
+  if (input.estimate !== undefined) {
+    sets.push("estimate = ?");
+    params.push(input.estimate);
   }
 
   if (sets.length === 0) return getTask(db, id);
@@ -609,4 +644,220 @@ export function getTag(db: Database.Database, id: string): Tag | null {
   return (
     (db.prepare("SELECT * FROM tags WHERE id = ?").get(id) as Tag | undefined) ?? null
   );
+}
+
+// ─── Time Estimates ──────────────────────────────────────────────────────────
+
+export function getTimeSpent(db: Database.Database, taskId: string): number | null {
+  const first = db
+    .prepare("SELECT MIN(timestamp) AS ts FROM activity_log WHERE task_id = ?")
+    .get(taskId) as { ts: string | null } | undefined;
+  const task = getTask(db, taskId);
+  if (!first?.ts || !task || task.status !== "done") return null;
+  const start = new Date(first.ts).getTime();
+  const end = new Date(task.updated_at).getTime();
+  return Math.max(0, Math.round((end - start) / 1000));
+}
+
+export function getSprintCapacity(db: Database.Database, sprintId: string): SprintCapacity {
+  const tasks = listTasks(db, { sprint_id: sprintId });
+  let totalEstimated = 0;
+  let completedPoints = 0;
+  let completedCount = 0;
+  for (const t of tasks) {
+    if (t.estimate) totalEstimated += t.estimate;
+    if (t.status === "done") {
+      completedCount++;
+      if (t.estimate) completedPoints += t.estimate;
+    }
+  }
+  return {
+    total_estimated: totalEstimated,
+    completed_points: completedPoints,
+    remaining_points: totalEstimated - completedPoints,
+    task_count: tasks.length,
+    completed_count: completedCount,
+  };
+}
+
+// ─── Agent Sessions ──────────────────────────────────────────────────────────
+
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+
+export function startOrGetSession(db: Database.Database, agentId: string): AgentSession {
+  const ts = now();
+  // Find open session for this agent
+  const open = db
+    .prepare("SELECT * FROM agent_sessions WHERE agent_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1")
+    .get(agentId) as AgentSession | undefined;
+
+  if (open) {
+    const elapsed = Date.now() - new Date(open.last_activity_at).getTime();
+    if (elapsed > SESSION_TIMEOUT_MS) {
+      // Close stale session, start new one
+      db.prepare("UPDATE agent_sessions SET ended_at = ? WHERE id = ?").run(ts, open.id);
+    } else {
+      // Increment activity count and update last_activity_at
+      db.prepare("UPDATE agent_sessions SET activity_count = activity_count + 1, last_activity_at = ? WHERE id = ?").run(ts, open.id);
+      return db.prepare("SELECT * FROM agent_sessions WHERE id = ?").get(open.id) as AgentSession;
+    }
+  }
+
+  // Start new session
+  const id = randomUUID();
+  db.prepare(
+    "INSERT INTO agent_sessions (id, agent_id, started_at, last_activity_at, tasks_touched, activity_count) VALUES (?, ?, ?, ?, 1, 1)"
+  ).run(id, agentId, ts, ts);
+  return db.prepare("SELECT * FROM agent_sessions WHERE id = ?").get(id) as AgentSession;
+}
+
+export function closeStaleSession(db: Database.Database): number {
+  const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
+  const result = db.prepare(
+    "UPDATE agent_sessions SET ended_at = ? WHERE ended_at IS NULL AND started_at < ?"
+  ).run(now(), cutoff);
+  return result.changes;
+}
+
+export function listAgentSessions(db: Database.Database, agentId: string): AgentSession[] {
+  return db
+    .prepare("SELECT * FROM agent_sessions WHERE agent_id = ? ORDER BY started_at DESC")
+    .all(agentId) as AgentSession[];
+}
+
+// ─── Task Dependencies ───────────────────────────────────────────────────────
+
+export function addDependency(
+  db: Database.Database,
+  taskId: string,
+  dependsOnTaskId: string
+): TaskDependency {
+  if (taskId === dependsOnTaskId) {
+    throw new Error("A task cannot depend on itself");
+  }
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT OR IGNORE INTO task_dependencies (id, task_id, depends_on_task_id, created_at) VALUES (?, ?, ?, ?)"
+  ).run(id, taskId, dependsOnTaskId, ts);
+  return db
+    .prepare("SELECT * FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?")
+    .get(taskId, dependsOnTaskId) as TaskDependency;
+}
+
+export function removeDependency(db: Database.Database, id: string): boolean {
+  const result = db.prepare("DELETE FROM task_dependencies WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
+export function listDependencies(db: Database.Database, taskId: string): TaskDependency[] {
+  return db
+    .prepare("SELECT * FROM task_dependencies WHERE task_id = ? ORDER BY created_at ASC")
+    .all(taskId) as TaskDependency[];
+}
+
+export function getBlockingTasks(db: Database.Database, taskId: string): Task[] {
+  return db
+    .prepare(
+      `SELECT t.* FROM tasks t
+       JOIN task_dependencies td ON t.id = td.depends_on_task_id
+       WHERE td.task_id = ? AND t.status != 'done'
+       ORDER BY t.created_at ASC`
+    )
+    .all(taskId) as Task[];
+}
+
+// ─── Search ──────────────────────────────────────────────────────────────────
+
+export interface SearchTasksFilter {
+  query?: string;
+  project_id?: string;
+  sprint_id?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assigned_agent_id?: string;
+  tag_id?: string;
+  due_before?: string;
+  due_after?: string;
+}
+
+export function searchTasks(db: Database.Database, filter: SearchTasksFilter): Task[] {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filter.query) {
+    conditions.push("(t.title LIKE ? OR t.description LIKE ?)");
+    const q = `%${filter.query}%`;
+    params.push(q, q);
+  }
+  if (filter.project_id) { conditions.push("t.project_id = ?"); params.push(filter.project_id); }
+  if (filter.sprint_id) { conditions.push("t.sprint_id = ?"); params.push(filter.sprint_id); }
+  if (filter.status) { conditions.push("t.status = ?"); params.push(filter.status); }
+  if (filter.priority) { conditions.push("t.priority = ?"); params.push(filter.priority); }
+  if (filter.assigned_agent_id) { conditions.push("t.assigned_agent_id = ?"); params.push(filter.assigned_agent_id); }
+  if (filter.due_before) { conditions.push("t.due_date <= ?"); params.push(filter.due_before); }
+  if (filter.due_after) { conditions.push("t.due_date >= ?"); params.push(filter.due_after); }
+
+  let sql = "SELECT DISTINCT t.* FROM tasks t";
+  if (filter.tag_id) {
+    sql += " JOIN task_tags tt ON t.id = tt.task_id";
+    conditions.push("tt.tag_id = ?");
+    params.push(filter.tag_id);
+  }
+
+  if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
+  sql += " ORDER BY t.created_at DESC LIMIT 200";
+
+  return db.prepare(sql).all(...params) as Task[];
+}
+
+// ─── Saved Filters ───────────────────────────────────────────────────────────
+
+export function createSavedFilter(db: Database.Database, name: string, filterJson: string): SavedFilter {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare("INSERT INTO saved_filters (id, name, filter_json, created_at) VALUES (?, ?, ?, ?)").run(id, name, filterJson, ts);
+  return db.prepare("SELECT * FROM saved_filters WHERE id = ?").get(id) as SavedFilter;
+}
+
+export function listSavedFilters(db: Database.Database): SavedFilter[] {
+  return db.prepare("SELECT * FROM saved_filters ORDER BY created_at DESC").all() as SavedFilter[];
+}
+
+export function deleteSavedFilter(db: Database.Database, id: string): boolean {
+  return db.prepare("DELETE FROM saved_filters WHERE id = ?").run(id).changes > 0;
+}
+
+// ─── Agent Detail ────────────────────────────────────────────────────────────
+
+export function getAgentById(db: Database.Database, id: string): Agent | null {
+  const row = db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return parseAgent(row);
+}
+
+export function getAgentActivity(db: Database.Database, agentId: string, limit = 50): ActivityEntry[] {
+  return db
+    .prepare(
+      `SELECT a.*, ag.name AS agent_name, t.title AS task_title
+       FROM activity_log a
+       LEFT JOIN agents ag ON a.agent_id = ag.id
+       LEFT JOIN tasks t ON a.task_id = t.id
+       WHERE a.agent_id = ?
+       ORDER BY a.timestamp DESC LIMIT ?`
+    )
+    .all(agentId, limit) as ActivityEntry[];
+}
+
+export function getAgentCompletedToday(db: Database.Database, agentId: string): number {
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const row = db
+    .prepare(
+      `SELECT COUNT(DISTINCT t.id) AS count FROM activity_log a
+       JOIN tasks t ON a.task_id = t.id
+       WHERE a.agent_id = ? AND t.status = 'done' AND t.updated_at >= ?`
+    )
+    .get(agentId, todayStart.toISOString()) as { count: number };
+  return row.count;
 }

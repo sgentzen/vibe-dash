@@ -62,6 +62,48 @@ export function TopBar() {
         <StatPill label="TASKS" value={stats.tasks} color="var(--text-secondary)" />
       </div>
 
+      {/* View Toggle */}
+      <div style={{ display: "flex", gap: "2px", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "2px" }}>
+        <button
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "board" })}
+          style={{
+            ...viewBtnStyle,
+            background: activeView === "board" ? "var(--bg-primary)" : "transparent",
+            color: activeView === "board" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
+        >
+          Board
+        </button>
+        <button
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "agents" })}
+          style={{
+            ...viewBtnStyle,
+            background: activeView === "agents" ? "var(--bg-primary)" : "transparent",
+            color: activeView === "agents" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
+        >
+          Agents
+        </button>
+      </div>
+
+      {/* Search */}
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => dispatch({ type: "SET_SEARCH_QUERY", payload: e.target.value })}
+        placeholder="Search tasks..."
+        style={{
+          background: "var(--bg-tertiary)",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          color: "var(--text-primary)",
+          padding: "4px 10px",
+          fontSize: "13px",
+          width: "200px",
+          outline: "none",
+        }}
+      />
+
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
@@ -151,6 +193,15 @@ function StatPill({
     </div>
   );
 }
+
+const viewBtnStyle: React.CSSProperties = {
+  border: "none",
+  borderRadius: "4px",
+  padding: "4px 10px",
+  fontSize: "12px",
+  cursor: "pointer",
+  fontWeight: 500,
+};
 
 function btnStyle(bg: string): React.CSSProperties {
   return {
