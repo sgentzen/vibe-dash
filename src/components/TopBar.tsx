@@ -95,6 +95,16 @@ export function TopBar() {
         >
           List
         </button>
+        <button
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "dashboard" })}
+          style={{
+            ...viewBtnStyle,
+            background: activeView === "dashboard" ? "var(--bg-primary)" : "transparent",
+            color: activeView === "dashboard" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
+        >
+          Dash
+        </button>
       </div>
 
       {/* Search */}

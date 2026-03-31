@@ -15,7 +15,7 @@ export interface AppState {
   unreadCount: number;
   fileConflicts: FileConflict[];
   searchQuery: string;
-  activeView: "board" | "agents" | "list";
+  activeView: "board" | "agents" | "list" | "dashboard";
   selectedProjectId: string | null;
   selectedSprintId: string | null;
   stats: {
@@ -57,7 +57,7 @@ export type AppAction =
   | { type: "SET_TASK_TAG_MAP"; payload: Record<string, string[]> }
   | { type: "SET_TASK_DEPS_MAP"; payload: Record<string, string[]> }
   | { type: "SET_SEARCH_QUERY"; payload: string }
-  | { type: "SET_ACTIVE_VIEW"; payload: "board" | "agents" | "list" }
+  | { type: "SET_ACTIVE_VIEW"; payload: "board" | "agents" | "list" | "dashboard" }
   | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
   | { type: "SET_UNREAD_COUNT"; payload: number }
   | { type: "SET_FILE_CONFLICTS"; payload: FileConflict[] }
@@ -221,6 +221,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
         case "file_lock_acquired":
           return state; // locks managed via conflicts
+        case "daily_stats_recorded":
+          return state; // dashboard reloads on demand
         case "dependency_removed": {
           const dep = event.payload as TaskDependency;
           const deps = state.taskDepsMap[dep.task_id] ?? [];

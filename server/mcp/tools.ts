@@ -36,6 +36,9 @@ import {
   listNotifications,
   markNotificationRead,
   bulkUpdateTasks,
+  getAgentStats,
+  getSprintAgentContributions,
+  generateReport,
 } from "../db.js";
 
 import { broadcast } from "../websocket.js";
@@ -390,6 +393,20 @@ export async function handleTool(
         broadcast({ type: "task_updated", payload: t });
       }
       return ok({ updated: tasks.length });
+    }
+
+    // ─── R4: Agent Stats ──────────────────────────────────────────────────
+
+    case "get_agent_stats": {
+      const stats = getAgentStats(db, args.agent_id as string, args.sprint_id as string | undefined);
+      return ok(stats);
+    }
+
+    // ─── R4: Report ──────────────────────────────────────────────────────
+
+    case "generate_report": {
+      const report = generateReport(db, args.project_id as string, args.period as "day" | "week" | "sprint");
+      return ok({ report });
     }
 
     case "get_agent_detail": {

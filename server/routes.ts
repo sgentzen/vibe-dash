@@ -40,6 +40,13 @@ import {
   createSavedFilter,
   listSavedFilters,
   deleteSavedFilter,
+  getAgentStats,
+  getSprintAgentContributions,
+  recordDailyStats,
+  getSprintDailyStats,
+  getVelocityTrend,
+  getAgentActivityHeatmap,
+  generateReport,
   addComment,
   listComments,
   reportWorkingOn,
@@ -249,6 +256,10 @@ export function createRouter(db: Database.Database): Router {
     broadcast({ type: "task_completed", payload: completed! });
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
+    // Record daily stats if task has a sprint
+    if (completed?.sprint_id) {
+      recordDailyStats(db, completed.sprint_id);
+    }
     const entry = logActivity(db, {
       task_id: completed!.id,
       agent_id: null,
@@ -580,6 +591,51 @@ export function createRouter(db: Database.Database): Router {
 
   router.post("/api/notifications/mark-all-read", (_req, res) => {
     res.json({ marked: markAllNotificationsRead(db) });
+  });
+
+  // ─── R4: Agent Stats ─────────────────────────────────────────────
+
+  router.get("/api/agents/:id/stats", (req, res) => {
+    const sprintId = req.query.sprint_id as string | undefined;
+    res.json(getAgentStats(db, req.params.id, sprintId));
+  });
+
+  // ─── R4: Sprint Contributions ──────────────────────────────────────
+
+  router.get("/api/sprints/:id/contributions", (req, res) => {
+    res.json(getSprintAgentContributions(db, req.params.id));
+  });
+
+  // ─── R4: Sprint Burndown ───────────────────────────────────────────
+
+  router.get("/api/sprints/:id/burndown", (req, res) => {
+    res.json(getSprintDailyStats(db, req.params.id));
+  });
+
+  router.post("/api/sprints/:id/record-stats", (req, res) => {
+    const stats = recordDailyStats(db, req.params.id);
+    broadcast({ type: "daily_stats_recorded", payload: stats });
+    res.json(stats);
+  });
+
+  // ─── R4: Velocity ──────────────────────────────────────────────────
+
+  router.get("/api/velocity", (req, res) => {
+    const limit = parseInt((req.query.limit as string) ?? "5", 10);
+    res.json(getVelocityTrend(db, isNaN(limit) ? 5 : limit));
+  });
+
+  // ─── R4: Activity Heatmap ──────────────────────────────────────────
+
+  router.get("/api/activity-heatmap", (_req, res) => {
+    res.json(getAgentActivityHeatmap(db));
+  });
+
+  // ─── R4: Reports ───────────────────────────────────────────────────
+
+  router.post("/api/projects/:id/report", (req, res) => {
+    const period = (req.body.period as "day" | "week" | "sprint") ?? "week";
+    res.json({ report: generateReport(db, req.params.id, period) });
   });
 
   return router;

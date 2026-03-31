@@ -145,6 +145,46 @@ export interface AppNotification {
   created_at: string;
 }
 
+export interface AgentStats {
+  agent_id: string;
+  tasks_completed_total: number;
+  tasks_completed_sprint: number;
+  tasks_completed_today: number;
+  avg_completion_time_seconds: number | null;
+  blocker_rate: number;
+  activity_frequency: number;
+}
+
+export interface AgentContribution {
+  agent_id: string;
+  agent_name: string;
+  completed_count: number;
+  completed_points: number;
+}
+
+export interface SprintDailyStats {
+  sprint_id: string;
+  date: string;
+  completed_points: number;
+  remaining_points: number;
+  completed_tasks: number;
+  remaining_tasks: number;
+}
+
+export interface VelocityData {
+  sprint_id: string;
+  sprint_name: string;
+  completed_points: number;
+  completed_tasks: number;
+}
+
+export interface ActivityHeatmapEntry {
+  hour: number;
+  agent_id: string;
+  agent_name: string;
+  count: number;
+}
+
 export interface Blocker {
   id: string;
   task_id: string;
@@ -176,9 +216,10 @@ export type WsEventType =
   | "comment_added"
   | "file_lock_acquired"
   | "file_conflict_detected"
-  | "notification_created";
+  | "notification_created"
+  | "daily_stats_recorded";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats;
 }

@@ -18,6 +18,11 @@ import type {
   FileConflict,
   AlertRule,
   AppNotification,
+  AgentStats,
+  AgentContribution,
+  SprintDailyStats,
+  VelocityData,
+  ActivityHeatmapEntry,
   TaskStatus,
   TaskPriority,
   SprintStatus,
@@ -98,6 +103,15 @@ const SCHEMA = [
   "  name TEXT NOT NULL,",
   "  filter_json TEXT NOT NULL,",
   "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS sprint_daily_stats (",
+  "  sprint_id TEXT NOT NULL REFERENCES sprints(id),",
+  "  date TEXT NOT NULL,",
+  "  completed_points INTEGER NOT NULL DEFAULT 0,",
+  "  remaining_points INTEGER NOT NULL DEFAULT 0,",
+  "  completed_tasks INTEGER NOT NULL DEFAULT 0,",
+  "  remaining_tasks INTEGER NOT NULL DEFAULT 0,",
+  "  PRIMARY KEY(sprint_id, date)",
   ");",
   "CREATE TABLE IF NOT EXISTS task_comments (",
   "  id TEXT PRIMARY KEY,",
@@ -1070,4 +1084,190 @@ export function bulkUpdateTasks(
     if (updated) results.push(updated);
   }
   return results;
+}
+
+// ─── Agent Performance Metrics ───────────────────────────────────────────────
+
+export function getAgentStats(db: Database.Database, agentId: string, sprintId?: string): AgentStats {
+  // Total completed
+  const totalRow = db.prepare(
+    "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ? AND t.status = 'done'"
+  ).get(agentId) as { c: number };
+
+  // Sprint completed
+  let sprintCompleted = 0;
+  if (sprintId) {
+    const row = db.prepare(
+      "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ? AND t.sprint_id = ? AND t.status = 'done'"
+    ).get(agentId, sprintId) as { c: number };
+    sprintCompleted = row.c;
+  }
+
+  // Today completed
+  const todayCompleted = getAgentCompletedToday(db, agentId);
+
+  // Avg completion time: avg delta between first activity and task updated_at for done tasks
+  const avgRow = db.prepare(
+    `SELECT AVG(completion_sec) AS avg_sec FROM (
+      SELECT (julianday(t.updated_at) - julianday(MIN(a.timestamp))) * 86400 AS completion_sec
+      FROM activity_log a
+      JOIN tasks t ON a.task_id = t.id
+      WHERE a.agent_id = ? AND t.status = 'done'
+      GROUP BY t.id
+    )`
+  ).get(agentId) as { avg_sec: number | null } | undefined;
+  const avgCompletionTime = avgRow?.avg_sec != null ? Math.round(avgRow.avg_sec) : null;
+
+  // Blocker rate
+  const totalTasks = db.prepare(
+    "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ?"
+  ).get(agentId) as { c: number };
+  const blockedTasks = db.prepare(
+    "SELECT COUNT(DISTINCT b.task_id) AS c FROM blockers b JOIN activity_log a ON b.task_id = a.task_id WHERE a.agent_id = ?"
+  ).get(agentId) as { c: number };
+  const blockerRate = totalTasks.c > 0 ? blockedTasks.c / totalTasks.c : 0;
+
+  // Activity frequency (events per hour while active — using sessions)
+  const sessions = listAgentSessions(db, agentId);
+  let totalActivityCount = 0;
+  let totalSessionHours = 0;
+  for (const s of sessions) {
+    totalActivityCount += s.activity_count;
+    const start = new Date(s.started_at).getTime();
+    const end = s.ended_at ? new Date(s.ended_at).getTime() : new Date(s.last_activity_at).getTime();
+    totalSessionHours += Math.max((end - start) / 3600000, 0.01); // min 0.01h to avoid div/0
+  }
+  const activityFrequency = totalSessionHours > 0 ? Math.round((totalActivityCount / totalSessionHours) * 10) / 10 : 0;
+
+  return {
+    agent_id: agentId,
+    tasks_completed_total: totalRow.c,
+    tasks_completed_sprint: sprintCompleted,
+    tasks_completed_today: todayCompleted,
+    avg_completion_time_seconds: avgCompletionTime,
+    blocker_rate: Math.round(blockerRate * 1000) / 1000,
+    activity_frequency: activityFrequency,
+  };
+}
+
+export function getSprintAgentContributions(db: Database.Database, sprintId: string): AgentContribution[] {
+  const rows = db.prepare(
+    `SELECT a.id AS agent_id, a.name AS agent_name,
+       COUNT(t.id) AS completed_count,
+       COALESCE(SUM(t.estimate), 0) AS completed_points
+     FROM tasks t
+     JOIN agents a ON t.assigned_agent_id = a.id
+     WHERE t.sprint_id = ? AND t.status = 'done'
+     GROUP BY a.id, a.name
+     ORDER BY completed_count DESC`
+  ).all(sprintId) as AgentContribution[];
+  return rows;
+}
+
+// ─── Sprint Daily Stats & Velocity ───────────────────────────────────────────
+
+export function recordDailyStats(db: Database.Database, sprintId: string): SprintDailyStats {
+  const today = new Date().toISOString().slice(0, 10);
+  const cap = getSprintCapacity(db, sprintId);
+
+  db.prepare(
+    `INSERT OR REPLACE INTO sprint_daily_stats (sprint_id, date, completed_points, remaining_points, completed_tasks, remaining_tasks)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(sprintId, today, cap.completed_points, cap.remaining_points, cap.completed_count, cap.task_count - cap.completed_count);
+
+  return db.prepare("SELECT * FROM sprint_daily_stats WHERE sprint_id = ? AND date = ?").get(sprintId, today) as SprintDailyStats;
+}
+
+export function getSprintDailyStats(db: Database.Database, sprintId: string): SprintDailyStats[] {
+  return db
+    .prepare("SELECT * FROM sprint_daily_stats WHERE sprint_id = ? ORDER BY date ASC")
+    .all(sprintId) as SprintDailyStats[];
+}
+
+export function getVelocityTrend(db: Database.Database, limit = 5): VelocityData[] {
+  return db.prepare(
+    `SELECT s.id AS sprint_id, s.name AS sprint_name,
+       COALESCE(SUM(CASE WHEN t.status = 'done' THEN t.estimate ELSE 0 END), 0) AS completed_points,
+       COUNT(CASE WHEN t.status = 'done' THEN 1 END) AS completed_tasks
+     FROM sprints s
+     LEFT JOIN tasks t ON t.sprint_id = s.id
+     WHERE s.status = 'completed'
+     GROUP BY s.id, s.name
+     ORDER BY s.created_at DESC
+     LIMIT ?`
+  ).all(limit) as VelocityData[];
+}
+
+// ─── Activity Heatmap ────────────────────────────────────────────────────────
+
+export function getAgentActivityHeatmap(db: Database.Database): ActivityHeatmapEntry[] {
+  return db.prepare(
+    `SELECT CAST(strftime('%H', a.timestamp) AS INTEGER) AS hour,
+       a.agent_id, ag.name AS agent_name, COUNT(*) AS count
+     FROM activity_log a
+     JOIN agents ag ON a.agent_id = ag.id
+     GROUP BY hour, a.agent_id, ag.name
+     ORDER BY hour ASC, count DESC`
+  ).all() as ActivityHeatmapEntry[];
+}
+
+// ─── Report Generation ───────────────────────────────────────────────────────
+
+export function generateReport(db: Database.Database, projectId: string, period: "day" | "week" | "sprint"): string {
+  const project = db.prepare("SELECT * FROM projects WHERE id = ?").get(projectId) as Project | undefined;
+  if (!project) return "# Report\n\nProject not found.";
+
+  const now_ts = new Date();
+  let sinceDate: string;
+  if (period === "day") {
+    sinceDate = new Date(now_ts.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  } else if (period === "week") {
+    sinceDate = new Date(now_ts.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  } else {
+    sinceDate = new Date(now_ts.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  // Tasks completed in period
+  const completedTasks = db.prepare(
+    "SELECT * FROM tasks WHERE project_id = ? AND status = 'done' AND updated_at >= ? ORDER BY updated_at DESC"
+  ).all(projectId, sinceDate) as Task[];
+
+  // Blockers in period
+  const blockers = db.prepare(
+    "SELECT * FROM blockers WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?) AND reported_at >= ? ORDER BY reported_at DESC"
+  ).all(projectId, sinceDate) as Blocker[];
+
+  // Active agents
+  const agents = listAgents(db);
+  const activeAgents = agents.filter(a => {
+    const elapsed = now_ts.getTime() - new Date(a.last_seen_at).getTime();
+    return elapsed < 30 * 60 * 1000;
+  });
+
+  // Sprint progress
+  const sprints = listSprints(db, projectId);
+  const activeSprint = sprints.find(s => s.status === "active");
+  let sprintSection = "";
+  if (activeSprint) {
+    const cap = getSprintCapacity(db, activeSprint.id);
+    sprintSection = `## Sprint: ${activeSprint.name}\n- Tasks: ${cap.completed_count}/${cap.task_count} done\n- Points: ${cap.completed_points}/${cap.total_estimated} completed\n- Remaining: ${cap.remaining_points} points\n`;
+  }
+
+  const lines = [
+    `# Status Report: ${project.name}`,
+    `**Period:** ${period} | **Generated:** ${now_ts.toISOString().slice(0, 16)}`,
+    "",
+    sprintSection,
+    `## Tasks Completed (${completedTasks.length})`,
+    ...completedTasks.slice(0, 20).map(t => `- ${t.title}${t.estimate ? ` (${t.estimate}pt)` : ""}`),
+    "",
+    `## Blockers (${blockers.length})`,
+    blockers.length === 0 ? "- None" : "",
+    ...blockers.slice(0, 10).map(b => `- ${b.reason}${b.resolved_at ? " (resolved)" : " **unresolved**"}`),
+    "",
+    `## Agents (${activeAgents.length} active / ${agents.length} total)`,
+    ...agents.map(a => `- ${a.name}: ${getAgentHealthStatus(a.last_seen_at)}`),
+  ];
+
+  return lines.filter(l => l !== undefined).join("\n");
 }

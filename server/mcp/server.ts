@@ -338,6 +338,28 @@ export function createMcpServer(db: Database.Database): McpServer {
     call("get_agent_detail")
   );
 
+  // ─── R4: Agent Stats ─────────────────────────────────────────────────
+
+  server.tool(
+    "get_agent_stats",
+    "Get performance metrics for an agent",
+    {
+      agent_id: z.string(),
+      sprint_id: z.string().optional(),
+    },
+    call("get_agent_stats")
+  );
+
+  server.tool(
+    "generate_report",
+    "Generate a markdown status report for a project",
+    {
+      project_id: z.string(),
+      period: z.enum(["day", "week", "sprint"]),
+    },
+    call("generate_report")
+  );
+
   // ─── R3: Comments ───────────────────────────────────────────────────────
 
   server.tool(

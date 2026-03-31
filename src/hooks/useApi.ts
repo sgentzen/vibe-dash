@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -340,6 +340,54 @@ async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknow
   return res.json();
 }
 
+// ─── R4: Agent Stats ─────────────────────────────────────────────────
+
+async function getAgentStats(agentId: string, sprintId?: string): Promise<AgentStats> {
+  const qs = sprintId ? `?sprint_id=${encodeURIComponent(sprintId)}` : "";
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/stats${qs}`);
+  if (!res.ok) throw new Error(`getAgentStats failed: ${res.status}`);
+  return res.json();
+}
+
+async function getSprintContributions(sprintId: string): Promise<AgentContribution[]> {
+  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/contributions`);
+  if (!res.ok) throw new Error(`getSprintContributions failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R4: Burndown & Velocity ─────────────────────────────────────────
+
+async function getSprintBurndown(sprintId: string): Promise<SprintDailyStats[]> {
+  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/burndown`);
+  if (!res.ok) throw new Error(`getSprintBurndown failed: ${res.status}`);
+  return res.json();
+}
+
+async function getVelocityTrend(limit = 5): Promise<VelocityData[]> {
+  const res = await fetch(`/api/velocity?limit=${limit}`);
+  if (!res.ok) throw new Error(`getVelocityTrend failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R4: Heatmap & Reports ──────────────────────────────────────────
+
+async function getActivityHeatmap(): Promise<ActivityHeatmapEntry[]> {
+  const res = await fetch("/api/activity-heatmap");
+  if (!res.ok) throw new Error(`getActivityHeatmap failed: ${res.status}`);
+  return res.json();
+}
+
+async function generateReportApi(projectId: string, period: "day" | "week" | "sprint"): Promise<string> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/report`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ period }),
+  });
+  if (!res.ok) throw new Error(`generateReport failed: ${res.status}`);
+  const data = await res.json();
+  return data.report;
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -382,5 +430,11 @@ export function useApi() {
     getAlertRules,
     createAlertRule,
     bulkUpdateTasks,
+    getAgentStats,
+    getSprintContributions,
+    getSprintBurndown,
+    getVelocityTrend,
+    getActivityHeatmap,
+    generateReport: generateReportApi,
   }), []);
 }
