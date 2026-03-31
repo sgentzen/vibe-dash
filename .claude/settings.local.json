@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__vibe-dash__list_projects",
+      "mcp__vibe-dash__create_sprint",
+      "mcp__vibe-dash__create_task",
+      "mcp__vibe-dash__update_task",
+      "mcp__vibe-dash__log_activity"
+    ]
+  }
+}

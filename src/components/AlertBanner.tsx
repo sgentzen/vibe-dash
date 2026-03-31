@@ -1,10 +1,10 @@
 import { useAppState } from "../store";
 
 export function AlertBanner() {
-  const { blockers } = useAppState();
-  if (blockers.length === 0) return null;
+  const { blockers, fileConflicts } = useAppState();
+  if (blockers.length === 0 && fileConflicts.length === 0) return null;
 
-  const latest = blockers[blockers.length - 1];
+  const latest = blockers.length > 0 ? blockers[blockers.length - 1] : null;
   const extra = blockers.length - 1;
 
   return (
@@ -30,18 +30,20 @@ export function AlertBanner() {
       >
         ⚠ ALERT
       </span>
-      <span
-        style={{
-          color: "var(--text-primary)",
-          fontSize: "13px",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-        }}
-      >
-        {latest.reason}
-      </span>
+      {latest && (
+        <span
+          style={{
+            color: "var(--text-primary)",
+            fontSize: "13px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+          }}
+        >
+          {latest.reason}
+        </span>
+      )}
       {extra > 0 && (
         <span
           style={{
@@ -54,6 +56,18 @@ export function AlertBanner() {
           +{extra} more
         </span>
       )}
+      {fileConflicts.map((c) => (
+        <span
+          key={c.file_path}
+          style={{
+            color: "var(--accent-red)",
+            fontSize: "12px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {c.agents.map((a) => a.agent_name).join(" & ")} both editing {c.file_path}
+        </span>
+      ))}
     </div>
   );
 }

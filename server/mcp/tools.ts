@@ -30,6 +30,16 @@ import {
   getAgentActivity,
   getAgentCompletedToday,
   getAgentHealthStatus,
+  addComment,
+  listComments,
+  reportWorkingOn,
+  getFileConflicts,
+  listNotifications,
+  markNotificationRead,
+  bulkUpdateTasks,
+  getAgentStats,
+  getSprintAgentContributions,
+  generateReport,
 } from "../db.js";
 
 import { broadcast } from "../websocket.js";
@@ -324,6 +334,82 @@ export async function handleTool(
         due_after: args.due_after as string | undefined,
       });
       return ok({ tasks: results });
+    }
+
+    // ─── R3: Comments ──────────────────────────────────────────────────────
+
+    case "add_comment": {
+      const comment = addComment(
+        db,
+        args.task_id as string,
+        args.message as string,
+        args.agent_name as string,
+        args.agent_id as string | undefined
+      );
+      broadcast({ type: "comment_added", payload: comment });
+      return ok({ comment });
+    }
+
+    case "list_comments": {
+      return ok({ comments: listComments(db, args.task_id as string) });
+    }
+
+    // ─── R3: File Locks ──────────────────────────────────────────────────────
+
+    case "report_working_on": {
+      const locks = reportWorkingOn(
+        db,
+        args.agent_id as string,
+        args.task_id as string,
+        args.file_paths as string[]
+      );
+      for (const lock of locks) {
+        broadcast({ type: "file_lock_acquired", payload: lock });
+      }
+      const conflicts = getFileConflicts(db);
+      for (const c of conflicts) {
+        broadcast({ type: "file_conflict_detected", payload: c });
+      }
+      return ok({ locks, conflicts });
+    }
+
+    // ─── R3: Notifications ───────────────────────────────────────────────────
+
+    case "list_notifications": {
+      return ok({ notifications: listNotifications(db, (args.limit as number) ?? 50) });
+    }
+
+    case "mark_notification_read": {
+      return ok({ success: markNotificationRead(db, args.notification_id as string) });
+    }
+
+    // ─── R3: Bulk Update ─────────────────────────────────────────────────────
+
+    case "bulk_update_tasks": {
+      const ids = args.task_ids as string[];
+      const updates: Record<string, unknown> = {};
+      if (args.status !== undefined) updates.status = args.status;
+      if (args.priority !== undefined) updates.priority = args.priority;
+      if (args.assigned_agent_id !== undefined) updates.assigned_agent_id = args.assigned_agent_id;
+      const tasks = bulkUpdateTasks(db, ids, updates as any);
+      for (const t of tasks) {
+        broadcast({ type: "task_updated", payload: t });
+      }
+      return ok({ updated: tasks.length });
+    }
+
+    // ─── R4: Agent Stats ──────────────────────────────────────────────────
+
+    case "get_agent_stats": {
+      const stats = getAgentStats(db, args.agent_id as string, args.sprint_id as string | undefined);
+      return ok(stats);
+    }
+
+    // ─── R4: Report ──────────────────────────────────────────────────────
+
+    case "generate_report": {
+      const report = generateReport(db, args.project_id as string, args.period as "day" | "week" | "sprint");
+      return ok({ report });
     }
 
     case "get_agent_detail": {

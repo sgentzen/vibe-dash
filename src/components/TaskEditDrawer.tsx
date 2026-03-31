@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
-import type { Task, TaskStatus, TaskPriority, Tag } from "../types";
+import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -23,6 +23,17 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
   const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
   const [saving, setSaving] = useState(false);
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [newComment, setNewComment] = useState("");
+
+  function submitComment() {
+    const text = newComment.trim();
+    if (!text) return;
+    api.addComment(task.id, text, "User").then((c) => {
+      setComments((prev) => [...prev, c]);
+      setNewComment("");
+    }).catch(() => {});
+  }
 
   const taskSprints = sprints.filter((s) => s.project_id === task.project_id);
   const projectTags = tags.filter((t) => t.project_id === task.project_id);
@@ -41,7 +52,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setAssignedAgentId(task.assigned_agent_id);
     setDueDate(task.due_date ?? "");
     setEstimate(task.estimate != null ? String(task.estimate) : "");
-  }, [task]);
+    setNewComment("");
+    api.getComments(task.id).then(setComments).catch(() => {});
+  }, [task, api]);
 
   async function handleSave() {
     setSaving(true);
@@ -327,6 +340,62 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             onChange={(e) => setProgress(Number(e.target.value))}
             style={{ width: "100%", accentColor: "var(--accent-green)" }}
           />
+        </div>
+
+        {/* Comments */}
+        <div>
+          <label style={labelStyle}>Comments ({comments.length})</label>
+          <div style={{
+            maxHeight: "200px", overflowY: "auto",
+            border: "1px solid var(--border)", borderRadius: "6px",
+            marginBottom: "8px",
+          }}>
+            {comments.length === 0 ? (
+              <div style={{ padding: "12px", color: "var(--text-muted)", fontSize: "12px", textAlign: "center" }}>
+                No comments yet
+              </div>
+            ) : (
+              comments.map((c) => (
+                <div key={c.id} style={{
+                  padding: "8px 10px", borderBottom: "1px solid var(--border)",
+                  fontSize: "12px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{c.author_name}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>
+                      {new Date(c.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ color: "var(--text-secondary)" }}>{c.message}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }}
+              placeholder="Add a comment..."
+              style={inputStyle}
+            />
+            <button
+              onClick={submitComment}
+              disabled={!newComment.trim()}
+              style={{
+                background: "transparent",
+                border: "1px solid var(--accent-blue)",
+                color: "var(--accent-blue)",
+                borderRadius: "6px",
+                padding: "4px 12px",
+                fontSize: "12px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Send
+            </button>
+          </div>
         </div>
 
         {/* Actions */}

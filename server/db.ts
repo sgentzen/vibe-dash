@@ -13,6 +13,16 @@ import type {
   TaskDependency,
   SavedFilter,
   SprintCapacity,
+  TaskComment,
+  AgentFileLock,
+  FileConflict,
+  AlertRule,
+  AppNotification,
+  AgentStats,
+  AgentContribution,
+  SprintDailyStats,
+  VelocityData,
+  ActivityHeatmapEntry,
   TaskStatus,
   TaskPriority,
   SprintStatus,
@@ -94,6 +104,45 @@ const SCHEMA = [
   "  id TEXT PRIMARY KEY,",
   "  name TEXT NOT NULL,",
   "  filter_json TEXT NOT NULL,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS sprint_daily_stats (",
+  "  sprint_id TEXT NOT NULL REFERENCES sprints(id),",
+  "  date TEXT NOT NULL,",
+  "  completed_points INTEGER NOT NULL DEFAULT 0,",
+  "  remaining_points INTEGER NOT NULL DEFAULT 0,",
+  "  completed_tasks INTEGER NOT NULL DEFAULT 0,",
+  "  remaining_tasks INTEGER NOT NULL DEFAULT 0,",
+  "  PRIMARY KEY(sprint_id, date)",
+  ");",
+  "CREATE TABLE IF NOT EXISTS task_comments (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  agent_id TEXT REFERENCES agents(id),",
+  "  author_name TEXT NOT NULL,",
+  "  message TEXT NOT NULL,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS agent_file_locks (",
+  "  id TEXT PRIMARY KEY,",
+  "  agent_id TEXT NOT NULL REFERENCES agents(id),",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  file_path TEXT NOT NULL,",
+  "  started_at TEXT NOT NULL,",
+  "  UNIQUE(agent_id, file_path)",
+  ");",
+  "CREATE TABLE IF NOT EXISTS alert_rules (",
+  "  id TEXT PRIMARY KEY,",
+  "  event_type TEXT NOT NULL,",
+  "  filter_json TEXT NOT NULL DEFAULT '{}',",
+  "  enabled INTEGER NOT NULL DEFAULT 1,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE TABLE IF NOT EXISTS notifications (",
+  "  id TEXT PRIMARY KEY,",
+  "  rule_id TEXT REFERENCES alert_rules(id),",
+  "  message TEXT NOT NULL,",
+  "  read INTEGER NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
 ].join("\n");
@@ -898,4 +947,365 @@ export function getAgentCompletedToday(db: Database.Database, agentId: string): 
     )
     .get(agentId, todayStart.toISOString()) as { count: number };
   return row.count;
+}
+
+// ─── Task Comments ───────────────────────────────────────────────────────────
+
+export function addComment(
+  db: Database.Database,
+  taskId: string,
+  message: string,
+  authorName: string,
+  agentId?: string | null
+): TaskComment {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO task_comments (id, task_id, agent_id, author_name, message, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, taskId, agentId ?? null, authorName, message, ts);
+  return db.prepare("SELECT * FROM task_comments WHERE id = ?").get(id) as TaskComment;
+}
+
+export function listComments(db: Database.Database, taskId: string): TaskComment[] {
+  return db
+    .prepare("SELECT * FROM task_comments WHERE task_id = ? ORDER BY created_at ASC")
+    .all(taskId) as TaskComment[];
+}
+
+// ─── Agent File Locks ────────────────────────────────────────────────────────
+
+export function reportWorkingOn(
+  db: Database.Database,
+  agentId: string,
+  taskId: string,
+  filePaths: string[]
+): AgentFileLock[] {
+  const ts = now();
+  const locks: AgentFileLock[] = [];
+  for (const fp of filePaths) {
+    const id = randomUUID();
+    db.prepare(
+      "INSERT OR REPLACE INTO agent_file_locks (id, agent_id, task_id, file_path, started_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, agentId, taskId, fp, ts);
+    locks.push(
+      db.prepare("SELECT * FROM agent_file_locks WHERE agent_id = ? AND file_path = ?").get(agentId, fp) as AgentFileLock
+    );
+  }
+  return locks;
+}
+
+export function releaseFileLocks(db: Database.Database, agentId: string, taskId?: string): number {
+  if (taskId) {
+    return db.prepare("DELETE FROM agent_file_locks WHERE agent_id = ? AND task_id = ?").run(agentId, taskId).changes;
+  }
+  return db.prepare("DELETE FROM agent_file_locks WHERE agent_id = ?").run(agentId).changes;
+}
+
+export function getActiveFileLocks(db: Database.Database): AgentFileLock[] {
+  return db.prepare("SELECT * FROM agent_file_locks ORDER BY started_at DESC").all() as AgentFileLock[];
+}
+
+export function getFileConflicts(db: Database.Database): FileConflict[] {
+  const rows = db.prepare(
+    `SELECT fl.file_path, fl.agent_id, a.name AS agent_name, fl.task_id
+     FROM agent_file_locks fl
+     JOIN agents a ON fl.agent_id = a.id
+     WHERE fl.file_path IN (
+       SELECT file_path FROM agent_file_locks GROUP BY file_path HAVING COUNT(DISTINCT agent_id) > 1
+     )
+     ORDER BY fl.file_path, a.name`
+  ).all() as { file_path: string; agent_id: string; agent_name: string; task_id: string }[];
+
+  const map = new Map<string, FileConflict>();
+  for (const row of rows) {
+    if (!map.has(row.file_path)) {
+      map.set(row.file_path, { file_path: row.file_path, agents: [] });
+    }
+    map.get(row.file_path)!.agents.push({
+      agent_id: row.agent_id,
+      agent_name: row.agent_name,
+      task_id: row.task_id,
+    });
+  }
+  return [...map.values()];
+}
+
+// ─── Alert Rules & Notifications ─────────────────────────────────────────────
+
+export function createAlertRule(
+  db: Database.Database,
+  eventType: string,
+  filterJson = "{}"
+): AlertRule {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO alert_rules (id, event_type, filter_json, enabled, created_at) VALUES (?, ?, ?, 1, ?)"
+  ).run(id, eventType, filterJson, ts);
+  return db.prepare("SELECT * FROM alert_rules WHERE id = ?").get(id) as AlertRule;
+}
+
+export function listAlertRules(db: Database.Database): AlertRule[] {
+  return db.prepare("SELECT * FROM alert_rules ORDER BY created_at DESC").all() as AlertRule[];
+}
+
+export function toggleAlertRule(db: Database.Database, id: string, enabled: boolean): AlertRule | null {
+  db.prepare("UPDATE alert_rules SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
+  return db.prepare("SELECT * FROM alert_rules WHERE id = ?").get(id) as AlertRule | null;
+}
+
+export function deleteAlertRule(db: Database.Database, id: string): boolean {
+  return db.prepare("DELETE FROM alert_rules WHERE id = ?").run(id).changes > 0;
+}
+
+export function createNotification(db: Database.Database, message: string, ruleId?: string | null): AppNotification {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO notifications (id, rule_id, message, read, created_at) VALUES (?, ?, ?, 0, ?)"
+  ).run(id, ruleId ?? null, message, ts);
+  return db.prepare("SELECT * FROM notifications WHERE id = ?").get(id) as AppNotification;
+}
+
+export function listNotifications(db: Database.Database, limit = 50): AppNotification[] {
+  return db
+    .prepare("SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?")
+    .all(limit) as AppNotification[];
+}
+
+export function markNotificationRead(db: Database.Database, id: string): boolean {
+  return db.prepare("UPDATE notifications SET read = 1 WHERE id = ?").run(id).changes > 0;
+}
+
+export function markAllNotificationsRead(db: Database.Database): number {
+  return db.prepare("UPDATE notifications SET read = 1 WHERE read = 0").run().changes;
+}
+
+export function getUnreadNotificationCount(db: Database.Database): number {
+  const row = db.prepare("SELECT COUNT(*) AS count FROM notifications WHERE read = 0").get() as { count: number };
+  return row.count;
+}
+
+export function evaluateAlertRules(db: Database.Database, eventType: string, eventPayload: Record<string, unknown>): AppNotification[] {
+  const rules = db
+    .prepare("SELECT * FROM alert_rules WHERE event_type = ? AND enabled = 1")
+    .all(eventType) as AlertRule[];
+
+  const notifications: AppNotification[] = [];
+  for (const rule of rules) {
+    let filterMatch = true;
+    try {
+      const filter = JSON.parse(rule.filter_json) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(filter)) {
+        if (eventPayload[key] !== value) { filterMatch = false; break; }
+      }
+    } catch { filterMatch = true; }
+
+    if (filterMatch) {
+      const msg = `Alert: ${eventType} event triggered (rule ${rule.id})`;
+      notifications.push(createNotification(db, msg, rule.id));
+    }
+  }
+  return notifications;
+}
+
+// ─── Bulk Update ─────────────────────────────────────────────────────────────
+
+export function bulkUpdateTasks(
+  db: Database.Database,
+  taskIds: string[],
+  updates: UpdateTaskInput
+): Task[] {
+  const results: Task[] = [];
+  for (const id of taskIds) {
+    const updated = updateTask(db, id, updates);
+    if (updated) results.push(updated);
+  }
+  return results;
+}
+
+// ─── Agent Performance Metrics ───────────────────────────────────────────────
+
+export function getAgentStats(db: Database.Database, agentId: string, sprintId?: string): AgentStats {
+  // Total completed
+  const totalRow = db.prepare(
+    "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ? AND t.status = 'done'"
+  ).get(agentId) as { c: number };
+
+  // Sprint completed
+  let sprintCompleted = 0;
+  if (sprintId) {
+    const row = db.prepare(
+      "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ? AND t.sprint_id = ? AND t.status = 'done'"
+    ).get(agentId, sprintId) as { c: number };
+    sprintCompleted = row.c;
+  }
+
+  // Today completed
+  const todayCompleted = getAgentCompletedToday(db, agentId);
+
+  // Avg completion time: avg delta between first activity and task updated_at for done tasks
+  const avgRow = db.prepare(
+    `SELECT AVG(completion_sec) AS avg_sec FROM (
+      SELECT (julianday(t.updated_at) - julianday(MIN(a.timestamp))) * 86400 AS completion_sec
+      FROM activity_log a
+      JOIN tasks t ON a.task_id = t.id
+      WHERE a.agent_id = ? AND t.status = 'done'
+      GROUP BY t.id
+    )`
+  ).get(agentId) as { avg_sec: number | null } | undefined;
+  const avgCompletionTime = avgRow?.avg_sec != null ? Math.round(avgRow.avg_sec) : null;
+
+  // Blocker rate
+  const totalTasks = db.prepare(
+    "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ?"
+  ).get(agentId) as { c: number };
+  const blockedTasks = db.prepare(
+    "SELECT COUNT(DISTINCT b.task_id) AS c FROM blockers b JOIN activity_log a ON b.task_id = a.task_id WHERE a.agent_id = ?"
+  ).get(agentId) as { c: number };
+  const blockerRate = totalTasks.c > 0 ? blockedTasks.c / totalTasks.c : 0;
+
+  // Activity frequency (events per hour while active — using sessions)
+  const sessions = listAgentSessions(db, agentId);
+  let totalActivityCount = 0;
+  let totalSessionHours = 0;
+  for (const s of sessions) {
+    totalActivityCount += s.activity_count;
+    const start = new Date(s.started_at).getTime();
+    const end = s.ended_at ? new Date(s.ended_at).getTime() : new Date(s.last_activity_at).getTime();
+    totalSessionHours += Math.max((end - start) / 3600000, 0.01); // min 0.01h to avoid div/0
+  }
+  const activityFrequency = totalSessionHours > 0 ? Math.round((totalActivityCount / totalSessionHours) * 10) / 10 : 0;
+
+  return {
+    agent_id: agentId,
+    tasks_completed_total: totalRow.c,
+    tasks_completed_sprint: sprintCompleted,
+    tasks_completed_today: todayCompleted,
+    avg_completion_time_seconds: avgCompletionTime,
+    blocker_rate: Math.round(blockerRate * 1000) / 1000,
+    activity_frequency: activityFrequency,
+  };
+}
+
+export function getSprintAgentContributions(db: Database.Database, sprintId: string): AgentContribution[] {
+  const rows = db.prepare(
+    `SELECT a.id AS agent_id, a.name AS agent_name,
+       COUNT(t.id) AS completed_count,
+       COALESCE(SUM(t.estimate), 0) AS completed_points
+     FROM tasks t
+     JOIN agents a ON t.assigned_agent_id = a.id
+     WHERE t.sprint_id = ? AND t.status = 'done'
+     GROUP BY a.id, a.name
+     ORDER BY completed_count DESC`
+  ).all(sprintId) as AgentContribution[];
+  return rows;
+}
+
+// ─── Sprint Daily Stats & Velocity ───────────────────────────────────────────
+
+export function recordDailyStats(db: Database.Database, sprintId: string): SprintDailyStats {
+  const today = new Date().toISOString().slice(0, 10);
+  const cap = getSprintCapacity(db, sprintId);
+
+  db.prepare(
+    `INSERT OR REPLACE INTO sprint_daily_stats (sprint_id, date, completed_points, remaining_points, completed_tasks, remaining_tasks)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(sprintId, today, cap.completed_points, cap.remaining_points, cap.completed_count, cap.task_count - cap.completed_count);
+
+  return db.prepare("SELECT * FROM sprint_daily_stats WHERE sprint_id = ? AND date = ?").get(sprintId, today) as SprintDailyStats;
+}
+
+export function getSprintDailyStats(db: Database.Database, sprintId: string): SprintDailyStats[] {
+  return db
+    .prepare("SELECT * FROM sprint_daily_stats WHERE sprint_id = ? ORDER BY date ASC")
+    .all(sprintId) as SprintDailyStats[];
+}
+
+export function getVelocityTrend(db: Database.Database, limit = 5): VelocityData[] {
+  return db.prepare(
+    `SELECT s.id AS sprint_id, s.name AS sprint_name,
+       COALESCE(SUM(CASE WHEN t.status = 'done' THEN t.estimate ELSE 0 END), 0) AS completed_points,
+       COUNT(CASE WHEN t.status = 'done' THEN 1 END) AS completed_tasks
+     FROM sprints s
+     LEFT JOIN tasks t ON t.sprint_id = s.id
+     WHERE s.status = 'completed'
+     GROUP BY s.id, s.name
+     ORDER BY s.created_at DESC
+     LIMIT ?`
+  ).all(limit) as VelocityData[];
+}
+
+// ─── Activity Heatmap ────────────────────────────────────────────────────────
+
+export function getAgentActivityHeatmap(db: Database.Database): ActivityHeatmapEntry[] {
+  return db.prepare(
+    `SELECT CAST(strftime('%H', a.timestamp) AS INTEGER) AS hour,
+       a.agent_id, ag.name AS agent_name, COUNT(*) AS count
+     FROM activity_log a
+     JOIN agents ag ON a.agent_id = ag.id
+     GROUP BY hour, a.agent_id, ag.name
+     ORDER BY hour ASC, count DESC`
+  ).all() as ActivityHeatmapEntry[];
+}
+
+// ─── Report Generation ───────────────────────────────────────────────────────
+
+export function generateReport(db: Database.Database, projectId: string, period: "day" | "week" | "sprint"): string {
+  const project = db.prepare("SELECT * FROM projects WHERE id = ?").get(projectId) as Project | undefined;
+  if (!project) return "# Report\n\nProject not found.";
+
+  const now_ts = new Date();
+  let sinceDate: string;
+  if (period === "day") {
+    sinceDate = new Date(now_ts.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  } else if (period === "week") {
+    sinceDate = new Date(now_ts.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  } else {
+    sinceDate = new Date(now_ts.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  // Tasks completed in period
+  const completedTasks = db.prepare(
+    "SELECT * FROM tasks WHERE project_id = ? AND status = 'done' AND updated_at >= ? ORDER BY updated_at DESC"
+  ).all(projectId, sinceDate) as Task[];
+
+  // Blockers in period
+  const blockers = db.prepare(
+    "SELECT * FROM blockers WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?) AND reported_at >= ? ORDER BY reported_at DESC"
+  ).all(projectId, sinceDate) as Blocker[];
+
+  // Active agents
+  const agents = listAgents(db);
+  const activeAgents = agents.filter(a => {
+    const elapsed = now_ts.getTime() - new Date(a.last_seen_at).getTime();
+    return elapsed < 30 * 60 * 1000;
+  });
+
+  // Sprint progress
+  const sprints = listSprints(db, projectId);
+  const activeSprint = sprints.find(s => s.status === "active");
+  let sprintSection = "";
+  if (activeSprint) {
+    const cap = getSprintCapacity(db, activeSprint.id);
+    sprintSection = `## Sprint: ${activeSprint.name}\n- Tasks: ${cap.completed_count}/${cap.task_count} done\n- Points: ${cap.completed_points}/${cap.total_estimated} completed\n- Remaining: ${cap.remaining_points} points\n`;
+  }
+
+  const lines = [
+    `# Status Report: ${project.name}`,
+    `**Period:** ${period} | **Generated:** ${now_ts.toISOString().slice(0, 16)}`,
+    "",
+    sprintSection,
+    `## Tasks Completed (${completedTasks.length})`,
+    ...completedTasks.slice(0, 20).map(t => `- ${t.title}${t.estimate ? ` (${t.estimate}pt)` : ""}`),
+    "",
+    `## Blockers (${blockers.length})`,
+    blockers.length === 0 ? "- None" : "",
+    ...blockers.slice(0, 10).map(b => `- ${b.reason}${b.resolved_at ? " (resolved)" : " **unresolved**"}`),
+    "",
+    `## Agents (${activeAgents.length} active / ${agents.length} total)`,
+    ...agents.map(a => `- ${a.name}: ${getAgentHealthStatus(a.last_seen_at)}`),
+  ];
+
+  return lines.filter(l => l !== undefined).join("\n");
 }

@@ -8,13 +8,15 @@ import { TopBar } from "./components/TopBar";
 import { ProjectList } from "./components/ProjectList";
 import { TaskBoard } from "./components/TaskBoard";
 import { AgentDashboard } from "./components/AgentDashboard";
+import { TaskListView } from "./components/TaskListView";
+import { DashboardView } from "./components/DashboardView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export function App() {
   const dispatch = useAppDispatch();
-  const { blockers, theme } = useAppState();
+  const { blockers, theme, activeView, fileConflicts } = useAppState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -84,6 +86,16 @@ export function App() {
           }
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 
+          // Load notifications and file conflicts
+          const [notifs, unread, conflicts] = await Promise.all([
+            api.getNotifications(50),
+            api.getUnreadCount(),
+            api.getFileConflicts(),
+          ]);
+          dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
+          dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
+          dispatch({ type: "SET_FILE_CONFLICTS", payload: conflicts });
+
           // Show onboarding wizard on first run (no projects)
           if (projects.length === 0) {
             setShowOnboarding(true);
@@ -130,10 +142,10 @@ export function App() {
       <TopBar />
       <div className="main-content">
         <ProjectList />
-        {activeView === "board" ? <TaskBoard /> : <AgentDashboard />}
+        {activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : <DashboardView />}
         <AgentFeed />
       </div>
-      {blockers.length > 0 && <AlertBanner />}
+      {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
       {loaded && showOnboarding && (
         <OnboardingWizard onComplete={handleOnboardingComplete} />
       )}

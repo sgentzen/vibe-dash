@@ -111,6 +111,84 @@ export interface SprintCapacity {
   completed_count: number;
 }
 
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  agent_id: string | null;
+  author_name: string;
+  message: string;
+  created_at: string;
+}
+
+export interface AgentFileLock {
+  id: string;
+  agent_id: string;
+  task_id: string;
+  file_path: string;
+  started_at: string;
+}
+
+export interface FileConflict {
+  file_path: string;
+  agents: { agent_id: string; agent_name: string; task_id: string }[];
+}
+
+export interface AlertRule {
+  id: string;
+  event_type: string;
+  filter_json: string;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  rule_id: string | null;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface AgentStats {
+  agent_id: string;
+  tasks_completed_total: number;
+  tasks_completed_sprint: number;
+  tasks_completed_today: number;
+  avg_completion_time_seconds: number | null;
+  blocker_rate: number;
+  activity_frequency: number;
+}
+
+export interface AgentContribution {
+  agent_id: string;
+  agent_name: string;
+  completed_count: number;
+  completed_points: number;
+}
+
+export interface SprintDailyStats {
+  sprint_id: string;
+  date: string;
+  completed_points: number;
+  remaining_points: number;
+  completed_tasks: number;
+  remaining_tasks: number;
+}
+
+export interface VelocityData {
+  sprint_id: string;
+  sprint_name: string;
+  completed_points: number;
+  completed_tasks: number;
+}
+
+export interface ActivityHeatmapEntry {
+  hour: number;
+  agent_id: string;
+  agent_name: string;
+  count: number;
+}
+
 export interface Blocker {
   id: string;
   task_id: string;
@@ -138,9 +216,14 @@ export type WsEventType =
   | "dependency_added"
   | "dependency_removed"
   | "session_started"
-  | "session_ended";
+  | "session_ended"
+  | "comment_added"
+  | "file_lock_acquired"
+  | "file_conflict_detected"
+  | "notification_created"
+  | "daily_stats_recorded";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats;
 }
