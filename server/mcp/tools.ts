@@ -40,6 +40,13 @@ import {
   getAgentStats,
   getSprintAgentContributions,
   generateReport,
+  extractMentions,
+  createNotification,
+  listMentions,
+  handleRecurringTaskCompletion,
+  createProjectFromTemplate,
+  listTemplates,
+  getActivityStream,
 } from "../db.js";
 
 import { broadcast } from "../websocket.js";
@@ -336,6 +343,25 @@ export async function handleTool(
       return ok({ tasks: results });
     }
 
+    // ─── R5: Mentions ─────────────────────────────────────────────────────
+
+    case "list_mentions": {
+      return ok({ mentions: listMentions(db, args.agent_name as string) });
+    }
+
+    // ─── R5: Templates ──────────────────────────────────────────────────
+
+    case "create_project_from_template": {
+      const project = createProjectFromTemplate(db, args.template_id as string, args.project_name as string);
+      if (!project) return ok({ error: "Template not found" });
+      broadcast({ type: "project_created", payload: project });
+      return ok({ project });
+    }
+
+    case "list_templates": {
+      return ok({ templates: listTemplates(db) });
+    }
+
     // ─── R3: Comments ──────────────────────────────────────────────────────
 
     case "add_comment": {
@@ -347,6 +373,12 @@ export async function handleTool(
         args.agent_id as string | undefined
       );
       broadcast({ type: "comment_added", payload: comment });
+      // Process @mentions
+      const mentions = extractMentions(args.message as string);
+      for (const name of mentions) {
+        const notif = createNotification(db, `${args.agent_name} mentioned @${name} in a comment`);
+        broadcast({ type: "notification_created", payload: notif });
+      }
       return ok({ comment });
     }
 

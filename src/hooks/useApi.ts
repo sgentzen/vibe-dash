@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -60,7 +60,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id" | "assigned_agent_id" | "due_date" | "estimate">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
 ): Promise<Task> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -388,6 +388,33 @@ async function generateReportApi(projectId: string, period: "day" | "week" | "sp
   return data.report;
 }
 
+// ─── R5: Templates ───────────────────────────────────────────────────
+
+async function getTemplates(): Promise<ProjectTemplate[]> {
+  const res = await fetch("/api/templates");
+  if (!res.ok) throw new Error(`getTemplates failed: ${res.status}`);
+  return res.json();
+}
+
+async function instantiateTemplate(templateId: string, projectName: string): Promise<Project> {
+  const res = await fetch(`/api/templates/${encodeURIComponent(templateId)}/instantiate`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ project_name: projectName }),
+  });
+  if (!res.ok) throw new Error(`instantiateTemplate failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── R5: Activity Stream ─────────────────────────────────────────────
+
+async function getActivityStreamApi(params: Record<string, string | undefined> = {}): Promise<ActivityEntry[]> {
+  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const res = await fetch(`/api/activity-stream${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error(`getActivityStream failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -436,5 +463,8 @@ export function useApi() {
     getVelocityTrend,
     getActivityHeatmap,
     generateReport: generateReportApi,
+    getTemplates,
+    instantiateTemplate,
+    getActivityStream: getActivityStreamApi,
   }), []);
 }

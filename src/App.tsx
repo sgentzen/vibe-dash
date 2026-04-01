@@ -10,6 +10,8 @@ import { TaskBoard } from "./components/TaskBoard";
 import { AgentDashboard } from "./components/AgentDashboard";
 import { TaskListView } from "./components/TaskListView";
 import { DashboardView } from "./components/DashboardView";
+import { TimelineView } from "./components/TimelineView";
+import { ActivityStreamView } from "./components/ActivityStreamView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
@@ -142,7 +144,7 @@ export function App() {
       <TopBar />
       <div className="main-content">
         <ProjectList />
-        {activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : <DashboardView />}
+        {activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : <ActivityStreamView />}
         <AgentFeed />
       </div>
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}

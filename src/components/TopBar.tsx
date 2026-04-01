@@ -105,6 +105,26 @@ export function TopBar() {
         >
           Dash
         </button>
+        <button
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "timeline" })}
+          style={{
+            ...viewBtnStyle,
+            background: activeView === "timeline" ? "var(--bg-primary)" : "transparent",
+            color: activeView === "timeline" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
+        >
+          Timeline
+        </button>
+        <button
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "activity" })}
+          style={{
+            ...viewBtnStyle,
+            background: activeView === "activity" ? "var(--bg-primary)" : "transparent",
+            color: activeView === "activity" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
+        >
+          Activity
+        </button>
       </div>
 
       {/* Search */}

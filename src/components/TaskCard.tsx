@@ -236,6 +236,23 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
             </span>
           )}
 
+          {/* Recurring icon */}
+          {task.recurrence_rule && (
+            <span
+              title={`Recurring: ${task.recurrence_rule}`}
+              style={{
+                fontSize: "10px",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                background: "rgba(6,182,212,0.1)",
+                color: "#06b6d4",
+                border: "1px solid rgba(6,182,212,0.3)",
+              }}
+            >
+              {"\u{1F501}"} {task.recurrence_rule}
+            </span>
+          )}
+
           {/* Estimate badge */}
           {task.estimate != null && (
             <span

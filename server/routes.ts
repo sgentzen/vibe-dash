@@ -42,6 +42,16 @@ import {
   deleteSavedFilter,
   getAgentStats,
   getSprintAgentContributions,
+  extractMentions,
+  createNotification,
+  listMentions,
+  handleRecurringTaskCompletion,
+  createTemplate,
+  listTemplates,
+  getTemplate,
+  deleteTemplate,
+  createProjectFromTemplate,
+  getActivityStream,
   recordDailyStats,
   getSprintDailyStats,
   getVelocityTrend,
@@ -154,15 +164,20 @@ export function createRouter(db: Database.Database): Router {
 
   // POST /api/tasks
   router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, sprint_id, title, description, priority, status } =
+    const { project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
         sprint_id?: string | null;
+        assigned_agent_id?: string | null;
         title: string;
         description?: string | null;
         priority: string;
         status?: string;
+        due_date?: string | null;
+        start_date?: string | null;
+        estimate?: number | null;
+        recurrence_rule?: string | null;
       };
     if (!project_id || !title || !priority) {
       res.status(400).json({ error: "project_id, title, and priority are required" });
@@ -172,10 +187,15 @@ export function createRouter(db: Database.Database): Router {
       project_id,
       parent_task_id: parent_task_id ?? null,
       sprint_id: sprint_id ?? null,
+      assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
       priority: priority as Parameters<typeof createTask>[1]["priority"],
       status: status as Parameters<typeof createTask>[1]["status"],
+      due_date: due_date ?? null,
+      start_date: start_date ?? null,
+      estimate: estimate ?? null,
+      recurrence_rule: recurrence_rule ?? null,
     });
     broadcast({ type: "task_created", payload: task });
     res.status(201).json(task);
@@ -259,6 +279,13 @@ export function createRouter(db: Database.Database): Router {
     // Record daily stats if task has a sprint
     if (completed?.sprint_id) {
       recordDailyStats(db, completed.sprint_id);
+    }
+    // Handle recurring tasks — create next instance
+    if (completed) {
+      const nextTask = handleRecurringTaskCompletion(db, completed.id);
+      if (nextTask) {
+        broadcast({ type: "task_created", payload: nextTask });
+      }
     }
     const entry = logActivity(db, {
       task_id: completed!.id,
@@ -518,6 +545,13 @@ export function createRouter(db: Database.Database): Router {
     const comment = addComment(db, req.params.id, message, author_name, agent_id);
     broadcast({ type: "comment_added", payload: comment });
 
+    // Process @mentions
+    const mentions = extractMentions(message);
+    for (const name of mentions) {
+      const notif = createNotification(db, `${author_name} mentioned @${name} in a comment`);
+      broadcast({ type: "notification_created", payload: notif });
+    }
+
     // Evaluate alert rules for comment events
     const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id });
     for (const n of notifications) broadcast({ type: "notification_created", payload: n });
@@ -636,6 +670,55 @@ export function createRouter(db: Database.Database): Router {
   router.post("/api/projects/:id/report", (req, res) => {
     const period = (req.body.period as "day" | "week" | "sprint") ?? "week";
     res.json({ report: generateReport(db, req.params.id, period) });
+  });
+
+  // ─── R5: Mentions ───────────────────────────────────────────────
+
+  router.get("/api/mentions/:agent_name", (req, res) => {
+    res.json(listMentions(db, req.params.agent_name));
+  });
+
+  // ─── R5: Templates ────────────────────────────────────────────
+
+  router.get("/api/templates", (_req, res) => {
+    res.json(listTemplates(db));
+  });
+
+  router.post("/api/templates", (req, res) => {
+    const { name, description, template_json } = req.body as { name: string; description?: string; template_json: string };
+    if (!name || !template_json) { res.status(400).json({ error: "name and template_json are required" }); return; }
+    res.status(201).json(createTemplate(db, name, description ?? null, template_json));
+  });
+
+  router.get("/api/templates/:id", (req, res) => {
+    const t = getTemplate(db, req.params.id);
+    if (!t) { res.status(404).json({ error: "Template not found" }); return; }
+    res.json(t);
+  });
+
+  router.delete("/api/templates/:id", (req, res) => {
+    res.json({ success: deleteTemplate(db, req.params.id) });
+  });
+
+  router.post("/api/templates/:id/instantiate", (req, res) => {
+    const { project_name } = req.body as { project_name: string };
+    if (!project_name) { res.status(400).json({ error: "project_name is required" }); return; }
+    const project = createProjectFromTemplate(db, req.params.id, project_name);
+    if (!project) { res.status(404).json({ error: "Template not found" }); return; }
+    broadcast({ type: "project_created", payload: project });
+    res.status(201).json(project);
+  });
+
+  // ─── R5: Activity Stream ───────────────────────────────────────
+
+  router.get("/api/activity-stream", (req, res) => {
+    const q = req.query as Record<string, string | undefined>;
+    res.json(getActivityStream(db, {
+      agent_id: q.agent_id,
+      project_id: q.project_id,
+      since: q.since,
+      limit: q.limit ? parseInt(q.limit, 10) : undefined,
+    }));
   });
 
   return router;

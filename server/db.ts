@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { getNextDueDate } from "./recurrence.js";
 import type {
   Project,
   Task,
@@ -23,6 +24,7 @@ import type {
   SprintDailyStats,
   VelocityData,
   ActivityHeatmapEntry,
+  ProjectTemplate,
   TaskStatus,
   TaskPriority,
   SprintStatus,
@@ -106,6 +108,13 @@ const SCHEMA = [
   "  filter_json TEXT NOT NULL,",
   "  created_at TEXT NOT NULL",
   ");",
+  "CREATE TABLE IF NOT EXISTS project_templates (",
+  "  id TEXT PRIMARY KEY,",
+  "  name TEXT NOT NULL UNIQUE,",
+  "  description TEXT,",
+  "  template_json TEXT NOT NULL,",
+  "  created_at TEXT NOT NULL",
+  ");",
   "CREATE TABLE IF NOT EXISTS sprint_daily_stats (",
   "  sprint_id TEXT NOT NULL REFERENCES sprints(id),",
   "  date TEXT NOT NULL,",
@@ -152,6 +161,7 @@ export function initDb(db: Database.Database): void {
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
   migrate(db);
+  seedBuiltInTemplates(db);
 }
 
 function migrate(db: Database.Database): void {
@@ -167,6 +177,12 @@ function migrate(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === "estimate")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN estimate INTEGER").run();
+  }
+  if (!cols.some((c) => c.name === "recurrence_rule")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN recurrence_rule TEXT").run();
+  }
+  if (!cols.some((c) => c.name === "start_date")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
   }
 
   // Agent migrations
@@ -318,7 +334,9 @@ export interface CreateTaskInput {
   priority: TaskPriority;
   status?: TaskStatus;
   due_date?: string | null;
+  start_date?: string | null;
   estimate?: number | null;
+  recurrence_rule?: string | null;
 }
 
 export function createTask(
@@ -329,8 +347,8 @@ export function createTask(
   const ts = now();
   const status: TaskStatus = input.status ?? "planned";
   db.prepare(
-    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, status, priority, progress, due_date, estimate, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)"
+    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, status, priority, progress, due_date, start_date, estimate, recurrence_rule, created_at, updated_at)" +
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)"
   ).run(
     id,
     input.project_id,
@@ -342,7 +360,9 @@ export function createTask(
     status,
     input.priority,
     input.due_date ?? null,
+    input.start_date ?? null,
     input.estimate ?? null,
+    input.recurrence_rule ?? null,
     ts,
     ts
   );
@@ -410,7 +430,9 @@ export interface UpdateTaskInput {
   sprint_id?: string | null;
   assigned_agent_id?: string | null;
   due_date?: string | null;
+  start_date?: string | null;
   estimate?: number | null;
+  recurrence_rule?: string | null;
 }
 
 export function updateTask(
@@ -460,6 +482,14 @@ export function updateTask(
   if (input.estimate !== undefined) {
     sets.push("estimate = ?");
     params.push(input.estimate);
+  }
+  if (input.recurrence_rule !== undefined) {
+    sets.push("recurrence_rule = ?");
+    params.push(input.recurrence_rule);
+  }
+  if (input.start_date !== undefined) {
+    sets.push("start_date = ?");
+    params.push(input.start_date);
   }
 
   if (sets.length === 0) return getTask(db, id);
@@ -1308,4 +1338,172 @@ export function generateReport(db: Database.Database, projectId: string, period:
   ];
 
   return lines.filter(l => l !== undefined).join("\n");
+}
+
+// ─── @Mentions ───────────────────────────────────────────────────────────────
+
+const MENTION_REGEX = /@([\w-]+)/g;
+
+export function extractMentions(message: string): string[] {
+  const matches = message.matchAll(MENTION_REGEX);
+  return [...new Set([...matches].map(m => m[1]))];
+}
+
+export function listMentions(db: Database.Database, agentName: string): TaskComment[] {
+  const needle = `@${agentName}`;
+  return db
+    .prepare("SELECT * FROM task_comments WHERE INSTR(message, ?) > 0 ORDER BY created_at DESC")
+    .all(needle) as TaskComment[];
+}
+
+// ─── Recurring Tasks ─────────────────────────────────────────────────────────
+
+export function handleRecurringTaskCompletion(db: Database.Database, taskId: string): Task | null {
+  const task = getTask(db, taskId);
+  if (!task || !task.recurrence_rule) return null;
+
+  const nextDueDate = getNextDueDate(task.due_date, task.recurrence_rule);
+  const nextStartDate = task.start_date ? getNextDueDate(task.start_date, task.recurrence_rule) : null;
+  const nextTask = createTask(db, {
+    project_id: task.project_id,
+    parent_task_id: task.parent_task_id,
+    sprint_id: task.sprint_id,
+    assigned_agent_id: task.assigned_agent_id,
+    title: task.title,
+    description: task.description,
+    priority: task.priority,
+    due_date: nextDueDate,
+    start_date: nextStartDate,
+    estimate: task.estimate,
+    recurrence_rule: task.recurrence_rule,
+  });
+  return nextTask;
+}
+
+// ─── Project Templates ───────────────────────────────────────────────────────
+
+export function createTemplate(db: Database.Database, name: string, description: string | null, templateJson: string): ProjectTemplate {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare("INSERT INTO project_templates (id, name, description, template_json, created_at) VALUES (?, ?, ?, ?, ?)").run(id, name, description, templateJson, ts);
+  return db.prepare("SELECT * FROM project_templates WHERE id = ?").get(id) as ProjectTemplate;
+}
+
+export function listTemplates(db: Database.Database): ProjectTemplate[] {
+  return db.prepare("SELECT * FROM project_templates ORDER BY name ASC").all() as ProjectTemplate[];
+}
+
+export function getTemplate(db: Database.Database, id: string): ProjectTemplate | null {
+  return (db.prepare("SELECT * FROM project_templates WHERE id = ?").get(id) as ProjectTemplate | undefined) ?? null;
+}
+
+export function deleteTemplate(db: Database.Database, id: string): boolean {
+  return db.prepare("DELETE FROM project_templates WHERE id = ?").run(id).changes > 0;
+}
+
+export function createProjectFromTemplate(db: Database.Database, templateId: string, projectName: string): Project | null {
+  const template = getTemplate(db, templateId);
+  if (!template) return null;
+
+  const project = createProject(db, { name: projectName, description: template.description });
+
+  try {
+    const taskDefs = JSON.parse(template.template_json) as { title: string; description?: string; priority?: TaskPriority; children?: { title: string; description?: string; priority?: TaskPriority }[] }[];
+    for (const def of taskDefs) {
+      const parent = createTask(db, {
+        project_id: project.id,
+        title: def.title,
+        description: def.description ?? null,
+        priority: def.priority ?? "medium",
+      });
+      if (def.children) {
+        for (const child of def.children) {
+          createTask(db, {
+            project_id: project.id,
+            parent_task_id: parent.id,
+            title: child.title,
+            description: child.description ?? null,
+            priority: child.priority ?? "medium",
+          });
+        }
+      }
+    }
+  } catch {
+    // template_json parse error — project created but no tasks
+  }
+
+  return project;
+}
+
+export function seedBuiltInTemplates(db: Database.Database): void {
+  const existing = listTemplates(db);
+  const BUILT_IN_NAME = "API Project";
+  if (existing.some(t => t.name === BUILT_IN_NAME)) return; // already seeded
+
+  const templates = [
+    { name: "API Project", description: "REST API with auth, CRUD, and tests", json: JSON.stringify([
+      { title: "Set up project structure", children: [{ title: "Initialize repo" }, { title: "Add linting and formatting" }] },
+      { title: "Design API schema", children: [{ title: "Define endpoints" }, { title: "Write OpenAPI spec" }] },
+      { title: "Implement authentication", priority: "high" },
+      { title: "Implement CRUD endpoints", priority: "high" },
+      { title: "Add integration tests", priority: "high" },
+      { title: "Deploy to staging" },
+    ])},
+    { name: "Frontend Feature", description: "UI feature with components, state, and tests", json: JSON.stringify([
+      { title: "Design mockups" },
+      { title: "Create components", priority: "high", children: [{ title: "Build UI components" }, { title: "Add styling" }] },
+      { title: "Wire up state management", priority: "high" },
+      { title: "Add unit tests", priority: "high" },
+      { title: "QA and polish" },
+    ])},
+    { name: "Bug Triage", description: "Bug investigation and fix workflow", json: JSON.stringify([
+      { title: "Reproduce the bug", priority: "high" },
+      { title: "Identify root cause", priority: "high" },
+      { title: "Write failing test" },
+      { title: "Implement fix", priority: "high" },
+      { title: "Verify fix and regression test" },
+    ])},
+    { name: "Sprint Retro", description: "Sprint retrospective template", json: JSON.stringify([
+      { title: "Collect feedback — what went well" },
+      { title: "Collect feedback — what could improve" },
+      { title: "Identify action items", priority: "high" },
+      { title: "Assign action item owners" },
+      { title: "Schedule follow-up" },
+    ])},
+  ];
+
+  for (const t of templates) {
+    createTemplate(db, t.name, t.description, t.json);
+  }
+}
+
+// ─── Activity Stream ─────────────────────────────────────────────────────────
+
+export interface ActivityStreamFilter {
+  agent_id?: string;
+  project_id?: string;
+  since?: string;
+  limit?: number;
+}
+
+export function getActivityStream(db: Database.Database, filter: ActivityStreamFilter = {}): ActivityEntry[] {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filter.agent_id) { conditions.push("a.agent_id = ?"); params.push(filter.agent_id); }
+  if (filter.project_id) {
+    conditions.push("a.task_id IN (SELECT id FROM tasks WHERE project_id = ?)");
+    params.push(filter.project_id);
+  }
+  if (filter.since) { conditions.push("a.timestamp >= ?"); params.push(filter.since); }
+
+  let sql = `SELECT a.*, ag.name AS agent_name, t.title AS task_title
+     FROM activity_log a
+     LEFT JOIN agents ag ON a.agent_id = ag.id
+     LEFT JOIN tasks t ON a.task_id = t.id`;
+  if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
+  sql += " ORDER BY a.timestamp DESC LIMIT ?";
+  params.push(filter.limit ?? 100);
+
+  return db.prepare(sql).all(...params) as ActivityEntry[];
 }

@@ -22,6 +22,8 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [assignedAgentId, setAssignedAgentId] = useState<string | null>(task.assigned_agent_id);
   const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
   const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
+  const [startDate, setStartDate] = useState<string>(task.start_date ?? "");
+  const [recurrenceRule, setRecurrenceRule] = useState<string>(task.recurrence_rule ?? "");
   const [saving, setSaving] = useState(false);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -52,6 +54,8 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setAssignedAgentId(task.assigned_agent_id);
     setDueDate(task.due_date ?? "");
     setEstimate(task.estimate != null ? String(task.estimate) : "");
+    setStartDate(task.start_date ?? "");
+    setRecurrenceRule(task.recurrence_rule ?? "");
     setNewComment("");
     api.getComments(task.id).then(setComments).catch(() => {});
   }, [task, api]);
@@ -68,7 +72,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         sprint_id: sprintId,
         assigned_agent_id: assignedAgentId,
         due_date: dueDate || null,
+        start_date: startDate || null,
         estimate: estimate ? parseInt(estimate, 10) : null,
+        recurrence_rule: recurrenceRule || null,
       });
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
       onClose();
@@ -260,6 +266,33 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             placeholder="0"
             style={inputStyle}
           />
+        </div>
+
+        {/* Start Date */}
+        <div>
+          <label style={labelStyle}>Start Date</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Recurrence */}
+        <div>
+          <label style={labelStyle}>Recurrence Rule</label>
+          <select
+            value={recurrenceRule}
+            onChange={(e) => setRecurrenceRule(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">None</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
         </div>
 
         {/* Tags */}

@@ -144,7 +144,9 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       sprint_id: z.string().nullable().optional(),
       assigned_agent_id: z.string().nullable().optional(),
       due_date: z.string().nullable().optional(),
+      start_date: z.string().nullable().optional(),
       estimate: z.number().int().min(0).nullable().optional(),
+      recurrence_rule: z.string().nullable().optional(),
       agent_name: z.string().optional(),
     },
     call("update_task")
@@ -366,6 +368,36 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       agent_id: z.string(),
     },
     call("get_agent_detail")
+  );
+
+  // ─── R5: Mentions ───────────────────────────────────────────────────
+
+  server.tool(
+    "list_mentions",
+    "List comments that mention an agent",
+    {
+      agent_name: z.string(),
+    },
+    call("list_mentions")
+  );
+
+  // ─── R5: Templates ────────────────────────────────────────────────
+
+  server.tool(
+    "create_project_from_template",
+    "Create a project from a template",
+    {
+      template_id: z.string(),
+      project_name: z.string(),
+    },
+    call("create_project_from_template")
+  );
+
+  server.tool(
+    "list_templates",
+    "List available project templates",
+    {},
+    call("list_templates")
   );
 
   // ─── R4: Agent Stats ─────────────────────────────────────────────────
