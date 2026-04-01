@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
+import rateLimit from "express-rate-limit";
 import type { TaskStatus, SprintStatus } from "./types.js";
 import {
   listProjects,
@@ -94,9 +95,9 @@ export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
 
-  const firstRunLimiter = rateLimit({
+  const statsLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 30, // limit each IP to 30 requests per windowMs
+    max: 30, // limit each IP to 30 requests per windowMs for /api/stats
     standardHeaders: true,
     legacyHeaders: false,
   });
@@ -110,7 +111,7 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // GET /api/stats
-  router.get("/api/stats", (_req, res) => {
+  router.get("/api/stats", statsLimiter, (_req, res) => {
     const projects = (
       db.prepare("SELECT COUNT(*) AS count FROM projects").get() as {
         count: number;
