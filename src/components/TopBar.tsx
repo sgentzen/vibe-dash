@@ -4,11 +4,7 @@ import { useApi } from "../hooks/useApi";
 import { useAppDispatch } from "../store";
 
 export function TopBar() {
-<<<<<<< HEAD
   const { stats, theme, activeView, searchQuery, unreadCount, notifications } = useAppState();
-=======
-  const { stats, activeView, searchQuery, unreadCount, notifications } = useAppState();
->>>>>>> master
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showNotifications, setShowNotifications] = useState(false);

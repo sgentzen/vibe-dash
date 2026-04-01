@@ -16,11 +16,7 @@ import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export function App() {
   const dispatch = useAppDispatch();
-<<<<<<< HEAD
   const { blockers, theme, activeView, fileConflicts } = useAppState();
-=======
-  const { blockers, activeView, fileConflicts } = useAppState();
->>>>>>> master
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);

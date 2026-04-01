@@ -460,9 +460,5 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("bulk_update_tasks")
   );
 
-<<<<<<< HEAD
   return { server, cleanup };
-=======
-  return server;
->>>>>>> master
 }
