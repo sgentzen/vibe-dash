@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
+import rateLimit from "express-rate-limit";
 import type { TaskStatus, SprintStatus } from "./types.js";
 import {
   listProjects,
@@ -81,6 +82,7 @@ import {
 } from "./db.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
+import rateLimit from "express-rate-limit";
 
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
@@ -93,8 +95,15 @@ export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
 
+  const statsLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // limit each IP to 30 requests per windowMs for /api/stats
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // GET /api/first-run — returns true if no projects exist
-  router.get("/api/first-run", (_req, res) => {
+  router.get("/api/first-run", firstRunLimiter, (_req, res) => {
     const count = (
       db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number }
     ).count;
@@ -102,7 +111,7 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // GET /api/stats
-  router.get("/api/stats", (_req, res) => {
+  router.get("/api/stats", statsLimiter, (_req, res) => {
     const projects = (
       db.prepare("SELECT COUNT(*) AS count FROM projects").get() as {
         count: number;
