@@ -1,8 +1,8 @@
 {
   "name": "vibe-dash",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Local-first real-time dashboard for monitoring AI-driven development projects via MCP",
+  "main": "server/index.ts",
   "directories": {
     "doc": "docs"
   },
@@ -20,9 +20,27 @@
   "bin": {
     "vibe-dash": "./server/mcp/stdio.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "mcp",
+    "dashboard",
+    "ai-agents",
+    "task-management",
+    "model-context-protocol",
+    "developer-tools"
+  ],
+  "author": "sgent",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sgent/vibe-dash.git"
+  },
+  "homepage": "https://github.com/sgent/vibe-dash",
+  "bugs": {
+    "url": "https://github.com/sgent/vibe-dash/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
     "better-sqlite3": "^12.8.0",

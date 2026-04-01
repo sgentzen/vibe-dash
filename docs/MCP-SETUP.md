@@ -10,7 +10,7 @@ From the vibe-dash directory:
 
 ```bash
 # Development (hot-reload on both frontend and backend)
-cd ~/projects/vibe-dash
+cd /path/to/vibe-dash
 npm run dev
 # Frontend: http://localhost:3000 (proxies API to :3001)
 # Backend:  http://localhost:3001
@@ -39,7 +39,7 @@ Add to your **project-level** `.mcp.json` in each project that should report to 
   "mcpServers": {
     "vibe-dash": {
       "command": "npx",
-      "args": ["tsx", "C:/Users/sgent/projects/vibe-dash/server/mcp/stdio.ts"]
+      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
     }
   }
 }
@@ -52,13 +52,13 @@ Or add it **globally** (all projects get it) in `~/.claude/settings.json` under 
   "mcpServers": {
     "vibe-dash": {
       "command": "npx",
-      "args": ["tsx", "C:/Users/sgent/projects/vibe-dash/server/mcp/stdio.ts"]
+      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
     }
   }
 }
 ```
 
-The stdio transport defaults to `C:/Users/sgent/projects/vibe-dash/vibe-dash.db` (same database the server reads). Override with the `VIBE_DASH_DB` environment variable if needed.
+The stdio transport defaults to `<vibe-dash-dir>/vibe-dash.db` (same database the server reads). Override with the `VIBE_DASH_DB` environment variable if needed.
 
 ### Option B: SSE (remote/multi-agent)
 
@@ -101,18 +101,6 @@ Using the vibe-dash MCP tools, do the following:
    - status: "done" if completed, "in_progress" if active, "planned" if not started
    - priority: "high", "medium", or "low" based on context
 5. Log what you did by calling `log_activity` with a summary message.
-```
-
-### Example for erate-assistant
-
-```
-Using the vibe-dash MCP tools:
-
-1. Call create_project with name "erate-assistant" and description "E-Rate application assistant"
-2. Read docs/superpowers/plans/ for the current implementation plan
-3. Read docs/superpowers/STATUS.md for current task statuses
-4. Create tasks in Vibe Dash matching the plan, setting appropriate statuses
-5. Log the import with log_activity
 ```
 
 ---
@@ -197,7 +185,7 @@ Watch the dashboard — you should see each action appear in real time.
 - Check the server is running (`npm run dev` or `npm start`)
 
 **Database location:**
-- Default: `C:/Users/sgent/projects/vibe-dash/vibe-dash.db`
+- Default: `<vibe-dash-dir>/vibe-dash.db`
 - Override: set `VIBE_DASH_DB` environment variable (for stdio) or `DB_PATH` (for server)
 - Both the stdio MCP and the server must use the same database file
 
