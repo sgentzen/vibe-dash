@@ -1,7 +1,35 @@
-.superpowers/
+# Dependencies
 node_modules/
-.claude/.last-code-review
+
+# Build output
 dist/
+
+# Database
 *.db
 *.db-shm
 *.db-wal
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local config (contains machine-specific paths)
+.mcp.json
+
+# Claude Code artifacts
+.claude/.last-code-review
+.superpowers/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
