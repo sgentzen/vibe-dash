@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { useAppDispatch } from "../store";
+import { WebhookSettings } from "./WebhookSettings";
 
 export function TopBar() {
   const { stats, theme, activeView, searchQuery, unreadCount, notifications } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -167,6 +169,47 @@ export function TopBar() {
       >
         {theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
       </button>
+
+      {/* Accent Color Picker */}
+      <input
+        type="color"
+        value={localStorage.getItem("vibe-dash-accent") ?? "#58a6ff"}
+        onChange={(e) => {
+          const color = e.target.value;
+          localStorage.setItem("vibe-dash-accent", color);
+          document.documentElement.style.setProperty("--accent-user", color);
+          document.documentElement.setAttribute("data-accent", "true");
+        }}
+        title="Custom accent color"
+        style={{
+          width: "28px",
+          height: "28px",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          cursor: "pointer",
+          background: "transparent",
+          padding: "2px",
+        }}
+      />
+
+      {/* Settings Gear */}
+      <button
+        onClick={() => setShowSettings(true)}
+        aria-label="Settings"
+        style={{
+          background: "transparent",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          padding: "4px 8px",
+          cursor: "pointer",
+          color: "var(--text-secondary)",
+          fontSize: "14px",
+        }}
+      >
+        {"\u2699\uFE0F"}
+      </button>
+
+      {showSettings && <WebhookSettings onClose={() => setShowSettings(false)} />}
 
       {/* Notification Bell */}
       <div style={{ position: "relative" }}>

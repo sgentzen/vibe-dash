@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate, Webhook } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -415,6 +415,38 @@ async function getActivityStreamApi(params: Record<string, string | undefined> =
   return res.json();
 }
 
+// ─── R6: Webhooks ────────────────────────────────────────────────────
+
+async function getWebhooks(): Promise<Webhook[]> {
+  const res = await fetch("/api/webhooks");
+  if (!res.ok) throw new Error(`getWebhooks failed: ${res.status}`);
+  return res.json();
+}
+
+async function createWebhookApi(url: string, eventTypes: string[]): Promise<Webhook> {
+  const res = await fetch("/api/webhooks", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ url, event_types: eventTypes }),
+  });
+  if (!res.ok) throw new Error(`createWebhook failed: ${res.status}`);
+  return res.json();
+}
+
+async function updateWebhookApi(id: string, updates: { url?: string; event_types?: string[]; active?: boolean }): Promise<Webhook> {
+  const res = await fetch(`/api/webhooks/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error(`updateWebhook failed: ${res.status}`);
+  return res.json();
+}
+
+async function deleteWebhookApi(id: string): Promise<void> {
+  await fetch(`/api/webhooks/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -466,5 +498,9 @@ export function useApi() {
     getTemplates,
     instantiateTemplate,
     getActivityStream: getActivityStreamApi,
+    getWebhooks,
+    createWebhook: createWebhookApi,
+    updateWebhook: updateWebhookApi,
+    deleteWebhook: deleteWebhookApi,
   }), []);
 }

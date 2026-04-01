@@ -45,6 +45,11 @@ import {
   extractMentions,
   createNotification,
   listMentions,
+  createWebhook,
+  listWebhooks,
+  updateWebhook,
+  deleteWebhook,
+  fireWebhooks,
   handleRecurringTaskCompletion,
   createTemplate,
   listTemplates,
@@ -74,9 +79,18 @@ import {
   evaluateAlertRules,
   bulkUpdateTasks,
 } from "./db.js";
-import { broadcast } from "./websocket.js";
+import { broadcast as wsBroadcast } from "./websocket.js";
+import type { WsEvent } from "./types.js";
+
+function makeBroadcast(db: Database.Database) {
+  return (event: WsEvent) => {
+    wsBroadcast(event);
+    void fireWebhooks(db, event.type, event.payload);
+  };
+}
 
 export function createRouter(db: Database.Database): Router {
+  const broadcast = makeBroadcast(db);
   const router = Router();
 
   // GET /api/first-run — returns true if no projects exist
@@ -719,6 +733,33 @@ export function createRouter(db: Database.Database): Router {
       since: q.since,
       limit: q.limit ? parseInt(q.limit, 10) : undefined,
     }));
+  });
+
+  // ─── R6: Webhooks ───────────────────────────────────────────────
+
+  router.get("/api/webhooks", (_req, res) => {
+    res.json(listWebhooks(db));
+  });
+
+  router.post("/api/webhooks", (req, res) => {
+    const { url, event_types } = req.body as { url: string; event_types: string[] };
+    if (!url || !event_types || !Array.isArray(event_types)) { res.status(400).json({ error: "url and event_types (array) are required" }); return; }
+    try {
+      const parsed = new URL(url);
+      if (!["http:", "https:"].includes(parsed.protocol)) { res.status(400).json({ error: "Only http/https URLs allowed" }); return; }
+    } catch { res.status(400).json({ error: "Invalid URL" }); return; }
+    res.status(201).json(createWebhook(db, url, event_types));
+  });
+
+  router.patch("/api/webhooks/:id", (req, res) => {
+    const updates = req.body as { url?: string; event_types?: string[]; active?: boolean };
+    const hook = updateWebhook(db, req.params.id, updates);
+    if (!hook) { res.status(404).json({ error: "Webhook not found" }); return; }
+    res.json(hook);
+  });
+
+  router.delete("/api/webhooks/:id", (req, res) => {
+    res.json({ success: deleteWebhook(db, req.params.id) });
   });
 
   return router;

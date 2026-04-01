@@ -32,6 +32,12 @@
   --yellow-bg: #fff8c5;
 }
 
+/* Accent color override — applied via JS when user picks a custom color.
+   --accent-user cascades into --accent-blue so buttons, links, stat pills pick it up. */
+:root[data-accent] {
+  --accent-blue: var(--accent-user);
+}
+
 *,
 *::before,
 *::after {

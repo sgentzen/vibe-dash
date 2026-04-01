@@ -28,6 +28,12 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    // Restore custom accent color
+    const accent = localStorage.getItem("vibe-dash-accent");
+    if (accent) {
+      document.documentElement.style.setProperty("--accent-user", accent);
+      document.documentElement.setAttribute("data-accent", "true");
+    }
   }, [theme]);
 
   useEffect(() => {
