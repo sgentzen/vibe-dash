@@ -7,6 +7,7 @@ import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpServer } from "./mcp/server.js";
+import rateLimit from "express-rate-limit";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -19,6 +20,11 @@ app.use(express.json());
 
 const db = openDb(DB_PATH);
 app.use(createRouter(db));
+
+const spaLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 SPA index requests per windowMs
+});
 
 // MCP SSE transport
 const transports = new Map<string, SSEServerTransport>();
@@ -44,7 +50,7 @@ app.post("/messages", async (req, res) => {
 // Serve built frontend in production (npm start)
 const distDir = path.join(PROJECT_ROOT, "dist");
 app.use(express.static(distDir));
-app.get("/{*splat}", (_req, res) => {
+app.get("/*", spaLimiter, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
