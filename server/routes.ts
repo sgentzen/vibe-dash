@@ -82,6 +82,7 @@ import {
 } from "./db.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
+import rateLimit from "express-rate-limit";
 
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
@@ -102,7 +103,7 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // GET /api/first-run — returns true if no projects exist
-  router.get("/api/first-run", (_req, res) => {
+  router.get("/api/first-run", firstRunLimiter, (_req, res) => {
     const count = (
       db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number }
     ).count;
