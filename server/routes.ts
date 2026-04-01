@@ -84,6 +84,11 @@ import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 
+const dependencyDeleteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 30, // limit each IP to 30 delete requests per windowMs
+});
+
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
@@ -508,7 +513,7 @@ export function createRouter(db: Database.Database): Router {
     res.status(201).json(dep);
   });
 
-  router.delete("/api/dependencies/:id", (req, res) => {
+  router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
     // Read before delete so we can broadcast
     const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as any;
     const removed = removeDependency(db, req.params.id);
