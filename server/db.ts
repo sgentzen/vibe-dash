@@ -583,8 +583,13 @@ export function getAgentByName(
 export function touchAgent(db: Database.Database, name: string): Agent {
   const existing = getAgentByName(db, name);
   if (existing) {
-    db.prepare("UPDATE agents SET last_seen_at = ? WHERE name = ?").run(now(), name);
-    return { ...existing, last_seen_at: now() };
+    const timestamp = now();
+    db.prepare("UPDATE agents SET last_seen_at = ? WHERE name = ?").run(timestamp, name);
+    // Bubble activity up to parent agent
+    if (existing.parent_agent_id) {
+      db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(timestamp, existing.parent_agent_id);
+    }
+    return { ...existing, last_seen_at: timestamp };
   }
   return registerAgent(db, { name, model: null, capabilities: [] });
 }
@@ -1260,18 +1265,22 @@ export function getSprintDailyStats(db: Database.Database, sprintId: string): Sp
     .all(sprintId) as SprintDailyStats[];
 }
 
-export function getVelocityTrend(db: Database.Database, limit = 5): VelocityData[] {
+export function getVelocityTrend(db: Database.Database, limit = 5, projectId?: string): VelocityData[] {
+  const whereClause = projectId
+    ? `WHERE (s.status = 'completed' OR s.status = 'active') AND s.project_id = ?`
+    : `WHERE s.status = 'completed' OR s.status = 'active'`;
+  const params = projectId ? [projectId, limit] : [limit];
   return db.prepare(
     `SELECT s.id AS sprint_id, s.name AS sprint_name,
        COALESCE(SUM(CASE WHEN t.status = 'done' THEN t.estimate ELSE 0 END), 0) AS completed_points,
        COUNT(CASE WHEN t.status = 'done' THEN 1 END) AS completed_tasks
      FROM sprints s
      LEFT JOIN tasks t ON t.sprint_id = s.id
-     WHERE s.status = 'completed'
+     ${whereClause}
      GROUP BY s.id, s.name
      ORDER BY s.created_at DESC
      LIMIT ?`
-  ).all(limit) as VelocityData[];
+  ).all(...params) as VelocityData[];
 }
 
 // ─── Activity Heatmap ────────────────────────────────────────────────────────

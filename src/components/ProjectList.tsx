@@ -181,7 +181,7 @@ function ProjectCard({
           <>
             {counts.in_progress > 0 && (
               <span style={{ color: "var(--accent-green)", fontSize: "11px" }}>
-                {counts.in_progress} active
+                {counts.in_progress} in progress
               </span>
             )}
             {counts.blocked > 0 && (

@@ -14,17 +14,29 @@ export function DashboardView() {
   const [reportText, setReportText] = useState<string | null>(null);
   const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "sprint">("week");
 
-  const activeSprint = sprints.find((s) => s.status === "active");
-  const overdueTasks = tasks.filter(
+  // Project-scoped data
+  const projectId = selectedProjectId || projects[0]?.id;
+  const projectSprints = sprints.filter((s) => !projectId || s.project_id === projectId);
+  const projectTasks = tasks.filter((t) => !projectId || t.project_id === projectId);
+  const projectTaskIds = new Set(projectTasks.map((t) => t.id));
+  const projectBlockers = blockers.filter((b) => !projectId || projectTaskIds.has(b.task_id));
+
+  const activeSprint = projectSprints.find((s) => s.status === "active");
+  const overdueTasks = projectTasks.filter(
     (t) => t.due_date && t.status !== "done" && new Date(t.due_date) < new Date()
   );
-  const unresolvedBlockers = blockers.filter((b) => !b.resolved_at);
+  const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
+
+  // Track completed task count for the active sprint to trigger refreshes
+  const sprintDoneCount = activeSprint
+    ? projectTasks.filter((t) => t.sprint_id === activeSprint.id && t.status === "done").length
+    : 0;
 
   useEffect(() => {
     async function load() {
       try {
         const [vel, heat] = await Promise.all([
-          api.getVelocityTrend(5),
+          api.getVelocityTrend(5, projectId),
           api.getActivityHeatmap(),
         ]);
         setVelocity(vel);
@@ -43,10 +55,9 @@ export function DashboardView() {
       }
     }
     load();
-  }, [api, activeSprint?.id]);
+  }, [api, activeSprint?.id, projectId, sprintDoneCount]);
 
   async function handleGenerateReport() {
-    const projectId = selectedProjectId || projects[0]?.id;
     if (!projectId) return;
     try {
       const report = await api.generateReport(projectId, reportPeriod);
@@ -81,7 +92,7 @@ export function DashboardView() {
         <KpiCard label="Active Sprint" value={activeSprint?.name ?? "None"} color="var(--accent-blue)" />
         <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--accent-red)" : "var(--accent-green)"} />
         <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--accent-yellow)" : "var(--accent-green)"} />
-        <KpiCard label="Active Tasks" value={String(tasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
+        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>

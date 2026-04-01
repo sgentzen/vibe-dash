@@ -60,7 +60,7 @@ export function TopBar() {
       {/* Stats */}
       <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
         <StatPill label="PROJECTS" value={stats.projects} color="var(--accent-blue)" />
-        <StatPill label="AGENTS" value={stats.activeAgents} color="var(--accent-green)" />
+        <StatPill label="ACTIVE AGENTS" value={stats.activeAgents} color="var(--accent-green)" />
         <StatPill label="ALERTS" value={stats.alerts} color="var(--accent-yellow)" />
         <StatPill label="TASKS" value={stats.tasks} color="var(--text-secondary)" />
       </div>

@@ -363,8 +363,10 @@ async function getSprintBurndown(sprintId: string): Promise<SprintDailyStats[]> 
   return res.json();
 }
 
-async function getVelocityTrend(limit = 5): Promise<VelocityData[]> {
-  const res = await fetch(`/api/velocity?limit=${limit}`);
+async function getVelocityTrend(limit = 5, projectId?: string): Promise<VelocityData[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (projectId) params.set("project_id", projectId);
+  const res = await fetch(`/api/velocity?${params}`);
   if (!res.ok) throw new Error(`getVelocityTrend failed: ${res.status}`);
   return res.json();
 }

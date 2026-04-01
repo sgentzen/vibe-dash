@@ -115,7 +115,7 @@ export function createRouter(db: Database.Database): Router {
     ).count;
     const activeAgents = (
       db.prepare(
-        "SELECT COUNT(*) AS count FROM agents WHERE last_seen_at >= datetime('now', '-15 minutes')"
+        "SELECT COUNT(*) AS count FROM agents WHERE last_seen_at >= datetime('now', '-5 minutes') AND parent_agent_id IS NULL"
       ).get() as {
         count: number;
       }
@@ -670,7 +670,8 @@ export function createRouter(db: Database.Database): Router {
 
   router.get("/api/velocity", (req, res) => {
     const limit = parseInt((req.query.limit as string) ?? "5", 10);
-    res.json(getVelocityTrend(db, isNaN(limit) ? 5 : limit));
+    const projectId = req.query.project_id as string | undefined;
+    res.json(getVelocityTrend(db, isNaN(limit) ? 5 : limit, projectId));
   });
 
   // ─── R4: Activity Heatmap ──────────────────────────────────────────
