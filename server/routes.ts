@@ -78,6 +78,7 @@ import {
   getUnreadNotificationCount,
   evaluateAlertRules,
   bulkUpdateTasks,
+  ACTIVE_THRESHOLD_MINUTES,
 } from "./db.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
@@ -135,7 +136,8 @@ export function createRouter(db: Database.Database): Router {
     ).count;
     const activeAgents = (
       db.prepare(
-        "SELECT COUNT(*) AS count FROM agents WHERE last_seen_at >= datetime('now', '-5 minutes') AND parent_agent_id IS NULL"
+        // Safe interpolation: ACTIVE_THRESHOLD_MINUTES is a module-level numeric constant, not user input
+        `SELECT COUNT(*) AS count FROM agents WHERE last_seen_at >= datetime('now', '-${ACTIVE_THRESHOLD_MINUTES} minutes') AND parent_agent_id IS NULL`
       ).get() as {
         count: number;
       }
@@ -242,6 +244,11 @@ export function createRouter(db: Database.Database): Router {
     if (task_ids.length > 200) { res.status(400).json({ error: "Maximum 200 tasks per bulk update" }); return; }
     const tasks = bulkUpdateTasks(db, task_ids, updates as any);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
+    // Record burndown stats for affected sprints when status changes
+    if (updates.status) {
+      const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
+      for (const sid of sprintIds) recordDailyStats(db, sid);
+    }
     res.json({ updated: tasks.length, tasks });
   });
 
@@ -295,6 +302,10 @@ export function createRouter(db: Database.Database): Router {
         type: "agent_activity",
         payload: { ...entry, agent_name: null, task_title: updated!.title },
       });
+    }
+    // Record burndown stats when task status changes and task has a sprint
+    if (body.status && body.status !== task.status && updated?.sprint_id) {
+      recordDailyStats(db, updated.sprint_id);
     }
     res.json(updated);
   });
@@ -696,8 +707,9 @@ export function createRouter(db: Database.Database): Router {
 
   // ─── R4: Activity Heatmap ──────────────────────────────────────────
 
-  router.get("/api/activity-heatmap", (_req, res) => {
-    res.json(getAgentActivityHeatmap(db));
+  router.get("/api/activity-heatmap", (req, res) => {
+    const projectId = req.query.project_id as string | undefined;
+    res.json(getAgentActivityHeatmap(db, projectId));
   });
 
   // ─── R4: Reports ───────────────────────────────────────────────────

@@ -258,6 +258,19 @@ describe("activity log", () => {
     logActivity(db, { task_id: taskId, agent_id: null, message: "Only entry" });
     expect(getRecentActivity(db, 100)).toHaveLength(1);
   });
+
+  it("bubbles sub-agent activity to parent agent last_seen_at", () => {
+    const parent = registerAgent(db, { name: "parent-agent", model: null, capabilities: [] });
+    const child = registerAgent(db, { name: "child-agent", model: null, capabilities: [], parent_agent_name: "parent-agent" });
+
+    // Set parent last_seen_at to an old timestamp
+    db.prepare("UPDATE agents SET last_seen_at = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(parent.id);
+
+    logActivity(db, { task_id: taskId, agent_id: child.id, message: "sub-agent work" });
+
+    const updatedParent = db.prepare("SELECT last_seen_at FROM agents WHERE id = ?").get(parent.id) as { last_seen_at: string };
+    expect(new Date(updatedParent.last_seen_at).getFullYear()).toBeGreaterThan(2020);
+  });
 });
 
 // ─── Blockers ─────────────────────────────────────────────────────────────────

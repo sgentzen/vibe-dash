@@ -27,17 +27,20 @@ export function DashboardView() {
   );
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
 
-  // Track completed task count for the active sprint to trigger refreshes
+  // Track task status changes for the active sprint to trigger dashboard refreshes
   const sprintDoneCount = activeSprint
     ? projectTasks.filter((t) => t.sprint_id === activeSprint.id && t.status === "done").length
     : 0;
+  const sprintTaskStatusKey = activeSprint
+    ? projectTasks.filter((t) => t.sprint_id === activeSprint.id).map((t) => `${t.id}:${t.status}`).join(",")
+    : "";
 
   useEffect(() => {
     async function load() {
       try {
         const [vel, heat] = await Promise.all([
           api.getVelocityTrend(5, projectId),
-          api.getActivityHeatmap(),
+          api.getActivityHeatmap(projectId),
         ]);
         setVelocity(vel);
         setHeatmap(heat);
@@ -55,7 +58,7 @@ export function DashboardView() {
       }
     }
     load();
-  }, [api, activeSprint?.id, projectId, sprintDoneCount]);
+  }, [api, activeSprint?.id, projectId, sprintDoneCount, sprintTaskStatusKey]);
 
   async function handleGenerateReport() {
     if (!projectId) return;

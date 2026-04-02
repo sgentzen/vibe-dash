@@ -2,6 +2,7 @@ import { useAppState } from "../store";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import type { Agent, AgentHealthStatus } from "../types";
 
+// Keep in sync with server/db.ts ACTIVE_THRESHOLD_MS / IDLE_THRESHOLD_MS
 const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 const EVENT_AGE_OUT_MS = 10 * 60 * 1000; // 10 minutes
