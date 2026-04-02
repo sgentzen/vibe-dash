@@ -50,7 +50,7 @@ app.post("/messages", async (req, res) => {
 // Serve built frontend in production (npm start)
 const distDir = path.join(PROJECT_ROOT, "dist");
 app.use(express.static(distDir));
-app.get("/*", spaLimiter, (_req, res) => {
+app.get("/{*splat}", spaLimiter, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
