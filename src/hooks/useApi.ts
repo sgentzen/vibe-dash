@@ -373,8 +373,9 @@ async function getVelocityTrend(limit = 5, projectId?: string): Promise<Velocity
 
 // ─── R4: Heatmap & Reports ──────────────────────────────────────────
 
-async function getActivityHeatmap(): Promise<ActivityHeatmapEntry[]> {
-  const res = await fetch("/api/activity-heatmap");
+async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEntry[]> {
+  const url = projectId ? `/api/activity-heatmap?project_id=${encodeURIComponent(projectId)}` : "/api/activity-heatmap";
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`getActivityHeatmap failed: ${res.status}`);
   return res.json();
 }

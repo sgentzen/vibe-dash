@@ -611,6 +611,13 @@ export function logActivity(
   db.prepare(
     "INSERT INTO activity_log (id, task_id, agent_id, message, timestamp) VALUES (?, ?, ?, ?, ?)"
   ).run(id, input.task_id, input.agent_id ?? null, input.message, ts);
+  // Bubble last_seen_at to parent agent when sub-agent logs activity
+  if (input.agent_id) {
+    const agent = db.prepare("SELECT parent_agent_id FROM agents WHERE id = ?").get(input.agent_id) as { parent_agent_id: string | null } | undefined;
+    if (agent?.parent_agent_id) {
+      db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(ts, agent.parent_agent_id);
+    }
+  }
   return db
     .prepare("SELECT * FROM activity_log WHERE id = ?")
     .get(id) as ActivityEntry;
@@ -690,8 +697,9 @@ export function getActiveBlockers(db: Database.Database): Blocker[] {
 
 // ─── Agent Health ────────────────────────────────────────────────────────────
 
-const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
-const IDLE_THRESHOLD_MS = 30 * 60 * 1000;
+export const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
+export const IDLE_THRESHOLD_MS = 30 * 60 * 1000;
+export const ACTIVE_THRESHOLD_MINUTES = ACTIVE_THRESHOLD_MS / 60_000;
 
 export function getAgentHealthStatus(lastSeenAt: string): AgentHealthStatus {
   const elapsed = Date.now() - new Date(lastSeenAt).getTime();
@@ -1285,15 +1293,21 @@ export function getVelocityTrend(db: Database.Database, limit = 5, projectId?: s
 
 // ─── Activity Heatmap ────────────────────────────────────────────────────────
 
-export function getAgentActivityHeatmap(db: Database.Database): ActivityHeatmapEntry[] {
+export function getAgentActivityHeatmap(db: Database.Database, projectId?: string): ActivityHeatmapEntry[] {
+  const whereClause = projectId
+    ? `WHERE t.project_id = ?`
+    : "";
+  const params = projectId ? [projectId] : [];
   return db.prepare(
     `SELECT CAST(strftime('%H', a.timestamp) AS INTEGER) AS hour,
        a.agent_id, ag.name AS agent_name, COUNT(*) AS count
      FROM activity_log a
      JOIN agents ag ON a.agent_id = ag.id
+     LEFT JOIN tasks t ON a.task_id = t.id
+     ${whereClause}
      GROUP BY hour, a.agent_id, ag.name
      ORDER BY hour ASC, count DESC`
-  ).all() as ActivityHeatmapEntry[];
+  ).all(...params) as ActivityHeatmapEntry[];
 }
 
 // ─── Report Generation ───────────────────────────────────────────────────────

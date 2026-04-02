@@ -37,7 +37,7 @@ function getTaskDates(task: Task, sprintMap: Map<string, Sprint>): { start: numb
 
 export function TimelineView() {
   const { tasks, sprints, selectedProjectId, selectedSprintId, taskDepsMap } = useAppState();
-  const [showUndated, setShowUndated] = useState(false);
+  const [showUndated, setShowUndated] = useState(true);
 
   const sprintMap = useMemo(() => {
     const m = new Map<string, Sprint>();
@@ -113,7 +113,7 @@ export function TimelineView() {
               cursor: "pointer",
             }}
           >
-            {showUndated ? "Hide" : "Show"} {undatedCount} undated tasks
+            {showUndated ? "Hide" : "Show"} {undatedCount} undated task{undatedCount !== 1 ? "s" : ""}
           </button>
         )}
       </div>
