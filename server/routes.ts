@@ -804,13 +804,16 @@ export function createRouter(db: Database.Database): Router {
 
   // ─── Cost & Token Tracking ──────────────────────────────────────
 
-  router.post("/api/costs", (req, res) => {
+  router.post("/api/costs", statsLimiter, (req, res) => {
     const { model, provider, input_tokens, output_tokens, cost_usd } = req.body as {
       model: string; provider: string; input_tokens: number; output_tokens: number; cost_usd: number;
       agent_id?: string; task_id?: string; sprint_id?: string; project_id?: string;
     };
-    if (!model || !provider || input_tokens == null || output_tokens == null || cost_usd == null) {
-      res.status(400).json({ error: "model, provider, input_tokens, output_tokens, and cost_usd are required" }); return;
+    if (!model || !provider || !Number.isFinite(input_tokens) || !Number.isFinite(output_tokens) || !Number.isFinite(cost_usd)) {
+      res.status(400).json({ error: "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required" }); return;
+    }
+    if (input_tokens < 0 || output_tokens < 0 || cost_usd < 0) {
+      res.status(400).json({ error: "input_tokens, output_tokens, and cost_usd must be non-negative" }); return;
     }
     const entry = logCost(db, {
       agent_id: req.body.agent_id ?? null,
@@ -819,6 +822,7 @@ export function createRouter(db: Database.Database): Router {
       project_id: req.body.project_id ?? null,
       model, provider, input_tokens, output_tokens, cost_usd,
     });
+    broadcast({ type: "cost_logged" as WsEvent["type"], payload: entry as unknown as WsEvent["payload"] });
     res.status(201).json(entry);
   });
 
