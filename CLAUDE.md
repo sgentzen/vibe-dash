@@ -18,10 +18,28 @@ Local-first real-time dashboard for monitoring AI-driven development projects vi
 server/
   index.ts          # Express app, MCP SSE, WebSocket setup (port 3001)
   routes.ts         # All REST API endpoints (Express Router)
-  db.ts             # Database layer — schema + all queries (being split in Sprint 1)
   types.ts          # Shared TypeScript interfaces/types
   websocket.ts      # WebSocket broadcast
   recurrence.ts     # Recurring task logic
+  db/
+    index.ts        # Barrel re-export (all consumers import from here)
+    schema.ts       # DDL, migrations, initDb(), openDb()
+    helpers.ts      # now(), genId(), parseAgent()
+    projects.ts     # createProject, listProjects
+    sprints.ts      # CRUD + capacity, daily stats, velocity
+    tasks.ts        # CRUD + search, bulk update, recurring tasks
+    agents.ts       # CRUD + health, sessions, stats, file locks
+    activity.ts     # logActivity, activity stream, heatmap
+    blockers.ts     # createBlocker, resolveBlocker
+    tags.ts         # tag CRUD + task-tag associations
+    dependencies.ts # task dependency graph
+    comments.ts     # comments + @mentions
+    notifications.ts # alert rules + notifications
+    filters.ts      # saved search filters
+    templates.ts    # project templates + seeding
+    webhooks.ts     # webhook CRUD + fireWebhooks
+    reports.ts      # generateReport
+    costs.ts        # cost/token tracking per agent/sprint/project
   mcp/
     server.ts       # MCP server factory + tool registration
     tools.ts        # MCP tool handler implementations
@@ -88,7 +106,7 @@ router.get("/api/resource", limiter, (req, res) => {
 - Tests in `tests/` directory, named `*.test.ts`
 - Each test gets a fresh in-memory DB via `beforeEach(() => { db = createTestDb(); })`
 - Integration tests — no mocking, test real DB operations
-- Import functions directly from `../server/db.js` (note `.js` extension for ESM)
+- Import functions directly from `../server/db/index.js` (note `.js` extension for ESM)
 
 ## Conventions
 
