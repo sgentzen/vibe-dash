@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
+import type Database from "better-sqlite3";
 import { openDb } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
@@ -18,7 +19,7 @@ const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.d
 const app = express();
 app.use(express.json());
 
-const db = openDb(DB_PATH);
+const db: Database.Database = openDb(DB_PATH);
 app.use(createRouter(db));
 
 const spaLimiter = rateLimit({
