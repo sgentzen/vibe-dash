@@ -3,6 +3,10 @@ import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+function buildQueryString(params: Record<string, string | undefined>): string {
+  return Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+}
+
 async function getStats(): Promise<{
   projects: number;
   tasks: number;
@@ -235,7 +239,7 @@ async function getAgentSessions(agentId: string): Promise<AgentSession[]> {
 // ─── R2: Search ──────────────────────────────────────────────────────────
 
 async function searchTasks(params: Record<string, string | undefined>): Promise<Task[]> {
-  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const qs = buildQueryString(params);
   const res = await fetch(`/api/tasks/search?${qs}`);
   if (!res.ok) throw new Error(`searchTasks failed: ${res.status}`);
   return res.json();
@@ -412,7 +416,7 @@ async function instantiateTemplate(templateId: string, projectName: string): Pro
 // ─── R5: Activity Stream ─────────────────────────────────────────────
 
 async function getActivityStreamApi(params: Record<string, string | undefined> = {}): Promise<ActivityEntry[]> {
-  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const qs = buildQueryString(params);
   const res = await fetch(`/api/activity-stream${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error(`getActivityStream failed: ${res.status}`);
   return res.json();
@@ -484,7 +488,7 @@ interface CostByAgentEntry {
 }
 
 async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
-  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const qs = buildQueryString(params);
   const res = await fetch(`/api/costs/timeseries${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error(`getCostTimeseries failed: ${res.status}`);
   return res.json();
@@ -497,14 +501,14 @@ async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
 }
 
 async function getCostByModel(params: Record<string, string | undefined> = {}): Promise<CostByModelEntry[]> {
-  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const qs = buildQueryString(params);
   const res = await fetch(`/api/costs/by-model${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error(`getCostByModel failed: ${res.status}`);
   return res.json();
 }
 
 async function getCostByAgent(params: Record<string, string | undefined> = {}): Promise<CostByAgentEntry[]> {
-  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const qs = buildQueryString(params);
   const res = await fetch(`/api/costs/by-agent${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error(`getCostByAgent failed: ${res.status}`);
   return res.json();

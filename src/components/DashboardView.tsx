@@ -30,6 +30,7 @@ export function DashboardView() {
     (t) => t.due_date && t.status !== "done" && new Date(t.due_date) < new Date()
   );
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
+  const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
   // Track task status changes for the active sprint to trigger dashboard refreshes
   const sprintDoneCount = activeSprint
@@ -39,6 +40,7 @@ export function DashboardView() {
     ? projectTasks.filter((t) => t.sprint_id === activeSprint.id).map((t) => `${t.id}:${t.status}`).join(",")
     : "";
 
+  // Dashboard charts: refresh on sprint task status changes + polling
   useEffect(() => {
     async function load() {
       try {
@@ -57,26 +59,34 @@ export function DashboardView() {
           setBurndown(bd);
           setContributions(contrib);
         }
-
-        // Load cost data
-        if (projectId) {
-          const [summary, ts, byModel, byAgent] = await Promise.all([
-            api.getProjectCostSummary(projectId),
-            api.getCostTimeseries({ project_id: projectId, days: "30" }),
-            api.getCostByModel({ project_id: projectId }),
-            api.getCostByAgent({ project_id: projectId }),
-          ]);
-          setCostSummary(summary);
-          setCostTimeseries(ts);
-          setCostByModel(byModel);
-          setCostByAgent(byAgent);
-        }
       } catch (e) {
         console.warn("[DashboardView] failed to load chart data", e);
       }
     }
     load();
-  }, [api, activeSprint?.id, projectId, sprintDoneCount, sprintTaskStatusKey, pollGeneration]);
+  }, [api, activeSprint?.id, projectId, sprintTaskStatusKey, pollGeneration]);
+
+  // Cost data: refresh on project change or sprint task status changes (not every poll tick)
+  useEffect(() => {
+    if (!projectId) return;
+    async function loadCosts() {
+      try {
+        const [summary, ts, byModel, byAgent] = await Promise.all([
+          api.getProjectCostSummary(projectId!),
+          api.getCostTimeseries({ project_id: projectId!, days: "30" }),
+          api.getCostByModel({ project_id: projectId! }),
+          api.getCostByAgent({ project_id: projectId! }),
+        ]);
+        setCostSummary(summary);
+        setCostTimeseries(ts);
+        setCostByModel(byModel);
+        setCostByAgent(byAgent);
+      } catch (e) {
+        console.warn("[DashboardView] failed to load cost data", e);
+      }
+    }
+    loadCosts();
+  }, [api, projectId, sprintTaskStatusKey]);
 
   async function handleGenerateReport() {
     if (!projectId) return;
@@ -150,8 +160,7 @@ export function DashboardView() {
             <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No completed sprints yet.</div>
           ) : (
             <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px" }}>
-              {velocity.map((v) => {
-                const maxPts = Math.max(...velocity.map((x) => x.completed_points), 1);
+              {(() => { const maxPts = Math.max(...velocity.map((x) => x.completed_points), 1); return velocity.map((v) => {
                 const pct = (v.completed_points / maxPts) * 100;
                 return (
                   <div key={v.sprint_id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -165,7 +174,7 @@ export function DashboardView() {
                     </span>
                   </div>
                 );
-              })}
+              }); })()}
             </div>
           )}
         </div>
@@ -198,10 +207,13 @@ export function DashboardView() {
             <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No activity data yet.</div>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "2px" }}>
-              {Array.from({ length: 24 }, (_, h) => {
-                const hourEntries = heatmap.filter((e) => e.hour === h);
-                const total = hourEntries.reduce((sum, e) => sum + e.count, 0);
-                const maxTotal = Math.max(...Array.from({ length: 24 }, (_, i) => heatmap.filter((e) => e.hour === i).reduce((s, e) => s + e.count, 0)), 1);
+              {(() => {
+                const hourTotals = Array.from({ length: 24 }, (_, h) =>
+                  heatmap.filter((e) => e.hour === h).reduce((sum, e) => sum + e.count, 0)
+                );
+                const maxTotal = Math.max(...hourTotals, 1);
+                return Array.from({ length: 24 }, (_, h) => {
+                const total = hourTotals[h];
                 const intensity = total / maxTotal;
                 return (
                   <div
@@ -217,7 +229,7 @@ export function DashboardView() {
                     {h}
                   </div>
                 );
-              })}
+              }); })()}
             </div>
           )}
         </div>
@@ -264,8 +276,8 @@ export function DashboardView() {
         <KpiCard label="Output Tokens" value={costSummary ? formatTokens(costSummary.total_output_tokens) : "0"} color="var(--text-secondary)" />
         <KpiCard
           label="Avg Cost/Task"
-          value={costSummary && projectTasks.filter(t => t.status === "done").length > 0
-            ? `$${(costSummary.total_cost_usd / projectTasks.filter(t => t.status === "done").length).toFixed(3)}`
+          value={costSummary && doneTaskCount > 0
+            ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}`
             : "$0.00"}
           color="var(--accent-green)"
         />
@@ -279,8 +291,7 @@ export function DashboardView() {
             <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No cost data yet. Agents will log costs as they work.</div>
           ) : (
             <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "120px" }}>
-              {costTimeseries.map((d) => {
-                const maxCost = Math.max(...costTimeseries.map((x) => x.total_cost_usd), 0.01);
+              {(() => { const maxCost = Math.max(...costTimeseries.map((x) => x.total_cost_usd), 0.01); return costTimeseries.map((d) => {
                 const pct = (d.total_cost_usd / maxCost) * 100;
                 return (
                   <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -293,7 +304,7 @@ export function DashboardView() {
                     </span>
                   </div>
                 );
-              })}
+              }); })()}
             </div>
           )}
         </div>
@@ -305,8 +316,7 @@ export function DashboardView() {
             <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No model cost data yet.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {costByModel.map((m) => {
-                const maxCost = Math.max(...costByModel.map((x) => x.total_cost_usd), 0.01);
+              {(() => { const maxCost = Math.max(...costByModel.map((x) => x.total_cost_usd), 0.01); return costByModel.map((m) => {
                 const pct = (m.total_cost_usd / maxCost) * 100;
                 return (
                   <div key={`${m.model}-${m.provider}`}>
@@ -319,7 +329,7 @@ export function DashboardView() {
                     </div>
                   </div>
                 );
-              })}
+              }); })()}
             </div>
           )}
         </div>
@@ -330,8 +340,7 @@ export function DashboardView() {
         <div style={{ ...cardStyle, marginBottom: "16px" }}>
           <div style={headerStyle}>Cost by Agent</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {costByAgent.map((a) => {
-              const maxCost = Math.max(...costByAgent.map((x) => x.total_cost_usd), 0.01);
+            {(() => { const maxCost = Math.max(...costByAgent.map((x) => x.total_cost_usd), 0.01); return costByAgent.map((a) => {
               const pct = (a.total_cost_usd / maxCost) * 100;
               return (
                 <div key={a.agent_id}>
@@ -344,7 +353,7 @@ export function DashboardView() {
                   </div>
                 </div>
               );
-            })}
+            }); })()}
           </div>
         </div>
       )}

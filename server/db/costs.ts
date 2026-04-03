@@ -64,37 +64,26 @@ export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
   return db.prepare("SELECT * FROM cost_entries WHERE id = ?").get(id) as CostEntry;
 }
 
-export function getAgentCostSummary(db: Database.Database, agentId: string): CostSummary {
-  const row = db.prepare(
+function getCostSummaryBy(db: Database.Database, column: string, value: string): CostSummary {
+  return db.prepare(
     `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
             COUNT(*) AS entry_count
-     FROM cost_entries WHERE agent_id = ?`
-  ).get(agentId) as CostSummary;
-  return row;
+     FROM cost_entries WHERE ${column} = ?`
+  ).get(value) as CostSummary;
+}
+
+export function getAgentCostSummary(db: Database.Database, agentId: string): CostSummary {
+  return getCostSummaryBy(db, "agent_id", agentId);
 }
 
 export function getSprintCostSummary(db: Database.Database, sprintId: string): CostSummary {
-  const row = db.prepare(
-    `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count
-     FROM cost_entries WHERE sprint_id = ?`
-  ).get(sprintId) as CostSummary;
-  return row;
+  return getCostSummaryBy(db, "sprint_id", sprintId);
 }
 
 export function getProjectCostSummary(db: Database.Database, projectId: string): CostSummary {
-  const row = db.prepare(
-    `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count
-     FROM cost_entries WHERE project_id = ?`
-  ).get(projectId) as CostSummary;
-  return row;
+  return getCostSummaryBy(db, "project_id", projectId);
 }
 
 export function getCostTimeseries(
