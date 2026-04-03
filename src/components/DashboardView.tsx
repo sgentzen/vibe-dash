@@ -33,9 +33,6 @@ export function DashboardView() {
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
   // Track task status changes for the active sprint to trigger dashboard refreshes
-  const sprintDoneCount = activeSprint
-    ? projectTasks.filter((t) => t.sprint_id === activeSprint.id && t.status === "done").length
-    : 0;
   const sprintTaskStatusKey = activeSprint
     ? projectTasks.filter((t) => t.sprint_id === activeSprint.id).map((t) => `${t.id}:${t.status}`).join(",")
     : "";
