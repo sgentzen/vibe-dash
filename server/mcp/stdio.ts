@@ -2,7 +2,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { openDb } from "../db.js";
+import { openDb } from "../db/index.js";
 import { createMcpServer } from "./server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

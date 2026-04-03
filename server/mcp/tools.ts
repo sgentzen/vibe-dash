@@ -47,7 +47,14 @@ import {
   createProjectFromTemplate,
   listTemplates,
   getActivityStream,
-} from "../db.js";
+  logCost,
+  getAgentCostSummary,
+  getSprintCostSummary,
+  getProjectCostSummary,
+  getCostTimeseries,
+  getCostByModel,
+  getCostByAgent,
+} from "../db/index.js";
 
 import { broadcast } from "../websocket.js";
 
@@ -454,6 +461,53 @@ export async function handleTool(
         recent_activity: getAgentActivity(db, agent.id, 20),
         sessions: listAgentSessions(db, agent.id),
       });
+    }
+
+    // ─── Cost & Token Tracking ────────────────────────────────────────
+
+    case "log_cost": {
+      const entry = logCost(db, {
+        agent_id: (args.agent_id as string) ?? null,
+        task_id: (args.task_id as string) ?? null,
+        sprint_id: (args.sprint_id as string) ?? null,
+        project_id: (args.project_id as string) ?? null,
+        model: args.model as string,
+        provider: args.provider as string,
+        input_tokens: args.input_tokens as number,
+        output_tokens: args.output_tokens as number,
+        cost_usd: args.cost_usd as number,
+      });
+      return ok(entry);
+    }
+
+    case "get_cost_summary": {
+      if (args.agent_id) return ok(getAgentCostSummary(db, args.agent_id as string));
+      if (args.sprint_id) return ok(getSprintCostSummary(db, args.sprint_id as string));
+      if (args.project_id) return ok(getProjectCostSummary(db, args.project_id as string));
+      return ok({ error: "Provide agent_id, sprint_id, or project_id" });
+    }
+
+    case "get_cost_timeseries": {
+      return ok(getCostTimeseries(db, {
+        agent_id: args.agent_id as string | undefined,
+        sprint_id: args.sprint_id as string | undefined,
+        project_id: args.project_id as string | undefined,
+        days: args.days as number | undefined,
+      }));
+    }
+
+    case "get_cost_by_model": {
+      return ok(getCostByModel(db, {
+        project_id: args.project_id as string | undefined,
+        sprint_id: args.sprint_id as string | undefined,
+      }));
+    }
+
+    case "get_cost_by_agent": {
+      return ok(getCostByAgent(db, {
+        project_id: args.project_id as string | undefined,
+        sprint_id: args.sprint_id as string | undefined,
+      }));
     }
 
     default:

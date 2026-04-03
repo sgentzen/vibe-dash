@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
-import { openDb } from "./db.js";
+import { openDb } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";

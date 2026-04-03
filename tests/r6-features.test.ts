@@ -7,7 +7,7 @@ import {
   updateWebhook,
   deleteWebhook,
   getMatchingWebhooks,
-} from "../server/db";
+} from "../server/db/index.js";
 
 let db: Database.Database;
 

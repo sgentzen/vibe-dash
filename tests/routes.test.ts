@@ -11,7 +11,7 @@ import {
   registerAgent,
   createBlocker,
   resolveBlocker,
-} from "../server/db.js";
+} from "../server/db/index.js";
 import http from "http";
 
 let app: Express;

@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
-import { registerAgent, touchAgent, startOrGetSession, closeAgentSessions, closeStaleSession, cleanupStaleAgents } from "../db.js";
+import { registerAgent, touchAgent, startOrGetSession, closeAgentSessions, closeStaleSession, cleanupStaleAgents } from "../db/index.js";
 import { broadcast } from "../websocket.js";
 
 const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
@@ -490,6 +490,68 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       assigned_agent_id: z.string().nullable().optional(),
     },
     call("bulk_update_tasks")
+  );
+
+  // ─── Cost & Token Tracking ────────────────────────────────────────────
+
+  server.tool(
+    "log_cost",
+    "Log a cost/token usage entry for an LLM call",
+    {
+      model: z.string(),
+      provider: z.string(),
+      input_tokens: z.number(),
+      output_tokens: z.number(),
+      cost_usd: z.number(),
+      agent_id: z.string().optional(),
+      task_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+      project_id: z.string().optional(),
+    },
+    call("log_cost")
+  );
+
+  server.tool(
+    "get_cost_summary",
+    "Get cost summary for an agent, sprint, or project",
+    {
+      agent_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+      project_id: z.string().optional(),
+    },
+    call("get_cost_summary")
+  );
+
+  server.tool(
+    "get_cost_timeseries",
+    "Get daily cost timeseries data",
+    {
+      agent_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+      project_id: z.string().optional(),
+      days: z.number().optional(),
+    },
+    call("get_cost_timeseries")
+  );
+
+  server.tool(
+    "get_cost_by_model",
+    "Get cost breakdown by model",
+    {
+      project_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+    },
+    call("get_cost_by_model")
+  );
+
+  server.tool(
+    "get_cost_by_agent",
+    "Get cost breakdown by agent",
+    {
+      project_id: z.string().optional(),
+      sprint_id: z.string().optional(),
+    },
+    call("get_cost_by_agent")
   );
 
   return { server, cleanup };

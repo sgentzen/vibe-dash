@@ -36,6 +36,7 @@ export interface AppState {
     activeAgents: number;
     alerts: number;
   };
+  pollGeneration: number;
 }
 
 const initialState: AppState = {
@@ -57,6 +58,7 @@ const initialState: AppState = {
   selectedProjectId: null,
   selectedSprintId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
+  pollGeneration: 0,
 };
 
 export type AppAction =
@@ -78,6 +80,7 @@ export type AppAction =
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_SPRINT"; payload: string | null }
   | { type: "SET_THEME"; payload: Theme }
+  | { type: "INCREMENT_POLL_GENERATION" }
   | { type: "WS_EVENT"; payload: WsEvent };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -119,6 +122,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "SET_THEME":
       localStorage.setItem(THEME_STORAGE_KEY, action.payload);
       return { ...state, theme: action.payload };
+    case "INCREMENT_POLL_GENERATION":
+      return { ...state, pollGeneration: state.pollGeneration + 1 };
     case "WS_EVENT": {
       const event = action.payload;
       switch (event.type) {

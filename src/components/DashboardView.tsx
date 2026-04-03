@@ -4,7 +4,7 @@ import { useApi } from "../hooks/useApi";
 import type { SprintDailyStats, VelocityData, ActivityHeatmapEntry, AgentContribution } from "../types";
 
 export function DashboardView() {
-  const { projects, sprints, blockers, tasks, selectedProjectId } = useAppState();
+  const { projects, sprints, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
   const api = useApi();
 
   const [burndown, setBurndown] = useState<SprintDailyStats[]>([]);
@@ -13,6 +13,10 @@ export function DashboardView() {
   const [contributions, setContributions] = useState<AgentContribution[]>([]);
   const [reportText, setReportText] = useState<string | null>(null);
   const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "sprint">("week");
+  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
+  const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
+  const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
+  const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
 
   // Project-scoped data
   const projectId = selectedProjectId || projects[0]?.id;
@@ -53,12 +57,26 @@ export function DashboardView() {
           setBurndown(bd);
           setContributions(contrib);
         }
-      } catch {
-        // ignore load errors
+
+        // Load cost data
+        if (projectId) {
+          const [summary, ts, byModel, byAgent] = await Promise.all([
+            api.getProjectCostSummary(projectId),
+            api.getCostTimeseries({ project_id: projectId, days: "30" }),
+            api.getCostByModel({ project_id: projectId }),
+            api.getCostByAgent({ project_id: projectId }),
+          ]);
+          setCostSummary(summary);
+          setCostTimeseries(ts);
+          setCostByModel(byModel);
+          setCostByAgent(byAgent);
+        }
+      } catch (e) {
+        console.warn("[DashboardView] failed to load chart data", e);
       }
     }
     load();
-  }, [api, activeSprint?.id, projectId, sprintDoneCount, sprintTaskStatusKey]);
+  }, [api, activeSprint?.id, projectId, sprintDoneCount, sprintTaskStatusKey, pollGeneration]);
 
   async function handleGenerateReport() {
     if (!projectId) return;
@@ -239,6 +257,98 @@ export function DashboardView() {
         </div>
       </div>
 
+      {/* Cost & Token Tracking */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
+        <KpiCard label="Total Spend" value={costSummary ? `$${costSummary.total_cost_usd.toFixed(2)}` : "$0.00"} color="var(--accent-blue)" />
+        <KpiCard label="Input Tokens" value={costSummary ? formatTokens(costSummary.total_input_tokens) : "0"} color="var(--text-secondary)" />
+        <KpiCard label="Output Tokens" value={costSummary ? formatTokens(costSummary.total_output_tokens) : "0"} color="var(--text-secondary)" />
+        <KpiCard
+          label="Avg Cost/Task"
+          value={costSummary && projectTasks.filter(t => t.status === "done").length > 0
+            ? `$${(costSummary.total_cost_usd / projectTasks.filter(t => t.status === "done").length).toFixed(3)}`
+            : "$0.00"}
+          color="var(--accent-green)"
+        />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+        {/* Cost Timeseries */}
+        <div style={cardStyle}>
+          <div style={headerStyle}>Daily Spend (Last 30 Days)</div>
+          {costTimeseries.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No cost data yet. Agents will log costs as they work.</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "120px" }}>
+              {costTimeseries.map((d) => {
+                const maxCost = Math.max(...costTimeseries.map((x) => x.total_cost_usd), 0.01);
+                const pct = (d.total_cost_usd / maxCost) * 100;
+                return (
+                  <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{
+                      width: "100%", background: "var(--accent-blue)", borderRadius: "2px",
+                      height: `${pct}%`, minHeight: "2px",
+                    }} title={`${d.date}: $${d.total_cost_usd.toFixed(4)}`} />
+                    <span style={{ fontSize: "8px", color: "var(--text-muted)", marginTop: "2px" }}>
+                      {d.date.slice(8)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Cost by Model */}
+        <div style={cardStyle}>
+          <div style={headerStyle}>Cost by Model</div>
+          {costByModel.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No model cost data yet.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {costByModel.map((m) => {
+                const maxCost = Math.max(...costByModel.map((x) => x.total_cost_usd), 0.01);
+                const pct = (m.total_cost_usd / maxCost) * 100;
+                return (
+                  <div key={`${m.model}-${m.provider}`}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+                      <span style={{ color: "var(--text-primary)" }}>{m.model}</span>
+                      <span style={{ color: "var(--text-muted)" }}>${m.total_cost_usd.toFixed(4)} ({formatTokens(m.total_tokens)} tok)</span>
+                    </div>
+                    <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-purple)", borderRadius: "2px" }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Cost by Agent */}
+      {costByAgent.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: "16px" }}>
+          <div style={headerStyle}>Cost by Agent</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {costByAgent.map((a) => {
+              const maxCost = Math.max(...costByAgent.map((x) => x.total_cost_usd), 0.01);
+              const pct = (a.total_cost_usd / maxCost) * 100;
+              return (
+                <div key={a.agent_id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+                    <span style={{ color: "var(--text-primary)" }}>{a.agent_name}</span>
+                    <span style={{ color: "var(--text-muted)" }}>${a.total_cost_usd.toFixed(4)} ({formatTokens(a.total_tokens)} tok)</span>
+                  </div>
+                  <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-green)", borderRadius: "2px" }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Report Generation */}
       <div style={cardStyle}>
         <div style={headerStyle}>Generate Status Report</div>
@@ -291,6 +401,12 @@ export function DashboardView() {
       </div>
     </div>
   );
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
 }
 
 function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {

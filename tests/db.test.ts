@@ -16,7 +16,7 @@ import {
   createBlocker,
   resolveBlocker,
   getActiveBlockers,
-} from "../server/db.js";
+} from "../server/db/index.js";
 
 let db: Database.Database;
 
