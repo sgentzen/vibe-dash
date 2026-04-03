@@ -215,6 +215,20 @@ export interface Blocker {
   resolved_at: string | null;
 }
 
+export interface CostEntry {
+  id: string;
+  agent_id: string | null;
+  task_id: string | null;
+  sprint_id: string | null;
+  project_id: string | null;
+  model: string;
+  provider: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  created_at: string;
+}
+
 export type WsEventType =
   | "project_created"
   | "task_created"
@@ -239,9 +253,10 @@ export type WsEventType =
   | "file_lock_acquired"
   | "file_conflict_detected"
   | "notification_created"
-  | "daily_stats_recorded";
+  | "daily_stats_recorded"
+  | "cost_logged";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats | CostEntry;
 }

@@ -59,6 +59,7 @@ export function usePolling() {
 
     waitForServer().then((ready) => {
       if (ready && !cancelled) {
+        poll();
         timer.current = setInterval(poll, POLL_INTERVAL_MS);
       }
     });

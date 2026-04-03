@@ -144,6 +144,10 @@ const SCHEMA = [
   "  cost_usd REAL NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
+  "CREATE INDEX IF NOT EXISTS idx_cost_entries_agent_id ON cost_entries(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_cost_entries_sprint_id ON cost_entries(sprint_id);",
+  "CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);",
+  "CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);",
 ].join("\n");
 
 function migrate(db: Database.Database): void {
