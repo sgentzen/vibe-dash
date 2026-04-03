@@ -64,7 +64,9 @@ export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
   return db.prepare("SELECT * FROM cost_entries WHERE id = ?").get(id) as CostEntry;
 }
 
-function getCostSummaryBy(db: Database.Database, column: string, value: string): CostSummary {
+type CostSummaryColumn = "agent_id" | "sprint_id" | "project_id";
+
+function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, value: string): CostSummary {
   return db.prepare(
     `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
