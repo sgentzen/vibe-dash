@@ -24,7 +24,7 @@ import {
   getUnreadNotificationCount,
   evaluateAlertRules,
   bulkUpdateTasks,
-} from "../server/db";
+} from "../server/db/index.js";
 
 let db: Database.Database;
 

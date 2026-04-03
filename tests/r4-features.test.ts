@@ -18,7 +18,7 @@ import {
   getAgentActivityHeatmap,
   generateReport,
   getSprintCapacity,
-} from "../server/db";
+} from "../server/db/index.js";
 
 let db: Database.Database;
 

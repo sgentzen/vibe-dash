@@ -450,6 +450,66 @@ async function deleteWebhookApi(id: string): Promise<void> {
   await fetch(`/api/webhooks/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+// ─── Cost & Token Tracking ──────────────────────────────────────────
+
+interface CostSummary {
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  entry_count: number;
+}
+
+interface CostTimeseriesEntry {
+  date: string;
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  entry_count: number;
+}
+
+interface CostByModelEntry {
+  model: string;
+  provider: string;
+  total_cost_usd: number;
+  total_tokens: number;
+  entry_count: number;
+}
+
+interface CostByAgentEntry {
+  agent_id: string;
+  agent_name: string;
+  total_cost_usd: number;
+  total_tokens: number;
+  entry_count: number;
+}
+
+async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
+  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const res = await fetch(`/api/costs/timeseries${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error(`getCostTimeseries failed: ${res.status}`);
+  return res.json();
+}
+
+async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
+  const res = await fetch(`/api/costs/project/${encodeURIComponent(projectId)}`);
+  if (!res.ok) throw new Error(`getProjectCostSummary failed: ${res.status}`);
+  return res.json();
+}
+
+async function getCostByModel(params: Record<string, string | undefined> = {}): Promise<CostByModelEntry[]> {
+  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const res = await fetch(`/api/costs/by-model${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error(`getCostByModel failed: ${res.status}`);
+  return res.json();
+}
+
+async function getCostByAgent(params: Record<string, string | undefined> = {}): Promise<CostByAgentEntry[]> {
+  const qs = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const res = await fetch(`/api/costs/by-agent${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error(`getCostByAgent failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -505,5 +565,9 @@ export function useApi() {
     createWebhook: createWebhookApi,
     updateWebhook: updateWebhookApi,
     deleteWebhook: deleteWebhookApi,
+    getCostTimeseries,
+    getProjectCostSummary,
+    getCostByModel,
+    getCostByAgent,
   }), []);
 }

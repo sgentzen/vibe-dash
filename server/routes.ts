@@ -79,7 +79,14 @@ import {
   evaluateAlertRules,
   bulkUpdateTasks,
   ACTIVE_THRESHOLD_MINUTES,
-} from "./db.js";
+  logCost,
+  getAgentCostSummary,
+  getSprintCostSummary,
+  getProjectCostSummary,
+  getCostTimeseries,
+  getCostByModel,
+  getCostByAgent,
+} from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
@@ -102,7 +109,7 @@ export function createRouter(db: Database.Database): Router {
 
   const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 30,
+    max: 60,
     standardHeaders: true,
     legacyHeaders: false,
   });
@@ -793,6 +800,58 @@ export function createRouter(db: Database.Database): Router {
 
   router.delete("/api/webhooks/:id", (req, res) => {
     res.json({ success: deleteWebhook(db, req.params.id) });
+  });
+
+  // ─── Cost & Token Tracking ──────────────────────────────────────
+
+  router.post("/api/costs", (req, res) => {
+    const { model, provider, input_tokens, output_tokens, cost_usd } = req.body as {
+      model: string; provider: string; input_tokens: number; output_tokens: number; cost_usd: number;
+      agent_id?: string; task_id?: string; sprint_id?: string; project_id?: string;
+    };
+    if (!model || !provider || input_tokens == null || output_tokens == null || cost_usd == null) {
+      res.status(400).json({ error: "model, provider, input_tokens, output_tokens, and cost_usd are required" }); return;
+    }
+    const entry = logCost(db, {
+      agent_id: req.body.agent_id ?? null,
+      task_id: req.body.task_id ?? null,
+      sprint_id: req.body.sprint_id ?? null,
+      project_id: req.body.project_id ?? null,
+      model, provider, input_tokens, output_tokens, cost_usd,
+    });
+    res.status(201).json(entry);
+  });
+
+  router.get("/api/costs/agent/:agentId", (req, res) => {
+    res.json(getAgentCostSummary(db, req.params.agentId));
+  });
+
+  router.get("/api/costs/sprint/:sprintId", (req, res) => {
+    res.json(getSprintCostSummary(db, req.params.sprintId));
+  });
+
+  router.get("/api/costs/project/:projectId", (req, res) => {
+    res.json(getProjectCostSummary(db, req.params.projectId));
+  });
+
+  router.get("/api/costs/timeseries", (req, res) => {
+    const agent_id = req.query.agent_id as string | undefined;
+    const sprint_id = req.query.sprint_id as string | undefined;
+    const project_id = req.query.project_id as string | undefined;
+    const days = req.query.days ? parseInt(req.query.days as string, 10) : undefined;
+    res.json(getCostTimeseries(db, { agent_id, sprint_id, project_id, days }));
+  });
+
+  router.get("/api/costs/by-model", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    const sprint_id = req.query.sprint_id as string | undefined;
+    res.json(getCostByModel(db, { project_id, sprint_id }));
+  });
+
+  router.get("/api/costs/by-agent", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    const sprint_id = req.query.sprint_id as string | undefined;
+    res.json(getCostByAgent(db, { project_id, sprint_id }));
   });
 
   return router;

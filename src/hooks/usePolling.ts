@@ -19,27 +19,30 @@ export function usePolling() {
     let cancelled = false;
 
     async function poll() {
-      try {
-        const [stats, projects, sprints, tasks, agents, activity, blockers] =
-          await Promise.all([
-            api.getStats(),
-            api.getProjects(),
-            api.getSprints(),
-            api.getTasks(),
-            api.getAgents(),
-            api.getActivity(),
-            api.getBlockers(),
-          ]);
-        dispatch({ type: "SET_STATS", payload: stats });
-        dispatch({ type: "SET_PROJECTS", payload: projects });
-        dispatch({ type: "SET_SPRINTS", payload: sprints });
-        dispatch({ type: "SET_TASKS", payload: tasks });
-        dispatch({ type: "SET_AGENTS", payload: agents });
-        dispatch({ type: "SET_ACTIVITY", payload: activity });
-        dispatch({ type: "SET_BLOCKERS", payload: blockers });
-      } catch {
-        // server may be temporarily unreachable — skip this cycle
+      const results = await Promise.allSettled([
+        api.getStats(),
+        api.getProjects(),
+        api.getSprints(),
+        api.getTasks(),
+        api.getAgents(),
+        api.getActivity(),
+        api.getBlockers(),
+      ]);
+      const [stats, projects, sprints, tasks, agents, activity, blockers] = results;
+      if (stats.status === "fulfilled") dispatch({ type: "SET_STATS", payload: stats.value });
+      if (projects.status === "fulfilled") dispatch({ type: "SET_PROJECTS", payload: projects.value });
+      if (sprints.status === "fulfilled") dispatch({ type: "SET_SPRINTS", payload: sprints.value });
+      if (tasks.status === "fulfilled") dispatch({ type: "SET_TASKS", payload: tasks.value });
+      if (agents.status === "fulfilled") dispatch({ type: "SET_AGENTS", payload: agents.value });
+      if (activity.status === "fulfilled") dispatch({ type: "SET_ACTIVITY", payload: activity.value });
+      if (blockers.status === "fulfilled") dispatch({ type: "SET_BLOCKERS", payload: blockers.value });
+
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        console.warn(`[usePolling] ${failures.length}/7 endpoints failed`, failures.map((f) => (f as PromiseRejectedResult).reason));
       }
+
+      dispatch({ type: "INCREMENT_POLL_GENERATION" });
     }
 
     async function waitForServer() {

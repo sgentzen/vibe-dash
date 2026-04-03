@@ -15,7 +15,7 @@ import {
   removeTagFromTask,
   getTaskTags,
   getTag,
-} from "../server/db.js";
+} from "../server/db/index.js";
 
 let db: Database.Database;
 

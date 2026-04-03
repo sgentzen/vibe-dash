@@ -19,7 +19,7 @@ import {
   deleteTemplate,
   createProjectFromTemplate,
   getActivityStream,
-} from "../server/db";
+} from "../server/db/index.js";
 import { getNextDueDate } from "../server/recurrence";
 
 let db: Database.Database;

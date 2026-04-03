@@ -26,7 +26,7 @@ import {
   getAgentById,
   getAgentActivity,
   getAgentCompletedToday,
-} from "../server/db";
+} from "../server/db/index.js";
 
 let db: Database.Database;
 

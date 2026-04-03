@@ -12,7 +12,7 @@
 
 import { resolve } from "path";
 import Database from "better-sqlite3";
-import { initDb, listProjects, listTasks, listSprints, createTask, listAgents, getAgentHealthStatus, getSprintCapacity, getActiveBlockers } from "../server/db.js";
+import { initDb, listProjects, listTasks, listSprints, createTask, listAgents, getAgentHealthStatus, getSprintCapacity, getActiveBlockers } from "../server/db/index.js";
 
 // ─── Parse args ──────────────────────────────────────────────────────────────
 
