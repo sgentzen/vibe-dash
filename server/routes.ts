@@ -540,7 +540,7 @@ export function createRouter(db: Database.Database): Router {
   router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
     // Read before delete so we can broadcast
     const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as any;
-    const removed = removeDependency(db, req.params.id);
+    const removed = removeDependency(db, req.params.id as string);
     if (removed && dep) {
       broadcast({ type: "dependency_removed", payload: dep });
     }
