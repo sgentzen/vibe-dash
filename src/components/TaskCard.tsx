@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
+import { badgeStyle } from "../styles/shared.js";
 
 interface TaskCardProps {
   task: Task;
@@ -58,12 +59,12 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
   if (isActive) {
     borderColor = "var(--accent-green)";
     background = "var(--green-bg)";
-    boxShadow = "0 0 8px rgba(63, 185, 80, 0.2)";
+    boxShadow = "var(--shadow-glow-green)";
   } else if (isBlocked) {
     borderColor = "var(--accent-yellow)";
   } else if (dueUrgency === "overdue") {
     borderColor = "var(--accent-red)";
-    boxShadow = "0 0 6px rgba(248, 81, 73, 0.15)";
+    boxShadow = "var(--shadow-glow-red)";
   } else if (dueUrgency === "today") {
     borderColor = "var(--accent-yellow)";
   }
@@ -223,14 +224,7 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
           {/* Assigned agent badge */}
           {assignedAgent && (
             <span
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background: `${agentColor(assignedAgent.name)}20`,
-                color: agentColor(assignedAgent.name),
-                border: `1px solid ${agentColor(assignedAgent.name)}40`,
-              }}
+              style={badgeStyle(agentColor(assignedAgent.name))}
             >
               {assignedAgent.name}
             </span>
@@ -245,7 +239,7 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
                 padding: "1px 6px",
                 borderRadius: "4px",
                 background: "rgba(6,182,212,0.1)",
-                color: "#06b6d4",
+                color: "var(--accent-cyan)",
                 border: "1px solid rgba(6,182,212,0.3)",
               }}
             >
@@ -261,7 +255,7 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
                 padding: "1px 6px",
                 borderRadius: "4px",
                 background: "rgba(99,102,241,0.1)",
-                color: "#6366f1",
+                color: "var(--accent-purple)",
                 border: "1px solid rgba(99,102,241,0.3)",
               }}
             >
@@ -290,14 +284,7 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
           {taskTags && taskTags.map((tag) => (
             <span
               key={tag.id}
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background: `${tag.color}20`,
-                color: tag.color,
-                border: `1px solid ${tag.color}40`,
-              }}
+              style={badgeStyle(tag.color)}
             >
               {tag.name}
             </span>

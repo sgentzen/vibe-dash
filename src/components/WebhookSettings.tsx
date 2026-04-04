@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useApi } from "../hooks/useApi";
+import { inputStyle, buttonPrimary } from "../styles/shared.js";
 import type { Webhook } from "../types";
 
 const EVENT_TYPES = [
@@ -48,10 +49,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
     );
   }
 
-  const inputStyle: React.CSSProperties = {
-    background: "var(--bg-tertiary)", border: "1px solid var(--border)",
-    borderRadius: "6px", color: "var(--text-primary)", padding: "6px 10px", fontSize: "12px", width: "100%",
-  };
+  const localInputStyle: React.CSSProperties = { ...inputStyle, padding: "6px 10px", fontSize: "12px" };
 
   return (
     <div style={{
@@ -80,7 +78,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
             placeholder="https://example.com/webhook"
-            style={{ ...inputStyle, marginBottom: "8px" }}
+            style={{ ...localInputStyle, marginBottom: "8px" }}
           />
           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>Event types:</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
@@ -91,8 +89,8 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
                 style={{
                   fontSize: "10px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
                   background: newEvents.includes(evt) ? "rgba(99,102,241,0.2)" : "var(--bg-secondary)",
-                  color: newEvents.includes(evt) ? "#6366f1" : "var(--text-muted)",
-                  border: `1px solid ${newEvents.includes(evt) ? "#6366f1" : "var(--border)"}`,
+                  color: newEvents.includes(evt) ? "var(--accent-purple)" : "var(--text-muted)",
+                  border: `1px solid ${newEvents.includes(evt) ? "var(--accent-purple)" : "var(--border)"}`,
                 }}
               >
                 {evt}
@@ -153,7 +151,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
                   {w.event_types.map((evt) => (
                     <span key={evt} style={{
                       fontSize: "9px", padding: "1px 5px", borderRadius: "3px",
-                      background: "rgba(99,102,241,0.1)", color: "#6366f1",
+                      background: "rgba(99,102,241,0.1)", color: "var(--accent-purple)",
                     }}>
                       {evt}
                     </span>

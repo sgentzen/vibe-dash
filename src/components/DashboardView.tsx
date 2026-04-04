@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
+import { cardStyle, sectionHeader } from "../styles/shared.js";
 import type { SprintDailyStats, VelocityData, ActivityHeatmapEntry, AgentContribution } from "../types";
 
 export function DashboardView() {
@@ -95,19 +96,7 @@ export function DashboardView() {
     }
   }
 
-  const cardStyle: React.CSSProperties = {
-    background: "var(--bg-secondary)",
-    border: "1px solid var(--border)",
-    borderRadius: "8px",
-    padding: "16px",
-  };
-
-  const headerStyle: React.CSSProperties = {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: "var(--text-primary)",
-    marginBottom: "12px",
-  };
+  const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
@@ -220,7 +209,7 @@ export function DashboardView() {
                       width: "20px", height: "20px", borderRadius: "3px",
                       background: total === 0 ? "var(--bg-tertiary)" : `rgba(99, 102, 241, ${0.2 + intensity * 0.8})`,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "8px", color: intensity > 0.5 ? "#fff" : "var(--text-muted)",
+                      fontSize: "8px", color: intensity > 0.5 ? "var(--text-on-accent)" : "var(--text-muted)",
                     }}
                   >
                     {h}

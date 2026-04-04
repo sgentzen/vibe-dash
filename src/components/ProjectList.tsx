@@ -1,4 +1,5 @@
 import { useAppState, useAppDispatch } from "../store";
+import { STATUS_COLORS } from "../constants/colors.js";
 import type { Project, Task } from "../types";
 
 function getProjectStatus(tasks: Task[]): "active" | "blocked" | "idle" {
@@ -13,12 +14,6 @@ function getBorderColor(status: "active" | "blocked" | "idle"): string {
   return "var(--text-muted)";
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  planned: "var(--text-muted)",
-  in_progress: "var(--accent-green)",
-  blocked: "var(--accent-yellow)",
-  done: "var(--accent-blue)",
-};
 
 export function ProjectList() {
   const { projects, tasks, selectedProjectId } = useAppState();

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
+import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
 interface AgentDetail {
@@ -125,10 +126,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
     <div
       onClick={onClick}
       style={{
-        background: "var(--bg-secondary)",
-        border: "1px solid var(--border)",
-        borderRadius: "8px",
-        padding: "16px",
+        ...cardStyle,
         cursor: "pointer",
         borderLeft: `3px solid ${color}`,
       }}
@@ -144,7 +142,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#fff",
+            color: "var(--text-on-accent)",
             fontWeight: 700,
             fontSize: "12px",
             flexShrink: 0,
@@ -200,7 +198,8 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
           {agent.capabilities.map((cap) => (
             <span key={cap} style={{
               fontSize: "10px", padding: "1px 6px", borderRadius: "4px",
-              background: "rgba(99,102,241,0.1)", color: "#6366f1",
+              background: "rgba(99,102,241,0.1)", color: "var(--accent-purple)",
+              border: "1px solid rgba(99,102,241,0.3)",
             }}>
               {cap}
             </span>
@@ -229,7 +228,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
       </button>
 
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-        <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: "16px" }}>
+        <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-on-accent)", fontWeight: 700, fontSize: "16px" }}>
           {agent.name.charAt(0).toUpperCase()}
         </div>
         <div>
@@ -263,7 +262,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
       </div>
 
       {current_task_title && (
-        <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "12px", marginBottom: "16px" }}>
+        <div style={{ ...cardStyle, padding: "12px", marginBottom: "16px" }}>
           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>Currently working on</div>
           <div style={{ color: "var(--text-primary)", fontSize: "14px" }}>{current_task_title}</div>
         </div>
