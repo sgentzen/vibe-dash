@@ -3,6 +3,7 @@ import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDrawer } from "./TaskEditDrawer";
+import { STATUS_COLORS } from "../constants/colors.js";
 import type { Task, Sprint, TaskStatus, Agent, Tag } from "../types";
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
@@ -11,12 +12,6 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "done", label: "DONE" },
 ];
 
-const COLUMN_COLORS: Record<TaskStatus, string> = {
-  planned: "var(--text-muted)",
-  in_progress: "var(--accent-green)",
-  done: "var(--accent-blue)",
-  blocked: "var(--accent-yellow)",
-};
 
 const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 
@@ -181,7 +176,6 @@ function SprintFilter({
         color: selectedSprintId ? "var(--accent-blue)" : "var(--text-secondary)",
         padding: "4px 8px",
         fontSize: "12px",
-        outline: "none",
         cursor: "pointer",
         maxWidth: "250px",
       }}
@@ -303,7 +297,7 @@ function KanbanColumn({
             fontSize: "11px",
             fontWeight: 700,
             letterSpacing: "0.1em",
-            color: COLUMN_COLORS[status],
+            color: STATUS_COLORS[status],
           }}
         >
           {label}
@@ -384,8 +378,7 @@ function KanbanColumn({
                   color: "var(--text-primary)",
                   padding: "5px 8px",
                   fontSize: "12px",
-                  outline: "none",
-                }}
+                        }}
               />
               <button
                 onClick={handleCreate}

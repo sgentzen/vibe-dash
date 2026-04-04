@@ -6,13 +6,21 @@
   --text-primary: #c9d1d9;
   --text-secondary: #8b949e;
   --text-muted: #484f58;
+  --text-on-accent: #ffffff;
   --accent-red: #f85149;
   --accent-green: #3fb950;
   --accent-blue: #58a6ff;
   --accent-yellow: #d29922;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #06b6d4;
   --green-bg: #0d1f0d;
   --green-border: #238636;
   --yellow-bg: #2a1a0a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow-green: 0 0 8px rgba(63, 185, 80, 0.2);
+  --shadow-glow-red: 0 0 6px rgba(248, 81, 73, 0.15);
 }
 
 [data-theme="light"] {
@@ -23,13 +31,21 @@
   --text-primary: #1f2328;
   --text-secondary: #656d76;
   --text-muted: #8b949e;
+  --text-on-accent: #ffffff;
   --accent-red: #cf222e;
   --accent-green: #1a7f37;
   --accent-blue: #0969da;
   --accent-yellow: #9a6700;
+  --accent-purple: #7c3aed;
+  --accent-cyan: #0891b2;
   --green-bg: #dafbe1;
   --green-border: #1a7f37;
   --yellow-bg: #fff8c5;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.15);
+  --shadow-glow-green: 0 0 8px rgba(26, 127, 55, 0.2);
+  --shadow-glow-red: 0 0 6px rgba(207, 34, 46, 0.15);
 }
 
 /* Accent color override — applied via JS when user picks a custom color.
@@ -52,6 +68,18 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
   font-size: 14px;
   line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 0;
 }
 
 .app {

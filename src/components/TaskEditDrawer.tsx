@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
+import { inputStyle as sharedInputStyle, sectionHeader } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 
 interface TaskEditDrawerProps {
@@ -474,22 +475,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   );
 }
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  color: "var(--text-muted)",
-  fontSize: "11px",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  marginBottom: "5px",
-};
+const labelStyle: React.CSSProperties = { ...sectionHeader, display: "block", marginBottom: "5px" };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "var(--bg-tertiary)",
-  border: "1px solid var(--border)",
-  borderRadius: "6px",
-  color: "var(--text-primary)",
-  padding: "7px 10px",
-  fontSize: "13px",
-  outline: "none",
-};
+const inputStyle: React.CSSProperties = sharedInputStyle;

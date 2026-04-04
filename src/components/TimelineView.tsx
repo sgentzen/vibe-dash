@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAppState } from "../store";
+import { PRIORITY_COLORS } from "../constants/colors.js";
 import type { Task, Sprint } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -79,11 +80,6 @@ export function TimelineView() {
     return ((timeMs - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
   }
 
-  const priorityColor: Record<string, string> = {
-    urgent: "var(--accent-red)", high: "var(--accent-yellow)",
-    medium: "#6366f1", low: "var(--text-muted)",
-  };
-
   const statusOpacity: Record<string, number> = {
     done: 0.4, blocked: 0.6, in_progress: 1, planned: 0.8,
   };
@@ -161,7 +157,7 @@ export function TimelineView() {
                   background: "rgba(99,102,241,0.03)", borderLeft: "1px dashed rgba(99,102,241,0.3)",
                   borderRight: "1px dashed rgba(99,102,241,0.3)", zIndex: 0,
                 }}>
-                  <span style={{ position: "absolute", top: -14, fontSize: "9px", color: "#6366f1", whiteSpace: "nowrap" }}>{s.name}</span>
+                  <span style={{ position: "absolute", top: -14, fontSize: "9px", color: "var(--accent-purple)", whiteSpace: "nowrap" }}>{s.name}</span>
                 </div>
               );
             })}
@@ -174,7 +170,7 @@ export function TimelineView() {
               const startX = dateToX(start);
               const endX = dateToX(end);
               const barWidth = Math.max(endX - startX, 8);
-              const color = priorityColor[task.priority] ?? "#6366f1";
+              const color = PRIORITY_COLORS[task.priority] ?? "var(--accent-purple)";
               const opacity = statusOpacity[task.status] ?? 1;
               const hasDates = dates !== null;
 
@@ -197,7 +193,7 @@ export function TimelineView() {
                         width: barWidth, height: BAR_HEIGHT, borderRadius: "4px",
                         background: color, opacity: hasDates ? opacity : opacity * 0.3,
                         display: "flex", alignItems: "center", paddingLeft: "6px",
-                        fontSize: "10px", color: "#fff", fontWeight: 500,
+                        fontSize: "10px", color: "var(--text-on-accent)", fontWeight: 500,
                         overflow: "hidden", whiteSpace: "nowrap",
                         border: hasDates ? "none" : "1px dashed rgba(255,255,255,0.3)",
                       }}

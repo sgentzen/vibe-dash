@@ -1,5 +1,6 @@
 import { useAppState } from "../store";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
+import { HEALTH_COLORS, HEALTH_LABELS } from "../constants/colors.js";
 import type { Agent, AgentHealthStatus } from "../types";
 
 // Keep in sync with server/db.ts ACTIVE_THRESHOLD_MS / IDLE_THRESHOLD_MS
@@ -25,17 +26,6 @@ function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
   return "offline";
 }
 
-const HEALTH_COLORS: Record<AgentHealthStatus, string> = {
-  active: "#3fb950",
-  idle: "#d2992a",
-  offline: "#8b949e",
-};
-
-const HEALTH_LABELS: Record<AgentHealthStatus, string> = {
-  active: "Active",
-  idle: "Idle",
-  offline: "Offline",
-};
 
 export function AgentFeed() {
   const { agents, activity } = useAppState();
@@ -231,7 +221,7 @@ function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#fff",
+          color: "var(--text-on-accent)",
           fontWeight: 700,
           fontSize: indent ? "10px" : "11px",
           flexShrink: 0,

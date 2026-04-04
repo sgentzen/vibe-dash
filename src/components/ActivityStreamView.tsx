@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
+import { inputStyle } from "../styles/shared.js";
 import type { ActivityEntry } from "../types";
 
 const LAST_VISIT_KEY = "vibe-dash-last-visit";
@@ -71,10 +72,7 @@ export function ActivityStreamView() {
     return groups;
   }, [entries]);
 
-  const selectStyle: React.CSSProperties = {
-    background: "var(--bg-tertiary)", border: "1px solid var(--border)",
-    borderRadius: "4px", color: "var(--text-primary)", padding: "4px 8px", fontSize: "12px",
-  };
+  const selectStyle: React.CSSProperties = { ...inputStyle, width: "auto", borderRadius: "4px", padding: "4px 8px", fontSize: "12px" };
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>

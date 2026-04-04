@@ -9,6 +9,7 @@ export function AlertBanner() {
 
   return (
     <div
+      role="alert"
       style={{
         background: "var(--yellow-bg)",
         borderTop: "1px solid var(--accent-yellow)",

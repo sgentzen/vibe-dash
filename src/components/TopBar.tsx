@@ -3,6 +3,7 @@ import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { useAppDispatch } from "../store";
 import { WebhookSettings } from "./WebhookSettings";
+import { sectionHeader } from "../styles/shared.js";
 
 export function TopBar() {
   const { stats, theme, activeView, searchQuery, unreadCount, notifications } = useAppState();
@@ -143,7 +144,6 @@ export function TopBar() {
           padding: "4px 10px",
           fontSize: "13px",
           width: "200px",
-          outline: "none",
         }}
       />
 
@@ -215,6 +215,7 @@ export function TopBar() {
       <div style={{ position: "relative" }}>
         <button
           onClick={() => setShowNotifications(!showNotifications)}
+          aria-label="Notifications"
           style={{
             background: "transparent",
             border: "1px solid var(--border)",
@@ -230,7 +231,7 @@ export function TopBar() {
           {unreadCount > 0 && (
             <span style={{
               position: "absolute", top: "-4px", right: "-4px",
-              background: "var(--accent-red)", color: "#fff",
+              background: "var(--accent-red)", color: "var(--text-on-accent)",
               fontSize: "10px", fontWeight: 700, borderRadius: "50%",
               width: "16px", height: "16px", display: "flex",
               alignItems: "center", justifyContent: "center",
@@ -245,7 +246,7 @@ export function TopBar() {
             position: "absolute", top: "100%", right: 0, marginTop: "4px",
             background: "var(--bg-secondary)", border: "1px solid var(--border)",
             borderRadius: "8px", width: "320px", maxHeight: "400px",
-            overflowY: "auto", zIndex: 100, boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            overflowY: "auto", zIndex: 100, boxShadow: "var(--shadow-md)",
           }}>
             <div style={{
               padding: "8px 12px", borderBottom: "1px solid var(--border)",
@@ -318,7 +319,6 @@ export function TopBar() {
               padding: "4px 10px",
               fontSize: "13px",
               width: "180px",
-              outline: "none",
             }}
           />
           <button

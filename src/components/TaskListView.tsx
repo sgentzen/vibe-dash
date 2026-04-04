@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
+import { PRIORITY_COLORS } from "../constants/colors.js";
 import type { Task, TaskStatus, TaskPriority } from "../types";
 
 type SortField = "title" | "status" | "priority" | "progress" | "due_date" | "estimate" | "created_at";
@@ -100,11 +101,6 @@ export function TaskListView() {
     overflow: "hidden", textOverflow: "ellipsis",
   };
 
-  const priorityColor: Record<TaskPriority, string> = {
-    urgent: "var(--accent-red)", high: "var(--accent-yellow)",
-    medium: "var(--text-secondary)", low: "var(--text-muted)",
-  };
-
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
       {/* Bulk action bar */}
@@ -169,7 +165,7 @@ export function TaskListView() {
                 </td>
                 <td style={{ ...cellStyle, color: "var(--text-primary)", fontWeight: 500, maxWidth: "300px" }}>{task.title}</td>
                 <td style={cellStyle}>{task.status}</td>
-                <td style={{ ...cellStyle, color: priorityColor[task.priority] }}>{task.priority}</td>
+                <td style={{ ...cellStyle, color: PRIORITY_COLORS[task.priority] }}>{task.priority}</td>
                 <td style={cellStyle}>{task.estimate ?? "-"}</td>
                 <td style={cellStyle}>{task.progress}%</td>
                 <td style={cellStyle}>{task.due_date ?? "-"}</td>

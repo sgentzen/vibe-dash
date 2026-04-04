@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApi } from "../hooks/useApi";
+import { inputStyle, buttonPrimary, buttonSecondary, sectionHeader } from "../styles/shared.js";
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -186,43 +187,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   );
 }
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  color: "var(--text-muted)",
-  fontSize: "11px",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  marginBottom: "5px",
-};
+const labelStyle: React.CSSProperties = { ...sectionHeader, display: "block", marginBottom: "5px" };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "var(--bg-tertiary)",
-  border: "1px solid var(--border)",
-  borderRadius: "6px",
-  color: "var(--text-primary)",
-  padding: "8px 10px",
-  fontSize: "13px",
-  outline: "none",
-};
+const primaryBtnStyle: React.CSSProperties = { ...buttonPrimary, fontWeight: 600, padding: "8px 20px" };
 
-const primaryBtnStyle: React.CSSProperties = {
-  background: "var(--accent-blue)",
-  border: "none",
-  color: "#fff",
-  borderRadius: "6px",
-  padding: "8px 20px",
-  fontSize: "13px",
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const secondaryBtnStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid var(--border)",
-  color: "var(--text-secondary)",
-  borderRadius: "6px",
-  padding: "8px 20px",
-  fontSize: "13px",
-  cursor: "pointer",
-};
+const secondaryBtnStyle: React.CSSProperties = { ...buttonSecondary, padding: "8px 20px" };
