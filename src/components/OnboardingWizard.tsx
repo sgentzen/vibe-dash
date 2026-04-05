@@ -68,12 +68,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   return (
     <>
-      <div style={{
-        position: "fixed", inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Getting started wizard"
+        style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.6)",
+          zIndex: 100,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
         <div style={{
           background: "var(--bg-secondary)",
           border: "1px solid var(--border)",

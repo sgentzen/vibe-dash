@@ -191,20 +191,37 @@ export function getAgentCompletedToday(db: Database.Database, agentId: string): 
 // ─── Agent Performance Metrics ──────────────────────────────────────────────
 
 export function getAgentStats(db: Database.Database, agentId: string, sprintId?: string): AgentStats {
-  const totalRow = db.prepare(
-    "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ? AND t.status = 'done'"
-  ).get(agentId) as { c: number };
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const todayIso = todayStart.toISOString();
 
+  // Counts query: completions, today, blocker rate
+  const mainRow = db.prepare(
+    `SELECT
+       COUNT(DISTINCT CASE WHEN t.status = 'done' THEN t.id END) AS total_done,
+       COUNT(DISTINCT CASE WHEN t.status = 'done' AND t.updated_at >= ? THEN t.id END) AS today_done,
+       COUNT(DISTINCT t.id) AS total_tasks,
+       COUNT(DISTINCT CASE WHEN EXISTS (SELECT 1 FROM blockers b WHERE b.task_id = t.id) THEN t.id END) AS blocked_tasks
+     FROM activity_log a
+     JOIN tasks t ON a.task_id = t.id
+     WHERE a.agent_id = ?`
+  ).get(todayIso, agentId) as {
+    total_done: number; today_done: number;
+    total_tasks: number; blocked_tasks: number;
+  };
+
+  // Sprint-scoped completion count (separate query only when needed)
   let sprintCompleted = 0;
   if (sprintId) {
     const row = db.prepare(
-      "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ? AND t.sprint_id = ? AND t.status = 'done'"
+      `SELECT COUNT(DISTINCT t.id) AS c
+       FROM activity_log a JOIN tasks t ON a.task_id = t.id
+       WHERE a.agent_id = ? AND t.sprint_id = ? AND t.status = 'done'`
     ).get(agentId, sprintId) as { c: number };
     sprintCompleted = row.c;
   }
 
-  const todayCompleted = getAgentCompletedToday(db, agentId);
-
+  // Avg completion time in a separate query (subquery aggregation)
   const avgRow = db.prepare(
     `SELECT AVG(completion_sec) AS avg_sec FROM (
       SELECT (julianday(t.updated_at) - julianday(MIN(a.timestamp))) * 86400 AS completion_sec
@@ -216,30 +233,25 @@ export function getAgentStats(db: Database.Database, agentId: string, sprintId?:
   ).get(agentId) as { avg_sec: number | null } | undefined;
   const avgCompletionTime = avgRow?.avg_sec != null ? Math.round(avgRow.avg_sec) : null;
 
-  const totalTasks = db.prepare(
-    "SELECT COUNT(DISTINCT t.id) AS c FROM activity_log a JOIN tasks t ON a.task_id = t.id WHERE a.agent_id = ?"
-  ).get(agentId) as { c: number };
-  const blockedTasks = db.prepare(
-    "SELECT COUNT(DISTINCT b.task_id) AS c FROM blockers b JOIN activity_log a ON b.task_id = a.task_id WHERE a.agent_id = ?"
-  ).get(agentId) as { c: number };
-  const blockerRate = totalTasks.c > 0 ? blockedTasks.c / totalTasks.c : 0;
+  // Session activity frequency via SQL aggregation
+  const sessionRow = db.prepare(
+    `SELECT
+       COALESCE(SUM(activity_count), 0) AS total_activity,
+       COALESCE(SUM(
+         MAX((julianday(COALESCE(ended_at, last_activity_at)) - julianday(started_at)) * 24, 0.01)
+       ), 0.01) AS total_hours
+     FROM agent_sessions WHERE agent_id = ?`
+  ).get(agentId) as { total_activity: number; total_hours: number };
+  const activityFrequency = sessionRow.total_hours > 0
+    ? Math.round((sessionRow.total_activity / sessionRow.total_hours) * 10) / 10 : 0;
 
-  const sessions = listAgentSessions(db, agentId);
-  let totalActivityCount = 0;
-  let totalSessionHours = 0;
-  for (const s of sessions) {
-    totalActivityCount += s.activity_count;
-    const start = new Date(s.started_at).getTime();
-    const end = s.ended_at ? new Date(s.ended_at).getTime() : new Date(s.last_activity_at).getTime();
-    totalSessionHours += Math.max((end - start) / 3600000, 0.01);
-  }
-  const activityFrequency = totalSessionHours > 0 ? Math.round((totalActivityCount / totalSessionHours) * 10) / 10 : 0;
+  const blockerRate = mainRow.total_tasks > 0 ? mainRow.blocked_tasks / mainRow.total_tasks : 0;
 
   return {
     agent_id: agentId,
-    tasks_completed_total: totalRow.c,
+    tasks_completed_total: mainRow.total_done,
     tasks_completed_sprint: sprintCompleted,
-    tasks_completed_today: todayCompleted,
+    tasks_completed_today: mainRow.today_done,
     avg_completion_time_seconds: avgCompletionTime,
     blocker_rate: Math.round(blockerRate * 1000) / 1000,
     activity_frequency: activityFrequency,

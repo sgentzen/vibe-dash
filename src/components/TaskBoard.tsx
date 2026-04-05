@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
@@ -22,32 +22,33 @@ export function TaskBoard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const dragTaskId = useRef<string>("");
 
-  const now = Date.now();
-  const lowerSearch = searchQuery.toLowerCase();
-
-  const filteredTasks = tasks.filter((t) => {
-    if (t.status === "done") {
-      const completedAt = new Date(t.updated_at).getTime();
-      if (now - completedAt > DONE_AGE_OFF_MS) return false;
-    }
-    return (
-      t.parent_task_id === null &&
-      (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
-      (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
-    );
-  });
+  const filteredTasks = useMemo(() => {
+    const nowMs = Date.now();
+    const lower = searchQuery.toLowerCase();
+    return tasks.filter((t) => {
+      if (t.status === "done") {
+        const completedAt = new Date(t.updated_at).getTime();
+        if (nowMs - completedAt > DONE_AGE_OFF_MS) return false;
+      }
+      return (
+        t.parent_task_id === null &&
+        (selectedProjectId === null || t.project_id === selectedProjectId) &&
+        (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
+        (!searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
+      );
+    });
+  }, [tasks, selectedProjectId, selectedSprintId, searchQuery]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
     : null;
 
-  // Get sprints for the selected project
-  const projectSprints = selectedProjectId
-    ? sprints.filter((s) => s.project_id === selectedProjectId)
-    : sprints;
+  const projectSprints = useMemo(
+    () => selectedProjectId ? sprints.filter((s) => s.project_id === selectedProjectId) : sprints,
+    [sprints, selectedProjectId]
+  );
 
-  function handleDrop(status: TaskStatus) {
+  const handleDrop = useCallback((status: TaskStatus) => {
     const id = dragTaskId.current;
     if (!id) return;
     const currentTask = tasks.find((t) => t.id === id);
@@ -55,7 +56,7 @@ export function TaskBoard() {
     api.updateTask(id, { status }).then((updated) => {
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
     }).catch(() => {});
-  }
+  }, [tasks, api, dispatch]);
 
   return (
     <main

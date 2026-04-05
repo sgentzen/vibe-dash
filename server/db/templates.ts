@@ -28,9 +28,9 @@ export function createProjectFromTemplate(db: Database.Database, templateId: str
   const template = getTemplate(db, templateId);
   if (!template) return null;
 
-  const project = createProject(db, { name: projectName, description: template.description });
+  const run = db.transaction(() => {
+    const project = createProject(db, { name: projectName, description: template.description });
 
-  try {
     const taskDefs = JSON.parse(template.template_json) as { title: string; description?: string; priority?: TaskPriority; children?: { title: string; description?: string; priority?: TaskPriority }[] }[];
     for (const def of taskDefs) {
       const parent = createTask(db, {
@@ -51,11 +51,11 @@ export function createProjectFromTemplate(db: Database.Database, templateId: str
         }
       }
     }
-  } catch {
-    // template_json parse error — project created but no tasks
-  }
 
-  return project;
+    return project;
+  });
+
+  return run();
 }
 
 export function seedBuiltInTemplates(db: Database.Database): void {

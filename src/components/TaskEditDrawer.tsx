@@ -115,6 +115,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
       {/* Drawer */}
       <div
         className="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit task"
         style={{
           position: "fixed",
           top: 0,
@@ -411,6 +414,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
               onChange={(e) => setNewComment(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }}
               placeholder="Add a comment..."
+              aria-label="Add a comment"
               style={inputStyle}
             />
             <button

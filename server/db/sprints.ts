@@ -1,7 +1,6 @@
 import type Database from "better-sqlite3";
 import type { Sprint, SprintCapacity, SprintDailyStats, VelocityData, SprintStatus } from "../types.js";
 import { now, genId } from "./helpers.js";
-import { listTasks } from "./tasks.js";
 
 export interface CreateSprintInput {
   project_id: string;
@@ -90,23 +89,20 @@ export function listSprints(
 // ─── Sprint Capacity ────────────────────────────────────────────────────────
 
 export function getSprintCapacity(db: Database.Database, sprintId: string): SprintCapacity {
-  const tasks = listTasks(db, { sprint_id: sprintId });
-  let totalEstimated = 0;
-  let completedPoints = 0;
-  let completedCount = 0;
-  for (const t of tasks) {
-    if (t.estimate) totalEstimated += t.estimate;
-    if (t.status === "done") {
-      completedCount++;
-      if (t.estimate) completedPoints += t.estimate;
-    }
-  }
+  const row = db.prepare(
+    `SELECT
+       COUNT(*) AS task_count,
+       COUNT(CASE WHEN status = 'done' THEN 1 END) AS completed_count,
+       COALESCE(SUM(estimate), 0) AS total_estimated,
+       COALESCE(SUM(CASE WHEN status = 'done' THEN estimate ELSE 0 END), 0) AS completed_points
+     FROM tasks WHERE sprint_id = ?`
+  ).get(sprintId) as { task_count: number; completed_count: number; total_estimated: number; completed_points: number };
   return {
-    total_estimated: totalEstimated,
-    completed_points: completedPoints,
-    remaining_points: totalEstimated - completedPoints,
-    task_count: tasks.length,
-    completed_count: completedCount,
+    total_estimated: row.total_estimated,
+    completed_points: row.completed_points,
+    remaining_points: row.total_estimated - row.completed_points,
+    task_count: row.task_count,
+    completed_count: row.completed_count,
   };
 }
 
