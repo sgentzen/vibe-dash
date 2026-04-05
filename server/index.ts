@@ -55,6 +55,12 @@ app.get("/{*splat}", spaLimiter, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
+// Global error handler — catches thrown errors in route handlers
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Unhandled route error:", err.message);
+  res.status(500).json({ error: "Internal server error" });
+});
+
 const server = createServer(app);
 initWebSocket(server);
 

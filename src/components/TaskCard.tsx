@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
@@ -28,7 +28,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -88,7 +88,7 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
         userSelect: "none",
       }}
     >
-      <div onClick={onClick}>
+      <div onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}>
         {/* Title */}
         <div
           style={{
@@ -336,7 +336,7 @@ export function TaskCard({ task, allTasks, activity, agents, taskTags, blockingC
       )}
     </div>
   );
-}
+});
 
 function SubTaskRow({ task }: { task: Task }) {
   const isDone = task.status === "done";

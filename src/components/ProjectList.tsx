@@ -97,6 +97,9 @@ function ProjectCard({
   return (
     <div
       onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
       style={{
         borderLeft: `3px solid ${borderColor}`,
         background: selected ? "var(--green-bg)" : "transparent",

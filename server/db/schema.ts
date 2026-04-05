@@ -148,6 +148,17 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_sprint_id ON cost_entries(sprint_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);",
+
+  // Foreign-key indexes for query performance (columns from CREATE TABLE only)
+  "CREATE INDEX IF NOT EXISTS idx_activity_log_agent_id ON activity_log(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_activity_log_task_id ON activity_log(task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);",
+  "CREATE INDEX IF NOT EXISTS idx_blockers_task_id ON blockers(task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_agent_sessions_agent_id ON agent_sessions(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_agent_file_locks_agent_id ON agent_file_locks(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_notifications_rule_id ON notifications(rule_id);",
 ].join("\n");
 
 function migrate(db: Database.Database): void {
@@ -180,11 +191,18 @@ function migrate(db: Database.Database): void {
   }
 }
 
+// Indexes on columns added by migrate() — must run after ALTER TABLEs
+const POST_MIGRATE_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS idx_tasks_sprint_id ON tasks(sprint_id);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent_id ON tasks(assigned_agent_id);",
+].join("\n");
+
 export function initDb(db: Database.Database): void {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
   migrate(db);
+  db.exec(POST_MIGRATE_INDEXES);
   seedBuiltInTemplates(db);
 }
 

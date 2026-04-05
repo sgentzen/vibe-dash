@@ -199,6 +199,8 @@ export interface SearchTasksFilter {
   tag_id?: string;
   due_before?: string;
   due_after?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export function searchTasks(db: Database.Database, filter: SearchTasksFilter): Task[] {
@@ -226,7 +228,10 @@ export function searchTasks(db: Database.Database, filter: SearchTasksFilter): T
   }
 
   if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
-  sql += " ORDER BY t.created_at DESC LIMIT 200";
+
+  const limit = Math.min(filter.limit ?? 200, 500);
+  const offset = filter.offset ?? 0;
+  sql += ` ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
   return db.prepare(sql).all(...params) as Task[];
 }
@@ -238,12 +243,15 @@ export function bulkUpdateTasks(
   taskIds: string[],
   updates: UpdateTaskInput
 ): Task[] {
-  const results: Task[] = [];
-  for (const id of taskIds) {
-    const updated = updateTask(db, id, updates);
-    if (updated) results.push(updated);
-  }
-  return results;
+  const run = db.transaction(() => {
+    const results: Task[] = [];
+    for (const id of taskIds) {
+      const updated = updateTask(db, id, updates);
+      if (updated) results.push(updated);
+    }
+    return results;
+  });
+  return run();
 }
 
 // ─── Recurring Tasks ────────────────────────────────────────────────────────

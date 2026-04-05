@@ -39,7 +39,7 @@
     "url": "https://github.com/sgent/vibe-dash/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
