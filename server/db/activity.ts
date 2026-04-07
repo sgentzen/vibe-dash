@@ -78,10 +78,15 @@ export function getActivityStream(db: Database.Database, filter: ActivityStreamF
   }
   if (filter.since) { conditions.push("a.timestamp >= ?"); params.push(filter.since); }
 
-  let sql = `SELECT a.*, ag.name AS agent_name, t.title AS task_title
+  let sql = `SELECT a.id, a.task_id, a.agent_id, a.message, a.timestamp,
+       ag.name AS agent_name, t.title AS task_title,
+       p.name AS project_name, p.id AS project_id,
+       parent_ag.name AS parent_agent_name
      FROM activity_log a
      LEFT JOIN agents ag ON a.agent_id = ag.id
-     LEFT JOIN tasks t ON a.task_id = t.id`;
+     LEFT JOIN agents parent_ag ON ag.parent_agent_id = parent_ag.id
+     LEFT JOIN tasks t ON a.task_id = t.id
+     LEFT JOIN projects p ON t.project_id = p.id`;
   if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
   sql += " ORDER BY a.timestamp DESC LIMIT ?";
   params.push(filter.limit ?? 100);

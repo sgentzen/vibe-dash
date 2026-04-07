@@ -84,7 +84,7 @@ export function DashboardView() {
       }
     }
     loadCosts();
-  }, [api, projectId, sprintTaskStatusKey]);
+  }, [api, projectId, sprintTaskStatusKey, pollGeneration]);
 
   async function handleGenerateReport() {
     if (!projectId) return;
@@ -117,7 +117,9 @@ export function DashboardView() {
         <div style={cardStyle}>
           <div style={headerStyle}>Sprint Burndown {activeSprint ? `(${activeSprint.name})` : ""}</div>
           {burndown.length === 0 ? (
-            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No burndown data yet. Complete tasks to see progress.</div>
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+              {activeSprint ? "No burndown data yet. Complete tasks to see progress." : "No active sprint — create and activate a sprint to see burndown."}
+            </div>
           ) : (
             <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
               {burndown.map((d) => {
@@ -143,7 +145,7 @@ export function DashboardView() {
         <div style={cardStyle}>
           <div style={headerStyle}>Velocity Trend (Last {velocity.length} Sprints)</div>
           {velocity.length === 0 ? (
-            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No completed sprints yet.</div>
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>Complete at least one sprint to see velocity trends.</div>
           ) : (
             <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px" }}>
               {(() => { const maxPts = Math.max(...velocity.map((x) => x.completed_points), 1); return velocity.map((v) => {
@@ -171,7 +173,9 @@ export function DashboardView() {
         <div style={cardStyle}>
           <div style={headerStyle}>Agent Contributions {activeSprint ? `(${activeSprint.name})` : ""}</div>
           {contributions.length === 0 ? (
-            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No contributions yet.</div>
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+              {activeSprint ? "No contributions yet." : "No active sprint — activate a sprint to track agent contributions."}
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {contributions.map((c) => (

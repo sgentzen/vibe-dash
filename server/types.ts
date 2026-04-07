@@ -61,6 +61,8 @@ export interface Agent {
   registered_at: string;
   last_seen_at: string;
   current_task_title?: string | null;
+  current_project_id?: string | null;
+  current_project_name?: string | null;
 }
 
 export interface ActivityEntry {
@@ -71,6 +73,9 @@ export interface ActivityEntry {
   timestamp: string;
   agent_name?: string | null;
   task_title?: string | null;
+  project_name?: string | null;
+  project_id?: string | null;
+  parent_agent_name?: string | null;
 }
 
 export type AgentHealthStatus = "active" | "idle" | "offline";

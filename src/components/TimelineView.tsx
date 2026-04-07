@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { useAppState } from "../store";
 import { PRIORITY_COLORS } from "../constants/colors.js";
-import type { Task, Sprint } from "../types";
+import type { Task, Sprint, TaskStatus } from "../types";
+
+const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
+  done: "var(--accent-green)",
+  in_progress: "var(--accent-blue)",
+  blocked: "var(--accent-yellow)",
+  planned: "var(--text-muted)",
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BAR_HEIGHT = 24;
@@ -38,7 +45,7 @@ function getTaskDates(task: Task, sprintMap: Map<string, Sprint>): { start: numb
 
 export function TimelineView() {
   const { tasks, sprints, selectedProjectId, selectedSprintId, taskDepsMap } = useAppState();
-  const [showUndated, setShowUndated] = useState(true);
+  const [showUndated, setShowUndated] = useState(false);
 
   const sprintMap = useMemo(() => {
     const m = new Map<string, Sprint>();
@@ -55,7 +62,18 @@ export function TimelineView() {
 
   const datedTasks = allMatchingTasks.filter((t) => getTaskDates(t, sprintMap) !== null);
   const undatedCount = allMatchingTasks.length - datedTasks.length;
-  const filteredTasks = showUndated ? allMatchingTasks : datedTasks;
+  const unsortedTasks = showUndated ? allMatchingTasks : datedTasks;
+
+  // Sort: dated tasks by start date ascending, then undated by created_at
+  const filteredTasks = [...unsortedTasks].sort((a, b) => {
+    const aDates = getTaskDates(a, sprintMap);
+    const bDates = getTaskDates(b, sprintMap);
+    if (aDates && !bDates) return -1;
+    if (!aDates && bDates) return 1;
+    const aStart = aDates ? aDates.start : new Date(a.created_at).getTime();
+    const bStart = bDates ? bDates.start : new Date(b.created_at).getTime();
+    return aStart - bStart;
+  });
 
   const { minDate, maxDate, totalDays } = useMemo(() => {
     if (filteredTasks.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 30 };
@@ -116,7 +134,19 @@ export function TimelineView() {
 
       {filteredTasks.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "40px" }}>
-          No tasks with dates to display.{undatedCount > 0 ? ` ${undatedCount} tasks have no dates set.` : ""}
+          {undatedCount > 0 && datedTasks.length === 0 ? (
+            <div>
+              <div style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+                No tasks have dates set
+              </div>
+              <div style={{ fontSize: "12px" }}>
+                Add start_date and due_date to tasks to build a useful timeline.
+                {!showUndated && ` ${undatedCount} undated task${undatedCount !== 1 ? "s" : ""} hidden.`}
+              </div>
+            </div>
+          ) : (
+            <>No tasks to display.{undatedCount > 0 ? ` ${undatedCount} tasks have no dates set.` : ""}</>
+          )}
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -162,6 +192,38 @@ export function TimelineView() {
               );
             })}
 
+            {/* Today marker */}
+            {(() => {
+              const todayX = dateToX(Date.now());
+              if (todayX > 0 && todayX < timelineWidth) {
+                return (
+                  <div style={{
+                    position: "absolute",
+                    left: LEFT_LABEL_WIDTH + todayX,
+                    top: 0,
+                    width: "2px",
+                    height: HEADER_HEIGHT + filteredTasks.length * ROW_HEIGHT,
+                    background: "var(--accent-red)",
+                    zIndex: 2,
+                    pointerEvents: "none",
+                  }}>
+                    <span style={{
+                      position: "absolute",
+                      top: "2px",
+                      left: "4px",
+                      fontSize: "9px",
+                      color: "var(--accent-red)",
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                    }}>
+                      Today
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Task rows */}
             {filteredTasks.map((task, i) => {
               const dates = getTaskDates(task, sprintMap);
@@ -176,12 +238,16 @@ export function TimelineView() {
 
               return (
                 <div key={task.id} style={{ display: "flex", alignItems: "center", height: ROW_HEIGHT, position: "relative", zIndex: 1 }}>
-                  {/* Label */}
+                  {/* Label with status dot */}
                   <div style={{
                     width: LEFT_LABEL_WIDTH, fontSize: "11px", color: "var(--text-primary)",
                     padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    flexShrink: 0,
+                    flexShrink: 0, display: "flex", alignItems: "center", gap: "6px",
                   }}>
+                    <span style={{
+                      width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
+                      background: STATUS_DOT_COLORS[task.status] ?? "var(--text-muted)",
+                    }} />
                     {task.title}
                   </div>
                   {/* Bar */}

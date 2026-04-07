@@ -20,6 +20,8 @@ import {
   updateSprint,
   logActivity,
   getAgentCurrentTask,
+  getAgentCurrentProject,
+  getAllAgentCurrentProjects,
   getAgentHealthStatus,
   createTag,
   listTags,
@@ -354,13 +356,17 @@ export function createRouter(db: Database.Database): Router {
   // GET /api/agents
   router.get("/api/agents", (_req, res) => {
     const agents = listAgents(db);
+    const projectMap = getAllAgentCurrentProjects(db);
     const withStatus = agents.map((a) => {
       const health_status = getAgentHealthStatus(a.last_seen_at);
+      const project = projectMap.get(a.id);
       return {
         ...a,
         health_status,
         active: health_status === "active",
         current_task_title: getAgentCurrentTask(db, a.id),
+        current_project_id: project?.project_id ?? null,
+        current_project_name: project?.project_name ?? null,
       };
     });
     res.json(withStatus);
@@ -552,11 +558,14 @@ export function createRouter(db: Database.Database): Router {
   router.get("/api/agents/:id", (req, res) => {
     const agent = getAgentById(db, req.params.id);
     if (!agent) { res.status(404).json({ error: "Agent not found" }); return; }
+    const project = getAgentCurrentProject(db, agent.id);
     res.json({
       ...agent,
       health_status: getAgentHealthStatus(agent.last_seen_at),
       completed_today: getAgentCompletedToday(db, agent.id),
       current_task_title: getAgentCurrentTask(db, agent.id),
+      current_project_id: project?.project_id ?? null,
+      current_project_name: project?.project_name ?? null,
     });
   });
 
