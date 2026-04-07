@@ -44,6 +44,8 @@ import {
   createNotification,
   listMentions,
   handleRecurringTaskCompletion,
+  recordDailyStats,
+  evaluateAlertRules,
   createProjectFromTemplate,
   listTemplates,
   getActivityStream,
@@ -177,6 +179,7 @@ export async function handleTool(
     }
 
     case "update_task": {
+      const prevTask = getTask(db, args.task_id as string);
       const updated = updateTask(db, args.task_id as string, {
         title: args.title as string | undefined,
         description: args.description as string | null | undefined,
@@ -199,6 +202,10 @@ export async function handleTool(
           ? `Updated "${updated.title}": ${changes.join(", ")}`
           : `Updated "${updated.title}"`;
         autoLog(db, updated.id, msg, agentName);
+        // Record burndown stats when task status changes and task has a sprint
+        if (args.status && args.status !== prevTask?.status && updated.sprint_id) {
+          recordDailyStats(db, updated.sprint_id);
+        }
       }
       return ok({ success: true });
     }
@@ -207,7 +214,16 @@ export async function handleTool(
       const completed = completeTask(db, args.task_id as string);
       if (completed) {
         broadcast({ type: "task_completed", payload: completed });
+        const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed.id, priority: completed.priority });
+        for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
         autoLog(db, completed.id, `Completed "${completed.title}"`, agentName);
+        if (completed.sprint_id) {
+          recordDailyStats(db, completed.sprint_id);
+        }
+        const nextTask = handleRecurringTaskCompletion(db, completed.id);
+        if (nextTask) {
+          broadcast({ type: "task_created", payload: nextTask });
+        }
       }
       return ok({ success: true });
     }
@@ -433,6 +449,11 @@ export async function handleTool(
       const tasks = bulkUpdateTasks(db, ids, updates as any);
       for (const t of tasks) {
         broadcast({ type: "task_updated", payload: t });
+      }
+      // Record burndown stats for affected sprints when status changes
+      if (updates.status) {
+        const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
+        for (const sid of sprintIds) recordDailyStats(db, sid);
       }
       return ok({ updated: tasks.length });
     }
