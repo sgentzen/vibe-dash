@@ -35,6 +35,8 @@ export {
   getAgentHealthStatus,
   getAgentActivity,
   getAgentCompletedToday,
+  getAgentCurrentProject,
+  getAllAgentCurrentProjects,
   getAgentStats,
   getSprintAgentContributions,
   startOrGetSession,

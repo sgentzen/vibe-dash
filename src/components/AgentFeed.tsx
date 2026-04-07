@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppState } from "../store";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import { HEALTH_COLORS, HEALTH_LABELS } from "../constants/colors.js";
@@ -30,6 +31,26 @@ function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
 export function AgentFeed() {
   const { agents, activity } = useAppState();
   const groups = groupAgents(agents);
+  const [showOffline, setShowOffline] = useState(false);
+
+  // Split groups into active (parent or any child not offline) vs offline
+  const activeGroups: typeof groups = [];
+  const offlineGroups: typeof groups = [];
+  for (const group of groups) {
+    const parentHealth = getHealthStatus(group.parent.last_seen_at);
+    const anyChildActive = group.children.some(
+      (c) => getHealthStatus(c.last_seen_at) !== "offline"
+    );
+    if (parentHealth !== "offline" || anyChildActive) {
+      activeGroups.push(group);
+    } else {
+      offlineGroups.push(group);
+    }
+  }
+
+  const offlineAgentCount = offlineGroups.reduce(
+    (n, g) => n + 1 + g.children.length, 0
+  );
 
   const now = Date.now();
   const recentActivity = activity.filter(
@@ -68,7 +89,7 @@ export function AgentFeed() {
           Active Agents
         </div>
 
-        {groups.length === 0 ? (
+        {activeGroups.length === 0 ? (
           <div
             style={{
               color: "var(--text-muted)",
@@ -81,7 +102,7 @@ export function AgentFeed() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {groups.map(({ parent, children }) => (
+            {activeGroups.map(({ parent, children }) => (
               <div key={parent.id}>
                 <AgentRow agent={parent} indent={false} />
                 {children.length > 0 && (
@@ -103,6 +124,55 @@ export function AgentFeed() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Offline Agents — collapsed by default */}
+        {offlineAgentCount > 0 && (
+          <div style={{ marginTop: "10px" }}>
+            <button
+              onClick={() => setShowOffline(!showOffline)}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                fontSize: "10px",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <span style={{ fontSize: "8px" }}>{showOffline ? "\u25BC" : "\u25B6"}</span>
+              Offline ({offlineAgentCount})
+            </button>
+            {showOffline && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px", opacity: 0.5 }}>
+                {offlineGroups.map(({ parent, children }) => (
+                  <div key={parent.id}>
+                    <AgentRow agent={parent} indent={false} />
+                    {children.length > 0 && (
+                      <div
+                        style={{
+                          marginLeft: "16px",
+                          borderLeft: `2px solid ${agentColor(parent.name)}`,
+                          paddingLeft: "8px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {children.map((child) => (
+                          <AgentRow key={child.id} agent={child} indent={true} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -290,6 +360,20 @@ function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
             }}
           >
             {agent.model}
+          </div>
+        )}
+        {agent.current_project_name && (
+          <div
+            style={{
+              fontSize: "10px",
+              color: "var(--accent-purple)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              marginTop: "1px",
+            }}
+          >
+            {agent.current_project_name}
           </div>
         )}
         {agent.current_task_title && isActive && (

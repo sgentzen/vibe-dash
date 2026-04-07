@@ -14,11 +14,20 @@ interface AgentDetail {
   sessions: AgentSession[];
 }
 
+type StatusFilter = "active+idle" | "all" | "offline";
+
+const FILTER_LABELS: Record<StatusFilter, string> = {
+  "active+idle": "Active",
+  all: "All",
+  offline: "Offline",
+};
+
 export function AgentDashboard() {
   const { agents } = useAppState();
   const api = useApi();
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active+idle");
 
   useEffect(() => {
     async function loadDetails() {
@@ -63,13 +72,60 @@ export function AgentDashboard() {
     );
   }
 
-  const groups = groupAgents(agents);
+  const allGroups = groupAgents(agents);
+
+  // Use health_status from the enriched API response (available on agents from /api/agents)
+  function agentHealth(agent: Agent): string {
+    return (agent as Agent & { health_status?: string }).health_status
+      ?? details[agent.id]?.health_status
+      ?? "offline";
+  }
+
+  // Filter groups by status
+  const groups = allGroups.filter(({ parent, children }) => {
+    if (statusFilter === "all") return true;
+    const allStatuses = [parent, ...children].map(agentHealth);
+    if (statusFilter === "active+idle") {
+      return allStatuses.some((s) => s === "active" || s === "idle");
+    }
+    // "offline" filter
+    return allStatuses.every((s) => s === "offline");
+  });
+
+  // Sort: active first, then idle, then offline
+  const statusOrder: Record<string, number> = { active: 0, idle: 1, offline: 2 };
+  groups.sort((a, b) => {
+    const aStatus = agentHealth(a.parent);
+    const bStatus = agentHealth(b.parent);
+    return (statusOrder[aStatus] ?? 2) - (statusOrder[bStatus] ?? 2);
+  });
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-      <h2 style={{ color: "var(--text-primary)", fontSize: "16px", marginBottom: "16px", fontWeight: 600 }}>
-        Agent Dashboard
-      </h2>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+        <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
+          Agent Dashboard
+        </h2>
+        <div style={{ display: "flex", gap: "4px" }}>
+          {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              style={{
+                background: statusFilter === f ? "var(--accent-blue)" : "transparent",
+                border: `1px solid ${statusFilter === f ? "var(--accent-blue)" : "var(--border)"}`,
+                color: statusFilter === f ? "var(--text-on-accent)" : "var(--text-muted)",
+                borderRadius: "4px",
+                padding: "2px 8px",
+                fontSize: "11px",
+                cursor: "pointer",
+              }}
+            >
+              {FILTER_LABELS[f]}
+            </button>
+          ))}
+        </div>
+      </div>
       {agents.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "40px" }}>
           No agents registered yet
@@ -175,6 +231,18 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
         <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
         <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{detail?.health_status ?? "..."}</span>
       </div>
+
+      {agent.current_project_name && (
+        <div style={{ marginBottom: "8px" }}>
+          <span style={{
+            fontSize: "10px", padding: "1px 6px", borderRadius: "3px",
+            background: "rgba(139, 92, 246, 0.1)", color: "var(--accent-purple)",
+            border: "1px solid rgba(139, 92, 246, 0.3)",
+          }}>
+            {agent.current_project_name}
+          </span>
+        </div>
+      )}
 
       {detail?.current_task_title && (
         <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>

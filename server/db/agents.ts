@@ -93,6 +93,50 @@ export function touchAgent(db: Database.Database, name: string): Agent {
   return registerAgent(db, { name, model: null, capabilities: [] });
 }
 
+// ─── Agent Current Project ──────────────────────────────────────────────────
+
+export function getAgentCurrentProject(
+  db: Database.Database,
+  agentId: string
+): { project_id: string; project_name: string } | null {
+  const row = db
+    .prepare(
+      `SELECT p.id AS project_id, p.name AS project_name
+       FROM activity_log a
+       JOIN tasks t ON a.task_id = t.id
+       JOIN projects p ON t.project_id = p.id
+       WHERE a.agent_id = ? AND t.status IN ('in_progress', 'planned')
+       ORDER BY a.timestamp DESC LIMIT 1`
+    )
+    .get(agentId) as { project_id: string; project_name: string } | undefined;
+  return row ?? null;
+}
+
+/** Batch version: returns a Map<agentId, { project_id, project_name }> for all agents at once. */
+export function getAllAgentCurrentProjects(
+  db: Database.Database
+): Map<string, { project_id: string; project_name: string }> {
+  const rows = db
+    .prepare(
+      `SELECT ranked.agent_id, ranked.project_id, ranked.project_name
+       FROM (
+         SELECT a.agent_id, p.id AS project_id, p.name AS project_name,
+                ROW_NUMBER() OVER (PARTITION BY a.agent_id ORDER BY a.timestamp DESC) AS rn
+         FROM activity_log a
+         JOIN tasks t ON a.task_id = t.id
+         JOIN projects p ON t.project_id = p.id
+         WHERE t.status IN ('in_progress', 'planned')
+       ) ranked
+       WHERE ranked.rn = 1`
+    )
+    .all() as { agent_id: string; project_id: string; project_name: string }[];
+  const map = new Map<string, { project_id: string; project_name: string }>();
+  for (const row of rows) {
+    map.set(row.agent_id, { project_id: row.project_id, project_name: row.project_name });
+  }
+  return map;
+}
+
 // ─── Agent Health ───────────────────────────────────────────────────────────
 
 export const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;

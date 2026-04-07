@@ -7,7 +7,7 @@ import type { ActivityEntry } from "../types";
 const LAST_VISIT_KEY = "vibe-dash-last-visit";
 
 export function ActivityStreamView() {
-  const { projects, agents } = useAppState();
+  const { projects, agents, pollGeneration } = useAppState();
   const api = useApi();
 
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
@@ -41,7 +41,7 @@ export function ActivityStreamView() {
       }
     }
     load();
-  }, [api, filterAgent, filterProject, showSince, lastVisit]);
+  }, [api, filterAgent, filterProject, showSince, lastVisit, pollGeneration]);
 
   // Group by date
   const grouped = useMemo(() => {
@@ -132,14 +132,28 @@ export function ActivityStreamView() {
                     {new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
                   <span style={{ color: "var(--accent-blue)", fontWeight: 500, minWidth: "80px", flexShrink: 0 }}>
-                    {(entry as ActivityEntry & { agent_name?: string }).agent_name ?? "System"}
+                    {entry.agent_name ?? "System"}
+                    {entry.parent_agent_name && (
+                      <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: "10px" }}>
+                        {" "}&rarr; {entry.parent_agent_name}
+                      </span>
+                    )}
                   </span>
+                  {entry.project_name && (
+                    <span style={{
+                      fontSize: "10px", padding: "0 4px", borderRadius: "3px",
+                      background: "rgba(139, 92, 246, 0.1)", color: "var(--accent-purple)",
+                      alignSelf: "center", flexShrink: 0, lineHeight: "16px",
+                    }}>
+                      {entry.project_name}
+                    </span>
+                  )}
                   <span style={{ color: "var(--text-secondary)", flex: 1 }}>
                     {entry.message}
                   </span>
-                  {(entry as ActivityEntry & { task_title?: string }).task_title && (
+                  {entry.task_title && (
                     <span style={{ color: "var(--text-muted)", fontSize: "10px", flexShrink: 0 }}>
-                      on {(entry as ActivityEntry & { task_title?: string }).task_title}
+                      on {entry.task_title}
                     </span>
                   )}
                 </div>
