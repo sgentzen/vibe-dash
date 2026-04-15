@@ -129,6 +129,17 @@ export function getMilestoneDailyStats(db: Database.Database, milestoneId: strin
     .all(milestoneId) as MilestoneDailyStats[];
 }
 
+/** Record a daily stats snapshot for every milestone that has tasks. Called on server startup. */
+export function backfillMilestoneDailyStats(db: Database.Database): number {
+  const milestoneIds = db.prepare(
+    `SELECT DISTINCT m.id FROM milestones m JOIN tasks t ON t.milestone_id = m.id`
+  ).all() as { id: string }[];
+  for (const { id } of milestoneIds) {
+    recordMilestoneDailyStats(db, id);
+  }
+  return milestoneIds.length;
+}
+
 // ─── Time Estimates ─────────────────────────────────────────────────────────
 
 export function getTimeSpent(db: Database.Database, taskId: string): number | null {

@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
 import type Database from "better-sqlite3";
-import { openDb } from "./db/index.js";
+import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -108,6 +108,9 @@ server.listen(PORT, () => {
   console.log(`Vibe Dash running on http://localhost:${PORT}`);
   console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
   console.log(`MCP SSE at http://localhost:${PORT}/sse`);
+  // Backfill milestone daily stats so the dashboard has data immediately
+  const backfilled = backfillMilestoneDailyStats(db);
+  if (backfilled > 0) console.log(`Backfilled daily stats for ${backfilled} milestones`);
 });
 
 export { app, db, server };

@@ -12,6 +12,7 @@ export {
   getMilestoneProgress,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
+  backfillMilestoneDailyStats,
   getTimeSpent,
 } from "./milestones.js";
 export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
