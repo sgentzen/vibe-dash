@@ -62,11 +62,13 @@ export function App() {
           dispatch({ type: "SET_ACTIVITY", payload: activity });
           dispatch({ type: "SET_BLOCKERS", payload: blockerList });
 
-          // Load tags for all projects
-          const allTags = (await Promise.all(
-            projects.map((p) => api.getTags(p.id))
-          )).flat();
+          // Load tags and milestones for all projects
+          const [allTags, allMilestones] = await Promise.all([
+            Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
+            Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
+          ]);
           dispatch({ type: "SET_TAGS", payload: allTags });
+          dispatch({ type: "SET_MILESTONES", payload: allMilestones });
 
           // Load task tags for all tasks
           const taskTagEntries = await Promise.all(

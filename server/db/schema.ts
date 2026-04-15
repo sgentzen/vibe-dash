@@ -131,6 +131,17 @@ const SCHEMA = [
   "  read INTEGER NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
+  "CREATE TABLE IF NOT EXISTS milestones (",
+  "  id TEXT PRIMARY KEY,",
+  "  project_id TEXT NOT NULL REFERENCES projects(id),",
+  "  title TEXT NOT NULL,",
+  "  description TEXT,",
+  "  status TEXT NOT NULL DEFAULT 'open',",
+  "  due_date TEXT,",
+  "  completed_at TEXT,",
+  "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);",
   "CREATE TABLE IF NOT EXISTS cost_entries (",
   "  id TEXT PRIMARY KEY,",
   "  agent_id TEXT REFERENCES agents(id),",
@@ -181,6 +192,9 @@ function migrate(db: Database.Database): void {
   if (!cols.some((c) => c.name === "start_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
   }
+  if (!cols.some((c) => c.name === "milestone_id")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id)").run();
+  }
 
   const agentCols = db.pragma("table_info(agents)") as { name: string }[];
   if (!agentCols.some((c) => c.name === "role")) {
@@ -194,6 +208,7 @@ function migrate(db: Database.Database): void {
 // Indexes on columns added by migrate() — must run after ALTER TABLEs
 const POST_MIGRATE_INDEXES = [
   "CREATE INDEX IF NOT EXISTS idx_tasks_sprint_id ON tasks(sprint_id);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_milestone_id ON tasks(milestone_id);",
   "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent_id ON tasks(assigned_agent_id);",
 ].join("\n");
 

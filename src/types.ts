@@ -27,6 +27,7 @@ export interface Task {
   project_id: string;
   parent_task_id: string | null;
   sprint_id: string | null;
+  milestone_id: string | null;
   assigned_agent_id: string | null;
   title: string;
   description: string | null;
@@ -47,6 +48,20 @@ export interface ProjectTemplate {
   description: string | null;
   template_json: string;
   created_at: string;
+}
+
+export type MilestoneStatus = "open" | "closed";
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  status: MilestoneStatus;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type AgentRole = "orchestrator" | "coder" | "reviewer" | "explorer" | "planner" | "agent";
@@ -244,9 +259,13 @@ export type WsEventType =
   | "file_lock_acquired"
   | "file_conflict_detected"
   | "notification_created"
-  | "daily_stats_recorded";
+  | "milestone_created"
+  | "milestone_updated"
+  | "milestone_completed"
+  | "daily_stats_recorded"
+  | "cost_logged";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Milestone | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats;
 }

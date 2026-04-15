@@ -47,6 +47,11 @@ import {
   createProjectFromTemplate,
   listTemplates,
   getActivityStream,
+  createMilestone,
+  getMilestone,
+  updateMilestone,
+  completeMilestone,
+  listMilestones,
   logCost,
   getAgentCostSummary,
   getSprintCostSummary,
@@ -129,6 +134,7 @@ export async function handleTool(
         project_id: args.project_id as string,
         parent_task_id: (args.parent_task_id as string | undefined) ?? null,
         sprint_id: (args.sprint_id as string | undefined) ?? null,
+        milestone_id: (args.milestone_id as string | undefined) ?? null,
         title: args.title as string,
         description: (args.description as string | undefined) ?? null,
         priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
@@ -185,6 +191,7 @@ export async function handleTool(
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,
         sprint_id: args.sprint_id as string | null | undefined,
+        milestone_id: args.milestone_id as string | null | undefined,
         assigned_agent_id: args.assigned_agent_id as string | null | undefined,
         due_date: args.due_date as string | null | undefined,
         estimate: args.estimate as number | null | undefined,
@@ -508,6 +515,49 @@ export async function handleTool(
         project_id: args.project_id as string | undefined,
         sprint_id: args.sprint_id as string | undefined,
       }));
+    }
+
+    // ─── Milestones ──────────────────────────────────────────────────────
+
+    case "create_milestone": {
+      const milestone = createMilestone(db, {
+        project_id: args.project_id as string,
+        title: args.title as string,
+        description: (args.description as string | undefined) ?? null,
+        due_date: (args.due_date as string | undefined) ?? null,
+      });
+      broadcast({ type: "milestone_created", payload: milestone });
+      return ok({ milestone_id: milestone.id });
+    }
+
+    case "list_milestones": {
+      const milestones = listMilestones(
+        db,
+        args.project_id as string,
+        args.status as "open" | "closed" | undefined
+      );
+      return ok({ milestones });
+    }
+
+    case "update_milestone": {
+      const updated = updateMilestone(db, args.milestone_id as string, {
+        title: args.title as string | undefined,
+        description: args.description as string | null | undefined,
+        status: args.status as "open" | "closed" | undefined,
+        due_date: args.due_date as string | null | undefined,
+      });
+      if (updated) {
+        broadcast({ type: "milestone_updated", payload: updated });
+      }
+      return ok({ success: true });
+    }
+
+    case "complete_milestone": {
+      const completed = completeMilestone(db, args.milestone_id as string);
+      if (completed) {
+        broadcast({ type: "milestone_completed", payload: completed });
+      }
+      return ok({ success: true });
     }
 
     default:

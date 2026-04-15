@@ -7,6 +7,7 @@ export interface CreateTaskInput {
   project_id: string;
   parent_task_id?: string | null;
   sprint_id?: string | null;
+  milestone_id?: string | null;
   assigned_agent_id?: string | null;
   title: string;
   description: string | null;
@@ -26,13 +27,14 @@ export function createTask(
   const ts = now();
   const status: TaskStatus = input.status ?? "planned";
   db.prepare(
-    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, status, priority, progress, due_date, start_date, estimate, recurrence_rule, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO tasks (id, project_id, parent_task_id, sprint_id, milestone_id, assigned_agent_id, title, description, status, priority, progress, due_date, start_date, estimate, recurrence_rule, created_at, updated_at)" +
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)"
   ).run(
     id,
     input.project_id,
     input.parent_task_id ?? null,
     input.sprint_id ?? null,
+    input.milestone_id ?? null,
     input.assigned_agent_id ?? null,
     input.title,
     input.description ?? null,
@@ -107,6 +109,7 @@ export interface UpdateTaskInput {
   progress?: number;
   parent_task_id?: string | null;
   sprint_id?: string | null;
+  milestone_id?: string | null;
   assigned_agent_id?: string | null;
   due_date?: string | null;
   start_date?: string | null;
@@ -149,6 +152,10 @@ export function updateTask(
   if (input.sprint_id !== undefined) {
     sets.push("sprint_id = ?");
     params.push(input.sprint_id);
+  }
+  if (input.milestone_id !== undefined) {
+    sets.push("milestone_id = ?");
+    params.push(input.milestone_id);
   }
   if (input.assigned_agent_id !== undefined) {
     sets.push("assigned_agent_id = ?");
@@ -266,6 +273,7 @@ export function handleRecurringTaskCompletion(db: Database.Database, taskId: str
     project_id: task.project_id,
     parent_task_id: task.parent_task_id,
     sprint_id: task.sprint_id,
+    milestone_id: task.milestone_id,
     assigned_agent_id: task.assigned_agent_id,
     title: task.title,
     description: task.description,

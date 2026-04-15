@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, TaskComment, FileConflict, AppNotification, WsEvent } from "./types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, TaskComment, FileConflict, AppNotification, Milestone, WsEvent } from "./types";
 
 export type Theme = "dark" | "light";
 
@@ -15,6 +15,7 @@ function getInitialTheme(): Theme {
 export interface AppState {
   projects: Project[];
   sprints: Sprint[];
+  milestones: Milestone[];
   tasks: Task[];
   agents: Agent[];
   activity: ActivityEntry[];
@@ -42,6 +43,7 @@ export interface AppState {
 const initialState: AppState = {
   projects: [],
   sprints: [],
+  milestones: [],
   tasks: [],
   agents: [],
   activity: [],
@@ -64,6 +66,7 @@ const initialState: AppState = {
 export type AppAction =
   | { type: "SET_PROJECTS"; payload: Project[] }
   | { type: "SET_SPRINTS"; payload: Sprint[] }
+  | { type: "SET_MILESTONES"; payload: Milestone[] }
   | { type: "SET_TASKS"; payload: Task[] }
   | { type: "SET_AGENTS"; payload: Agent[] }
   | { type: "SET_ACTIVITY"; payload: ActivityEntry[] }
@@ -89,6 +92,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, projects: action.payload };
     case "SET_SPRINTS":
       return { ...state, sprints: action.payload };
+    case "SET_MILESTONES":
+      return { ...state, milestones: action.payload };
     case "SET_TASKS":
       return { ...state, tasks: action.payload };
     case "SET_AGENTS":
@@ -255,6 +260,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
         case "file_lock_acquired":
           return state; // locks managed via conflicts
+        case "milestone_created": {
+          const ms = event.payload as Milestone;
+          return { ...state, milestones: [...state.milestones, ms] };
+        }
+        case "milestone_updated":
+        case "milestone_completed": {
+          const ms = event.payload as Milestone;
+          return {
+            ...state,
+            milestones: state.milestones.map((m) => (m.id === ms.id ? ms : m)),
+          };
+        }
         case "daily_stats_recorded":
           return state; // dashboard reloads on demand
         case "dependency_removed": {

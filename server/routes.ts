@@ -81,6 +81,11 @@ import {
   evaluateAlertRules,
   bulkUpdateTasks,
   ACTIVE_THRESHOLD_MINUTES,
+  createMilestone,
+  getMilestone,
+  updateMilestone,
+  completeMilestone,
+  listMilestones,
   logCost,
   getAgentCostSummary,
   getSprintCostSummary,
@@ -865,6 +870,64 @@ export function createRouter(db: Database.Database): Router {
     const project_id = req.query.project_id as string | undefined;
     const sprint_id = req.query.sprint_id as string | undefined;
     res.json(getCostByAgent(db, { project_id, sprint_id }));
+  });
+
+  // ─── Milestones ──────────────────────────────────────────────────────────
+
+  router.post("/api/milestones", (req, res) => {
+    const { project_id, title, description, due_date } = req.body;
+    if (!project_id || !title) {
+      res.status(400).json({ error: "project_id and title are required" });
+      return;
+    }
+    const milestone = createMilestone(db, {
+      project_id,
+      title,
+      description: description ?? null,
+      due_date: due_date ?? null,
+    });
+    broadcast({ type: "milestone_created", payload: milestone });
+    res.json(milestone);
+  });
+
+  router.get("/api/milestones", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    if (!project_id) {
+      res.status(400).json({ error: "project_id is required" });
+      return;
+    }
+    const status = req.query.status as "open" | "closed" | undefined;
+    res.json(listMilestones(db, project_id, status));
+  });
+
+  router.get("/api/milestones/:id", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) {
+      res.status(404).json({ error: "Milestone not found" });
+      return;
+    }
+    res.json(milestone);
+  });
+
+  router.patch("/api/milestones/:id", (req, res) => {
+    const { title, description, status, due_date } = req.body;
+    const updated = updateMilestone(db, req.params.id, { title, description, status, due_date });
+    if (!updated) {
+      res.status(404).json({ error: "Milestone not found" });
+      return;
+    }
+    broadcast({ type: "milestone_updated", payload: updated });
+    res.json(updated);
+  });
+
+  router.post("/api/milestones/:id/complete", (req, res) => {
+    const completed = completeMilestone(db, req.params.id);
+    if (!completed) {
+      res.status(404).json({ error: "Milestone not found" });
+      return;
+    }
+    broadcast({ type: "milestone_completed", payload: completed });
+    res.json(completed);
   });
 
   return router;

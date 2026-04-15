@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate, Webhook } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate, Webhook, Milestone } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -64,7 +64,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id" | "milestone_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
 ): Promise<Task> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -138,6 +138,12 @@ async function updateSprint(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`updateSprint failed: ${res.status}`);
+  return res.json();
+}
+
+async function getMilestones(projectId: string): Promise<Milestone[]> {
+  const res = await fetch(`/api/milestones?project_id=${encodeURIComponent(projectId)}`);
+  if (!res.ok) throw new Error(`getMilestones failed: ${res.status}`);
   return res.json();
 }
 
@@ -529,6 +535,7 @@ export function useApi() {
     getSprints,
     createSprint,
     updateSprint,
+    getMilestones,
     getTags,
     createTag,
     getTaskTags,

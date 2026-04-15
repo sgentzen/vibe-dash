@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAppDispatch, useAppState } from "../store";
 import { useApi } from "./useApi";
+import type { Milestone } from "../types";
 
 const POLL_INTERVAL_MS = 3000;
 const STARTUP_PROBE_MS = 1000;
@@ -15,11 +16,13 @@ const STARTUP_PROBE_MS = 1000;
  */
 export function usePolling() {
   const dispatch = useAppDispatch();
-  const { activeView } = useAppState();
+  const { activeView, projects } = useAppState();
   const api = useApi();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
 
   useEffect(() => {
     let cancelled = false;
@@ -34,11 +37,13 @@ export function usePolling() {
         api.getBlockers().then((v) => dispatch({ type: "SET_BLOCKERS", payload: v })),
       ];
 
-      // Tasks + sprints needed for board, list, dashboard, timeline views
+      // Tasks + sprints + milestones needed for board, list, dashboard, timeline views
       if (view !== "agents") {
         promises.push(
           api.getTasks().then((v) => dispatch({ type: "SET_TASKS", payload: v })),
           api.getSprints().then((v) => dispatch({ type: "SET_SPRINTS", payload: v })),
+          Promise.all(projectsRef.current.map((p) => api.getMilestones(p.id)))
+            .then((results) => dispatch({ type: "SET_MILESTONES", payload: results.flat() as Milestone[] })),
         );
       }
 
