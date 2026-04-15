@@ -150,10 +150,6 @@ export function updateTask(
     sets.push("milestone_id = ?");
     params.push(input.milestone_id);
   }
-  if (input.milestone_id !== undefined) {
-    sets.push("milestone_id = ?");
-    params.push(input.milestone_id);
-  }
   if (input.assigned_agent_id !== undefined) {
     sets.push("assigned_agent_id = ?");
     params.push(input.assigned_agent_id);
@@ -201,7 +197,6 @@ export interface SearchTasksFilter {
   priority?: TaskPriority;
   assigned_agent_id?: string;
   tag_id?: string;
-  milestone_id?: string;
   due_before?: string;
   due_after?: string;
   limit?: number;
@@ -222,7 +217,6 @@ export function searchTasks(db: Database.Database, filter: SearchTasksFilter): T
   if (filter.status) { conditions.push("t.status = ?"); params.push(filter.status); }
   if (filter.priority) { conditions.push("t.priority = ?"); params.push(filter.priority); }
   if (filter.assigned_agent_id) { conditions.push("t.assigned_agent_id = ?"); params.push(filter.assigned_agent_id); }
-  if (filter.milestone_id) { conditions.push("t.milestone_id = ?"); params.push(filter.milestone_id); }
   if (filter.due_before) { conditions.push("t.due_date <= ?"); params.push(filter.due_before); }
   if (filter.due_after) { conditions.push("t.due_date >= ?"); params.push(filter.due_after); }
 

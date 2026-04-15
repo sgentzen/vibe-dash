@@ -20,7 +20,7 @@ describe("searchTasks milestone_id filter", () => {
     const project = createProject(db, { name: "P", description: null });
     const milestone = createMilestone(db, {
       project_id: project.id,
-      title: "v1.0",
+      name: "v1.0",
     });
 
     const taskWithMilestone = createTask(db, {
@@ -49,7 +49,7 @@ describe("searchTasks milestone_id filter", () => {
     const project = createProject(db, { name: "P", description: null });
     const milestone = createMilestone(db, {
       project_id: project.id,
-      title: "v1.0",
+      name: "v1.0",
     });
 
     createTask(db, {
@@ -76,7 +76,7 @@ describe("searchTasks milestone_id filter", () => {
     const project = createProject(db, { name: "P", description: null });
     const milestone = createMilestone(db, {
       project_id: project.id,
-      title: "v2.0",
+      name: "v2.0",
     });
 
     createTask(db, {
@@ -95,7 +95,7 @@ describe("searchTasks milestone_id filter", () => {
     const project = createProject(db, { name: "P", description: null });
     const milestone = createMilestone(db, {
       project_id: project.id,
-      title: "v1.0",
+      name: "v1.0",
     });
 
     createTask(db, {

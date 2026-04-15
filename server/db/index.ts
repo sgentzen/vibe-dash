@@ -96,14 +96,6 @@ export {
   getMatchingWebhooks,
   fireWebhooks,
 } from "./webhooks.js";
-export {
-  createMilestone,
-  getMilestone,
-  updateMilestone,
-  completeMilestone,
-  listMilestones,
-} from "./milestones.js";
-export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
 export { generateReport } from "./reports.js";
 export {
   logCost,
