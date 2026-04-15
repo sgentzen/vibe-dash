@@ -12,7 +12,7 @@ interface TaskEditDrawerProps {
 }
 
 export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
-  const { sprints, agents, tags, taskTagMap } = useAppState();
+  const { milestones, agents, tags, taskTagMap } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -21,7 +21,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [progress, setProgress] = useState(task.progress);
-  const [sprintId, setSprintId] = useState<string | null>(task.sprint_id);
+  const [milestoneId, setMilestoneId] = useState<string | null>(task.milestone_id);
   const [assignedAgentId, setAssignedAgentId] = useState<string | null>(task.assigned_agent_id);
   const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
   const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
@@ -40,7 +40,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     }).catch(() => {});
   }
 
-  const taskSprints = sprints.filter((s) => s.project_id === task.project_id);
+  const taskMilestones = milestones.filter((m) => m.project_id === task.project_id);
   const projectTags = tags.filter((t) => t.project_id === task.project_id);
   const currentTagIds = taskTagMap[task.id] ?? [];
   const currentTags = currentTagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => !!t);
@@ -53,7 +53,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setStatus(task.status);
     setPriority(task.priority);
     setProgress(task.progress);
-    setSprintId(task.sprint_id);
+    setMilestoneId(task.milestone_id);
     setAssignedAgentId(task.assigned_agent_id);
     setDueDate(task.due_date ?? "");
     setEstimate(task.estimate != null ? String(task.estimate) : "");
@@ -72,7 +72,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         status,
         priority,
         progress,
-        sprint_id: sprintId,
+        milestone_id: milestoneId,
         assigned_agent_id: assignedAgentId,
         due_date: dueDate || null,
         start_date: startDate || null,
@@ -221,19 +221,18 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           </select>
         </div>
 
-        {/* Sprint */}
-        {taskSprints.length > 0 && (
+        {/* Milestone */}
+        {taskMilestones.length > 0 && (
           <div>
-            <label htmlFor="task-sprint" style={labelStyle}>Sprint</label>
+            <label style={labelStyle}>Milestone</label>
             <select
-              id="task-sprint"
-              value={sprintId ?? ""}
-              onChange={(e) => setSprintId(e.target.value || null)}
+              value={milestoneId ?? ""}
+              onChange={(e) => setMilestoneId(e.target.value || null)}
               style={inputStyle}
             >
-              <option value="">No Sprint</option>
-              {taskSprints.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              <option value="">No Milestone</option>
+              {taskMilestones.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
           </div>

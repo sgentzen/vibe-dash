@@ -8,18 +8,19 @@ const SCHEMA = [
   "  id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,",
   "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
   ");",
-  "CREATE TABLE IF NOT EXISTS sprints (",
+  "CREATE TABLE IF NOT EXISTS milestones (",
   "  id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),",
   "  name TEXT NOT NULL, description TEXT,",
-  "  status TEXT NOT NULL DEFAULT 'planned',",
-  "  start_date TEXT, end_date TEXT,",
+  "  acceptance_criteria TEXT NOT NULL DEFAULT '[]',",
+  "  target_date TEXT,",
+  "  status TEXT NOT NULL DEFAULT 'open',",
   "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
   ");",
   "CREATE TABLE IF NOT EXISTS tasks (",
   "  id TEXT PRIMARY KEY,",
   "  project_id TEXT NOT NULL REFERENCES projects(id),",
   "  parent_task_id TEXT REFERENCES tasks(id),",
-  "  sprint_id TEXT REFERENCES sprints(id),",
+  "  milestone_id TEXT REFERENCES milestones(id),",
   "  title TEXT NOT NULL, description TEXT,",
   "  status TEXT NOT NULL DEFAULT 'planned',",
   "  priority TEXT NOT NULL DEFAULT 'medium',",
@@ -92,14 +93,13 @@ const SCHEMA = [
   "  template_json TEXT NOT NULL,",
   "  created_at TEXT NOT NULL",
   ");",
-  "CREATE TABLE IF NOT EXISTS sprint_daily_stats (",
-  "  sprint_id TEXT NOT NULL REFERENCES sprints(id),",
+  "CREATE TABLE IF NOT EXISTS milestone_daily_stats (",
+  "  milestone_id TEXT NOT NULL REFERENCES milestones(id),",
   "  date TEXT NOT NULL,",
-  "  completed_points INTEGER NOT NULL DEFAULT 0,",
-  "  remaining_points INTEGER NOT NULL DEFAULT 0,",
   "  completed_tasks INTEGER NOT NULL DEFAULT 0,",
-  "  remaining_tasks INTEGER NOT NULL DEFAULT 0,",
-  "  PRIMARY KEY(sprint_id, date)",
+  "  total_tasks INTEGER NOT NULL DEFAULT 0,",
+  "  completion_pct REAL NOT NULL DEFAULT 0,",
+  "  PRIMARY KEY(milestone_id, date)",
   ");",
   "CREATE TABLE IF NOT EXISTS task_comments (",
   "  id TEXT PRIMARY KEY,",
@@ -131,11 +131,22 @@ const SCHEMA = [
   "  read INTEGER NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
+  "CREATE TABLE IF NOT EXISTS milestones (",
+  "  id TEXT PRIMARY KEY,",
+  "  project_id TEXT NOT NULL REFERENCES projects(id),",
+  "  title TEXT NOT NULL,",
+  "  description TEXT,",
+  "  status TEXT NOT NULL DEFAULT 'open',",
+  "  due_date TEXT,",
+  "  completed_at TEXT,",
+  "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);",
   "CREATE TABLE IF NOT EXISTS cost_entries (",
   "  id TEXT PRIMARY KEY,",
   "  agent_id TEXT REFERENCES agents(id),",
   "  task_id TEXT REFERENCES tasks(id),",
-  "  sprint_id TEXT REFERENCES sprints(id),",
+  "  milestone_id TEXT REFERENCES milestones(id),",
   "  project_id TEXT REFERENCES projects(id),",
   "  model TEXT NOT NULL,",
   "  provider TEXT NOT NULL,",
@@ -145,7 +156,6 @@ const SCHEMA = [
   "  created_at TEXT NOT NULL",
   ");",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_agent_id ON cost_entries(agent_id);",
-  "CREATE INDEX IF NOT EXISTS idx_cost_entries_sprint_id ON cost_entries(sprint_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);",
 
@@ -178,8 +188,13 @@ const SCHEMA = [
 
 function migrate(db: Database.Database): void {
   const cols = db.pragma("table_info(tasks)") as { name: string }[];
-  if (!cols.some((c) => c.name === "sprint_id")) {
-    db.prepare("ALTER TABLE tasks ADD COLUMN sprint_id TEXT REFERENCES sprints(id)").run();
+  if (!cols.some((c) => c.name === "milestone_id")) {
+    // Legacy migration: rename sprint_id → milestone_id if it exists
+    if (cols.some((c) => c.name === "sprint_id")) {
+      db.prepare("ALTER TABLE tasks RENAME COLUMN sprint_id TO milestone_id").run();
+    } else {
+      db.prepare("ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id)").run();
+    }
   }
   if (!cols.some((c) => c.name === "assigned_agent_id")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN assigned_agent_id TEXT REFERENCES agents(id)").run();
@@ -196,6 +211,9 @@ function migrate(db: Database.Database): void {
   if (!cols.some((c) => c.name === "start_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
   }
+  if (!cols.some((c) => c.name === "milestone_id")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id)").run();
+  }
 
   const agentCols = db.pragma("table_info(agents)") as { name: string }[];
   if (!agentCols.some((c) => c.name === "role")) {
@@ -204,12 +222,50 @@ function migrate(db: Database.Database): void {
   if (!agentCols.some((c) => c.name === "parent_agent_id")) {
     db.prepare("ALTER TABLE agents ADD COLUMN parent_agent_id TEXT REFERENCES agents(id)").run();
   }
+
+  // Migrate sprints → milestones if legacy sprints table exists
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sprints'").all();
+  if (tables.length > 0) {
+    const milestoneCount = (db.prepare("SELECT COUNT(*) AS c FROM milestones").get() as { c: number }).c;
+    if (milestoneCount === 0) {
+      db.prepare(
+        `INSERT INTO milestones (id, project_id, name, description, acceptance_criteria, target_date, status, created_at, updated_at)
+         SELECT id, project_id, name, description, '[]', end_date,
+           CASE WHEN status = 'completed' THEN 'achieved' ELSE 'open' END,
+           created_at, updated_at
+         FROM sprints`
+      ).run();
+    }
+    // Migrate cost_entries sprint_id → milestone_id if needed
+    const costCols = db.pragma("table_info(cost_entries)") as { name: string }[];
+    if (costCols.some((c) => c.name === "sprint_id") && !costCols.some((c) => c.name === "milestone_id")) {
+      db.prepare("ALTER TABLE cost_entries RENAME COLUMN sprint_id TO milestone_id").run();
+    }
+
+    // Migrate sprint_daily_stats → milestone_daily_stats if it exists
+    const hasSDS = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sprint_daily_stats'").all();
+    if (hasSDS.length > 0) {
+      const mdCount = (db.prepare("SELECT COUNT(*) AS c FROM milestone_daily_stats").get() as { c: number }).c;
+      if (mdCount === 0) {
+        db.prepare(
+          `INSERT INTO milestone_daily_stats (milestone_id, date, completed_tasks, total_tasks, completion_pct)
+           SELECT sprint_id, date, completed_tasks,
+             completed_tasks + remaining_tasks,
+             CASE WHEN (completed_tasks + remaining_tasks) > 0
+               THEN ROUND(completed_tasks * 100.0 / (completed_tasks + remaining_tasks), 1)
+               ELSE 0 END
+           FROM sprint_daily_stats`
+        ).run();
+      }
+    }
+  }
 }
 
 // Indexes on columns added by migrate() — must run after ALTER TABLEs
 const POST_MIGRATE_INDEXES = [
-  "CREATE INDEX IF NOT EXISTS idx_tasks_sprint_id ON tasks(sprint_id);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_milestone_id ON tasks(milestone_id);",
   "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent_id ON tasks(assigned_agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_cost_entries_milestone_id ON cost_entries(milestone_id);",
 ].join("\n");
 
 export function initDb(db: Database.Database): void {

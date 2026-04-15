@@ -90,9 +90,6 @@ app.all("/mcp", async (req, res) => {
   res.status(400).json({ error: "No valid MCP session. Send an initialize request first." });
 });
 
-// 404 for unknown API routes — must come after all route modules, before SPA catch-all
-app.use(notFoundHandler);
-
 // Serve built frontend in production (npm start)
 const distDir = path.join(PROJECT_ROOT, "dist");
 app.use(express.static(distDir));

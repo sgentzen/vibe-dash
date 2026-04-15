@@ -1,6 +1,6 @@
 export type TaskStatus = "planned" | "in_progress" | "blocked" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
-export type SprintStatus = "planned" | "active" | "completed";
+export type MilestoneStatus = "open" | "achieved";
 
 export interface Project {
   id: string;
@@ -10,14 +10,14 @@ export interface Project {
   updated_at: string;
 }
 
-export interface Sprint {
+export interface Milestone {
   id: string;
   project_id: string;
   name: string;
   description: string | null;
-  status: SprintStatus;
-  start_date: string | null;
-  end_date: string | null;
+  acceptance_criteria: string;
+  target_date: string | null;
+  status: MilestoneStatus;
   created_at: string;
   updated_at: string;
 }
@@ -26,7 +26,7 @@ export interface Task {
   id: string;
   project_id: string;
   parent_task_id: string | null;
-  sprint_id: string | null;
+  milestone_id: string | null;
   assigned_agent_id: string | null;
   title: string;
   description: string | null;
@@ -118,12 +118,10 @@ export interface SavedFilter {
   created_at: string;
 }
 
-export interface SprintCapacity {
-  total_estimated: number;
-  completed_points: number;
-  remaining_points: number;
+export interface MilestoneProgress {
   task_count: number;
   completed_count: number;
+  completion_pct: number;
 }
 
 export interface TaskComment {
@@ -167,7 +165,7 @@ export interface AppNotification {
 export interface AgentStats {
   agent_id: string;
   tasks_completed_total: number;
-  tasks_completed_sprint: number;
+  tasks_completed_milestone: number;
   tasks_completed_today: number;
   avg_completion_time_seconds: number | null;
   blocker_rate: number;
@@ -181,20 +179,12 @@ export interface AgentContribution {
   completed_points: number;
 }
 
-export interface SprintDailyStats {
-  sprint_id: string;
+export interface MilestoneDailyStats {
+  milestone_id: string;
   date: string;
-  completed_points: number;
-  remaining_points: number;
   completed_tasks: number;
-  remaining_tasks: number;
-}
-
-export interface VelocityData {
-  sprint_id: string;
-  sprint_name: string;
-  completed_points: number;
-  completed_tasks: number;
+  total_tasks: number;
+  completion_pct: number;
 }
 
 export interface ActivityHeatmapEntry {
@@ -224,7 +214,7 @@ export interface CostEntry {
   id: string;
   agent_id: string | null;
   task_id: string | null;
-  sprint_id: string | null;
+  milestone_id: string | null;
   project_id: string | null;
   model: string;
   provider: string;
@@ -249,6 +239,7 @@ export interface CompletionMetrics {
 
 export type WsEventType =
   | "project_created"
+  | "project_updated"
   | "task_created"
   | "task_updated"
   | "task_completed"
@@ -258,8 +249,9 @@ export type WsEventType =
   | "agent_activity"
   | "blocker_reported"
   | "blocker_resolved"
-  | "sprint_created"
-  | "sprint_updated"
+  | "milestone_created"
+  | "milestone_updated"
+  | "milestone_achieved"
   | "tag_created"
   | "tag_added"
   | "tag_removed"
@@ -277,5 +269,5 @@ export type WsEventType =
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats | CostEntry | CompletionMetrics;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Milestone | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | MilestoneDailyStats | CostEntry;
 }
