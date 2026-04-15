@@ -86,7 +86,7 @@ export function seedBuiltInTemplates(db: Database.Database): void {
       { title: "Implement fix", priority: "high" },
       { title: "Verify fix and regression test" },
     ])},
-    { name: "Sprint Retro", description: "Sprint retrospective template", json: JSON.stringify([
+    { name: "Milestone Retro", description: "Milestone retrospective template", json: JSON.stringify([
       { title: "Collect feedback — what went well" },
       { title: "Collect feedback — what could improve" },
       { title: "Identify action items", priority: "high" },

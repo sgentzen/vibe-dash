@@ -6,7 +6,13 @@
       "mcp__vibe-dash__create_task",
       "mcp__vibe-dash__update_task",
       "mcp__vibe-dash__log_activity",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "mcp__vibe-dash__list_sprints",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "mcp__vibe-dash__list_tasks",
+      "mcp__vibe-dash__update_sprint",
+      "mcp__vibe-dash__complete_task"
     ]
   }
 }

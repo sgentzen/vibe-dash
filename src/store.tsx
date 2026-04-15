@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, TaskComment, FileConflict, AppNotification, WsEvent } from "./types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, TaskComment, FileConflict, AppNotification, WsEvent } from "./types";
 
 export type Theme = "dark" | "light";
 
@@ -14,7 +14,7 @@ function getInitialTheme(): Theme {
 
 export interface AppState {
   projects: Project[];
-  sprints: Sprint[];
+  milestones: Milestone[];
   tasks: Task[];
   agents: Agent[];
   activity: ActivityEntry[];
@@ -29,7 +29,7 @@ export interface AppState {
   activeView: "board" | "agents" | "list" | "dashboard" | "timeline" | "activity";
   theme: Theme;
   selectedProjectId: string | null;
-  selectedSprintId: string | null;
+  selectedMilestoneId: string | null;
   stats: {
     projects: number;
     tasks: number;
@@ -41,7 +41,7 @@ export interface AppState {
 
 const initialState: AppState = {
   projects: [],
-  sprints: [],
+  milestones: [],
   tasks: [],
   agents: [],
   activity: [],
@@ -56,14 +56,14 @@ const initialState: AppState = {
   activeView: "board",
   theme: getInitialTheme(),
   selectedProjectId: null,
-  selectedSprintId: null,
+  selectedMilestoneId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
   pollGeneration: 0,
 };
 
 export type AppAction =
   | { type: "SET_PROJECTS"; payload: Project[] }
-  | { type: "SET_SPRINTS"; payload: Sprint[] }
+  | { type: "SET_MILESTONES"; payload: Milestone[] }
   | { type: "SET_TASKS"; payload: Task[] }
   | { type: "SET_AGENTS"; payload: Agent[] }
   | { type: "SET_ACTIVITY"; payload: ActivityEntry[] }
@@ -78,7 +78,7 @@ export type AppAction =
   | { type: "SET_FILE_CONFLICTS"; payload: FileConflict[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
-  | { type: "SELECT_SPRINT"; payload: string | null }
+  | { type: "SELECT_MILESTONE"; payload: string | null }
   | { type: "SET_THEME"; payload: Theme }
   | { type: "INCREMENT_POLL_GENERATION" }
   | { type: "WS_EVENT"; payload: WsEvent };
@@ -87,8 +87,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SET_PROJECTS":
       return { ...state, projects: action.payload };
-    case "SET_SPRINTS":
-      return { ...state, sprints: action.payload };
+    case "SET_MILESTONES":
+      return { ...state, milestones: action.payload };
     case "SET_TASKS":
       return { ...state, tasks: action.payload };
     case "SET_AGENTS":
@@ -116,9 +116,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "SET_STATS":
       return { ...state, stats: action.payload };
     case "SELECT_PROJECT":
-      return { ...state, selectedProjectId: action.payload, selectedSprintId: null };
-    case "SELECT_SPRINT":
-      return { ...state, selectedSprintId: action.payload };
+      return { ...state, selectedProjectId: action.payload, selectedMilestoneId: null };
+    case "SELECT_MILESTONE":
+      return { ...state, selectedMilestoneId: action.payload };
     case "SET_THEME":
       localStorage.setItem(THEME_STORAGE_KEY, action.payload);
       return { ...state, theme: action.payload };
@@ -191,17 +191,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
             },
           };
         }
-        case "sprint_created":
+        case "milestone_created":
           return {
             ...state,
-            sprints: [...state.sprints, event.payload as Sprint],
+            milestones: [...state.milestones, event.payload as Milestone],
           };
-        case "sprint_updated": {
-          const updatedSprint = event.payload as Sprint;
+        case "milestone_updated": {
+          const updatedMilestone = event.payload as Milestone;
           return {
             ...state,
-            sprints: state.sprints.map((s) =>
-              s.id === updatedSprint.id ? updatedSprint : s
+            milestones: state.milestones.map((m) =>
+              m.id === updatedMilestone.id ? updatedMilestone : m
             ),
           };
         }
