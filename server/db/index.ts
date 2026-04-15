@@ -105,5 +105,6 @@ export {
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  getGlobalCostSummary,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";

@@ -486,6 +486,13 @@ async function getCostTimeseries(params: Record<string, string | undefined> = {}
   return res.json();
 }
 
+async function getCostSummary(projectId?: string): Promise<CostSummary> {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  const res = await fetch(`/api/costs/summary${qs}`);
+  if (!res.ok) throw new Error(`getCostSummary failed: ${res.status}`);
+  return res.json();
+}
+
 async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
   const res = await fetch(`/api/costs/project/${encodeURIComponent(projectId)}`);
   if (!res.ok) throw new Error(`getProjectCostSummary failed: ${res.status}`);
@@ -562,6 +569,7 @@ export function useApi() {
     deleteWebhook: deleteWebhookApi,
     getCostTimeseries,
     getProjectCostSummary,
+    getCostSummary,
     getCostByModel,
     getCostByAgent,
   }), []);
