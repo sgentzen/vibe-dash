@@ -11,7 +11,7 @@ const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 0, high: 1, mediu
 const STATUS_ORDER: Record<TaskStatus, number> = { in_progress: 0, planned: 1, blocked: 2, done: 3 };
 
 export function TaskListView() {
-  const { tasks, selectedProjectId, selectedSprintId, searchQuery, agents } = useAppState();
+  const { tasks, selectedProjectId, selectedMilestoneId, searchQuery, agents } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -26,7 +26,7 @@ export function TaskListView() {
     (t) =>
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
+      (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId) &&
       (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
   );
 
