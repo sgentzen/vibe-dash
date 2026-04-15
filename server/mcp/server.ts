@@ -574,5 +574,48 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("get_cost_by_agent")
   );
 
+  // ─── Agent Performance Metrics ──────────────────────────────────────────
+
+  server.tool(
+    "log_completion_metrics",
+    "Log completion metrics for a task (lines changed, files, tests, duration)",
+    {
+      task_id: z.string(),
+      agent_id: z.string(),
+      lines_added: z.number().optional(),
+      lines_removed: z.number().optional(),
+      files_changed: z.number().optional(),
+      tests_added: z.number().optional(),
+      tests_passing: z.number().optional(),
+      duration_seconds: z.number().optional(),
+    },
+    call("log_completion_metrics")
+  );
+
+  server.tool(
+    "get_agent_comparison",
+    "Compare performance metrics across all agents",
+    {},
+    call("get_agent_comparison")
+  );
+
+  server.tool(
+    "get_agent_performance",
+    "Get detailed performance metrics for a specific agent",
+    {
+      agent_id: z.string(),
+    },
+    call("get_agent_performance")
+  );
+
+  server.tool(
+    "get_task_type_breakdown",
+    "Get task type breakdown for a specific agent",
+    {
+      agent_id: z.string(),
+    },
+    call("get_task_type_breakdown")
+  );
+
   return { server, cleanup };
 }

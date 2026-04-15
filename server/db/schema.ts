@@ -159,6 +159,21 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);",
 
+  "CREATE TABLE IF NOT EXISTS completion_metrics (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  agent_id TEXT NOT NULL REFERENCES agents(id),",
+  "  lines_added INTEGER NOT NULL DEFAULT 0,",
+  "  lines_removed INTEGER NOT NULL DEFAULT 0,",
+  "  files_changed INTEGER NOT NULL DEFAULT 0,",
+  "  tests_added INTEGER NOT NULL DEFAULT 0,",
+  "  tests_passing INTEGER NOT NULL DEFAULT 0,",
+  "  duration_seconds INTEGER NOT NULL DEFAULT 0,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_completion_metrics_agent_id ON completion_metrics(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_completion_metrics_task_id ON completion_metrics(task_id);",
+
   // Foreign-key indexes for query performance (columns from CREATE TABLE only)
   "CREATE INDEX IF NOT EXISTS idx_activity_log_agent_id ON activity_log(agent_id);",
   "CREATE INDEX IF NOT EXISTS idx_activity_log_task_id ON activity_log(task_id);",
