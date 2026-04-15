@@ -7,7 +7,9 @@ import { openDb } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
+import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +48,44 @@ app.post("/messages", async (req, res) => {
   const transport = transports.get(sessionId);
   if (!transport) { res.status(400).json({ error: "Unknown session" }); return; }
   await transport.handlePostMessage(req, res);
+});
+
+// MCP Streamable HTTP transport (modern clients use this)
+const httpTransports = new Map<string, { transport: StreamableHTTPServerTransport; cleanup: () => void }>();
+
+app.all("/mcp", async (req, res) => {
+  // Handle session-based routing for existing sessions
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  if (sessionId && httpTransports.has(sessionId)) {
+    const entry = httpTransports.get(sessionId)!;
+    if (req.method === "DELETE") {
+      entry.cleanup();
+      httpTransports.delete(sessionId);
+    }
+    await entry.transport.handleRequest(req, res, req.body);
+    return;
+  }
+
+  // New session — only POST (initialize) creates one
+  if (req.method === "POST") {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+    const handle = createMcpServer(db, transport.sessionId ?? undefined);
+    transport.onclose = () => {
+      handle.cleanup();
+      if (transport.sessionId) httpTransports.delete(transport.sessionId);
+    };
+    await handle.server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+    if (transport.sessionId) {
+      httpTransports.set(transport.sessionId, { transport, cleanup: handle.cleanup });
+    }
+    return;
+  }
+
+  // GET/DELETE without a valid session
+  res.status(400).json({ error: "No valid MCP session. Send an initialize request first." });
 });
 
 // Serve built frontend in production (npm start)
