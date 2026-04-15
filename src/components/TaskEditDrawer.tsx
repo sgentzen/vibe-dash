@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle, sectionHeader } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
+import { CommentsSection } from "./task/CommentsSection";
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -100,7 +102,8 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   }
 
   return (
-    <>
+    <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: true, escapeDeactivates: true, onDeactivate: onClose }}>
+      <div>
       {/* Backdrop */}
       <div
         onClick={onClose}
@@ -165,8 +168,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Title */}
         <div>
-          <label style={labelStyle}>Title</label>
+          <label htmlFor="task-title" style={labelStyle}>Title</label>
           <input
+            id="task-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={inputStyle}
@@ -175,8 +179,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Description */}
         <div>
-          <label style={labelStyle}>Description</label>
+          <label htmlFor="task-description" style={labelStyle}>Description</label>
           <textarea
+            id="task-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
@@ -186,8 +191,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Status */}
         <div>
-          <label style={labelStyle}>Status</label>
+          <label htmlFor="task-status" style={labelStyle}>Status</label>
           <select
+            id="task-status"
             value={status}
             onChange={(e) => setStatus(e.target.value as TaskStatus)}
             style={inputStyle}
@@ -201,8 +207,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Priority */}
         <div>
-          <label style={labelStyle}>Priority</label>
+          <label htmlFor="task-priority" style={labelStyle}>Priority</label>
           <select
+            id="task-priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
             style={inputStyle}
@@ -234,8 +241,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         {/* Assigned Agent */}
         {agents.length > 0 && (
           <div>
-            <label style={labelStyle}>Assigned Agent</label>
+            <label htmlFor="task-agent" style={labelStyle}>Assigned Agent</label>
             <select
+              id="task-agent"
               value={assignedAgentId ?? ""}
               onChange={(e) => setAssignedAgentId(e.target.value || null)}
               style={inputStyle}
@@ -250,8 +258,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Due Date */}
         <div>
-          <label style={labelStyle}>Due Date</label>
+          <label htmlFor="task-due-date" style={labelStyle}>Due Date</label>
           <input
+            id="task-due-date"
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
@@ -261,8 +270,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Estimate */}
         <div>
-          <label style={labelStyle}>Estimate (story points)</label>
+          <label htmlFor="task-estimate" style={labelStyle}>Estimate (story points)</label>
           <input
+            id="task-estimate"
             type="number"
             min={0}
             value={estimate}
@@ -274,8 +284,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Start Date */}
         <div>
-          <label style={labelStyle}>Start Date</label>
+          <label htmlFor="task-start-date" style={labelStyle}>Start Date</label>
           <input
+            id="task-start-date"
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
@@ -285,8 +296,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Recurrence */}
         <div>
-          <label style={labelStyle}>Recurrence Rule</label>
+          <label htmlFor="task-recurrence" style={labelStyle}>Recurrence Rule</label>
           <select
+            id="task-recurrence"
             value={recurrenceRule}
             onChange={(e) => setRecurrenceRule(e.target.value)}
             style={inputStyle}
@@ -301,7 +313,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Tags */}
         <div>
-          <label style={labelStyle}>Tags</label>
+          <label htmlFor="task-tags" style={labelStyle}>Tags</label>
           {currentTags.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
               {currentTags.map((tag) => (
@@ -351,6 +363,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
                   payload: { type: "tag_added", payload: taskTag },
                 });
               }}
+              id="task-tags"
               style={inputStyle}
             >
               <option value="">Add tag...</option>
@@ -368,8 +381,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
         {/* Progress */}
         <div>
-          <label style={labelStyle}>Progress — {progress}%</label>
+          <label htmlFor="task-progress" style={labelStyle}>Progress — {progress}%</label>
           <input
+            id="task-progress"
             type="range"
             min={0}
             max={100}
@@ -380,61 +394,12 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         </div>
 
         {/* Comments */}
-        <div>
-          <label style={labelStyle}>Comments ({comments.length})</label>
-          <div style={{
-            maxHeight: "200px", overflowY: "auto",
-            border: "1px solid var(--border)", borderRadius: "6px",
-            marginBottom: "8px",
-          }}>
-            {comments.length === 0 ? (
-              <div style={{ padding: "12px", color: "var(--text-muted)", fontSize: "12px", textAlign: "center" }}>
-                No comments yet
-              </div>
-            ) : (
-              comments.map((c) => (
-                <div key={c.id} style={{
-                  padding: "8px 10px", borderBottom: "1px solid var(--border)",
-                  fontSize: "12px",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{c.author_name}</span>
-                    <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>
-                      {new Date(c.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ color: "var(--text-secondary)" }}>{c.message}</div>
-                </div>
-              ))
-            )}
-          </div>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <input
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }}
-              placeholder="Add a comment..."
-              aria-label="Add a comment"
-              style={inputStyle}
-            />
-            <button
-              onClick={submitComment}
-              disabled={!newComment.trim()}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--accent-blue)",
-                color: "var(--accent-blue)",
-                borderRadius: "6px",
-                padding: "4px 12px",
-                fontSize: "12px",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Send
-            </button>
-          </div>
-        </div>
+        <CommentsSection
+          comments={comments}
+          newComment={newComment}
+          onNewCommentChange={setNewComment}
+          onSubmitComment={submitComment}
+        />
 
         {/* Actions */}
         <div style={{ marginTop: "auto", display: "flex", gap: "10px" }}>
@@ -475,7 +440,8 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           )}
         </div>
       </div>
-    </>
+      </div>
+    </FocusTrap>
   );
 }
 

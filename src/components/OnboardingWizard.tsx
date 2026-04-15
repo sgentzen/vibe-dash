@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FocusTrap from "focus-trap-react";
 import { useApi } from "../hooks/useApi";
 import { inputStyle, buttonPrimary, buttonSecondary, sectionHeader } from "../styles/shared.js";
 
@@ -67,7 +68,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   return (
-    <>
+    <FocusTrap focusTrapOptions={{ escapeDeactivates: false }}>
       <div
         role="dialog"
         aria-modal="true"
@@ -111,8 +112,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 Create your first project to get started.
               </p>
               <div style={{ marginBottom: "12px" }}>
-                <label style={labelStyle}>Project Name</label>
+                <label htmlFor="onboard-project-name" style={labelStyle}>Project Name</label>
                 <input
+                  id="onboard-project-name"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleCreateProject(); }}
@@ -122,8 +124,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 />
               </div>
               <div style={{ marginBottom: "20px" }}>
-                <label style={labelStyle}>Description (optional)</label>
+                <label htmlFor="onboard-project-desc" style={labelStyle}>Description (optional)</label>
                 <input
+                  id="onboard-project-desc"
                   value={projectDesc}
                   onChange={(e) => setProjectDesc(e.target.value)}
                   placeholder="What are you building?"
@@ -188,7 +191,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           )}
         </div>
       </div>
-    </>
+    </FocusTrap>
   );
 }
 

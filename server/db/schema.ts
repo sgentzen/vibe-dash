@@ -131,6 +131,17 @@ const SCHEMA = [
   "  read INTEGER NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
+  "CREATE TABLE IF NOT EXISTS milestones (",
+  "  id TEXT PRIMARY KEY,",
+  "  project_id TEXT NOT NULL REFERENCES projects(id),",
+  "  title TEXT NOT NULL,",
+  "  description TEXT,",
+  "  status TEXT NOT NULL DEFAULT 'open',",
+  "  due_date TEXT,",
+  "  completed_at TEXT,",
+  "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);",
   "CREATE TABLE IF NOT EXISTS cost_entries (",
   "  id TEXT PRIMARY KEY,",
   "  agent_id TEXT REFERENCES agents(id),",
@@ -147,6 +158,21 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_agent_id ON cost_entries(agent_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);",
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);",
+
+  "CREATE TABLE IF NOT EXISTS completion_metrics (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  agent_id TEXT NOT NULL REFERENCES agents(id),",
+  "  lines_added INTEGER NOT NULL DEFAULT 0,",
+  "  lines_removed INTEGER NOT NULL DEFAULT 0,",
+  "  files_changed INTEGER NOT NULL DEFAULT 0,",
+  "  tests_added INTEGER NOT NULL DEFAULT 0,",
+  "  tests_passing INTEGER NOT NULL DEFAULT 0,",
+  "  duration_seconds INTEGER NOT NULL DEFAULT 0,",
+  "  created_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_completion_metrics_agent_id ON completion_metrics(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_completion_metrics_task_id ON completion_metrics(task_id);",
 
   // Foreign-key indexes for query performance (columns from CREATE TABLE only)
   "CREATE INDEX IF NOT EXISTS idx_activity_log_agent_id ON activity_log(agent_id);",
@@ -184,6 +210,9 @@ function migrate(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === "start_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
+  }
+  if (!cols.some((c) => c.name === "milestone_id")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id)").run();
   }
 
   const agentCols = db.pragma("table_info(agents)") as { name: string }[];

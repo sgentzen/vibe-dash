@@ -109,3 +109,10 @@ export {
   getGlobalCostSummary,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
+export {
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
+} from "./metrics.js";
+export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";

@@ -58,6 +58,10 @@ import {
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
 } from "../db/index.js";
 
 import { broadcast } from "../websocket.js";
@@ -555,6 +559,37 @@ export async function handleTool(
         project_id: args.project_id as string | undefined,
         milestone_id: args.milestone_id as string | undefined,
       }));
+    }
+
+    // ─── Agent Performance Metrics ────────────────────────────────────────
+
+    case "log_completion_metrics": {
+      const entry = logCompletionMetrics(db, {
+        task_id: args.task_id as string,
+        agent_id: args.agent_id as string,
+        lines_added: args.lines_added as number | undefined,
+        lines_removed: args.lines_removed as number | undefined,
+        files_changed: args.files_changed as number | undefined,
+        tests_added: args.tests_added as number | undefined,
+        tests_passing: args.tests_passing as number | undefined,
+        duration_seconds: args.duration_seconds as number | undefined,
+      });
+      broadcast({ type: "metrics_logged", payload: entry });
+      return ok(entry);
+    }
+
+    case "get_agent_comparison": {
+      return ok(getAgentComparison(db));
+    }
+
+    case "get_agent_performance": {
+      const perf = getAgentPerformance(db, args.agent_id as string);
+      if (!perf) return ok({ error: "No metrics found for this agent" });
+      return ok(perf);
+    }
+
+    case "get_task_type_breakdown": {
+      return ok(getTaskTypeBreakdown(db, args.agent_id as string));
     }
 
     default:

@@ -513,6 +513,26 @@ async function getCostByAgent(params: Record<string, string | undefined> = {}): 
   return res.json();
 }
 
+// ─── Agent Performance Metrics ────────────────────────────────────────
+
+async function getAgentPerformance(agentId: string): Promise<AgentPerformance> {
+  const res = await fetch(`/api/agents/${agentId}/performance`);
+  if (!res.ok) throw new Error(`getAgentPerformance failed: ${res.status}`);
+  return res.json();
+}
+
+async function getAgentComparison(): Promise<AgentComparison> {
+  const res = await fetch("/api/agents/comparison");
+  if (!res.ok) throw new Error(`getAgentComparison failed: ${res.status}`);
+  return res.json();
+}
+
+async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[]> {
+  const res = await fetch(`/api/agents/${agentId}/task-type-breakdown`);
+  if (!res.ok) throw new Error(`getTaskTypeBreakdown failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -572,5 +592,8 @@ export function useApi() {
     getCostSummary,
     getCostByModel,
     getCostByAgent,
+    getAgentPerformance,
+    getAgentComparison,
+    getTaskTypeBreakdown,
   }), []);
 }

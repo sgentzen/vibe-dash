@@ -17,6 +17,7 @@ export function DashboardView() {
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
+  const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
 
   // Project-scoped data — null means "all projects"
   const projectId = selectedProjectId ?? null;
@@ -84,6 +85,11 @@ export function DashboardView() {
     loadCosts();
   }, [api, projectId, milestoneTaskStatusKey, pollGeneration]);
 
+  // Load agent performance comparison
+  useEffect(() => {
+    api.getAgentComparison().then(setAgentComparison).catch(() => {});
+  }, [api, pollGeneration]);
+
   async function handleGenerateReport() {
     const reportProjectId = projectId ?? projects[0]?.id;
     if (!reportProjectId) return;
@@ -94,8 +100,6 @@ export function DashboardView() {
       setReportText("Failed to generate report.");
     }
   }
-
-  const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
@@ -274,54 +278,11 @@ export function DashboardView() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-            <div style={cardStyle}>
-              <div style={headerStyle}>Daily Spend (Last 30 Days)</div>
-              {costTimeseries.length === 0 ? (
-                <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No daily breakdown available yet.</div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "120px" }}>
-                  {(() => { const maxCost = Math.max(...costTimeseries.map((x) => x.total_cost_usd), 0.01); return costTimeseries.map((d) => {
-                    const pct = (d.total_cost_usd / maxCost) * 100;
-                    return (
-                      <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{
-                          width: "100%", background: "var(--accent-blue)", borderRadius: "2px",
-                          height: `${pct}%`, minHeight: "2px",
-                        }} title={`${d.date}: $${d.total_cost_usd.toFixed(4)}`} />
-                        <span style={{ fontSize: "8px", color: "var(--text-muted)", marginTop: "2px" }}>
-                          {d.date.slice(8)}
-                        </span>
-                      </div>
-                    );
-                  }); })()}
-                </div>
-              )}
-            </div>
-
-            <div style={cardStyle}>
-              <div style={headerStyle}>Cost by Model</div>
-              {costByModel.length === 0 ? (
-                <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No model breakdown available yet.</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {(() => { const maxCost = Math.max(...costByModel.map((x) => x.total_cost_usd), 0.01); return costByModel.map((m) => {
-                    const pct = (m.total_cost_usd / maxCost) * 100;
-                    return (
-                      <div key={`${m.model}-${m.provider}`}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
-                          <span style={{ color: "var(--text-primary)" }}>{m.model}</span>
-                          <span style={{ color: "var(--text-muted)" }}>${m.total_cost_usd.toFixed(4)} ({formatTokens(m.total_tokens)} tok)</span>
-                        </div>
-                        <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
-                          <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-purple)", borderRadius: "2px" }} />
-                        </div>
-                      </div>
-                    );
-                  }); })()}
-                </div>
-              )}
-            </div>
+            <CostTimeseriesCard data={costTimeseries} />
+            <CostByModelCard data={costByModel} />
           </div>
+
+          <CostByAgentCard data={costByAgent} />
         </>
       ) : (
         <div style={{ ...cardStyle, marginBottom: "16px" }}>
@@ -332,28 +293,7 @@ export function DashboardView() {
         </div>
       )}
 
-      {/* Cost by Agent */}
-      {costByAgent.length > 0 && (
-        <div style={{ ...cardStyle, marginBottom: "16px" }}>
-          <div style={headerStyle}>Cost by Agent</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {(() => { const maxCost = Math.max(...costByAgent.map((x) => x.total_cost_usd), 0.01); return costByAgent.map((a) => {
-              const pct = (a.total_cost_usd / maxCost) * 100;
-              return (
-                <div key={a.agent_id}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
-                    <span style={{ color: "var(--text-primary)" }}>{a.agent_name}</span>
-                    <span style={{ color: "var(--text-muted)" }}>${a.total_cost_usd.toFixed(4)} ({formatTokens(a.total_tokens)} tok)</span>
-                  </div>
-                  <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-green)", borderRadius: "2px" }} />
-                  </div>
-                </div>
-              );
-            }); })()}
-          </div>
-        </div>
-      )}
+      {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
 
       {/* Report Generation */}
       <div style={cardStyle}>
@@ -405,24 +345,6 @@ export function DashboardView() {
           </pre>
         )}
       </div>
-    </div>
-  );
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div style={{
-      background: "var(--bg-secondary)", border: "1px solid var(--border)",
-      borderRadius: "8px", padding: "12px", textAlign: "center",
-    }}>
-      <div style={{ fontSize: "24px", fontWeight: 700, color, fontFamily: "monospace" }}>{value}</div>
-      <div style={{ fontSize: "10px", color: "var(--text-muted)", letterSpacing: "0.05em", marginTop: "4px" }}>{label}</div>
     </div>
   );
 }
