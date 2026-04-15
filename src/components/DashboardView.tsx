@@ -6,6 +6,9 @@ import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, Agen
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
+import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
+import { AgentContributionsCard, ActivityHeatmapCard } from "./dashboard/ActivityCards";
+import { ReportGeneratorCard } from "./dashboard/ReportGeneratorCard";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
@@ -90,16 +93,7 @@ export function DashboardView() {
     api.getAgentComparison().then(setAgentComparison).catch(() => {});
   }, [api, pollGeneration]);
 
-  async function handleGenerateReport() {
-    const reportProjectId = projectId ?? projects[0]?.id;
-    if (!reportProjectId) return;
-    try {
-      const report = await api.generateReport(reportProjectId, reportPeriod);
-      setReportText(report);
-    } catch {
-      setReportText("Failed to generate report.");
-    }
-  }
+  const reportProjectId = projectId ?? projects[0]?.id ?? null;
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>

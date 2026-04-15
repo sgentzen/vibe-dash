@@ -32,6 +32,25 @@ export function updateProject(
   return row ?? null;
 }
 
+export function updateProject(
+  db: Database.Database,
+  id: string,
+  input: { name?: string; description?: string | null }
+): Project | null {
+  const existing = db.prepare("SELECT * FROM projects WHERE id = ?").get(id) as Project | undefined;
+  if (!existing) return null;
+
+  const name = input.name ?? existing.name;
+  const description = input.description !== undefined ? input.description : existing.description;
+  const ts = now();
+
+  db.prepare(
+    "UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ?"
+  ).run(name, description, ts, id);
+
+  return db.prepare("SELECT * FROM projects WHERE id = ?").get(id) as Project;
+}
+
 export function listProjects(db: Database.Database): Project[] {
   return db
     .prepare("SELECT * FROM projects ORDER BY created_at ASC")
