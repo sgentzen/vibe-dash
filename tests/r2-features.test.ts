@@ -9,7 +9,7 @@ import {
   logActivity,
   registerAgent,
   getTimeSpent,
-  getSprintCapacity,
+  getMilestoneProgress,
   addDependency,
   removeDependency,
   listDependencies,
@@ -21,7 +21,7 @@ import {
   createSavedFilter,
   listSavedFilters,
   deleteSavedFilter,
-  createSprint,
+  createMilestone,
   completeTask,
   getAgentById,
   getAgentActivity,
@@ -76,21 +76,19 @@ describe("2.2 Time Estimates", () => {
     expect(updated!.estimate).toBeNull();
   });
 
-  it("computes sprint capacity", () => {
+  it("computes milestone progress", () => {
     const project = createProject(db, { name: "P", description: null });
-    const sprint = createSprint(db, { project_id: project.id, name: "S1" });
-    createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium", estimate: 5, sprint_id: sprint.id });
-    const t2 = createTask(db, { project_id: project.id, title: "T2", description: null, priority: "medium", estimate: 3, sprint_id: sprint.id });
-    createTask(db, { project_id: project.id, title: "T3", description: null, priority: "medium", sprint_id: sprint.id });
+    const milestone = createMilestone(db, { project_id: project.id, name: "M1" });
+    createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium", estimate: 5, milestone_id: milestone.id });
+    const t2 = createTask(db, { project_id: project.id, title: "T2", description: null, priority: "medium", estimate: 3, milestone_id: milestone.id });
+    createTask(db, { project_id: project.id, title: "T3", description: null, priority: "medium", milestone_id: milestone.id });
 
     completeTask(db, t2.id);
 
-    const cap = getSprintCapacity(db, sprint.id);
-    expect(cap.total_estimated).toBe(8);
-    expect(cap.completed_points).toBe(3);
-    expect(cap.remaining_points).toBe(5);
-    expect(cap.task_count).toBe(3);
-    expect(cap.completed_count).toBe(1);
+    const progress = getMilestoneProgress(db, milestone.id);
+    expect(progress.task_count).toBe(3);
+    expect(progress.completed_count).toBe(1);
+    expect(progress.completion_pct).toBe(33);
   });
 
   it("returns null time_spent for incomplete task", () => {
