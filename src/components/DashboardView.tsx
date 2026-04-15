@@ -93,6 +93,17 @@ export function DashboardView() {
     api.getAgentComparison().then(setAgentComparison).catch(() => {});
   }, [api, pollGeneration]);
 
+  async function handleGenerateReport() {
+    const reportProjectId = projectId ?? projects[0]?.id;
+    if (!reportProjectId) return;
+    try {
+      const report = await api.generateReport(reportProjectId, reportPeriod);
+      setReportText(report);
+    } catch {
+      setReportText("Failed to generate report.");
+    }
+  }
+
   const reportProjectId = projectId ?? projects[0]?.id ?? null;
 
   return (
