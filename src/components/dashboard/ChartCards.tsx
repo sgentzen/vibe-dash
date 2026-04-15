@@ -1,21 +1,20 @@
 import { cardStyle, sectionHeader } from "../../styles/shared.js";
-import type { SprintDailyStats, VelocityData, ActivityHeatmapEntry, AgentContribution, Sprint } from "../../types";
+import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, Milestone } from "../../types";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
-export function BurndownCard({ burndown, activeSprint }: { burndown: SprintDailyStats[]; activeSprint?: Sprint }) {
+export function MilestoneProgressCard({ dailyStats, openMilestones }: { dailyStats: MilestoneDailyStats[]; openMilestones: Milestone[] }) {
   return (
     <div style={cardStyle}>
-      <div style={headerStyle}>Sprint Burndown {activeSprint ? `(${activeSprint.name})` : ""}</div>
-      {burndown.length === 0 ? (
+      <div style={headerStyle}>Milestone Progress {openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}</div>
+      {dailyStats.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-          {activeSprint ? "No burndown data yet. Complete tasks to see progress." : "No active sprint — create and activate a sprint to see burndown."}
+          {openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
-          {burndown.map((d) => {
-            const total = d.completed_tasks + d.remaining_tasks;
-            const pct = total > 0 ? (d.remaining_tasks / total) * 100 : 0;
+          {dailyStats.map((d) => {
+            const pct = d.completion_pct;
             return (
               <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div style={{
@@ -34,42 +33,44 @@ export function BurndownCard({ burndown, activeSprint }: { burndown: SprintDaily
   );
 }
 
-export function VelocityCard({ velocity }: { velocity: VelocityData[] }) {
+export function MilestoneOverviewCard({ openMilestones, projectTasks }: { openMilestones: Milestone[]; projectTasks: { id: string; milestone_id: string | null; status: string }[] }) {
   return (
     <div style={cardStyle}>
-      <div style={headerStyle}>Velocity Trend (Last {velocity.length} Sprints)</div>
-      {velocity.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>Complete at least one sprint to see velocity trends.</div>
+      <div style={headerStyle}>Open Milestones Overview</div>
+      {openMilestones.length === 0 ? (
+        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No open milestones. Create a milestone to track progress.</div>
       ) : (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px" }}>
-          {(() => { const maxPts = Math.max(...velocity.map((x) => x.completed_points), 1); return velocity.map((v) => {
-            const pct = (v.completed_points / maxPts) * 100;
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {openMilestones.map((m) => {
+            const milestoneTasks = projectTasks.filter((t) => t.milestone_id === m.id);
+            const completedCount = milestoneTasks.filter((t) => t.status === "done").length;
+            const totalCount = milestoneTasks.length;
+            const pct = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
             return (
-              <div key={v.sprint_id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", color: "var(--accent-green)", fontWeight: 600 }}>{v.completed_points}pt</span>
-                <div style={{
-                  width: "100%", background: "var(--accent-green)", borderRadius: "2px",
-                  height: `${pct}%`, minHeight: "2px", marginTop: "4px",
-                }} />
-                <span style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "4px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: "60px" }}>
-                  {v.sprint_name}
-                </span>
+              <div key={m.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+                  <span style={{ color: "var(--text-primary)" }}>{m.name}</span>
+                  <span style={{ color: "var(--text-muted)" }}>{completedCount}/{totalCount}</span>
+                </div>
+                <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-green)", borderRadius: "2px" }} />
+                </div>
               </div>
             );
-          }); })()}
+          })}
         </div>
       )}
     </div>
   );
 }
 
-export function ContributionsCard({ contributions, activeSprint }: { contributions: AgentContribution[]; activeSprint?: Sprint }) {
+export function ContributionsCard({ contributions, openMilestones }: { contributions: AgentContribution[]; openMilestones: Milestone[] }) {
   return (
     <div style={cardStyle}>
-      <div style={headerStyle}>Agent Contributions {activeSprint ? `(${activeSprint.name})` : ""}</div>
+      <div style={headerStyle}>Agent Contributions {openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}</div>
       {contributions.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-          {activeSprint ? "No contributions yet." : "No active sprint — activate a sprint to track agent contributions."}
+          {openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -77,7 +78,7 @@ export function ContributionsCard({ contributions, activeSprint }: { contributio
             <div key={c.agent_id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
               <span style={{ color: "var(--text-primary)" }}>{c.agent_name}</span>
               <span style={{ color: "var(--text-muted)" }}>
-                {c.completed_count} tasks ({c.completed_points}pt)
+                {c.completed_count} tasks
               </span>
             </div>
           ))}

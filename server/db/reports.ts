@@ -1,9 +1,9 @@
 import type Database from "better-sqlite3";
 import type { Project, Task, Blocker } from "../types.js";
 import { listAgents, getAgentHealthStatus } from "./agents.js";
-import { listSprints, getSprintCapacity } from "./sprints.js";
+import { listMilestones, getMilestoneProgress } from "./milestones.js";
 
-export function generateReport(db: Database.Database, projectId: string, period: "day" | "week" | "sprint"): string {
+export function generateReport(db: Database.Database, projectId: string, period: "day" | "week" | "milestone"): string {
   const project = db.prepare("SELECT * FROM projects WHERE id = ?").get(projectId) as Project | undefined;
   if (!project) return "# Report\n\nProject not found.";
 
@@ -31,19 +31,19 @@ export function generateReport(db: Database.Database, projectId: string, period:
     return elapsed < 30 * 60 * 1000;
   });
 
-  const sprints = listSprints(db, projectId);
-  const activeSprint = sprints.find(s => s.status === "active");
-  let sprintSection = "";
-  if (activeSprint) {
-    const cap = getSprintCapacity(db, activeSprint.id);
-    sprintSection = `## Sprint: ${activeSprint.name}\n- Tasks: ${cap.completed_count}/${cap.task_count} done\n- Points: ${cap.completed_points}/${cap.total_estimated} completed\n- Remaining: ${cap.remaining_points} points\n`;
+  const milestones = listMilestones(db, projectId);
+  const openMilestone = milestones.find(m => m.status === "open");
+  let milestoneSection = "";
+  if (openMilestone) {
+    const progress = getMilestoneProgress(db, openMilestone.id);
+    milestoneSection = `## Milestone: ${openMilestone.name}\n- Tasks: ${progress.completed_count}/${progress.task_count} done\n- Progress: ${progress.completion_pct}%\n`;
   }
 
   const lines = [
     `# Status Report: ${project.name}`,
     `**Period:** ${period} | **Generated:** ${now_ts.toISOString().slice(0, 16)}`,
     "",
-    sprintSection,
+    milestoneSection,
     `## Tasks Completed (${completedTasks.length})`,
     ...completedTasks.slice(0, 20).map(t => `- ${t.title}${t.estimate ? ` (${t.estimate}pt)` : ""}`),
     "",

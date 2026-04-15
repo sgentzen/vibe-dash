@@ -1,7 +1,7 @@
 import React from "react";
 import { render, type RenderOptions } from "@testing-library/react";
 import { AppProvider, type AppState } from "../../src/store";
-import type { Project, Task, Agent, Sprint } from "../../src/types";
+import type { Project, Task, Agent, Milestone } from "../../src/types";
 
 // ─── Factories ──────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     id,
     project_id: "proj-1",
     parent_task_id: null,
-    sprint_id: null,
+    milestone_id: null,
     assigned_agent_id: null,
     title: `Task ${id}`,
     description: null,
@@ -60,16 +60,16 @@ export function makeAgent(overrides: Partial<Agent> = {}): Agent {
   };
 }
 
-export function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
+export function makeMilestone(overrides: Partial<Milestone> = {}): Milestone {
   const id = uid();
   return {
     id,
     project_id: "proj-1",
-    name: `Sprint ${id}`,
+    name: `Milestone ${id}`,
     description: null,
-    status: "active",
-    start_date: null,
-    end_date: null,
+    acceptance_criteria: null,
+    target_date: null,
+    status: "open",
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides,

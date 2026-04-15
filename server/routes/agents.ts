@@ -59,8 +59,8 @@ export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
   });
 
   router.get("/api/agents/:id/stats", (req, res) => {
-    const sprintId = req.query.sprint_id as string | undefined;
-    res.json(getAgentStats(db, req.params.id, sprintId));
+    const milestoneId = req.query.milestone_id as string | undefined;
+    res.json(getAgentStats(db, req.params.id, milestoneId));
   });
 
   return router;

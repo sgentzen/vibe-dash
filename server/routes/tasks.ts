@@ -10,7 +10,7 @@ import {
   searchTasks,
   bulkUpdateTasks,
   logActivity,
-  recordDailyStats,
+  recordMilestoneDailyStats,
   evaluateAlertRules,
   handleRecurringTaskCompletion,
   getTimeSpent,
@@ -42,11 +42,11 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
-        sprint_id?: string | null;
+        milestone_id?: string | null;
         assigned_agent_id?: string | null;
         title: string;
         description?: string | null;
@@ -64,7 +64,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
-      sprint_id: sprint_id ?? null,
+      milestone_id: milestone_id ?? null,
       assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
@@ -87,8 +87,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const tasks = bulkUpdateTasks(db, task_ids, updates as any);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
-      const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
-      for (const sid of sprintIds) recordDailyStats(db, sid);
+      const milestoneIds = new Set(tasks.filter((t) => t.milestone_id).map((t) => t.milestone_id!));
+      for (const mid of milestoneIds) recordMilestoneDailyStats(db, mid);
     }
     res.json({ updated: tasks.length, tasks });
   });
@@ -99,7 +99,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     res.json(searchTasks(db, {
       query: q.q,
       project_id: q.project_id,
-      sprint_id: q.sprint_id,
+      milestone_id: q.milestone_id,
       status: q.status as any,
       priority: q.priority as any,
       assigned_agent_id: q.assigned_agent_id,
@@ -141,8 +141,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
         payload: { ...entry, agent_name: null, task_title: updated!.title },
       });
     }
-    if (body.status && body.status !== task.status && updated?.sprint_id) {
-      recordDailyStats(db, updated.sprint_id);
+    if (body.status && body.status !== task.status && updated?.milestone_id) {
+      recordMilestoneDailyStats(db, updated.milestone_id);
     }
     res.json(updated);
   });
@@ -157,8 +157,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     broadcast({ type: "task_completed", payload: completed! });
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
-    if (completed?.sprint_id) {
-      recordDailyStats(db, completed.sprint_id);
+    if (completed?.milestone_id) {
+      recordMilestoneDailyStats(db, completed.milestone_id);
     }
     if (completed) {
       const nextTask = handleRecurringTaskCompletion(db, completed.id);

@@ -22,7 +22,7 @@ export function projectRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
   });
 
   router.post("/api/projects/:id/report", (req, res) => {
-    const period = (req.body.period as "day" | "week" | "sprint") ?? "week";
+    const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
     res.json({ report: generateReport(db, req.params.id, period) });
   });
 

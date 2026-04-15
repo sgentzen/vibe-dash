@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -64,7 +64,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "sprint_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "milestone_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
 ): Promise<Task> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -102,42 +102,42 @@ async function getBlockers(): Promise<Blocker[]> {
   return res.json();
 }
 
-async function getSprints(projectId?: string): Promise<Sprint[]> {
+async function getMilestones(projectId?: string): Promise<Milestone[]> {
   const url = projectId
-    ? `/api/sprints?project_id=${encodeURIComponent(projectId)}`
-    : "/api/sprints";
+    ? `/api/milestones?project_id=${encodeURIComponent(projectId)}`
+    : "/api/milestones";
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`getSprints failed: ${res.status}`);
+  if (!res.ok) throw new Error(`getMilestones failed: ${res.status}`);
   return res.json();
 }
 
-async function createSprint(data: {
+async function createMilestone(data: {
   project_id: string;
   name: string;
   description?: string;
+  acceptance_criteria?: string;
+  target_date?: string;
   status?: string;
-  start_date?: string;
-  end_date?: string;
-}): Promise<Sprint> {
-  const res = await fetch("/api/sprints", {
+}): Promise<Milestone> {
+  const res = await fetch("/api/milestones", {
     method: "POST",
     headers: JSON_HEADERS,
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`createSprint failed: ${res.status}`);
+  if (!res.ok) throw new Error(`createMilestone failed: ${res.status}`);
   return res.json();
 }
 
-async function updateSprint(
+async function updateMilestone(
   id: string,
-  data: Partial<Pick<Sprint, "name" | "description" | "status" | "start_date" | "end_date">>
-): Promise<Sprint> {
-  const res = await fetch(`/api/sprints/${encodeURIComponent(id)}`, {
+  data: Partial<Pick<Milestone, "name" | "description" | "acceptance_criteria" | "status" | "target_date">>
+): Promise<Milestone> {
+  const res = await fetch(`/api/milestones/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: JSON_HEADERS,
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`updateSprint failed: ${res.status}`);
+  if (!res.ok) throw new Error(`updateMilestone failed: ${res.status}`);
   return res.json();
 }
 
@@ -180,11 +180,11 @@ async function removeTagFromTask(taskId: string, tagId: string): Promise<void> {
   if (!res.ok) throw new Error(`removeTagFromTask failed: ${res.status}`);
 }
 
-// ─── R2: Sprint Capacity ─────────────────────────────────────────────────
+// ─── R2: Milestone Progress ─────────────────────────────────────────────
 
-async function getSprintCapacity(sprintId: string): Promise<SprintCapacity> {
-  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/capacity`);
-  if (!res.ok) throw new Error(`getSprintCapacity failed: ${res.status}`);
+async function getMilestoneProgress(milestoneId: string): Promise<MilestoneProgress> {
+  const res = await fetch(`/api/milestones/${encodeURIComponent(milestoneId)}/progress`);
+  if (!res.ok) throw new Error(`getMilestoneProgress failed: ${res.status}`);
   return res.json();
 }
 
@@ -346,32 +346,24 @@ async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknow
 
 // ─── R4: Agent Stats ─────────────────────────────────────────────────
 
-async function getAgentStats(agentId: string, sprintId?: string): Promise<AgentStats> {
-  const qs = sprintId ? `?sprint_id=${encodeURIComponent(sprintId)}` : "";
+async function getAgentStats(agentId: string, milestoneId?: string): Promise<AgentStats> {
+  const qs = milestoneId ? `?milestone_id=${encodeURIComponent(milestoneId)}` : "";
   const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/stats${qs}`);
   if (!res.ok) throw new Error(`getAgentStats failed: ${res.status}`);
   return res.json();
 }
 
-async function getSprintContributions(sprintId: string): Promise<AgentContribution[]> {
-  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/contributions`);
-  if (!res.ok) throw new Error(`getSprintContributions failed: ${res.status}`);
+async function getMilestoneContributions(milestoneId: string): Promise<AgentContribution[]> {
+  const res = await fetch(`/api/milestones/${encodeURIComponent(milestoneId)}/contributions`);
+  if (!res.ok) throw new Error(`getMilestoneContributions failed: ${res.status}`);
   return res.json();
 }
 
-// ─── R4: Burndown & Velocity ─────────────────────────────────────────
+// ─── R4: Milestone Daily Stats ───────────────────────────────────────────
 
-async function getSprintBurndown(sprintId: string): Promise<SprintDailyStats[]> {
-  const res = await fetch(`/api/sprints/${encodeURIComponent(sprintId)}/burndown`);
-  if (!res.ok) throw new Error(`getSprintBurndown failed: ${res.status}`);
-  return res.json();
-}
-
-async function getVelocityTrend(limit = 5, projectId?: string): Promise<VelocityData[]> {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (projectId) params.set("project_id", projectId);
-  const res = await fetch(`/api/velocity?${params}`);
-  if (!res.ok) throw new Error(`getVelocityTrend failed: ${res.status}`);
+async function getMilestoneDailyStats(milestoneId: string): Promise<MilestoneDailyStats[]> {
+  const res = await fetch(`/api/milestones/${encodeURIComponent(milestoneId)}/daily-stats`);
+  if (!res.ok) throw new Error(`getMilestoneDailyStats failed: ${res.status}`);
   return res.json();
 }
 
@@ -384,7 +376,7 @@ async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEn
   return res.json();
 }
 
-async function generateReportApi(projectId: string, period: "day" | "week" | "sprint"): Promise<string> {
+async function generateReportApi(projectId: string, period: "day" | "week" | "milestone"): Promise<string> {
   const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/report`, {
     method: "POST",
     headers: JSON_HEADERS,
@@ -546,15 +538,15 @@ export function useApi() {
     getAgents,
     getActivity,
     getBlockers,
-    getSprints,
-    createSprint,
-    updateSprint,
+    getMilestones,
+    createMilestone,
+    updateMilestone,
     getTags,
     createTag,
     getTaskTags,
     addTagToTask,
     removeTagFromTask,
-    getSprintCapacity,
+    getMilestoneProgress,
     getDependencies,
     getBlockingTasks,
     addDependency,
@@ -577,9 +569,8 @@ export function useApi() {
     createAlertRule,
     bulkUpdateTasks,
     getAgentStats,
-    getSprintContributions,
-    getSprintBurndown,
-    getVelocityTrend,
+    getMilestoneContributions,
+    getMilestoneDailyStats,
     getActivityHeatmap,
     generateReport: generateReportApi,
     getTemplates,

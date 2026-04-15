@@ -2,24 +2,23 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader } from "../styles/shared.js";
-import type { SprintDailyStats, VelocityData, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
+import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
-import { BurndownCard, VelocityCard, ContributionsCard, HeatmapCard } from "./dashboard/ChartCards";
+import { MilestoneProgressCard, MilestoneOverviewCard, ContributionsCard, HeatmapCard } from "./dashboard/ChartCards";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 export function DashboardView() {
-  const { projects, sprints, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
+  const { projects, milestones, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
   const api = useApi();
 
-  const [burndown, setBurndown] = useState<SprintDailyStats[]>([]);
-  const [velocity, setVelocity] = useState<VelocityData[]>([]);
+  const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
   const [heatmap, setHeatmap] = useState<ActivityHeatmapEntry[]>([]);
   const [contributions, setContributions] = useState<AgentContribution[]>([]);
   const [reportText, setReportText] = useState<string | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "sprint">("week");
+  const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "milestone">("week");
   const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
@@ -28,40 +27,39 @@ export function DashboardView() {
 
   // Project-scoped data
   const projectId = selectedProjectId || projects[0]?.id;
-  const projectSprints = sprints.filter((s) => !projectId || s.project_id === projectId);
+  const projectMilestones = milestones.filter((m) => !projectId || m.project_id === projectId);
   const projectTasks = tasks.filter((t) => !projectId || t.project_id === projectId);
   const projectTaskIds = new Set(projectTasks.map((t) => t.id));
   const projectBlockers = blockers.filter((b) => !projectId || projectTaskIds.has(b.task_id));
 
-  const activeSprint = projectSprints.find((s) => s.status === "active");
+  const openMilestones = projectMilestones.filter((m) => m.status === "open");
   const overdueTasks = projectTasks.filter(
     (t) => t.due_date && t.status !== "done" && new Date(t.due_date) < new Date()
   );
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
-  // Track task status changes for the active sprint to trigger dashboard refreshes
-  const sprintTaskStatusKey = activeSprint
-    ? projectTasks.filter((t) => t.sprint_id === activeSprint.id).map((t) => `${t.id}:${t.status}`).join(",")
+  // Track task status changes for open milestones to trigger dashboard refreshes
+  const milestoneTaskStatusKey = openMilestones.length > 0
+    ? openMilestones.map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";")).join("|")
     : "";
 
-  // Dashboard charts: refresh on sprint task status changes + polling
+  // Dashboard charts: refresh on milestone task status changes + polling
   useEffect(() => {
     async function load() {
       try {
-        const [vel, heat] = await Promise.all([
-          api.getVelocityTrend(5, projectId),
+        const [heat] = await Promise.all([
           api.getActivityHeatmap(projectId),
         ]);
-        setVelocity(vel);
         setHeatmap(heat);
 
-        if (activeSprint) {
-          const [bd, contrib] = await Promise.all([
-            api.getSprintBurndown(activeSprint.id),
-            api.getSprintContributions(activeSprint.id),
+        if (openMilestones.length > 0) {
+          const firstOpenMilestone = openMilestones[0];
+          const [stats, contrib] = await Promise.all([
+            api.getMilestoneDailyStats(firstOpenMilestone.id),
+            api.getMilestoneContributions(firstOpenMilestone.id),
           ]);
-          setBurndown(bd);
+          setDailyStats(stats);
           setContributions(contrib);
         }
       } catch (e) {
@@ -69,9 +67,9 @@ export function DashboardView() {
       }
     }
     load();
-  }, [api, activeSprint?.id, projectId, sprintTaskStatusKey, pollGeneration]);
+  }, [api, openMilestones.length > 0 ? openMilestones[0]?.id : null, projectId, milestoneTaskStatusKey, pollGeneration]);
 
-  // Cost data: refresh on project change or sprint task status changes (not every poll tick)
+  // Cost data: refresh on project change or milestone task status changes (not every poll tick)
   useEffect(() => {
     if (!projectId) return;
     async function loadCosts() {
@@ -91,7 +89,12 @@ export function DashboardView() {
       }
     }
     loadCosts();
-  }, [api, projectId, sprintTaskStatusKey, pollGeneration]);
+  }, [api, projectId, milestoneTaskStatusKey, pollGeneration]);
+
+  // Load agent performance comparison
+  useEffect(() => {
+    api.getAgentComparison().then(setAgentComparison).catch(() => {});
+  }, [api, pollGeneration]);
 
   // Load agent performance comparison
   useEffect(() => {
@@ -116,19 +119,19 @@ export function DashboardView() {
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-        <KpiCard label="Active Sprint" value={activeSprint?.name ?? "None"} color="var(--accent-blue)" />
+        <KpiCard label="Open Milestones" value={String(openMilestones.length)} color="var(--accent-blue)" />
         <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--accent-red)" : "var(--accent-green)"} />
         <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--accent-yellow)" : "var(--accent-green)"} />
         <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-        <BurndownCard burndown={burndown} activeSprint={activeSprint} />
-        <VelocityCard velocity={velocity} />
+        <MilestoneProgressCard dailyStats={dailyStats} openMilestones={openMilestones} />
+        <MilestoneOverviewCard openMilestones={openMilestones} projectTasks={projectTasks} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-        <ContributionsCard contributions={contributions} activeSprint={activeSprint} />
+        <ContributionsCard contributions={contributions} openMilestones={openMilestones} />
         <HeatmapCard heatmap={heatmap} />
       </div>
 
@@ -195,7 +198,7 @@ export function DashboardView() {
         <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
           <select
             value={reportPeriod}
-            onChange={(e) => setReportPeriod(e.target.value as "day" | "week" | "sprint")}
+            onChange={(e) => setReportPeriod(e.target.value as "day" | "week" | "milestone")}
             style={{
               background: "var(--bg-tertiary)", border: "1px solid var(--border)",
               borderRadius: "4px", color: "var(--text-primary)", padding: "4px 8px", fontSize: "12px",
@@ -203,7 +206,7 @@ export function DashboardView() {
           >
             <option value="day">Last 24 hours</option>
             <option value="week">Last 7 days</option>
-            <option value="sprint">Current sprint</option>
+            <option value="milestone">Current milestone</option>
           </select>
           <button
             onClick={handleGenerateReport}

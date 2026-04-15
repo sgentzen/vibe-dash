@@ -4,15 +4,15 @@
  * Shares the same SQLite database. No server needed.
  *
  * Usage:
- *   npx ts-node cli/index.ts list [projects|tasks|sprints]
- *   npx ts-node cli/index.ts add-task --project <name> --title <title> [--priority high] [--sprint <name>]
+ *   npx ts-node cli/index.ts list [projects|tasks|milestones]
+ *   npx ts-node cli/index.ts add-task --project <name> --title <title> [--priority high] [--milestone <name>]
  *   npx ts-node cli/index.ts status [project-name]
  *   npx ts-node cli/index.ts agents
  */
 
 import { resolve } from "path";
 import Database from "better-sqlite3";
-import { initDb, listProjects, listTasks, listSprints, createTask, listAgents, getAgentHealthStatus, getSprintCapacity, getActiveBlockers } from "../server/db/index.js";
+import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
 
 // ─── Parse args ──────────────────────────────────────────────────────────────
 
@@ -73,13 +73,13 @@ function cmdList() {
     for (const p of projects) {
       console.log(`  ${BOLD}${p.name}${RESET}  ${DIM}${p.id.slice(0, 8)}${RESET}  ${p.description ?? ""}`);
     }
-  } else if (target === "sprints") {
-    const sprints = listSprints(db);
-    console.log(`${BOLD}${CYAN}Sprints (${sprints.length})${RESET}`);
+  } else if (target === "milestones") {
+    const milestones = listMilestones(db);
+    console.log(`${BOLD}${CYAN}Milestones (${milestones.length})${RESET}`);
     console.log(`${DIM}${"─".repeat(60)}${RESET}`);
-    for (const s of sprints) {
-      const color = s.status === "active" ? GREEN : s.status === "completed" ? DIM : YELLOW;
-      console.log(`  ${color}${pad(s.status, 10)}${RESET} ${BOLD}${s.name}${RESET}  ${DIM}${s.id.slice(0, 8)}${RESET}`);
+    for (const m of milestones) {
+      const color = m.status === "open" ? GREEN : m.status === "achieved" ? DIM : YELLOW;
+      console.log(`  ${color}${pad(m.status, 10)}${RESET} ${BOLD}${m.name}${RESET}  ${DIM}${m.id.slice(0, 8)}${RESET}`);
     }
   } else {
     const projectName = flags.project;
@@ -107,11 +107,11 @@ function cmdAddTask() {
   const projectName = flags.project;
   const title = flags.title;
   const priority = flags.priority ?? "medium";
-  const sprintName = flags.sprint;
+  const milestoneName = flags.milestone;
 
   const VALID_PRIORITIES = ["low", "medium", "high", "urgent"];
   if (!projectName || !title) {
-    console.error(`${RED}Usage:${RESET} add-task --project <name> --title <title> [--priority high] [--sprint <name>]`);
+    console.error(`${RED}Usage:${RESET} add-task --project <name> --title <title> [--priority high] [--milestone <name>]`);
     process.exit(1);
   }
   if (!VALID_PRIORITIES.includes(priority)) {
@@ -126,11 +126,11 @@ function cmdAddTask() {
     process.exit(1);
   }
 
-  let sprintId: string | undefined;
-  if (sprintName) {
-    const sprints = listSprints(db, project.id);
-    const sprint = sprints.find((s) => s.name.toLowerCase() === sprintName.toLowerCase());
-    if (sprint) sprintId = sprint.id;
+  let milestoneId: string | undefined;
+  if (milestoneName) {
+    const milestones = listMilestones(db, project.id);
+    const milestone = milestones.find((m) => m.name.toLowerCase() === milestoneName.toLowerCase());
+    if (milestone) milestoneId = milestone.id;
   }
 
   const task = createTask(db, {
@@ -138,7 +138,7 @@ function cmdAddTask() {
     title,
     description: null,
     priority: priority as "low" | "medium" | "high" | "urgent",
-    sprint_id: sprintId ?? null,
+    milestone_id: milestoneId ?? null,
   });
 
   console.log(`${GREEN}Created task:${RESET} ${task.title} ${DIM}(${task.id.slice(0, 8)})${RESET}`);
@@ -158,8 +158,8 @@ function cmdStatus() {
   const byStatus: Record<string, number> = { planned: 0, in_progress: 0, blocked: 0, done: 0 };
   for (const t of tasks) byStatus[t.status] = (byStatus[t.status] ?? 0) + 1;
 
-  const sprints = listSprints(db, project.id);
-  const activeSprint = sprints.find((s) => s.status === "active");
+  const milestones = listMilestones(db, project.id);
+  const openMilestone = milestones.find((m) => m.status === "open");
   const blockers = getActiveBlockers(db);
 
   console.log(`${BOLD}${CYAN}Status: ${project.name}${RESET}`);
@@ -171,11 +171,11 @@ function cmdStatus() {
   console.log(`  ${DIM}${"─".repeat(30)}${RESET}`);
   console.log(`  Total:       ${tasks.length}`);
 
-  if (activeSprint) {
-    const cap = getSprintCapacity(db, activeSprint.id);
-    console.log(`\n  ${BOLD}Active Sprint:${RESET} ${activeSprint.name}`);
-    console.log(`  Tasks: ${cap.completed_count}/${cap.task_count} done`);
-    console.log(`  Points: ${cap.completed_points}/${cap.total_estimated} completed`);
+  if (openMilestone) {
+    const progress = getMilestoneProgress(db, openMilestone.id);
+    console.log(`\n  ${BOLD}Open Milestone:${RESET} ${openMilestone.name}`);
+    console.log(`  Tasks: ${progress.completed_count}/${progress.task_count} done`);
+    console.log(`  Progress: ${progress.completion_pct}% completed`);
   }
 
   if (blockers.length > 0) {
@@ -206,16 +206,16 @@ function cmdHelp() {
   console.log(`${BOLD}${CYAN}vibe-dash${RESET} — CLI companion for Vibe Dash`);
   console.log();
   console.log("Commands:");
-  console.log(`  ${BOLD}list${RESET} [projects|tasks|sprints]  List entities`);
+  console.log(`  ${BOLD}list${RESET} [projects|tasks|milestones]  List entities`);
   console.log(`  ${BOLD}add-task${RESET} --project <n> --title <t>  Create a task`);
-  console.log(`  ${BOLD}status${RESET} [project-name]           Project status summary`);
-  console.log(`  ${BOLD}agents${RESET}                          List agents with health`);
+  console.log(`  ${BOLD}status${RESET} [project-name]            Project status summary`);
+  console.log(`  ${BOLD}agents${RESET}                           List agents with health`);
   console.log();
   console.log("Flags:");
-  console.log(`  --db <path>     Database file (default: ./vibe-dash.db)`);
-  console.log(`  --project <n>   Filter by project name`);
-  console.log(`  --priority <p>  Task priority (low|medium|high|urgent)`);
-  console.log(`  --sprint <n>    Sprint name for add-task`);
+  console.log(`  --db <path>      Database file (default: ./vibe-dash.db)`);
+  console.log(`  --project <n>    Filter by project name`);
+  console.log(`  --priority <p>   Task priority (low|medium|high|urgent)`);
+  console.log(`  --milestone <n>  Milestone name for add-task`);
 }
 
 // ─── Dispatch ────────────────────────────────────────────────────────────────

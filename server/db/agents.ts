@@ -234,7 +234,7 @@ export function getAgentCompletedToday(db: Database.Database, agentId: string): 
 
 // ─── Agent Performance Metrics ──────────────────────────────────────────────
 
-export function getAgentStats(db: Database.Database, agentId: string, sprintId?: string): AgentStats {
+export function getAgentStats(db: Database.Database, agentId: string, milestoneId?: string): AgentStats {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const todayIso = todayStart.toISOString();
@@ -254,15 +254,15 @@ export function getAgentStats(db: Database.Database, agentId: string, sprintId?:
     total_tasks: number; blocked_tasks: number;
   };
 
-  // Sprint-scoped completion count (separate query only when needed)
-  let sprintCompleted = 0;
-  if (sprintId) {
+  // Milestone-scoped completion count (separate query only when needed)
+  let milestoneCompleted = 0;
+  if (milestoneId) {
     const row = db.prepare(
       `SELECT COUNT(DISTINCT t.id) AS c
        FROM activity_log a JOIN tasks t ON a.task_id = t.id
-       WHERE a.agent_id = ? AND t.sprint_id = ? AND t.status = 'done'`
-    ).get(agentId, sprintId) as { c: number };
-    sprintCompleted = row.c;
+       WHERE a.agent_id = ? AND t.milestone_id = ? AND t.status = 'done'`
+    ).get(agentId, milestoneId) as { c: number };
+    milestoneCompleted = row.c;
   }
 
   // Avg completion time in a separate query (subquery aggregation)
@@ -294,7 +294,7 @@ export function getAgentStats(db: Database.Database, agentId: string, sprintId?:
   return {
     agent_id: agentId,
     tasks_completed_total: mainRow.total_done,
-    tasks_completed_sprint: sprintCompleted,
+    tasks_completed_milestone: milestoneCompleted,
     tasks_completed_today: mainRow.today_done,
     avg_completion_time_seconds: avgCompletionTime,
     blocker_rate: Math.round(blockerRate * 1000) / 1000,
@@ -302,17 +302,17 @@ export function getAgentStats(db: Database.Database, agentId: string, sprintId?:
   };
 }
 
-export function getSprintAgentContributions(db: Database.Database, sprintId: string): AgentContribution[] {
+export function getMilestoneAgentContributions(db: Database.Database, milestoneId: string): AgentContribution[] {
   const rows = db.prepare(
     `SELECT a.id AS agent_id, a.name AS agent_name,
        COUNT(t.id) AS completed_count,
        COALESCE(SUM(t.estimate), 0) AS completed_points
      FROM tasks t
      JOIN agents a ON t.assigned_agent_id = a.id
-     WHERE t.sprint_id = ? AND t.status = 'done'
+     WHERE t.milestone_id = ? AND t.status = 'done'
      GROUP BY a.id, a.name
      ORDER BY completed_count DESC`
-  ).all(sprintId) as AgentContribution[];
+  ).all(milestoneId) as AgentContribution[];
   return rows;
 }
 

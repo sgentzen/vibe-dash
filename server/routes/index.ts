@@ -7,7 +7,7 @@ import { systemRoutes } from "./system.js";
 import { projectRoutes } from "./projects.js";
 import { taskRoutes } from "./tasks.js";
 import { agentRoutes } from "./agents.js";
-import { sprintRoutes } from "./sprints.js";
+import { milestoneRoutes } from "./sprints.js";
 import { activityRoutes } from "./activity.js";
 import { blockerRoutes } from "./blockers.js";
 import { tagRoutes } from "./tags.js";
@@ -36,7 +36,7 @@ const routeFactories: RouteFactory[] = [
   taskRoutes,
   metricRoutes,
   agentRoutes,
-  sprintRoutes,
+  milestoneRoutes,
   activityRoutes,
   blockerRoutes,
   tagRoutes,
