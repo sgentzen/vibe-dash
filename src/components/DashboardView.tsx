@@ -2,18 +2,17 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader } from "../styles/shared.js";
-import type { SprintDailyStats, VelocityData, ActivityHeatmapEntry, AgentContribution } from "../types";
+import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution } from "../types";
 
 export function DashboardView() {
-  const { projects, sprints, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
+  const { projects, milestones, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
   const api = useApi();
 
-  const [burndown, setBurndown] = useState<SprintDailyStats[]>([]);
-  const [velocity, setVelocity] = useState<VelocityData[]>([]);
+  const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
   const [heatmap, setHeatmap] = useState<ActivityHeatmapEntry[]>([]);
   const [contributions, setContributions] = useState<AgentContribution[]>([]);
   const [reportText, setReportText] = useState<string | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "sprint">("week");
+  const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "milestone">("week");
   const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
@@ -21,40 +20,39 @@ export function DashboardView() {
 
   // Project-scoped data
   const projectId = selectedProjectId || projects[0]?.id;
-  const projectSprints = sprints.filter((s) => !projectId || s.project_id === projectId);
+  const projectMilestones = milestones.filter((m) => !projectId || m.project_id === projectId);
   const projectTasks = tasks.filter((t) => !projectId || t.project_id === projectId);
   const projectTaskIds = new Set(projectTasks.map((t) => t.id));
   const projectBlockers = blockers.filter((b) => !projectId || projectTaskIds.has(b.task_id));
 
-  const activeSprint = projectSprints.find((s) => s.status === "active");
+  const openMilestones = projectMilestones.filter((m) => m.status === "open");
   const overdueTasks = projectTasks.filter(
     (t) => t.due_date && t.status !== "done" && new Date(t.due_date) < new Date()
   );
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
-  // Track task status changes for the active sprint to trigger dashboard refreshes
-  const sprintTaskStatusKey = activeSprint
-    ? projectTasks.filter((t) => t.sprint_id === activeSprint.id).map((t) => `${t.id}:${t.status}`).join(",")
+  // Track task status changes for open milestones to trigger dashboard refreshes
+  const milestoneTaskStatusKey = openMilestones.length > 0
+    ? openMilestones.map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";")).join("|")
     : "";
 
-  // Dashboard charts: refresh on sprint task status changes + polling
+  // Dashboard charts: refresh on milestone task status changes + polling
   useEffect(() => {
     async function load() {
       try {
-        const [vel, heat] = await Promise.all([
-          api.getVelocityTrend(5, projectId),
+        const [heat] = await Promise.all([
           api.getActivityHeatmap(projectId),
         ]);
-        setVelocity(vel);
         setHeatmap(heat);
 
-        if (activeSprint) {
-          const [bd, contrib] = await Promise.all([
-            api.getSprintBurndown(activeSprint.id),
-            api.getSprintContributions(activeSprint.id),
+        if (openMilestones.length > 0) {
+          const firstOpenMilestone = openMilestones[0];
+          const [stats, contrib] = await Promise.all([
+            api.getMilestoneDailyStats(firstOpenMilestone.id),
+            api.getMilestoneContributions(firstOpenMilestone.id),
           ]);
-          setBurndown(bd);
+          setDailyStats(stats);
           setContributions(contrib);
         }
       } catch (e) {
@@ -62,9 +60,9 @@ export function DashboardView() {
       }
     }
     load();
-  }, [api, activeSprint?.id, projectId, sprintTaskStatusKey, pollGeneration]);
+  }, [api, openMilestones.length > 0 ? openMilestones[0]?.id : null, projectId, milestoneTaskStatusKey, pollGeneration]);
 
-  // Cost data: refresh on project change or sprint task status changes (not every poll tick)
+  // Cost data: refresh on project change or milestone task status changes (not every poll tick)
   useEffect(() => {
     if (!projectId) return;
     async function loadCosts() {
@@ -84,7 +82,7 @@ export function DashboardView() {
       }
     }
     loadCosts();
-  }, [api, projectId, sprintTaskStatusKey, pollGeneration]);
+  }, [api, projectId, milestoneTaskStatusKey, pollGeneration]);
 
   async function handleGenerateReport() {
     if (!projectId) return;
@@ -106,25 +104,24 @@ export function DashboardView() {
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-        <KpiCard label="Active Sprint" value={activeSprint?.name ?? "None"} color="var(--accent-blue)" />
+        <KpiCard label="Open Milestones" value={String(openMilestones.length)} color="var(--accent-blue)" />
         <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--accent-red)" : "var(--accent-green)"} />
         <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--accent-yellow)" : "var(--accent-green)"} />
         <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-        {/* Burndown */}
+        {/* Milestone Completion */}
         <div style={cardStyle}>
-          <div style={headerStyle}>Sprint Burndown {activeSprint ? `(${activeSprint.name})` : ""}</div>
-          {burndown.length === 0 ? (
+          <div style={headerStyle}>Milestone Progress {openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}</div>
+          {dailyStats.length === 0 ? (
             <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-              {activeSprint ? "No burndown data yet. Complete tasks to see progress." : "No active sprint — create and activate a sprint to see burndown."}
+              {openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
-              {burndown.map((d) => {
-                const total = d.completed_tasks + d.remaining_tasks;
-                const pct = total > 0 ? (d.remaining_tasks / total) * 100 : 0;
+              {dailyStats.map((d) => {
+                const pct = d.completion_pct;
                 return (
                   <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
                     <div style={{
@@ -141,28 +138,30 @@ export function DashboardView() {
           )}
         </div>
 
-        {/* Velocity */}
+        {/* Milestone Completion Percentage */}
         <div style={cardStyle}>
-          <div style={headerStyle}>Velocity Trend (Last {velocity.length} Sprints)</div>
-          {velocity.length === 0 ? (
-            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>Complete at least one sprint to see velocity trends.</div>
+          <div style={headerStyle}>Open Milestones Overview</div>
+          {openMilestones.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No open milestones. Create a milestone to track progress.</div>
           ) : (
-            <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px" }}>
-              {(() => { const maxPts = Math.max(...velocity.map((x) => x.completed_points), 1); return velocity.map((v) => {
-                const pct = (v.completed_points / maxPts) * 100;
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {openMilestones.map((m) => {
+                const milestoneTasks = projectTasks.filter((t) => t.milestone_id === m.id);
+                const completedCount = milestoneTasks.filter((t) => t.status === "done").length;
+                const totalCount = milestoneTasks.length;
+                const pct = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
                 return (
-                  <div key={v.sprint_id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <span style={{ fontSize: "10px", color: "var(--accent-green)", fontWeight: 600 }}>{v.completed_points}pt</span>
-                    <div style={{
-                      width: "100%", background: "var(--accent-green)", borderRadius: "2px",
-                      height: `${pct}%`, minHeight: "2px", marginTop: "4px",
-                    }} />
-                    <span style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "4px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: "60px" }}>
-                      {v.sprint_name}
-                    </span>
+                  <div key={m.id}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+                      <span style={{ color: "var(--text-primary)" }}>{m.name}</span>
+                      <span style={{ color: "var(--text-muted)" }}>{completedCount}/{totalCount}</span>
+                    </div>
+                    <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-green)", borderRadius: "2px" }} />
+                    </div>
                   </div>
                 );
-              }); })()}
+              })}
             </div>
           )}
         </div>
@@ -171,10 +170,10 @@ export function DashboardView() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
         {/* Agent Contributions */}
         <div style={cardStyle}>
-          <div style={headerStyle}>Agent Contributions {activeSprint ? `(${activeSprint.name})` : ""}</div>
+          <div style={headerStyle}>Agent Contributions {openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}</div>
           {contributions.length === 0 ? (
             <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-              {activeSprint ? "No contributions yet." : "No active sprint — activate a sprint to track agent contributions."}
+              {openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -182,7 +181,7 @@ export function DashboardView() {
                 <div key={c.agent_id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
                   <span style={{ color: "var(--text-primary)" }}>{c.agent_name}</span>
                   <span style={{ color: "var(--text-muted)" }}>
-                    {c.completed_count} tasks ({c.completed_points}pt)
+                    {c.completed_count} tasks
                   </span>
                 </div>
               ))}
@@ -354,7 +353,7 @@ export function DashboardView() {
         <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
           <select
             value={reportPeriod}
-            onChange={(e) => setReportPeriod(e.target.value as "day" | "week" | "sprint")}
+            onChange={(e) => setReportPeriod(e.target.value as "day" | "week" | "milestone")}
             style={{
               background: "var(--bg-tertiary)", border: "1px solid var(--border)",
               borderRadius: "4px", color: "var(--text-primary)", padding: "4px 8px", fontSize: "12px",
@@ -362,7 +361,7 @@ export function DashboardView() {
           >
             <option value="day">Last 24 hours</option>
             <option value="week">Last 7 days</option>
-            <option value="sprint">Current sprint</option>
+            <option value="milestone">Current milestone</option>
           </select>
           <button
             onClick={handleGenerateReport}

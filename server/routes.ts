@@ -1,9 +1,10 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import type { TaskStatus, SprintStatus } from "./types.js";
+import type { TaskStatus, MilestoneStatus } from "./types.js";
 import {
   listProjects,
   createProject,
+  updateProject,
   listTasks,
   createTask,
   getTask,
@@ -14,10 +15,11 @@ import {
   getActiveBlockers,
   createBlocker,
   resolveBlocker,
-  listSprints,
-  createSprint,
-  getSprint,
-  updateSprint,
+  listMilestones,
+  createMilestone,
+  getMilestone,
+  updateMilestone,
+  completeMilestone,
   logActivity,
   getAgentCurrentTask,
   getAgentCurrentProject,
@@ -28,7 +30,7 @@ import {
   addTagToTask,
   removeTagFromTask,
   getTaskTags,
-  getSprintCapacity,
+  getMilestoneProgress,
   getTimeSpent,
   addDependency,
   removeDependency,
@@ -43,7 +45,7 @@ import {
   listSavedFilters,
   deleteSavedFilter,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   extractMentions,
   createNotification,
   listMentions,
@@ -59,9 +61,8 @@ import {
   deleteTemplate,
   createProjectFromTemplate,
   getActivityStream,
-  recordDailyStats,
-  getSprintDailyStats,
-  getVelocityTrend,
+  recordMilestoneDailyStats,
+  getMilestoneDailyStats,
   getAgentActivityHeatmap,
   generateReport,
   addComment,
@@ -81,14 +82,9 @@ import {
   evaluateAlertRules,
   bulkUpdateTasks,
   ACTIVE_THRESHOLD_MINUTES,
-  createMilestone,
-  getMilestone,
-  updateMilestone,
-  completeMilestone,
-  listMilestones,
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
@@ -189,6 +185,26 @@ export function createRouter(db: Database.Database): Router {
     res.status(201).json(project);
   });
 
+  // PUT /api/projects/:id
+  router.put("/api/projects/:id", (req, res) => {
+    const { name, description } = req.body as {
+      name?: string;
+      description?: string | null;
+    };
+    if (name !== undefined && !name) {
+      res.status(400).json({ error: "name cannot be empty" });
+      return;
+    }
+    const project = updateProject(db, req.params.id, { name, description });
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    broadcast({ type: "project_updated", payload: project });
+    fireWebhooks(db, "project_updated", project);
+    res.json(project);
+  });
+
   // GET /api/projects/:projectId/tasks
   router.get("/api/projects/:projectId/tasks", (req, res) => {
     res.json(listTasks(db, { project_id: req.params.projectId }));
@@ -214,11 +230,11 @@ export function createRouter(db: Database.Database): Router {
 
   // POST /api/tasks
   router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
-        sprint_id?: string | null;
+        milestone_id?: string | null;
         assigned_agent_id?: string | null;
         title: string;
         description?: string | null;
@@ -236,7 +252,7 @@ export function createRouter(db: Database.Database): Router {
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
-      sprint_id: sprint_id ?? null,
+      milestone_id: milestone_id ?? null,
       assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
@@ -258,10 +274,10 @@ export function createRouter(db: Database.Database): Router {
     if (task_ids.length > 200) { res.status(400).json({ error: "Maximum 200 tasks per bulk update" }); return; }
     const tasks = bulkUpdateTasks(db, task_ids, updates as any);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
-    // Record burndown stats for affected sprints when status changes
+    // Record daily stats for affected milestones when status changes
     if (updates.status) {
-      const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
-      for (const sid of sprintIds) recordDailyStats(db, sid);
+      const milestoneIds = new Set(tasks.filter((t) => t.milestone_id).map((t) => t.milestone_id!));
+      for (const mid of milestoneIds) recordMilestoneDailyStats(db, mid);
     }
     res.json({ updated: tasks.length, tasks });
   });
@@ -272,7 +288,7 @@ export function createRouter(db: Database.Database): Router {
     res.json(searchTasks(db, {
       query: q.q,
       project_id: q.project_id,
-      sprint_id: q.sprint_id,
+      milestone_id: q.milestone_id,
       status: q.status as any,
       priority: q.priority as any,
       assigned_agent_id: q.assigned_agent_id,
@@ -317,9 +333,9 @@ export function createRouter(db: Database.Database): Router {
         payload: { ...entry, agent_name: null, task_title: updated!.title },
       });
     }
-    // Record burndown stats when task status changes and task has a sprint
-    if (body.status && body.status !== task.status && updated?.sprint_id) {
-      recordDailyStats(db, updated.sprint_id);
+    // Record daily stats when task status changes and task has a milestone
+    if (body.status && body.status !== task.status && updated?.milestone_id) {
+      recordMilestoneDailyStats(db, updated.milestone_id);
     }
     res.json(updated);
   });
@@ -335,9 +351,9 @@ export function createRouter(db: Database.Database): Router {
     broadcast({ type: "task_completed", payload: completed! });
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
-    // Record daily stats if task has a sprint
-    if (completed?.sprint_id) {
-      recordDailyStats(db, completed.sprint_id);
+    // Record daily stats if task has a milestone
+    if (completed?.milestone_id) {
+      recordMilestoneDailyStats(db, completed.milestone_id);
     }
     // Handle recurring tasks — create next instance
     if (completed) {
@@ -420,49 +436,61 @@ export function createRouter(db: Database.Database): Router {
     res.json(resolved);
   });
 
-  // GET /api/sprints
-  router.get("/api/sprints", (req, res) => {
+  // GET /api/milestones
+  router.get("/api/milestones", (req, res) => {
     const { project_id } = req.query as { project_id?: string };
-    res.json(listSprints(db, project_id));
+    res.json(listMilestones(db, project_id));
   });
 
-  // POST /api/sprints
-  router.post("/api/sprints", (req, res) => {
-    const { project_id, name, description, status, start_date, end_date } =
+  // POST /api/milestones
+  router.post("/api/milestones", (req, res) => {
+    const { project_id, name, description, status, acceptance_criteria, target_date } =
       req.body as {
         project_id: string;
         name: string;
         description?: string | null;
         status?: string;
-        start_date?: string | null;
-        end_date?: string | null;
+        acceptance_criteria?: string | null;
+        target_date?: string | null;
       };
     if (!project_id || !name) {
       res.status(400).json({ error: "project_id and name are required" });
       return;
     }
-    const sprint = createSprint(db, {
+    const milestone = createMilestone(db, {
       project_id,
       name,
       description: description ?? null,
-      status: status as SprintStatus | undefined,
-      start_date: start_date ?? null,
-      end_date: end_date ?? null,
+      status: status as MilestoneStatus | undefined,
+      acceptance_criteria: acceptance_criteria ?? null,
+      target_date: target_date ?? null,
     });
-    broadcast({ type: "sprint_created", payload: sprint });
-    res.status(201).json(sprint);
+    broadcast({ type: "milestone_created", payload: milestone });
+    res.status(201).json(milestone);
   });
 
-  // PATCH /api/sprints/:id
-  router.patch("/api/sprints/:id", (req, res) => {
-    const sprint = getSprint(db, req.params.id);
-    if (!sprint) {
-      res.status(404).json({ error: "Sprint not found" });
+  // PATCH /api/milestones/:id
+  router.patch("/api/milestones/:id", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) {
+      res.status(404).json({ error: "Milestone not found" });
       return;
     }
-    const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
-    broadcast({ type: "sprint_updated", payload: updated! });
+    const updated = updateMilestone(db, req.params.id, req.body as Parameters<typeof updateMilestone>[2]);
+    broadcast({ type: "milestone_updated", payload: updated! });
     res.json(updated);
+  });
+
+  // POST /api/milestones/:id/complete
+  router.post("/api/milestones/:id/complete", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) {
+      res.status(404).json({ error: "Milestone not found" });
+      return;
+    }
+    const completed = completeMilestone(db, req.params.id);
+    broadcast({ type: "milestone_achieved", payload: completed! });
+    res.json(completed);
   });
 
   // ─── Tags ────────────────────────────────────────────────────────────────
@@ -514,12 +542,12 @@ export function createRouter(db: Database.Database): Router {
     res.json({ success: removed });
   });
 
-  // ─── R2: Sprint Capacity ─────────────────────────────────────────────────
+  // ─── R2: Milestone Progress ─────────────────────────────────────────────────
 
-  router.get("/api/sprints/:id/capacity", (req, res) => {
-    const sprint = getSprint(db, req.params.id);
-    if (!sprint) { res.status(404).json({ error: "Sprint not found" }); return; }
-    res.json(getSprintCapacity(db, req.params.id));
+  router.get("/api/milestones/:id/progress", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    res.json(getMilestoneProgress(db, req.params.id));
   });
 
   // ─── R2: Task time spent ────────────────────────────────────────────────
@@ -696,34 +724,26 @@ export function createRouter(db: Database.Database): Router {
   // ─── R4: Agent Stats ─────────────────────────────────────────────
 
   router.get("/api/agents/:id/stats", (req, res) => {
-    const sprintId = req.query.sprint_id as string | undefined;
-    res.json(getAgentStats(db, req.params.id, sprintId));
+    const milestoneId = req.query.milestone_id as string | undefined;
+    res.json(getAgentStats(db, req.params.id, milestoneId));
   });
 
-  // ─── R4: Sprint Contributions ──────────────────────────────────────
+  // ─── R4: Milestone Contributions ──────────────────────────────────────
 
-  router.get("/api/sprints/:id/contributions", (req, res) => {
-    res.json(getSprintAgentContributions(db, req.params.id));
+  router.get("/api/milestones/:id/contributions", (req, res) => {
+    res.json(getMilestoneAgentContributions(db, req.params.id));
   });
 
-  // ─── R4: Sprint Burndown ───────────────────────────────────────────
+  // ─── R4: Milestone Daily Stats ───────────────────────────────────────
 
-  router.get("/api/sprints/:id/burndown", (req, res) => {
-    res.json(getSprintDailyStats(db, req.params.id));
+  router.get("/api/milestones/:id/daily-stats", (req, res) => {
+    res.json(getMilestoneDailyStats(db, req.params.id));
   });
 
-  router.post("/api/sprints/:id/record-stats", (req, res) => {
-    const stats = recordDailyStats(db, req.params.id);
+  router.post("/api/milestones/:id/record-stats", (req, res) => {
+    const stats = recordMilestoneDailyStats(db, req.params.id);
     broadcast({ type: "daily_stats_recorded", payload: stats });
     res.json(stats);
-  });
-
-  // ─── R4: Velocity ──────────────────────────────────────────────────
-
-  router.get("/api/velocity", (req, res) => {
-    const limit = parseInt((req.query.limit as string) ?? "5", 10);
-    const projectId = req.query.project_id as string | undefined;
-    res.json(getVelocityTrend(db, isNaN(limit) ? 5 : limit, projectId));
   });
 
   // ─── R4: Activity Heatmap ──────────────────────────────────────────
@@ -736,7 +756,7 @@ export function createRouter(db: Database.Database): Router {
   // ─── R4: Reports ───────────────────────────────────────────────────
 
   router.post("/api/projects/:id/report", (req, res) => {
-    const period = (req.body.period as "day" | "week" | "sprint") ?? "week";
+    const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
     res.json({ report: generateReport(db, req.params.id, period) });
   });
 
@@ -819,9 +839,9 @@ export function createRouter(db: Database.Database): Router {
   // ─── Cost & Token Tracking ──────────────────────────────────────
 
   router.post("/api/costs", statsLimiter, (req, res) => {
-    const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, sprint_id, project_id } = req.body as {
+    const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body as {
       model: string; provider: string; input_tokens: number; output_tokens: number; cost_usd: number;
-      agent_id?: string; task_id?: string; sprint_id?: string; project_id?: string;
+      agent_id?: string; task_id?: string; milestone_id?: string; project_id?: string;
     };
     if (!model || !provider || !Number.isFinite(input_tokens) || !Number.isFinite(output_tokens) || !Number.isFinite(cost_usd)) {
       res.status(400).json({ error: "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required" }); return;
@@ -832,7 +852,7 @@ export function createRouter(db: Database.Database): Router {
     const entry = logCost(db, {
       agent_id: agent_id ?? null,
       task_id: task_id ?? null,
-      sprint_id: sprint_id ?? null,
+      milestone_id: milestone_id ?? null,
       project_id: project_id ?? null,
       model, provider, input_tokens, output_tokens, cost_usd,
     });
@@ -844,8 +864,8 @@ export function createRouter(db: Database.Database): Router {
     res.json(getAgentCostSummary(db, req.params.agentId));
   });
 
-  router.get("/api/costs/sprint/:sprintId", (req, res) => {
-    res.json(getSprintCostSummary(db, req.params.sprintId));
+  router.get("/api/costs/milestone/:milestoneId", (req, res) => {
+    res.json(getMilestoneCostSummary(db, req.params.milestoneId));
   });
 
   router.get("/api/costs/project/:projectId", (req, res) => {
@@ -854,80 +874,22 @@ export function createRouter(db: Database.Database): Router {
 
   router.get("/api/costs/timeseries", (req, res) => {
     const agent_id = req.query.agent_id as string | undefined;
-    const sprint_id = req.query.sprint_id as string | undefined;
+    const milestone_id = req.query.milestone_id as string | undefined;
     const project_id = req.query.project_id as string | undefined;
     const days = req.query.days ? parseInt(req.query.days as string, 10) : undefined;
-    res.json(getCostTimeseries(db, { agent_id, sprint_id, project_id, days }));
+    res.json(getCostTimeseries(db, { agent_id, milestone_id, project_id, days }));
   });
 
   router.get("/api/costs/by-model", (req, res) => {
     const project_id = req.query.project_id as string | undefined;
-    const sprint_id = req.query.sprint_id as string | undefined;
-    res.json(getCostByModel(db, { project_id, sprint_id }));
+    const milestone_id = req.query.milestone_id as string | undefined;
+    res.json(getCostByModel(db, { project_id, milestone_id }));
   });
 
   router.get("/api/costs/by-agent", (req, res) => {
     const project_id = req.query.project_id as string | undefined;
-    const sprint_id = req.query.sprint_id as string | undefined;
-    res.json(getCostByAgent(db, { project_id, sprint_id }));
-  });
-
-  // ─── Milestones ──────────────────────────────────────────────────────────
-
-  router.post("/api/milestones", (req, res) => {
-    const { project_id, title, description, due_date } = req.body;
-    if (!project_id || !title) {
-      res.status(400).json({ error: "project_id and title are required" });
-      return;
-    }
-    const milestone = createMilestone(db, {
-      project_id,
-      title,
-      description: description ?? null,
-      due_date: due_date ?? null,
-    });
-    broadcast({ type: "milestone_created", payload: milestone });
-    res.json(milestone);
-  });
-
-  router.get("/api/milestones", (req, res) => {
-    const project_id = req.query.project_id as string | undefined;
-    if (!project_id) {
-      res.status(400).json({ error: "project_id is required" });
-      return;
-    }
-    const status = req.query.status as "open" | "closed" | undefined;
-    res.json(listMilestones(db, project_id, status));
-  });
-
-  router.get("/api/milestones/:id", (req, res) => {
-    const milestone = getMilestone(db, req.params.id);
-    if (!milestone) {
-      res.status(404).json({ error: "Milestone not found" });
-      return;
-    }
-    res.json(milestone);
-  });
-
-  router.patch("/api/milestones/:id", (req, res) => {
-    const { title, description, status, due_date } = req.body;
-    const updated = updateMilestone(db, req.params.id, { title, description, status, due_date });
-    if (!updated) {
-      res.status(404).json({ error: "Milestone not found" });
-      return;
-    }
-    broadcast({ type: "milestone_updated", payload: updated });
-    res.json(updated);
-  });
-
-  router.post("/api/milestones/:id/complete", (req, res) => {
-    const completed = completeMilestone(db, req.params.id);
-    if (!completed) {
-      res.status(404).json({ error: "Milestone not found" });
-      return;
-    }
-    broadcast({ type: "milestone_completed", payload: completed });
-    res.json(completed);
+    const milestone_id = req.query.milestone_id as string | undefined;
+    res.json(getCostByAgent(db, { project_id, milestone_id }));
   });
 
   return router;

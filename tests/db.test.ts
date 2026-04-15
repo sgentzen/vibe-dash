@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import {
   createProject,
+  updateProject,
   listProjects,
   createTask,
   getTask,
@@ -47,6 +48,36 @@ describe("projects", () => {
 
   it("returns empty array when no projects exist", () => {
     expect(listProjects(db)).toHaveLength(0);
+  });
+
+  it("updates a project name", () => {
+    const p = createProject(db, { name: "Old", description: "desc" });
+    const updated = updateProject(db, p.id, { name: "New" });
+
+    expect(updated).not.toBeNull();
+    expect(updated!.name).toBe("New");
+    expect(updated!.description).toBe("desc");
+    expect(updated!.updated_at).not.toBe(p.updated_at);
+  });
+
+  it("updates a project description", () => {
+    const p = createProject(db, { name: "P", description: "old desc" });
+    const updated = updateProject(db, p.id, { description: "new desc" });
+
+    expect(updated!.name).toBe("P");
+    expect(updated!.description).toBe("new desc");
+  });
+
+  it("clears description by setting it to null", () => {
+    const p = createProject(db, { name: "P", description: "has desc" });
+    const updated = updateProject(db, p.id, { description: null });
+
+    expect(updated!.description).toBeNull();
+  });
+
+  it("returns null for non-existent project", () => {
+    const result = updateProject(db, "non-existent-id", { name: "X" });
+    expect(result).toBeNull();
   });
 });
 

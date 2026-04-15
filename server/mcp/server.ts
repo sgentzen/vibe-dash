@@ -7,8 +7,7 @@ import { broadcast } from "../websocket.js";
 
 const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
 const PRIORITY_ENUM = z.enum(["low", "medium", "high", "urgent"]);
-const MILESTONE_STATUS_ENUM = z.enum(["open", "closed"]);
-const SPRINT_STATUS_ENUM = z.enum(["planned", "active", "completed"]);
+const MILESTONE_STATUS_ENUM = z.enum(["open", "achieved"]);
 const AGENT_ROLE_ENUM = z.enum(["orchestrator", "coder", "reviewer", "explorer", "planner", "agent"]);
 
 export interface McpServerHandle {
@@ -88,6 +87,17 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   );
 
   server.tool(
+    "update_project",
+    "Update an existing project's name or description",
+    {
+      project_id: z.string(),
+      name: z.string().optional(),
+      description: z.string().nullable().optional(),
+    },
+    call("update_project")
+  );
+
+  server.tool(
     "list_projects",
     "List all projects",
     {},
@@ -100,7 +110,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     {
       project_id: z.string(),
       parent_task_id: z.string().optional(),
-      sprint_id: z.string().optional(),
       milestone_id: z.string().optional(),
       title: z.string(),
       description: z.string().optional(),
@@ -143,7 +152,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       priority: PRIORITY_ENUM.optional(),
       progress: z.number().min(0).max(100).optional(),
       parent_task_id: z.string().nullable().optional(),
-      sprint_id: z.string().nullable().optional(),
       milestone_id: z.string().nullable().optional(),
       assigned_agent_id: z.string().nullable().optional(),
       due_date: z.string().nullable().optional(),
@@ -217,40 +225,49 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   );
 
   server.tool(
-    "create_sprint",
-    "Create a sprint for a project",
+    "create_milestone",
+    "Create a milestone for a project",
     {
       project_id: z.string(),
       name: z.string(),
       description: z.string().optional(),
-      status: SPRINT_STATUS_ENUM.optional(),
-      start_date: z.string().optional(),
-      end_date: z.string().optional(),
+      acceptance_criteria: z.string().optional(),
+      target_date: z.string().optional(),
+      status: MILESTONE_STATUS_ENUM.optional(),
     },
-    call("create_sprint")
+    call("create_milestone")
   );
 
   server.tool(
-    "list_sprints",
-    "List sprints, optionally filtered by project",
+    "list_milestones",
+    "List milestones, optionally filtered by project",
     {
       project_id: z.string().optional(),
     },
-    call("list_sprints")
+    call("list_milestones")
   );
 
   server.tool(
-    "update_sprint",
-    "Update sprint fields",
+    "update_milestone",
+    "Update milestone fields",
     {
-      sprint_id: z.string(),
+      milestone_id: z.string(),
       name: z.string().optional(),
       description: z.string().nullable().optional(),
-      status: SPRINT_STATUS_ENUM.optional(),
-      start_date: z.string().nullable().optional(),
-      end_date: z.string().nullable().optional(),
+      acceptance_criteria: z.string().nullable().optional(),
+      target_date: z.string().nullable().optional(),
+      status: MILESTONE_STATUS_ENUM.optional(),
     },
-    call("update_sprint")
+    call("update_milestone")
+  );
+
+  server.tool(
+    "complete_milestone",
+    "Mark a milestone as achieved",
+    {
+      milestone_id: z.string(),
+    },
+    call("complete_milestone")
   );
 
   server.tool(
@@ -351,7 +368,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     {
       query: z.string().optional(),
       project_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       status: STATUS_ENUM.optional(),
       priority: PRIORITY_ENUM.optional(),
       assigned_agent_id: z.string().optional(),
@@ -410,7 +427,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get performance metrics for an agent",
     {
       agent_id: z.string(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
     },
     call("get_agent_stats")
   );
@@ -420,7 +437,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Generate a markdown status report for a project",
     {
       project_id: z.string(),
-      period: z.enum(["day", "week", "sprint"]),
+      period: z.enum(["day", "week", "milestone"]),
     },
     call("generate_report")
   );
@@ -495,52 +512,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("bulk_update_tasks")
   );
 
-  // ─── Milestones ──────────────────────────────────────────────────────
-
-  server.tool(
-    "create_milestone",
-    "Create a milestone for a project",
-    {
-      project_id: z.string(),
-      title: z.string(),
-      description: z.string().optional(),
-      due_date: z.string().optional(),
-    },
-    call("create_milestone")
-  );
-
-  server.tool(
-    "list_milestones",
-    "List milestones for a project",
-    {
-      project_id: z.string(),
-      status: MILESTONE_STATUS_ENUM.optional(),
-    },
-    call("list_milestones")
-  );
-
-  server.tool(
-    "update_milestone",
-    "Update milestone fields",
-    {
-      milestone_id: z.string(),
-      title: z.string().optional(),
-      description: z.string().nullable().optional(),
-      status: MILESTONE_STATUS_ENUM.optional(),
-      due_date: z.string().nullable().optional(),
-    },
-    call("update_milestone")
-  );
-
-  server.tool(
-    "complete_milestone",
-    "Mark a milestone as closed",
-    {
-      milestone_id: z.string(),
-    },
-    call("complete_milestone")
-  );
-
   // ─── Cost & Token Tracking ────────────────────────────────────────────
 
   server.tool(
@@ -554,7 +525,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       cost_usd: z.number(),
       agent_id: z.string().optional(),
       task_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       project_id: z.string().optional(),
     },
     call("log_cost")
@@ -562,10 +533,10 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
 
   server.tool(
     "get_cost_summary",
-    "Get cost summary for an agent, sprint, or project",
+    "Get cost summary for an agent, milestone, or project",
     {
       agent_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       project_id: z.string().optional(),
     },
     call("get_cost_summary")
@@ -576,7 +547,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get daily cost timeseries data",
     {
       agent_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       project_id: z.string().optional(),
       days: z.number().optional(),
     },
@@ -588,7 +559,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get cost breakdown by model",
     {
       project_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
     },
     call("get_cost_by_model")
   );
@@ -598,7 +569,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get cost breakdown by agent",
     {
       project_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
     },
     call("get_cost_by_agent")
   );

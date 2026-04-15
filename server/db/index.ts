@@ -2,19 +2,19 @@
 // and get the same public API as the original monolithic db.ts.
 
 export { initDb, openDb } from "./schema.js";
-export { createProject, listProjects } from "./projects.js";
+export { createProject, updateProject, listProjects } from "./projects.js";
 export {
-  createSprint,
-  updateSprint,
-  getSprint,
-  listSprints,
-  getSprintCapacity,
-  recordDailyStats,
-  getSprintDailyStats,
-  getVelocityTrend,
+  createMilestone,
+  updateMilestone,
+  completeMilestone,
+  getMilestone,
+  listMilestones,
+  getMilestoneProgress,
+  recordMilestoneDailyStats,
+  getMilestoneDailyStats,
   getTimeSpent,
-} from "./sprints.js";
-export type { CreateSprintInput, UpdateSprintInput } from "./sprints.js";
+} from "./milestones.js";
+export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
 export {
   createTask,
   getTask,
@@ -38,7 +38,7 @@ export {
   getAgentCurrentProject,
   getAllAgentCurrentProjects,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   startOrGetSession,
   closeAgentSessions,
   closeStaleSession,
@@ -96,19 +96,11 @@ export {
   getMatchingWebhooks,
   fireWebhooks,
 } from "./webhooks.js";
-export {
-  createMilestone,
-  getMilestone,
-  updateMilestone,
-  completeMilestone,
-  listMilestones,
-} from "./milestones.js";
-export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
 export { generateReport } from "./reports.js";
 export {
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
