@@ -373,6 +373,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       priority: PRIORITY_ENUM.optional(),
       assigned_agent_id: z.string().optional(),
       tag_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       due_before: z.string().optional(),
       due_after: z.string().optional(),
     },
