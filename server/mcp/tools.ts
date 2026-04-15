@@ -363,6 +363,7 @@ export async function handleTool(
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         assigned_agent_id: args.assigned_agent_id as string | undefined,
         tag_id: args.tag_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
         due_before: args.due_before as string | undefined,
         due_after: args.due_after as string | undefined,
       });
