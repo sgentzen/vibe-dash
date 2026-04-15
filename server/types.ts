@@ -27,6 +27,7 @@ export interface Task {
   project_id: string;
   parent_task_id: string | null;
   sprint_id: string | null;
+  milestone_id: string | null;
   assigned_agent_id: string | null;
   title: string;
   description: string | null;
@@ -37,6 +38,20 @@ export interface Task {
   start_date: string | null;
   estimate: number | null;
   recurrence_rule: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MilestoneStatus = "open" | "closed";
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  status: MilestoneStatus;
+  due_date: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
