@@ -220,6 +220,45 @@ export interface Blocker {
   resolved_at: string | null;
 }
 
+// ─── Agent Performance Metrics ────────────────────────────────────────
+
+export interface CompletionMetrics {
+  id: string;
+  task_id: string;
+  agent_id: string;
+  lines_added: number;
+  lines_removed: number;
+  files_changed: number;
+  tests_added: number;
+  tests_passing: number;
+  duration_seconds: number;
+  created_at: string;
+}
+
+export interface AgentPerformance {
+  agent_id: string;
+  agent_name: string;
+  tasks_completed: number;
+  total_lines_added: number;
+  total_lines_removed: number;
+  total_files_changed: number;
+  total_tests_added: number;
+  avg_duration_seconds: number;
+  avg_lines_per_task: number;
+  avg_tests_per_task: number;
+}
+
+export interface AgentComparison {
+  agents: AgentPerformance[];
+}
+
+export interface TaskTypeBreakdown {
+  priority: string;
+  count: number;
+  avg_duration_seconds: number;
+  avg_lines_added: number;
+}
+
 export type WsEventType =
   | "project_created"
   | "task_created"
@@ -244,7 +283,9 @@ export type WsEventType =
   | "file_lock_acquired"
   | "file_conflict_detected"
   | "notification_created"
-  | "daily_stats_recorded";
+  | "daily_stats_recorded"
+  | "cost_logged"
+  | "metrics_logged";
 
 export interface WsEvent {
   type: WsEventType;

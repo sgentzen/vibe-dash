@@ -4,6 +4,7 @@ import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
+import AgentComparisonView from "./AgentComparisonView";
 
 interface AgentDetail {
   agent: Agent;
@@ -28,6 +29,7 @@ export function AgentDashboard() {
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active+idle");
+  const [viewMode, setViewMode] = useState<"agents" | "performance">("agents");
 
   useEffect(() => {
     async function loadDetails() {
@@ -107,26 +109,49 @@ export function AgentDashboard() {
           Agent Dashboard
         </h2>
         <div style={{ display: "flex", gap: "4px" }}>
-          {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((f) => (
+          {(["agents", "performance"] as const).map((mode) => (
             <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
+              key={mode}
+              onClick={() => setViewMode(mode)}
               style={{
-                background: statusFilter === f ? "var(--accent-blue)" : "transparent",
-                border: `1px solid ${statusFilter === f ? "var(--accent-blue)" : "var(--border)"}`,
-                color: statusFilter === f ? "var(--text-on-accent)" : "var(--text-muted)",
+                background: viewMode === mode ? "var(--accent-blue)" : "transparent",
+                border: `1px solid ${viewMode === mode ? "var(--accent-blue)" : "var(--border)"}`,
+                color: viewMode === mode ? "var(--text-on-accent)" : "var(--text-muted)",
                 borderRadius: "4px",
-                padding: "2px 8px",
+                padding: "2px 10px",
                 fontSize: "11px",
                 cursor: "pointer",
               }}
             >
-              {FILTER_LABELS[f]}
+              {mode === "agents" ? "Agents" : "Performance"}
             </button>
           ))}
         </div>
+        {viewMode === "agents" && (
+          <div style={{ display: "flex", gap: "4px" }}>
+            {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setStatusFilter(f)}
+                style={{
+                  background: statusFilter === f ? "var(--accent-blue)" : "transparent",
+                  border: `1px solid ${statusFilter === f ? "var(--accent-blue)" : "var(--border)"}`,
+                  color: statusFilter === f ? "var(--text-on-accent)" : "var(--text-muted)",
+                  borderRadius: "4px",
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                }}
+              >
+                {FILTER_LABELS[f]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      {agents.length === 0 ? (
+      {viewMode === "performance" ? (
+        <AgentComparisonView />
+      ) : agents.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "40px" }}>
           No agents registered yet
         </div>

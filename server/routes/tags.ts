@@ -1,0 +1,52 @@
+import { Router } from "express";
+import type Database from "better-sqlite3";
+import { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags } from "../db/index.js";
+import type { BroadcastFn } from "./types.js";
+
+export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
+  const router = Router();
+
+  router.get("/api/projects/:projectId/tags", (req, res) => {
+    res.json(listTags(db, req.params.projectId));
+  });
+
+  router.post("/api/projects/:projectId/tags", (req, res) => {
+    const { name, color } = req.body as { name: string; color?: string };
+    if (!name) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+      res.status(400).json({ error: "color must be a hex color like #ff0000" });
+      return;
+    }
+    const tag = createTag(db, { project_id: req.params.projectId, name, color });
+    broadcast({ type: "tag_created", payload: tag });
+    res.status(201).json(tag);
+  });
+
+  router.get("/api/tasks/:id/tags", (req, res) => {
+    res.json(getTaskTags(db, req.params.id));
+  });
+
+  router.post("/api/tasks/:id/tags", (req, res) => {
+    const { tag_id } = req.body as { tag_id: string };
+    if (!tag_id) {
+      res.status(400).json({ error: "tag_id is required" });
+      return;
+    }
+    const taskTag = addTagToTask(db, req.params.id, tag_id);
+    broadcast({ type: "tag_added", payload: taskTag });
+    res.status(201).json(taskTag);
+  });
+
+  router.delete("/api/tasks/:id/tags/:tagId", (req, res) => {
+    const removed = removeTagFromTask(db, req.params.id, req.params.tagId);
+    if (removed) {
+      broadcast({ type: "tag_removed", payload: { id: "", task_id: req.params.id, tag_id: req.params.tagId } });
+    }
+    res.json({ success: removed });
+  });
+
+  return router;
+}

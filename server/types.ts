@@ -234,6 +234,19 @@ export interface CostEntry {
   created_at: string;
 }
 
+export interface CompletionMetrics {
+  id: string;
+  task_id: string;
+  agent_id: string;
+  lines_added: number;
+  lines_removed: number;
+  files_changed: number;
+  tests_added: number;
+  tests_passing: number;
+  duration_seconds: number;
+  created_at: string;
+}
+
 export type WsEventType =
   | "project_created"
   | "task_created"
@@ -259,9 +272,10 @@ export type WsEventType =
   | "file_conflict_detected"
   | "notification_created"
   | "daily_stats_recorded"
-  | "cost_logged";
+  | "cost_logged"
+  | "metrics_logged";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats | CostEntry;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats | CostEntry | CompletionMetrics;
 }
