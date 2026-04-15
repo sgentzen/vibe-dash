@@ -43,11 +43,11 @@ export function App() {
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
-          const [stats, projects, sprints, tasks, agents, activity, blockerList] =
+          const [stats, projects, milestones, tasks, agents, activity, blockerList] =
             await Promise.all([
               api.getStats(),
               api.getProjects(),
-              api.getSprints(),
+              api.getMilestones(),
               api.getTasks(),
               api.getAgents(),
               api.getActivity(),
@@ -56,7 +56,7 @@ export function App() {
           if (cancelled) return;
           dispatch({ type: "SET_STATS", payload: stats });
           dispatch({ type: "SET_PROJECTS", payload: projects });
-          dispatch({ type: "SET_SPRINTS", payload: sprints });
+          dispatch({ type: "SET_MILESTONES", payload: milestones });
           dispatch({ type: "SET_TASKS", payload: tasks });
           dispatch({ type: "SET_AGENTS", payload: agents });
           dispatch({ type: "SET_ACTIVITY", payload: activity });
@@ -127,15 +127,15 @@ export function App() {
     setShowOnboarding(false);
     // Reload data to reflect newly created project/task
     try {
-      const [stats, projects, sprints, tasks] = await Promise.all([
+      const [stats, projects, milestones, tasks] = await Promise.all([
         api.getStats(),
         api.getProjects(),
-        api.getSprints(),
+        api.getMilestones(),
         api.getTasks(),
       ]);
       dispatch({ type: "SET_STATS", payload: stats });
       dispatch({ type: "SET_PROJECTS", payload: projects });
-      dispatch({ type: "SET_SPRINTS", payload: sprints });
+      dispatch({ type: "SET_MILESTONES", payload: milestones });
       dispatch({ type: "SET_TASKS", payload: tasks });
       if (projects.length > 0) {
         dispatch({ type: "SELECT_PROJECT", payload: projects[0].id });

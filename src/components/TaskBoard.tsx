@@ -4,7 +4,7 @@ import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDrawer } from "./TaskEditDrawer";
 import { STATUS_COLORS } from "../constants/colors.js";
-import type { Task, Sprint, TaskStatus, Agent, Tag } from "../types";
+import type { Task, Milestone, TaskStatus, Agent, Tag } from "../types";
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "planned", label: "PLANNED" },
@@ -16,7 +16,7 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
 const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 
 export function TaskBoard() {
-  const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
+  const { tasks, projects, milestones, selectedProjectId, selectedMilestoneId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -33,19 +33,19 @@ export function TaskBoard() {
       return (
         t.parent_task_id === null &&
         (selectedProjectId === null || t.project_id === selectedProjectId) &&
-        (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
+        (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId) &&
         (!searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
       );
     });
-  }, [tasks, selectedProjectId, selectedSprintId, searchQuery]);
+  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
     : null;
 
-  const projectSprints = useMemo(
-    () => selectedProjectId ? sprints.filter((s) => s.project_id === selectedProjectId) : sprints,
-    [sprints, selectedProjectId]
+  const projectMilestones = useMemo(
+    () => selectedProjectId ? milestones.filter((m) => m.project_id === selectedProjectId) : milestones,
+    [milestones, selectedProjectId]
   );
 
   const handleDrop = useCallback((status: TaskStatus) => {
@@ -91,14 +91,14 @@ export function TaskBoard() {
           )}
         </span>
 
-        {/* Sprint filter */}
-        {projectSprints.length > 0 && (
+        {/* Milestone filter */}
+        {projectMilestones.length > 0 && (
           <>
             <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
-            <SprintFilter
-              sprints={projectSprints}
-              selectedSprintId={selectedSprintId}
-              onSelect={(id) => dispatch({ type: "SELECT_SPRINT", payload: id })}
+            <MilestoneFilter
+              milestones={projectMilestones}
+              selectedMilestoneId={selectedMilestoneId}
+              onSelect={(id) => dispatch({ type: "SELECT_MILESTONE", payload: id })}
             />
           </>
         )}
@@ -121,14 +121,14 @@ export function TaskBoard() {
             label={label}
             tasks={filteredTasks.filter((t) => t.status === key)}
             allTasks={tasks}
-            sprints={projectSprints}
+            milestones={projectMilestones}
             activity={activity}
             agents={agents}
             tags={tags}
             taskTagMap={taskTagMap}
             taskDepsMap={taskDepsMap}
             selectedProjectId={selectedProjectId}
-            selectedSprintId={selectedSprintId}
+            selectedMilestoneId={selectedMilestoneId}
             onDragStart={(id) => { dragTaskId.current = id; }}
             onDrop={() => handleDrop(key)}
             onClickTask={setEditingTask}
@@ -150,43 +150,43 @@ export function TaskBoard() {
   );
 }
 
-/* ─── Sprint Filter ──────────────────────────────────────────────────────── */
+/* ─── Milestone Filter ──────────────────────────────────────────────────── */
 
-function SprintFilter({
-  sprints,
-  selectedSprintId,
+function MilestoneFilter({
+  milestones,
+  selectedMilestoneId,
   onSelect,
 }: {
-  sprints: Sprint[];
-  selectedSprintId: string | null;
+  milestones: Milestone[];
+  selectedMilestoneId: string | null;
   onSelect: (id: string | null) => void;
 }) {
-  const statusOrder: Record<string, number> = { active: 0, planned: 1, completed: 2 };
-  const sorted = [...sprints].sort(
+  const statusOrder: Record<string, number> = { open: 0, achieved: 1 };
+  const sorted = [...milestones].sort(
     (a, b) => (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1)
   );
 
   return (
     <select
-      value={selectedSprintId ?? ""}
+      value={selectedMilestoneId ?? ""}
       onChange={(e) => onSelect(e.target.value || null)}
       style={{
         background: "var(--bg-tertiary)",
         border: "1px solid var(--border)",
         borderRadius: "6px",
-        color: selectedSprintId ? "var(--accent-blue)" : "var(--text-secondary)",
+        color: selectedMilestoneId ? "var(--accent-blue)" : "var(--text-secondary)",
         padding: "4px 8px",
         fontSize: "12px",
         cursor: "pointer",
         maxWidth: "250px",
       }}
     >
-      <option value="">All Sprints ({sprints.length})</option>
-      {sorted.map((s) => {
-        const icon = s.status === "completed" ? "\u2713" : s.status === "active" ? "\u25cf" : "\u25cb";
+      <option value="">All Milestones ({milestones.length})</option>
+      {sorted.map((m) => {
+        const icon = m.status === "achieved" ? "\u2713" : "\u25cf";
         return (
-          <option key={s.id} value={s.id}>
-            {icon} {s.name}
+          <option key={m.id} value={m.id}>
+            {icon} {m.name}
           </option>
         );
       })}
@@ -201,14 +201,14 @@ interface ColumnProps {
   label: string;
   tasks: Task[];
   allTasks: Task[];
-  sprints: Sprint[];
+  milestones: Milestone[];
   activity: ReturnType<typeof useAppState>["activity"];
   agents: Agent[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>;
   taskDepsMap: Record<string, string[]>;
   selectedProjectId: string | null;
-  selectedSprintId: string | null;
+  selectedMilestoneId: string | null;
   onDragStart: (id: string) => void;
   onDrop: () => void;
   onClickTask: (task: Task) => void;
@@ -221,14 +221,14 @@ function KanbanColumn({
   label,
   tasks,
   allTasks,
-  sprints,
+  milestones,
   activity,
   agents,
   tags,
   taskTagMap,
   taskDepsMap,
   selectedProjectId,
-  selectedSprintId,
+  selectedMilestoneId,
   onDragStart,
   onDrop,
   onClickTask,
@@ -264,9 +264,9 @@ function KanbanColumn({
     }
   }
 
-  // Group tasks by sprint when no specific sprint is selected
-  const shouldGroup = selectedSprintId === null && sprints.length > 0;
-  const sprintGroups = shouldGroup ? groupBySprint(tasks, sprints) : null;
+  // Group tasks by milestone when no specific milestone is selected
+  const shouldGroup = selectedMilestoneId === null && milestones.length > 0;
+  const milestoneGroups = shouldGroup ? groupByMilestone(tasks, milestones) : null;
 
   return (
     <div
@@ -328,11 +328,11 @@ function KanbanColumn({
           gap: "8px",
         }}
       >
-        {sprintGroups ? (
-          sprintGroups.map((group) => (
-            <SprintGroup
-              key={group.sprint?.id ?? "no-sprint"}
-              sprint={group.sprint}
+        {milestoneGroups ? (
+          milestoneGroups.map((group) => (
+            <MilestoneGroup
+              key={group.milestone?.id ?? "no-milestone"}
+              milestone={group.milestone}
               tasks={group.tasks}
               allTasks={allTasks}
               activity={activity}
@@ -404,43 +404,43 @@ function KanbanColumn({
   );
 }
 
-/* ─── Sprint Group ───────────────────────────────────────────────────────── */
+/* ─── Milestone Group ──────────────────────────────────────────────────── */
 
-interface SprintGroupData {
-  sprint: Sprint | null;
+interface MilestoneGroupData {
+  milestone: Milestone | null;
   tasks: Task[];
 }
 
-function groupBySprint(tasks: Task[], sprints: Sprint[]): SprintGroupData[] {
-  const sprintMap = new Map<string, Sprint>();
-  for (const s of sprints) sprintMap.set(s.id, s);
+function groupByMilestone(tasks: Task[], milestones: Milestone[]): MilestoneGroupData[] {
+  const milestoneMap = new Map<string, Milestone>();
+  for (const m of milestones) milestoneMap.set(m.id, m);
 
   const grouped = new Map<string | null, Task[]>();
   for (const task of tasks) {
-    const key = task.sprint_id;
+    const key = task.milestone_id;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(task);
   }
 
-  const result: SprintGroupData[] = [];
+  const result: MilestoneGroupData[] = [];
 
-  // Active sprints first, then planned, then completed
-  const statusOrder: Record<string, number> = { active: 0, planned: 1, completed: 2 };
-  const sortedSprints = [...sprints].sort(
+  // Open milestones first, then achieved
+  const statusOrder: Record<string, number> = { open: 0, achieved: 1 };
+  const sortedMilestones = [...milestones].sort(
     (a, b) => (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1)
   );
 
-  for (const sprint of sortedSprints) {
-    const sprintTasks = grouped.get(sprint.id);
-    if (sprintTasks && sprintTasks.length > 0) {
-      result.push({ sprint, tasks: sprintTasks });
+  for (const milestone of sortedMilestones) {
+    const milestoneTasks = grouped.get(milestone.id);
+    if (milestoneTasks && milestoneTasks.length > 0) {
+      result.push({ milestone, tasks: milestoneTasks });
     }
   }
 
   // Unassigned tasks at the end
   const unassigned = grouped.get(null);
   if (unassigned && unassigned.length > 0) {
-    result.push({ sprint: null, tasks: unassigned });
+    result.push({ milestone: null, tasks: unassigned });
   }
 
   return result;
@@ -461,8 +461,8 @@ function resolveTaskTags(taskId: string, taskTagMap: Record<string, string[]>, t
   return tagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => t !== undefined);
 }
 
-function SprintGroup({
-  sprint,
+function MilestoneGroup({
+  milestone,
   tasks,
   allTasks,
   activity,
@@ -473,7 +473,7 @@ function SprintGroup({
   onClickTask,
   onDragStart,
 }: {
-  sprint: Sprint | null;
+  milestone: Milestone | null;
   tasks: Task[];
   allTasks: Task[];
   activity: ReturnType<typeof useAppState>["activity"];
@@ -485,17 +485,15 @@ function SprintGroup({
   onDragStart: (id: string) => void;
 }) {
   const statusIcon =
-    sprint?.status === "completed" ? "\u2713" : sprint?.status === "active" ? "\u25cf" : "\u25cb";
+    milestone?.status === "achieved" ? "\u2713" : "\u25cf";
   const statusColor =
-    sprint?.status === "active"
+    milestone?.status === "open"
       ? "var(--accent-green)"
-      : sprint?.status === "completed"
-        ? "var(--accent-blue)"
-        : "var(--text-muted)";
+      : "var(--text-muted)";
 
   return (
     <div style={{ marginBottom: "4px" }}>
-      {/* Sprint header */}
+      {/* Milestone header */}
       <div
         style={{
           padding: "6px 8px",
@@ -509,8 +507,8 @@ function SprintGroup({
           marginBottom: "6px",
         }}
       >
-        <span>{sprint ? statusIcon : ""}</span>
-        <span>{sprint ? sprint.name : "No Sprint"}</span>
+        <span>{milestone ? statusIcon : ""}</span>
+        <span>{milestone ? milestone.name : "No Milestone"}</span>
         <span
           style={{
             fontSize: "10px",
@@ -522,8 +520,8 @@ function SprintGroup({
         </span>
       </div>
 
-      {/* Sprint description (truncated) */}
-      {sprint?.description && (
+      {/* Milestone description (truncated) */}
+      {milestone?.description && (
         <div
           style={{
             fontSize: "10px",
@@ -534,7 +532,7 @@ function SprintGroup({
             whiteSpace: "nowrap",
           }}
         >
-          {sprint.description.slice(0, 100)}{sprint.description.length > 100 ? "\u2026" : ""}
+          {milestone.description.slice(0, 100)}{milestone.description.length > 100 ? "\u2026" : ""}
         </div>
       )}
 

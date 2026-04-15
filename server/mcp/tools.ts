@@ -3,6 +3,7 @@ import type { Agent } from "../types.js";
 import {
   registerAgent,
   createProject,
+  updateProject,
   listProjects,
   createTask,
   getTask,
@@ -13,9 +14,11 @@ import {
   createBlocker,
   resolveBlocker,
   touchAgent,
-  createSprint,
-  listSprints,
-  updateSprint,
+  createMilestone,
+  listMilestones,
+  updateMilestone,
+  completeMilestone,
+  getMilestone,
   createTag,
   listTags,
   addTagToTask,
@@ -38,7 +41,7 @@ import {
   markNotificationRead,
   bulkUpdateTasks,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   generateReport,
   extractMentions,
   createNotification,
@@ -49,7 +52,7 @@ import {
   getActivityStream,
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
@@ -119,6 +122,16 @@ export async function handleTool(
       return ok({ project_id: project.id });
     }
 
+    case "update_project": {
+      const project = updateProject(db, args.project_id as string, {
+        name: args.name as string | undefined,
+        description: args.description !== undefined ? (args.description as string | null) : undefined,
+      });
+      if (!project) return ok({ error: "Project not found" });
+      broadcast({ type: "project_updated", payload: project });
+      return ok({ project });
+    }
+
     case "list_projects": {
       const projects = listProjects(db);
       return ok({ projects });
@@ -128,7 +141,7 @@ export async function handleTool(
       const task = createTask(db, {
         project_id: args.project_id as string,
         parent_task_id: (args.parent_task_id as string | undefined) ?? null,
-        sprint_id: (args.sprint_id as string | undefined) ?? null,
+        milestone_id: (args.milestone_id as string | undefined) ?? null,
         title: args.title as string,
         description: (args.description as string | undefined) ?? null,
         priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
@@ -184,7 +197,7 @@ export async function handleTool(
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,
-        sprint_id: args.sprint_id as string | null | undefined,
+        milestone_id: args.milestone_id as string | null | undefined,
         assigned_agent_id: args.assigned_agent_id as string | null | undefined,
         due_date: args.due_date as string | null | undefined,
         estimate: args.estimate as number | null | undefined,
@@ -240,36 +253,42 @@ export async function handleTool(
       return ok({ success: true });
     }
 
-    case "create_sprint": {
-      const sprint = createSprint(db, {
+    case "create_milestone": {
+      const milestone = createMilestone(db, {
         project_id: args.project_id as string,
         name: args.name as string,
         description: (args.description as string | undefined) ?? null,
-        status: args.status as "planned" | "active" | "completed" | undefined,
-        start_date: (args.start_date as string | undefined) ?? null,
-        end_date: (args.end_date as string | undefined) ?? null,
+        acceptance_criteria: (args.acceptance_criteria as string | undefined) ?? null,
+        target_date: (args.target_date as string | undefined) ?? null,
       });
-      broadcast({ type: "sprint_created", payload: sprint });
-      return ok({ sprint_id: sprint.id });
+      broadcast({ type: "milestone_created", payload: milestone });
+      return ok({ milestone_id: milestone.id });
     }
 
-    case "list_sprints": {
-      const sprints = listSprints(db, args.project_id as string | undefined);
-      return ok({ sprints });
+    case "list_milestones": {
+      const milestones = listMilestones(db, args.project_id as string | undefined);
+      return ok({ milestones });
     }
 
-    case "update_sprint": {
-      const updated = updateSprint(db, args.sprint_id as string, {
+    case "update_milestone": {
+      const updated = updateMilestone(db, args.milestone_id as string, {
         name: args.name as string | undefined,
         description: args.description as string | null | undefined,
-        status: args.status as "planned" | "active" | "completed" | undefined,
-        start_date: args.start_date as string | null | undefined,
-        end_date: args.end_date as string | null | undefined,
+        acceptance_criteria: args.acceptance_criteria as string | null | undefined,
+        target_date: args.target_date as string | null | undefined,
       });
       if (updated) {
-        broadcast({ type: "sprint_updated", payload: updated });
+        broadcast({ type: "milestone_updated", payload: updated });
       }
       return ok({ success: true });
+    }
+
+    case "complete_milestone": {
+      const completed = completeMilestone(db, args.milestone_id as string);
+      if (completed) {
+        broadcast({ type: "milestone_achieved", payload: completed });
+      }
+      return ok({ success: completed !== null });
     }
 
     case "create_tag": {
@@ -339,12 +358,11 @@ export async function handleTool(
       const results = searchTasks(db, {
         query: args.query as string | undefined,
         project_id: args.project_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
         status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         assigned_agent_id: args.assigned_agent_id as string | undefined,
         tag_id: args.tag_id as string | undefined,
-        milestone_id: args.milestone_id as string | undefined,
         due_before: args.due_before as string | undefined,
         due_after: args.due_after as string | undefined,
       });
@@ -441,14 +459,14 @@ export async function handleTool(
     // ─── R4: Agent Stats ──────────────────────────────────────────────────
 
     case "get_agent_stats": {
-      const stats = getAgentStats(db, args.agent_id as string, args.sprint_id as string | undefined);
+      const stats = getAgentStats(db, args.agent_id as string, args.milestone_id as string | undefined);
       return ok(stats);
     }
 
     // ─── R4: Report ──────────────────────────────────────────────────────
 
     case "generate_report": {
-      const report = generateReport(db, args.project_id as string, args.period as "day" | "week" | "sprint");
+      const report = generateReport(db, args.project_id as string, args.period as "day" | "week" | "milestone");
       return ok({ report });
     }
 
@@ -470,7 +488,7 @@ export async function handleTool(
       const entry = logCost(db, {
         agent_id: (args.agent_id as string) ?? null,
         task_id: (args.task_id as string) ?? null,
-        sprint_id: (args.sprint_id as string) ?? null,
+        milestone_id: (args.milestone_id as string) ?? null,
         project_id: (args.project_id as string) ?? null,
         model: args.model as string,
         provider: args.provider as string,
@@ -483,15 +501,15 @@ export async function handleTool(
 
     case "get_cost_summary": {
       if (args.agent_id) return ok(getAgentCostSummary(db, args.agent_id as string));
-      if (args.sprint_id) return ok(getSprintCostSummary(db, args.sprint_id as string));
+      if (args.milestone_id) return ok(getMilestoneCostSummary(db, args.milestone_id as string));
       if (args.project_id) return ok(getProjectCostSummary(db, args.project_id as string));
-      return ok({ error: "Provide agent_id, sprint_id, or project_id" });
+      return ok({ error: "Provide agent_id, milestone_id, or project_id" });
     }
 
     case "get_cost_timeseries": {
       return ok(getCostTimeseries(db, {
         agent_id: args.agent_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
         project_id: args.project_id as string | undefined,
         days: args.days as number | undefined,
       }));
@@ -500,14 +518,14 @@ export async function handleTool(
     case "get_cost_by_model": {
       return ok(getCostByModel(db, {
         project_id: args.project_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
       }));
     }
 
     case "get_cost_by_agent": {
       return ok(getCostByAgent(db, {
         project_id: args.project_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
       }));
     }
 

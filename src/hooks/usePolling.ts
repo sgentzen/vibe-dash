@@ -34,11 +34,11 @@ export function usePolling() {
         api.getBlockers().then((v) => dispatch({ type: "SET_BLOCKERS", payload: v })),
       ];
 
-      // Tasks + sprints needed for board, list, dashboard, timeline views
+      // Tasks + milestones needed for board, list, dashboard, timeline views
       if (view !== "agents") {
         promises.push(
           api.getTasks().then((v) => dispatch({ type: "SET_TASKS", payload: v })),
-          api.getSprints().then((v) => dispatch({ type: "SET_SPRINTS", payload: v })),
+          api.getMilestones().then((v) => dispatch({ type: "SET_MILESTONES", payload: v })),
         );
       }
 
