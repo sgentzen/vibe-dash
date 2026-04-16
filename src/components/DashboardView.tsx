@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader } from "../styles/shared.js";
-import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution } from "../types";
+import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
+import { KpiCard, formatTokens } from "./dashboard/KpiCard";
+import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
+import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
+
+const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 export function DashboardView() {
   const { projects, milestones, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
