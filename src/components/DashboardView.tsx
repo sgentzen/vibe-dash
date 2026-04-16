@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader } from "../styles/shared.js";
-import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution } from "../types";
+import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
+import { KpiCard, formatTokens } from "./dashboard/KpiCard";
+import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
+import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
+
+const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 export function DashboardView() {
   const { projects, milestones, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
@@ -19,12 +24,12 @@ export function DashboardView() {
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
 
-  // Project-scoped data
-  const projectId = selectedProjectId || projects[0]?.id;
-  const projectMilestones = milestones.filter((m) => !projectId || m.project_id === projectId);
-  const projectTasks = tasks.filter((t) => !projectId || t.project_id === projectId);
+  // Project-scoped data — null means "all projects"
+  const projectId = selectedProjectId ?? null;
+  const projectMilestones = projectId ? milestones.filter((m) => m.project_id === projectId) : milestones;
+  const projectTasks = projectId ? tasks.filter((t) => t.project_id === projectId) : tasks;
   const projectTaskIds = new Set(projectTasks.map((t) => t.id));
-  const projectBlockers = blockers.filter((b) => !projectId || projectTaskIds.has(b.task_id));
+  const projectBlockers = projectId ? blockers.filter((b) => projectTaskIds.has(b.task_id)) : blockers;
 
   const openMilestones = projectMilestones.filter((m) => m.status === "open");
   const overdueTasks = projectTasks.filter(
@@ -42,9 +47,7 @@ export function DashboardView() {
   useEffect(() => {
     async function load() {
       try {
-        const [heat] = await Promise.all([
-          api.getActivityHeatmap(projectId),
-        ]);
+        const heat = await api.getActivityHeatmap(projectId ?? undefined);
         setHeatmap(heat);
 
         if (openMilestones.length > 0) {
@@ -55,6 +58,9 @@ export function DashboardView() {
           ]);
           setDailyStats(stats);
           setContributions(contrib);
+        } else {
+          setDailyStats([]);
+          setContributions([]);
         }
       } catch (e) {
         console.warn("[DashboardView] failed to load chart data", e);
@@ -63,16 +69,15 @@ export function DashboardView() {
     load();
   }, [api, openMilestones.length > 0 ? openMilestones[0]?.id : null, projectId, milestoneTaskStatusKey, pollGeneration]);
 
-  // Cost data: refresh on project change or milestone task status changes (not every poll tick)
+  // Cost data: refresh on project change or milestone task status changes
   useEffect(() => {
-    if (!projectId) return;
     async function loadCosts() {
       try {
         const [summary, ts, byModel, byAgent] = await Promise.all([
-          api.getProjectCostSummary(projectId!),
-          api.getCostTimeseries({ project_id: projectId!, days: "30" }),
-          api.getCostByModel({ project_id: projectId! }),
-          api.getCostByAgent({ project_id: projectId! }),
+          api.getCostSummary(projectId ?? undefined),
+          api.getCostTimeseries({ project_id: projectId ?? undefined, days: "30" }),
+          api.getCostByModel({ project_id: projectId ?? undefined }),
+          api.getCostByAgent({ project_id: projectId ?? undefined }),
         ]);
         setCostSummary(summary);
         setCostTimeseries(ts);
@@ -91,9 +96,10 @@ export function DashboardView() {
   }, [api, pollGeneration]);
 
   async function handleGenerateReport() {
-    if (!projectId) return;
+    const reportProjectId = projectId ?? projects[0]?.id;
+    if (!reportProjectId) return;
     try {
-      const report = await api.generateReport(projectId, reportPeriod);
+      const report = await api.generateReport(reportProjectId, reportPeriod);
       setReportText(report);
     } catch {
       setReportText("Failed to generate report.");
@@ -262,26 +268,35 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* Cost & Token Tracking */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-        <KpiCard label="Total Spend" value={costSummary ? `$${costSummary.total_cost_usd.toFixed(2)}` : "$0.00"} color="var(--accent-blue)" />
-        <KpiCard label="Input Tokens" value={costSummary ? formatTokens(costSummary.total_input_tokens) : "0"} color="var(--text-secondary)" />
-        <KpiCard label="Output Tokens" value={costSummary ? formatTokens(costSummary.total_output_tokens) : "0"} color="var(--text-secondary)" />
-        <KpiCard
-          label="Avg Cost/Task"
-          value={costSummary && doneTaskCount > 0
-            ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}`
-            : "$0.00"}
-          color="var(--accent-green)"
-        />
-      </div>
+      {/* Cost & Token Tracking — only show details when cost data exists */}
+      {costSummary && costSummary.entry_count > 0 ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
+            <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" />
+            <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
+            <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
+            <KpiCard
+              label="Avg Cost/Task"
+              value={doneTaskCount > 0 ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}` : "$0.00"}
+              color="var(--accent-green)"
+            />
+          </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-        <CostTimeseriesCard data={costTimeseries} />
-        <CostByModelCard data={costByModel} />
-      </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+            <CostTimeseriesCard data={costTimeseries} />
+            <CostByModelCard data={costByModel} />
+          </div>
 
-      <CostByAgentCard data={costByAgent} />
+          <CostByAgentCard data={costByAgent} />
+        </>
+      ) : (
+        <div style={{ ...cardStyle, marginBottom: "16px" }}>
+          <div style={headerStyle}>Cost & Token Tracking</div>
+          <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+            No cost data recorded yet. Agents report costs via the <code style={{ color: "var(--accent-blue)" }}>log_cost</code> MCP tool after completing work. Cost cards will appear here once data is available.
+          </div>
+        </div>
+      )}
 
       {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
 

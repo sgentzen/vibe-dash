@@ -304,15 +304,41 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
 
 export function getMilestoneAgentContributions(db: Database.Database, milestoneId: string): AgentContribution[] {
   const rows = db.prepare(
-    `SELECT a.id AS agent_id, a.name AS agent_name,
-       COUNT(t.id) AS completed_count,
-       COALESCE(SUM(t.estimate), 0) AS completed_points
-     FROM tasks t
-     JOIN agents a ON t.assigned_agent_id = a.id
-     WHERE t.milestone_id = ? AND t.status = 'done'
-     GROUP BY a.id, a.name
+    `SELECT agent_id, agent_name,
+            SUM(completed_count) AS completed_count,
+            SUM(completed_points) AS completed_points
+     FROM (
+       -- Primary: tasks with assigned_agent_id
+       SELECT a.id AS agent_id, a.name AS agent_name,
+              COUNT(t.id) AS completed_count,
+              COALESCE(SUM(t.estimate), 0) AS completed_points
+       FROM tasks t
+       JOIN agents a ON t.assigned_agent_id = a.id
+       WHERE t.milestone_id = ? AND t.status = 'done'
+       GROUP BY a.id, a.name
+
+       UNION ALL
+
+       -- Fallback: derive agent from activity_log for unassigned tasks
+       SELECT deduped.agent_id, ag.name AS agent_name,
+              COUNT(*) AS completed_count,
+              COALESCE(SUM(t.estimate), 0) AS completed_points
+       FROM (
+         SELECT DISTINCT al.agent_id, al.task_id
+         FROM activity_log al
+         JOIN tasks t2 ON al.task_id = t2.id
+         WHERE t2.milestone_id = ? AND t2.status = 'done'
+           AND t2.assigned_agent_id IS NULL
+           AND al.agent_id IS NOT NULL
+           AND al.message LIKE 'Completed "%'
+       ) deduped
+       JOIN agents ag ON deduped.agent_id = ag.id
+       JOIN tasks t ON deduped.task_id = t.id
+       GROUP BY deduped.agent_id, ag.name
+     )
+     GROUP BY agent_id, agent_name
      ORDER BY completed_count DESC`
-  ).all(milestoneId) as AgentContribution[];
+  ).all(milestoneId, milestoneId) as AgentContribution[];
   return rows;
 }
 

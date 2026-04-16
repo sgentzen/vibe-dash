@@ -12,6 +12,7 @@ export {
   getMilestoneProgress,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
+  backfillMilestoneDailyStats,
   getTimeSpent,
 } from "./milestones.js";
 export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
@@ -105,6 +106,7 @@ export {
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  getGlobalCostSummary,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
 export {

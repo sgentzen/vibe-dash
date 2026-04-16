@@ -86,6 +86,7 @@ import {
   getAgentCostSummary,
   getMilestoneCostSummary,
   getProjectCostSummary,
+  getGlobalCostSummary,
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
@@ -866,6 +867,15 @@ export function createRouter(db: Database.Database): Router {
 
   router.get("/api/costs/milestone/:milestoneId", (req, res) => {
     res.json(getMilestoneCostSummary(db, req.params.milestoneId));
+  });
+
+  router.get("/api/costs/summary", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    if (project_id) {
+      res.json(getProjectCostSummary(db, project_id));
+    } else {
+      res.json(getGlobalCostSummary(db));
+    }
   });
 
   router.get("/api/costs/project/:projectId", (req, res) => {

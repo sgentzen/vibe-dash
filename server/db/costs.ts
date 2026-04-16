@@ -76,6 +76,16 @@ function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, valu
   ).get(value) as CostSummary;
 }
 
+export function getGlobalCostSummary(db: Database.Database): CostSummary {
+  return db.prepare(
+    `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
+            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+            COUNT(*) AS entry_count
+     FROM cost_entries`
+  ).get() as CostSummary;
+}
+
 export function getAgentCostSummary(db: Database.Database, agentId: string): CostSummary {
   return getCostSummaryBy(db, "agent_id", agentId);
 }

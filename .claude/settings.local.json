@@ -14,7 +14,9 @@
       "mcp__vibe-dash__update_sprint",
       "mcp__vibe-dash__complete_task",
       "Bash(npx tsc:*)",
-      "Bash(gh pr create --title 'feat: add milestone_id filter to searchTasks' --body ':*)"
+      "Bash(gh pr create --title 'feat: add milestone_id filter to searchTasks' --body ':*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(git add:*)"
     ]
   }
 }

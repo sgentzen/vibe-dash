@@ -47,6 +47,7 @@ import {
   createNotification,
   listMentions,
   handleRecurringTaskCompletion,
+  recordMilestoneDailyStats,
   createProjectFromTemplate,
   listTemplates,
   getActivityStream,
@@ -194,6 +195,7 @@ export async function handleTool(
     }
 
     case "update_task": {
+      const prior = getTask(db, args.task_id as string);
       const updated = updateTask(db, args.task_id as string, {
         title: args.title as string | undefined,
         description: args.description as string | null | undefined,
@@ -207,6 +209,11 @@ export async function handleTool(
         estimate: args.estimate as number | null | undefined,
       });
       if (updated) {
+        // Auto-assign agent when status changes to in_progress or done
+        if (agentName && !updated.assigned_agent_id && args.status && (args.status === "in_progress" || args.status === "done")) {
+          const agent = touchAgent(db, agentName);
+          updateTask(db, updated.id, { assigned_agent_id: agent.id });
+        }
         broadcast({ type: "task_updated", payload: updated });
         const changes: string[] = [];
         if (args.status) changes.push(`status → ${args.status}`);
@@ -216,15 +223,36 @@ export async function handleTool(
           ? `Updated "${updated.title}": ${changes.join(", ")}`
           : `Updated "${updated.title}"`;
         autoLog(db, updated.id, msg, agentName);
+        // Record milestone daily stats when status changes
+        if (args.status && prior && args.status !== prior.status && updated.milestone_id) {
+          recordMilestoneDailyStats(db, updated.milestone_id);
+        }
       }
       return ok({ success: true });
     }
 
     case "complete_task": {
+      // Auto-assign agent before completion if not already assigned
+      if (agentName) {
+        const task = getTask(db, args.task_id as string);
+        if (task && !task.assigned_agent_id) {
+          const agent = touchAgent(db, agentName);
+          updateTask(db, task.id, { assigned_agent_id: agent.id });
+        }
+      }
       const completed = completeTask(db, args.task_id as string);
       if (completed) {
         broadcast({ type: "task_completed", payload: completed });
         autoLog(db, completed.id, `Completed "${completed.title}"`, agentName);
+        // Record milestone daily stats
+        if (completed.milestone_id) {
+          recordMilestoneDailyStats(db, completed.milestone_id);
+        }
+        // Handle recurring tasks
+        const nextTask = handleRecurringTaskCompletion(db, completed.id);
+        if (nextTask) {
+          broadcast({ type: "task_created", payload: nextTask });
+        }
       }
       return ok({ success: true });
     }
