@@ -41,6 +41,14 @@ export function createMilestone(
   ) as Milestone;
 }
 
+export interface UpdateMilestoneInput {
+  name?: string;
+  description?: string | null;
+  acceptance_criteria?: string | null;
+  target_date?: string | null;
+  status?: MilestoneStatus;
+}
+
 export function updateMilestone(
   db: Database.Database,
   id: string,

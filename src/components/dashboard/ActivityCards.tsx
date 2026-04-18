@@ -1,17 +1,15 @@
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
+import { memo } from "react";
+import { CardWrapper } from "../ui/Card";
 import type { AgentContribution, ActivityHeatmapEntry, Milestone } from "../../types";
-
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 interface AgentContributionsCardProps {
   contributions: AgentContribution[];
   openMilestones: Milestone[];
 }
 
-export function AgentContributionsCard({ contributions, openMilestones }: AgentContributionsCardProps) {
+export const AgentContributionsCard = memo(function AgentContributionsCard({ contributions, openMilestones }: AgentContributionsCardProps) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Agent Contributions {openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}</div>
+    <CardWrapper title={`Agent Contributions ${openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}`}>
       {contributions.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
           {openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}
@@ -26,23 +24,22 @@ export function AgentContributionsCard({ contributions, openMilestones }: AgentC
           ))}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
 interface ActivityHeatmapCardProps {
   heatmap: ActivityHeatmapEntry[];
 }
 
-export function ActivityHeatmapCard({ heatmap }: ActivityHeatmapCardProps) {
+export const ActivityHeatmapCard = memo(function ActivityHeatmapCard({ heatmap }: ActivityHeatmapCardProps) {
   const hourTotals = Array.from({ length: 24 }, (_, h) =>
     heatmap.filter((e) => e.hour === h).reduce((sum, e) => sum + e.count, 0)
   );
   const maxTotal = Math.max(...hourTotals, 1);
 
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Activity Heatmap (by hour)</div>
+    <CardWrapper title="Activity Heatmap (by hour)">
       {heatmap.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No activity data yet.</div>
       ) : (
@@ -67,6 +64,6 @@ export function ActivityHeatmapCard({ heatmap }: ActivityHeatmapCardProps) {
           })}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});

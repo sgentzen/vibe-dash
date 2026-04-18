@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
-import { inputStyle } from "../styles/shared.js";
+import { inputStyle as sharedInputStyle } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
 import { TagPicker } from "./task/TagPicker";
@@ -10,16 +10,9 @@ import { ModalBackdrop } from "./ui/ModalBackdrop";
 import { ModalDrawer } from "./ui/ModalDrawer";
 import { FormField } from "./ui/FormField";
 import { TaskDrawerHeader } from "./task-edit/TaskDrawerHeader";
+import { TaskMetadataFields } from "./task-edit/TaskMetadataFields";
 import { TaskDateFields } from "./task-edit/TaskDateFields";
 import { TaskDrawerActions } from "./task-edit/TaskDrawerActions";
-
-const labelStyle: import("react").CSSProperties = {
-  display: "block",
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "var(--text-secondary)",
-  marginBottom: "4px",
-};
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -142,73 +135,18 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           />
         </FormField>
 
-        {/* Status */}
-        <div>
-          <label htmlFor="task-status" style={labelStyle}>Status</label>
-          <select
-            id="task-status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as TaskStatus)}
-            style={inputStyle}
-          >
-            <option value="planned">Planned</option>
-            <option value="in_progress">In Progress</option>
-            <option value="blocked">Blocked</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-
-        {/* Priority */}
-        <div>
-          <label htmlFor="task-priority" style={labelStyle}>Priority</label>
-          <select
-            id="task-priority"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            style={inputStyle}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-
-        {/* Milestone */}
-        {taskMilestones.length > 0 && (
-          <div>
-            <label htmlFor="task-milestone" style={labelStyle}>Milestone</label>
-            <select
-              id="task-milestone"
-              value={milestoneId ?? ""}
-              onChange={(e) => setMilestoneId(e.target.value || null)}
-              style={inputStyle}
-            >
-              <option value="">No Milestone</option>
-              {taskMilestones.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Assigned Agent */}
-        {agents.length > 0 && (
-          <div>
-            <label htmlFor="task-agent" style={labelStyle}>Assigned Agent</label>
-            <select
-              id="task-agent"
-              value={assignedAgentId ?? ""}
-              onChange={(e) => setAssignedAgentId(e.target.value || null)}
-              style={inputStyle}
-            >
-              <option value="">Unassigned</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        <TaskMetadataFields
+          status={status}
+          onStatusChange={setStatus}
+          priority={priority}
+          onPriorityChange={setPriority}
+          milestoneId={milestoneId}
+          onMilestoneChange={setMilestoneId}
+          assignedAgentId={assignedAgentId}
+          onAgentChange={setAssignedAgentId}
+          taskMilestones={taskMilestones}
+          agents={agents}
+        />
 
         <TaskDateFields
           dueDate={dueDate}
@@ -261,3 +199,4 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   );
 }
 
+const inputStyle: React.CSSProperties = sharedInputStyle;
