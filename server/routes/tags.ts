@@ -2,6 +2,7 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
 
 export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -13,11 +14,11 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
   router.post("/api/projects/:projectId/tags", (req, res) => {
     const { name, color } = req.body as { name: string; color?: string };
     if (!name) {
-      res.status(400).json({ error: "name is required" });
+      badRequest(res, "name is required");
       return;
     }
     if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
-      res.status(400).json({ error: "color must be a hex color like #ff0000" });
+      badRequest(res, "color must be a hex color like #ff0000");
       return;
     }
     const tag = createTag(db, { project_id: req.params.projectId, name, color });
@@ -32,7 +33,7 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
   router.post("/api/tasks/:id/tags", (req, res) => {
     const { tag_id } = req.body as { tag_id: string };
     if (!tag_id) {
-      res.status(400).json({ error: "tag_id is required" });
+      badRequest(res, "tag_id is required");
       return;
     }
     const taskTag = addTagToTask(db, req.params.id, tag_id);

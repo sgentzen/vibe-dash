@@ -2,10 +2,17 @@ import { useState, useEffect } from "react";
 import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
-import { inputStyle as sharedInputStyle, sectionHeader } from "../styles/shared.js";
+import { inputStyle as sharedInputStyle } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
 import { TagPicker } from "./task/TagPicker";
+import { ModalBackdrop } from "./ui/ModalBackdrop";
+import { ModalDrawer } from "./ui/ModalDrawer";
+import { FormField } from "./ui/FormField";
+import { TaskDrawerHeader } from "./task-edit/TaskDrawerHeader";
+import { TaskMetadataFields } from "./task-edit/TaskMetadataFields";
+import { TaskDateFields } from "./task-edit/TaskDateFields";
+import { TaskDrawerActions } from "./task-edit/TaskDrawerActions";
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -105,82 +112,20 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   return (
     <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: true, escapeDeactivates: true, onDeactivate: onClose }}>
       <div>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.4)",
-          zIndex: 10,
-        }}
-      />
+      <ModalBackdrop onClick={onClose} />
+      <ModalDrawer ariaLabel="Edit task">
+        <TaskDrawerHeader onClose={onClose} />
 
-      {/* Drawer */}
-      <div
-        className="drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Edit task"
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: "360px",
-          background: "var(--bg-secondary)",
-          borderLeft: "1px solid var(--border)",
-          boxShadow: "-4px 0 24px rgba(0,0,0,0.5)",
-          zIndex: 20,
-          display: "flex",
-          flexDirection: "column",
-          padding: "20px",
-          gap: "16px",
-        }}
-      >
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span
-            style={{
-              color: "var(--text-secondary)",
-              fontSize: "11px",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            Edit Task
-          </span>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted)",
-              fontSize: "18px",
-              cursor: "pointer",
-              lineHeight: 1,
-              padding: "0 4px",
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Title */}
-        <div>
-          <label htmlFor="task-title" style={labelStyle}>Title</label>
+        <FormField id="task-title" label="Title">
           <input
             id="task-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={inputStyle}
           />
-        </div>
+        </FormField>
 
-        {/* Description */}
-        <div>
-          <label htmlFor="task-description" style={labelStyle}>Description</label>
+        <FormField id="task-description" label="Description">
           <textarea
             id="task-description"
             value={description}
@@ -188,130 +133,31 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             rows={4}
             style={{ ...inputStyle, resize: "vertical" }}
           />
-        </div>
+        </FormField>
 
-        {/* Status */}
-        <div>
-          <label htmlFor="task-status" style={labelStyle}>Status</label>
-          <select
-            id="task-status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as TaskStatus)}
-            style={inputStyle}
-          >
-            <option value="planned">Planned</option>
-            <option value="in_progress">In Progress</option>
-            <option value="blocked">Blocked</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
+        <TaskMetadataFields
+          status={status}
+          onStatusChange={setStatus}
+          priority={priority}
+          onPriorityChange={setPriority}
+          milestoneId={milestoneId}
+          onMilestoneChange={setMilestoneId}
+          assignedAgentId={assignedAgentId}
+          onAgentChange={setAssignedAgentId}
+          taskMilestones={taskMilestones}
+          agents={agents}
+        />
 
-        {/* Priority */}
-        <div>
-          <label htmlFor="task-priority" style={labelStyle}>Priority</label>
-          <select
-            id="task-priority"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            style={inputStyle}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-
-        {/* Milestone */}
-        {taskMilestones.length > 0 && (
-          <div>
-            <label htmlFor="task-milestone" style={labelStyle}>Milestone</label>
-            <select
-              id="task-milestone"
-              value={milestoneId ?? ""}
-              onChange={(e) => setMilestoneId(e.target.value || null)}
-              style={inputStyle}
-            >
-              <option value="">No Milestone</option>
-              {taskMilestones.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Assigned Agent */}
-        {agents.length > 0 && (
-          <div>
-            <label htmlFor="task-agent" style={labelStyle}>Assigned Agent</label>
-            <select
-              id="task-agent"
-              value={assignedAgentId ?? ""}
-              onChange={(e) => setAssignedAgentId(e.target.value || null)}
-              style={inputStyle}
-            >
-              <option value="">Unassigned</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Due Date */}
-        <div>
-          <label htmlFor="task-due-date" style={labelStyle}>Due Date</label>
-          <input
-            id="task-due-date"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Estimate */}
-        <div>
-          <label htmlFor="task-estimate" style={labelStyle}>Estimate (story points)</label>
-          <input
-            id="task-estimate"
-            type="number"
-            min={0}
-            value={estimate}
-            onChange={(e) => setEstimate(e.target.value)}
-            placeholder="0"
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Start Date */}
-        <div>
-          <label htmlFor="task-start-date" style={labelStyle}>Start Date</label>
-          <input
-            id="task-start-date"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Recurrence */}
-        <div>
-          <label htmlFor="task-recurrence" style={labelStyle}>Recurrence Rule</label>
-          <select
-            id="task-recurrence"
-            value={recurrenceRule}
-            onChange={(e) => setRecurrenceRule(e.target.value)}
-            style={inputStyle}
-          >
-            <option value="">None</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
+        <TaskDateFields
+          dueDate={dueDate}
+          onDueDateChange={setDueDate}
+          estimate={estimate}
+          onEstimateChange={setEstimate}
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          recurrenceRule={recurrenceRule}
+          onRecurrenceRuleChange={setRecurrenceRule}
+        />
 
         {/* Tags */}
         <TagPicker
@@ -321,9 +167,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           projectTagCount={projectTags.length}
         />
 
-        {/* Progress */}
-        <div>
-          <label htmlFor="task-progress" style={labelStyle}>Progress — {progress}%</label>
+        <FormField id="task-progress" label={`Progress — ${progress}%`}>
           <input
             id="task-progress"
             type="range"
@@ -333,7 +177,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             onChange={(e) => setProgress(Number(e.target.value))}
             style={{ width: "100%", accentColor: "var(--accent-green)" }}
           />
-        </div>
+        </FormField>
 
         {/* Comments */}
         <CommentsSection
@@ -343,50 +187,16 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           onSubmitComment={submitComment}
         />
 
-        {/* Actions */}
-        <div style={{ marginTop: "auto", display: "flex", gap: "10px" }}>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              flex: 1,
-              background: "var(--green-bg)",
-              border: "1px solid var(--green-border)",
-              color: "var(--accent-green)",
-              borderRadius: "6px",
-              padding: "8px",
-              fontSize: "13px",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-          {task.status !== "done" && (
-            <button
-              onClick={handleMarkDone}
-              disabled={saving}
-              style={{
-                flex: 1,
-                background: "transparent",
-                border: "1px solid var(--accent-green)",
-                color: "var(--accent-green)",
-                borderRadius: "6px",
-                padding: "8px",
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
-            >
-              Mark Done
-            </button>
-          )}
-        </div>
-      </div>
+        <TaskDrawerActions
+          saving={saving}
+          showMarkDone={task.status !== "done"}
+          onSave={handleSave}
+          onMarkDone={handleMarkDone}
+        />
+      </ModalDrawer>
       </div>
     </FocusTrap>
   );
 }
-
-const labelStyle: React.CSSProperties = { ...sectionHeader, display: "block", marginBottom: "5px" };
 
 const inputStyle: React.CSSProperties = sharedInputStyle;

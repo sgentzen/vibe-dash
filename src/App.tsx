@@ -70,29 +70,20 @@ export function App() {
           dispatch({ type: "SET_TAGS", payload: allTags });
           dispatch({ type: "SET_MILESTONES", payload: allMilestones });
 
-          // Load task tags for all tasks
-          const taskTagEntries = await Promise.all(
-            tasks.map(async (t) => {
-              const tags = await api.getTaskTags(t.id);
-              return [t.id, tags.map((tag) => tag.id)] as [string, string[]];
-            })
-          );
+          // Load task tags and dependencies in bulk (one request per project instead of N per task)
+          const [taskTagPairs, allDeps] = await Promise.all([
+            Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
+            Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
+          ]);
           const tagMap: Record<string, string[]> = {};
-          for (const [taskId, tagIds] of taskTagEntries) {
-            if (tagIds.length > 0) tagMap[taskId] = tagIds;
+          for (const { task_id, tag } of taskTagPairs) {
+            (tagMap[task_id] ??= []).push(tag.id);
           }
           dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
 
-          // Load task dependencies for all tasks
-          const depsEntries = await Promise.all(
-            tasks.map(async (t) => {
-              const deps = await api.getDependencies(t.id);
-              return [t.id, deps.map((d) => d.depends_on_task_id)] as [string, string[]];
-            })
-          );
           const depsMap: Record<string, string[]> = {};
-          for (const [taskId, depIds] of depsEntries) {
-            if (depIds.length > 0) depsMap[taskId] = depIds;
+          for (const d of allDeps) {
+            (depsMap[d.task_id] ??= []).push(d.depends_on_task_id);
           }
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 

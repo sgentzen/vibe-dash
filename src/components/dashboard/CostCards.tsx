@@ -1,7 +1,6 @@
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
+import { memo } from "react";
+import { CardWrapper } from "../ui/Card";
 import { formatTokens } from "./KpiCard";
-
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 interface CostTimeseriesEntry {
   date: string;
@@ -22,10 +21,9 @@ interface CostByAgentEntry {
   total_tokens: number;
 }
 
-export function CostTimeseriesCard({ data }: { data: CostTimeseriesEntry[] }) {
+export const CostTimeseriesCard = memo(function CostTimeseriesCard({ data }: { data: CostTimeseriesEntry[] }) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Daily Spend (Last 30 Days)</div>
+    <CardWrapper title="Daily Spend (Last 30 Days)">
       {data.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No cost data yet. Agents will log costs as they work.</div>
       ) : (
@@ -46,14 +44,13 @@ export function CostTimeseriesCard({ data }: { data: CostTimeseriesEntry[] }) {
           }); })()}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
-export function CostByModelCard({ data }: { data: CostByModelEntry[] }) {
+export const CostByModelCard = memo(function CostByModelCard({ data }: { data: CostByModelEntry[] }) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Cost by Model</div>
+    <CardWrapper title="Cost by Model">
       {data.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No model cost data yet.</div>
       ) : (
@@ -74,15 +71,14 @@ export function CostByModelCard({ data }: { data: CostByModelEntry[] }) {
           }); })()}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
-export function CostByAgentCard({ data }: { data: CostByAgentEntry[] }) {
+export const CostByAgentCard = memo(function CostByAgentCard({ data }: { data: CostByAgentEntry[] }) {
   if (data.length === 0) return null;
   return (
-    <div style={{ ...cardStyle, marginBottom: "16px" }}>
-      <div style={headerStyle}>Cost by Agent</div>
+    <CardWrapper title="Cost by Agent" style={{ marginBottom: "16px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
         {(() => { const maxCost = Math.max(...data.map((x) => x.total_cost_usd), 0.01); return data.map((a) => {
           const pct = (a.total_cost_usd / maxCost) * 100;
@@ -99,6 +95,6 @@ export function CostByAgentCard({ data }: { data: CostByAgentEntry[] }) {
           );
         }); })()}
       </div>
-    </div>
+    </CardWrapper>
   );
-}
+});

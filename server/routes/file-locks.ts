@@ -2,13 +2,14 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { reportWorkingOn, releaseFileLocks, getActiveFileLocks, getFileConflicts } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
 
 export function fileLockRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
 
   router.post("/api/agents/:id/file-locks", (req, res) => {
     const { task_id, file_paths } = req.body as { task_id: string; file_paths: string[] };
-    if (!task_id || !file_paths?.length) { res.status(400).json({ error: "task_id and file_paths are required" }); return; }
+    if (!task_id || !file_paths?.length) { badRequest(res, "task_id and file_paths are required"); return; }
     const locks = reportWorkingOn(db, req.params.id, task_id, file_paths);
     for (const lock of locks) broadcast({ type: "file_lock_acquired", payload: lock });
     const conflicts = getFileConflicts(db);

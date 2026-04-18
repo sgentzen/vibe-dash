@@ -1,4 +1,6 @@
 import type Database from "better-sqlite3";
+import { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS, ACTIVE_THRESHOLD_MINUTES, SESSION_TIMEOUT_MS } from "../constants.js";
+export { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS, ACTIVE_THRESHOLD_MINUTES };
 import type {
   Agent,
   AgentSession,
@@ -39,20 +41,18 @@ export function registerAgent(
     .prepare("SELECT * FROM agents WHERE name = ?")
     .get(input.name) as Record<string, unknown> | undefined;
 
+  let row: Record<string, unknown>;
   if (existing) {
-    db.prepare(
-      "UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), last_seen_at = ? WHERE name = ?"
-    ).run(input.model ?? null, capJson, role, parentAgentId, ts, input.name);
+    row = db.prepare(
+      "UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), last_seen_at = ? WHERE name = ? RETURNING *"
+    ).get(input.model ?? null, capJson, role, parentAgentId, ts, input.name) as Record<string, unknown>;
   } else {
     const id = genId();
-    db.prepare(
-      "INSERT INTO agents (id, name, model, capabilities, role, parent_agent_id, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(id, input.name, input.model ?? null, capJson, role, parentAgentId, ts, ts);
+    row = db.prepare(
+      "INSERT INTO agents (id, name, model, capabilities, role, parent_agent_id, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
+    ).get(id, input.name, input.model ?? null, capJson, role, parentAgentId, ts, ts) as Record<string, unknown>;
   }
 
-  const row = db
-    .prepare("SELECT * FROM agents WHERE name = ?")
-    .get(input.name) as Record<string, unknown>;
   return parseAgent(row);
 }
 
@@ -139,10 +139,6 @@ export function getAllAgentCurrentProjects(
 
 // ─── Agent Health ───────────────────────────────────────────────────────────
 
-export const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
-export const IDLE_THRESHOLD_MS = 30 * 60 * 1000;
-export const ACTIVE_THRESHOLD_MINUTES = ACTIVE_THRESHOLD_MS / 60_000;
-
 export function getAgentHealthStatus(lastSeenAt: string): AgentHealthStatus {
   const elapsed = Date.now() - new Date(lastSeenAt).getTime();
   if (elapsed < ACTIVE_THRESHOLD_MS) return "active";
@@ -152,7 +148,6 @@ export function getAgentHealthStatus(lastSeenAt: string): AgentHealthStatus {
 
 // ─── Agent Sessions ─────────────────────────────────────────────────────────
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function startOrGetSession(db: Database.Database, agentId: string): AgentSession {
   const ts = now();
@@ -165,16 +160,14 @@ export function startOrGetSession(db: Database.Database, agentId: string): Agent
     if (elapsed > SESSION_TIMEOUT_MS) {
       db.prepare("UPDATE agent_sessions SET ended_at = ? WHERE id = ?").run(ts, open.id);
     } else {
-      db.prepare("UPDATE agent_sessions SET activity_count = activity_count + 1, last_activity_at = ? WHERE id = ?").run(ts, open.id);
-      return db.prepare("SELECT * FROM agent_sessions WHERE id = ?").get(open.id) as AgentSession;
+      return db.prepare("UPDATE agent_sessions SET activity_count = activity_count + 1, last_activity_at = ? WHERE id = ? RETURNING *").get(ts, open.id) as AgentSession;
     }
   }
 
   const id = genId();
-  db.prepare(
-    "INSERT INTO agent_sessions (id, agent_id, started_at, last_activity_at, tasks_touched, activity_count) VALUES (?, ?, ?, ?, 1, 1)"
-  ).run(id, agentId, ts, ts);
-  return db.prepare("SELECT * FROM agent_sessions WHERE id = ?").get(id) as AgentSession;
+  return db.prepare(
+    "INSERT INTO agent_sessions (id, agent_id, started_at, last_activity_at, tasks_touched, activity_count) VALUES (?, ?, ?, ?, 1, 1) RETURNING *"
+  ).get(id, agentId, ts, ts) as AgentSession;
 }
 
 export function closeAgentSessions(db: Database.Database, agentId: string): void {
@@ -354,12 +347,10 @@ export function reportWorkingOn(
   const locks: AgentFileLock[] = [];
   for (const fp of filePaths) {
     const id = genId();
-    db.prepare(
-      "INSERT OR REPLACE INTO agent_file_locks (id, agent_id, task_id, file_path, started_at) VALUES (?, ?, ?, ?, ?)"
-    ).run(id, agentId, taskId, fp, ts);
-    locks.push(
-      db.prepare("SELECT * FROM agent_file_locks WHERE agent_id = ? AND file_path = ?").get(agentId, fp) as AgentFileLock
-    );
+    const row = db.prepare(
+      "INSERT OR REPLACE INTO agent_file_locks (id, agent_id, task_id, file_path, started_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
+    ).get(id, agentId, taskId, fp, ts) as AgentFileLock;
+    locks.push(row);
   }
   return locks;
 }

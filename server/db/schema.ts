@@ -21,10 +21,15 @@ const SCHEMA = [
   "  project_id TEXT NOT NULL REFERENCES projects(id),",
   "  parent_task_id TEXT REFERENCES tasks(id),",
   "  milestone_id TEXT REFERENCES milestones(id),",
+  "  assigned_agent_id TEXT REFERENCES agents(id),",
   "  title TEXT NOT NULL, description TEXT,",
   "  status TEXT NOT NULL DEFAULT 'planned',",
   "  priority TEXT NOT NULL DEFAULT 'medium',",
   "  progress INTEGER NOT NULL DEFAULT 0,",
+  "  due_date TEXT,",
+  "  start_date TEXT,",
+  "  estimate INTEGER,",
+  "  recurrence_rule TEXT,",
   "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
   ");",
   "CREATE TABLE IF NOT EXISTS agents (",
@@ -131,16 +136,6 @@ const SCHEMA = [
   "  read INTEGER NOT NULL DEFAULT 0,",
   "  created_at TEXT NOT NULL",
   ");",
-  "CREATE TABLE IF NOT EXISTS milestones (",
-  "  id TEXT PRIMARY KEY,",
-  "  project_id TEXT NOT NULL REFERENCES projects(id),",
-  "  title TEXT NOT NULL,",
-  "  description TEXT,",
-  "  status TEXT NOT NULL DEFAULT 'open',",
-  "  due_date TEXT,",
-  "  completed_at TEXT,",
-  "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
-  ");",
   "CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);",
   "CREATE TABLE IF NOT EXISTS cost_entries (",
   "  id TEXT PRIMARY KEY,",
@@ -184,6 +179,18 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);",
   "CREATE INDEX IF NOT EXISTS idx_agent_file_locks_agent_id ON agent_file_locks(agent_id);",
   "CREATE INDEX IF NOT EXISTS idx_notifications_rule_id ON notifications(rule_id);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);",
+  // task_tags.task_id and task_dependencies.task_id are covered by the UNIQUE
+  // composite indexes (leftmost prefix). Only index the non-leftmost columns.
+  "CREATE INDEX IF NOT EXISTS idx_task_tags_tag_id ON task_tags(tag_id);",
+  "CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_tags_project_id ON tags(project_id);",
+  "CREATE INDEX IF NOT EXISTS idx_task_comments_agent_id ON task_comments(agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_agent_file_locks_task_id ON agent_file_locks(task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_cost_entries_task_id ON cost_entries(task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_completion_metrics_created_at ON completion_metrics(created_at);",
+  "CREATE INDEX IF NOT EXISTS idx_blockers_resolved_at ON blockers(resolved_at);",
 ].join("\n");
 
 function migrate(db: Database.Database): void {
@@ -211,9 +218,6 @@ function migrate(db: Database.Database): void {
   if (!cols.some((c) => c.name === "start_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
   }
-  if (!cols.some((c) => c.name === "milestone_id")) {
-    db.prepare("ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id)").run();
-  }
 
   const agentCols = db.pragma("table_info(agents)") as { name: string }[];
   if (!agentCols.some((c) => c.name === "role")) {
@@ -222,6 +226,11 @@ function migrate(db: Database.Database): void {
   if (!agentCols.some((c) => c.name === "parent_agent_id")) {
     db.prepare("ALTER TABLE agents ADD COLUMN parent_agent_id TEXT REFERENCES agents(id)").run();
   }
+
+  // Fix: `ALTER TABLE tasks RENAME COLUMN sprint_id TO milestone_id` leaves the
+  // FK still pointing at sprints(id). If sprints has been dropped this causes
+  // every insert to fail. Detect via foreign_key_list and rebuild if needed.
+  rebuildTasksIfFkStale(db);
 
   // Migrate sprints → milestones if legacy sprints table exists
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sprints'").all();
@@ -258,6 +267,52 @@ function migrate(db: Database.Database): void {
         ).run();
       }
     }
+  }
+}
+
+interface ForeignKeyRow { id: number; seq: number; table: string; from: string; to: string; on_update: string; on_delete: string; match: string }
+
+function rebuildTasksIfFkStale(db: Database.Database): void {
+  const fks = db.pragma("foreign_key_list(tasks)") as ForeignKeyRow[];
+  const hasStaleSprintFk = fks.some((fk) => fk.from === "milestone_id" && fk.table === "sprints");
+  if (!hasStaleSprintFk) return;
+
+  // Rebuild tasks with correct FK target. Must run with foreign_keys OFF.
+  const fkWasOn = (db.pragma("foreign_keys", { simple: true }) as number) === 1;
+  if (fkWasOn) db.pragma("foreign_keys = OFF");
+  try {
+    db.exec(`
+      BEGIN;
+      CREATE TABLE tasks_new (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id),
+        parent_task_id TEXT REFERENCES tasks(id),
+        milestone_id TEXT REFERENCES milestones(id),
+        assigned_agent_id TEXT REFERENCES agents(id),
+        title TEXT NOT NULL, description TEXT,
+        status TEXT NOT NULL DEFAULT 'planned',
+        priority TEXT NOT NULL DEFAULT 'medium',
+        progress INTEGER NOT NULL DEFAULT 0,
+        due_date TEXT,
+        start_date TEXT,
+        estimate INTEGER,
+        recurrence_rule TEXT,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      INSERT INTO tasks_new
+        (id, project_id, parent_task_id, milestone_id, assigned_agent_id,
+         title, description, status, priority, progress,
+         due_date, start_date, estimate, recurrence_rule, created_at, updated_at)
+      SELECT id, project_id, parent_task_id, milestone_id, assigned_agent_id,
+         title, description, status, priority, progress,
+         due_date, start_date, estimate, recurrence_rule, created_at, updated_at
+      FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      COMMIT;
+    `);
+  } finally {
+    if (fkWasOn) db.pragma("foreign_keys = ON");
   }
 }
 

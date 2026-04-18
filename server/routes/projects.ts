@@ -2,6 +2,7 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { listProjects, createProject, generateReport } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
 
 export function projectRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -13,7 +14,7 @@ export function projectRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
   router.post("/api/projects", (req, res) => {
     const { name, description } = req.body as { name: string; description?: string | null };
     if (!name) {
-      res.status(400).json({ error: "name is required" });
+      badRequest(res, "name is required");
       return;
     }
     const project = createProject(db, { name, description: description ?? null });

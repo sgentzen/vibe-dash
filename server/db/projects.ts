@@ -8,10 +8,9 @@ export function createProject(
 ): Project {
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT INTO projects (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, input.name, input.description ?? null, ts, ts);
-  return db.prepare("SELECT * FROM projects WHERE id = ?").get(id) as Project;
+  return db.prepare(
+    "INSERT INTO projects (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
+  ).get(id, input.name, input.description ?? null, ts, ts) as Project;
 }
 
 export function updateProject(
@@ -26,11 +25,11 @@ export function updateProject(
   const description = input.description !== undefined ? input.description : existing.description;
   const ts = now();
 
-  db.prepare(
-    "UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ?"
-  ).run(name, description, ts, id);
+  const row = db.prepare(
+    "UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ? RETURNING *"
+  ).get(name, description, ts, id) as Project | undefined;
 
-  return db.prepare("SELECT * FROM projects WHERE id = ?").get(id) as Project;
+  return row ?? null;
 }
 
 export function listProjects(db: Database.Database): Project[] {

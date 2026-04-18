@@ -1,12 +1,10 @@
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
+import { memo } from "react";
+import { CardWrapper } from "../ui/Card";
 import type { SprintDailyStats, VelocityData, ActivityHeatmapEntry, AgentContribution, Sprint } from "../../types";
 
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
-
-export function BurndownCard({ burndown, activeSprint }: { burndown: SprintDailyStats[]; activeSprint?: Sprint }) {
+export const BurndownCard = memo(function BurndownCard({ burndown, activeSprint }: { burndown: SprintDailyStats[]; activeSprint?: Sprint }) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Sprint Burndown {activeSprint ? `(${activeSprint.name})` : ""}</div>
+    <CardWrapper title={`Sprint Burndown ${activeSprint ? `(${activeSprint.name})` : ""}`}>
       {burndown.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
           {activeSprint ? "No burndown data yet. Complete tasks to see progress." : "No active sprint — create and activate a sprint to see burndown."}
@@ -30,14 +28,13 @@ export function BurndownCard({ burndown, activeSprint }: { burndown: SprintDaily
           })}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
-export function VelocityCard({ velocity }: { velocity: VelocityData[] }) {
+export const VelocityCard = memo(function VelocityCard({ velocity }: { velocity: VelocityData[] }) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Velocity Trend (Last {velocity.length} Sprints)</div>
+    <CardWrapper title={`Velocity Trend (Last ${velocity.length} Sprints)`}>
       {velocity.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>Complete at least one sprint to see velocity trends.</div>
       ) : (
@@ -59,14 +56,13 @@ export function VelocityCard({ velocity }: { velocity: VelocityData[] }) {
           }); })()}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
-export function ContributionsCard({ contributions, activeSprint }: { contributions: AgentContribution[]; activeSprint?: Sprint }) {
+export const ContributionsCard = memo(function ContributionsCard({ contributions, activeSprint }: { contributions: AgentContribution[]; activeSprint?: Sprint }) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Agent Contributions {activeSprint ? `(${activeSprint.name})` : ""}</div>
+    <CardWrapper title={`Agent Contributions ${activeSprint ? `(${activeSprint.name})` : ""}`}>
       {contributions.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
           {activeSprint ? "No contributions yet." : "No active sprint — activate a sprint to track agent contributions."}
@@ -83,14 +79,13 @@ export function ContributionsCard({ contributions, activeSprint }: { contributio
           ))}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
-export function HeatmapCard({ heatmap }: { heatmap: ActivityHeatmapEntry[] }) {
+export const HeatmapCard = memo(function HeatmapCard({ heatmap }: { heatmap: ActivityHeatmapEntry[] }) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Activity Heatmap (by hour)</div>
+    <CardWrapper title="Activity Heatmap (by hour)">
       {heatmap.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No activity data yet.</div>
       ) : (
@@ -121,6 +116,6 @@ export function HeatmapCard({ heatmap }: { heatmap: ActivityHeatmapEntry[] }) {
           })()}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});

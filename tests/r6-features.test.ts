@@ -1,19 +1,18 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import {
-  initDb,
   createWebhook,
   listWebhooks,
   updateWebhook,
   deleteWebhook,
   getMatchingWebhooks,
 } from "../server/db/index.js";
+import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
 beforeEach(() => {
-  db = new Database(":memory:");
-  initDb(db);
+  db = createTestDb();
 });
 
 // ─── 5.3 Webhooks ────────────────────────────────────────────────────────────

@@ -1,8 +1,6 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useApi } from "../../hooks/useApi";
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
-
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
+import { CardWrapper } from "../ui/Card";
 
 type ReportPeriod = "day" | "week" | "milestone";
 
@@ -10,7 +8,7 @@ interface ReportGeneratorCardProps {
   projectId: string | null;
 }
 
-export function ReportGeneratorCard({ projectId }: ReportGeneratorCardProps) {
+export const ReportGeneratorCard = memo(function ReportGeneratorCard({ projectId }: ReportGeneratorCardProps) {
   const api = useApi();
   const [reportText, setReportText] = useState<string | null>(null);
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>("week");
@@ -26,8 +24,7 @@ export function ReportGeneratorCard({ projectId }: ReportGeneratorCardProps) {
   }
 
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Generate Status Report</div>
+    <CardWrapper title="Generate Status Report">
       <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
         <select
           value={reportPeriod}
@@ -76,6 +73,6 @@ export function ReportGeneratorCard({ projectId }: ReportGeneratorCardProps) {
           {reportText}
         </pre>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});

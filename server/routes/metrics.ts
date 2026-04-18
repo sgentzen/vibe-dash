@@ -8,6 +8,7 @@ import {
 } from "../db/index.js";
 import { statsLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest, notFound } from "./responses.js";
 
 const NUMERIC_FIELDS = ["lines_added", "lines_removed", "files_changed", "tests_added", "tests_passing", "duration_seconds"] as const;
 
@@ -26,13 +27,13 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       duration_seconds?: number;
     };
     if (!task_id || !agent_id) {
-      res.status(400).json({ error: "task_id and agent_id are required" });
+      badRequest(res, "task_id and agent_id are required");
       return;
     }
     for (const field of NUMERIC_FIELDS) {
       const val = req.body[field];
       if (val !== undefined && !Number.isFinite(val)) {
-        res.status(400).json({ error: `${field} must be a number` });
+        badRequest(res, `${field} must be a number`);
         return;
       }
     }
@@ -46,7 +47,7 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
   router.get("/api/agents/:id/performance", (req, res) => {
     const perf = getAgentPerformance(db, req.params.id);
     if (!perf) {
-      res.status(404).json({ error: "No metrics found for this agent" });
+      notFound(res, "No metrics found for this agent");
       return;
     }
     res.json(perf);

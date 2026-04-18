@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
@@ -38,7 +38,10 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
     ? agents.find((a) => a.id === task.assigned_agent_id)
     : null;
 
-  const dueUrgency = isDone ? null : getDueUrgency(task.due_date);
+  const dueUrgency = useMemo(
+    () => (isDone ? null : getDueUrgency(task.due_date)),
+    [isDone, task.due_date]
+  );
 
   const childTasks = allTasks.filter((t) => t.parent_task_id === task.id);
   const hasChildren = childTasks.length > 0;

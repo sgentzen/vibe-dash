@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -160,6 +160,18 @@ async function createTag(projectId: string, data: { name: string; color?: string
 async function getTaskTags(taskId: string): Promise<Tag[]> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`);
   if (!res.ok) throw new Error(`getTaskTags failed: ${res.status}`);
+  return res.json();
+}
+
+async function getProjectTaskTags(projectId: string): Promise<Array<{ task_id: string; tag: Tag }>> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/task-tags`);
+  if (!res.ok) throw new Error(`getProjectTaskTags failed: ${res.status}`);
+  return res.json();
+}
+
+async function getProjectTaskDependencies(projectId: string): Promise<TaskDependency[]> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/task-dependencies`);
+  if (!res.ok) throw new Error(`getProjectTaskDependencies failed: ${res.status}`);
   return res.json();
 }
 
@@ -551,6 +563,8 @@ export function useApi() {
     getTags,
     createTag,
     getTaskTags,
+    getProjectTaskTags,
+    getProjectTaskDependencies,
     addTagToTask,
     removeTagFromTask,
     getMilestoneProgress,

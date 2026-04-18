@@ -67,6 +67,8 @@ export type { CreateBlockerInput } from "./blockers.js";
 export { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags, getTag } from "./tags.js";
 export type { CreateTagInput } from "./tags.js";
 export { addDependency, removeDependency, listDependencies, getBlockingTasks } from "./dependencies.js";
+export { getTaskTagsForProject, getDependenciesForProject } from "./bulk.js";
+export type { TaskTagPair } from "./bulk.js";
 export { createSavedFilter, listSavedFilters, deleteSavedFilter } from "./filters.js";
 export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
 export {

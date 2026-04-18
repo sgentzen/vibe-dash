@@ -8,6 +8,7 @@ import {
   evaluateAlertRules,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
 
 export function commentRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -18,7 +19,7 @@ export function commentRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
 
   router.post("/api/tasks/:id/comments", (req, res) => {
     const { message, author_name, agent_id } = req.body as { message: string; author_name: string; agent_id?: string };
-    if (!message || !author_name) { res.status(400).json({ error: "message and author_name are required" }); return; }
+    if (!message || !author_name) { badRequest(res, "message and author_name are required"); return; }
     const comment = addComment(db, req.params.id, message, author_name, agent_id);
     broadcast({ type: "comment_added", payload: comment });
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import type { TaskStatus, MilestoneStatus } from "./types.js";
+import type { TaskStatus, TaskPriority, MilestoneStatus, TaskDependency } from "./types.js";
 import {
   listProjects,
   createProject,
@@ -92,8 +92,21 @@ import {
   getCostByAgent,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
+import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
+import { validateBody } from "./routes/validate.js";
+import {
+  createProjectSchema,
+  updateProjectSchema,
+  createTaskSchema,
+  updateTaskSchema,
+  createMilestoneSchema,
+  updateMilestoneSchema,
+  createTagSchema,
+  createCommentSchema,
+  logCostSchema,
+} from "../shared/schemas.js";
 
 const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
@@ -103,7 +116,9 @@ const dependencyDeleteLimiter = rateLimit({
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
-    void fireWebhooks(db, event.type, event.payload);
+    fireWebhooks(db, event.type, event.payload).catch((err) => {
+      logger.warn({ err, event: event.type }, "webhook dispatch failed");
+    });
   };
 }
 
@@ -169,15 +184,11 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/projects
-  router.post("/api/projects", (req, res) => {
+  router.post("/api/projects", validateBody(createProjectSchema), (req, res) => {
     const { name, description } = req.body as {
       name: string;
       description?: string | null;
     };
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
-    }
     const project = createProject(db, {
       name,
       description: description ?? null,
@@ -187,22 +198,20 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // PUT /api/projects/:id
-  router.put("/api/projects/:id", (req, res) => {
+  router.put("/api/projects/:id", validateBody(updateProjectSchema), (req, res) => {
     const { name, description } = req.body as {
       name?: string;
       description?: string | null;
     };
-    if (name !== undefined && !name) {
-      res.status(400).json({ error: "name cannot be empty" });
-      return;
-    }
-    const project = updateProject(db, req.params.id, { name, description });
+    const project = updateProject(db, req.params.id as string, { name, description });
     if (!project) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
     broadcast({ type: "project_updated", payload: project });
-    fireWebhooks(db, "project_updated", project);
+    fireWebhooks(db, "project_updated", project).catch((err) => {
+      logger.warn({ err, event: "project_updated" }, "webhook dispatch failed");
+    });
     res.json(project);
   });
 
@@ -230,7 +239,7 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/tasks
-  router.post("/api/tasks", (req, res) => {
+  router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
     const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
       req.body as {
         project_id: string;
@@ -246,10 +255,6 @@ export function createRouter(db: Database.Database): Router {
         estimate?: number | null;
         recurrence_rule?: string | null;
       };
-    if (!project_id || !title || !priority) {
-      res.status(400).json({ error: "project_id, title, and priority are required" });
-      return;
-    }
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
@@ -273,7 +278,7 @@ export function createRouter(db: Database.Database): Router {
     const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
     if (!task_ids?.length || !updates) { res.status(400).json({ error: "task_ids and updates are required" }); return; }
     if (task_ids.length > 200) { res.status(400).json({ error: "Maximum 200 tasks per bulk update" }); return; }
-    const tasks = bulkUpdateTasks(db, task_ids, updates as any);
+    const tasks = bulkUpdateTasks(db, task_ids, updates as Parameters<typeof bulkUpdateTasks>[2]);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     // Record daily stats for affected milestones when status changes
     if (updates.status) {
@@ -290,8 +295,8 @@ export function createRouter(db: Database.Database): Router {
       query: q.q,
       project_id: q.project_id,
       milestone_id: q.milestone_id,
-      status: q.status as any,
-      priority: q.priority as any,
+      status: q.status as TaskStatus | undefined,
+      priority: q.priority as TaskPriority | undefined,
       assigned_agent_id: q.assigned_agent_id,
       tag_id: q.tag_id,
       due_before: q.due_before,
@@ -310,14 +315,15 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // PATCH /api/tasks/:id
-  router.patch("/api/tasks/:id", (req, res) => {
-    const task = getTask(db, req.params.id);
+  router.patch("/api/tasks/:id", validateBody(updateTaskSchema), (req, res) => {
+    const id = req.params.id as string;
+    const task = getTask(db, id);
     if (!task) {
       res.status(404).json({ error: "Task not found" });
       return;
     }
     const body = req.body as Parameters<typeof updateTask>[2];
-    const updated = updateTask(db, req.params.id, body);
+    const updated = updateTask(db, id, body);
     broadcast({ type: "task_updated", payload: updated! });
     // Auto-log the change
     const changes: string[] = [];
@@ -444,7 +450,7 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/milestones
-  router.post("/api/milestones", (req, res) => {
+  router.post("/api/milestones", validateBody(createMilestoneSchema), (req, res) => {
     const { project_id, name, description, status, acceptance_criteria, target_date } =
       req.body as {
         project_id: string;
@@ -454,10 +460,6 @@ export function createRouter(db: Database.Database): Router {
         acceptance_criteria?: string | null;
         target_date?: string | null;
       };
-    if (!project_id || !name) {
-      res.status(400).json({ error: "project_id and name are required" });
-      return;
-    }
     const milestone = createMilestone(db, {
       project_id,
       name,
@@ -471,13 +473,14 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // PATCH /api/milestones/:id
-  router.patch("/api/milestones/:id", (req, res) => {
-    const milestone = getMilestone(db, req.params.id);
+  router.patch("/api/milestones/:id", validateBody(updateMilestoneSchema), (req, res) => {
+    const id = req.params.id as string;
+    const milestone = getMilestone(db, id);
     if (!milestone) {
       res.status(404).json({ error: "Milestone not found" });
       return;
     }
-    const updated = updateMilestone(db, req.params.id, req.body as Parameters<typeof updateMilestone>[2]);
+    const updated = updateMilestone(db, id, req.body as Parameters<typeof updateMilestone>[2]);
     broadcast({ type: "milestone_updated", payload: updated! });
     res.json(updated);
   });
@@ -502,17 +505,9 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/projects/:projectId/tags
-  router.post("/api/projects/:projectId/tags", (req, res) => {
+  router.post("/api/projects/:projectId/tags", validateBody(createTagSchema), (req, res) => {
     const { name, color } = req.body as { name: string; color?: string };
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
-    }
-    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
-      res.status(400).json({ error: "color must be a hex color like #ff0000" });
-      return;
-    }
-    const tag = createTag(db, { project_id: req.params.projectId, name, color });
+    const tag = createTag(db, { project_id: req.params.projectId as string, name, color });
     broadcast({ type: "tag_created", payload: tag });
     res.status(201).json(tag);
   });
@@ -579,7 +574,7 @@ export function createRouter(db: Database.Database): Router {
 
   router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
     // Read before delete so we can broadcast
-    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as any;
+    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as TaskDependency | undefined;
     const removed = removeDependency(db, req.params.id as string);
     if (removed && dep) {
       broadcast({ type: "dependency_removed", payload: dep });
@@ -634,10 +629,9 @@ export function createRouter(db: Database.Database): Router {
     res.json(listComments(db, req.params.id));
   });
 
-  router.post("/api/tasks/:id/comments", (req, res) => {
+  router.post("/api/tasks/:id/comments", validateBody(createCommentSchema), (req, res) => {
     const { message, author_name, agent_id } = req.body as { message: string; author_name: string; agent_id?: string };
-    if (!message || !author_name) { res.status(400).json({ error: "message and author_name are required" }); return; }
-    const comment = addComment(db, req.params.id, message, author_name, agent_id);
+    const comment = addComment(db, req.params.id as string, message, author_name, agent_id);
     broadcast({ type: "comment_added", payload: comment });
 
     // Process @mentions
@@ -839,17 +833,11 @@ export function createRouter(db: Database.Database): Router {
 
   // ─── Cost & Token Tracking ──────────────────────────────────────
 
-  router.post("/api/costs", statsLimiter, (req, res) => {
+  router.post("/api/costs", statsLimiter, validateBody(logCostSchema), (req, res) => {
     const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body as {
       model: string; provider: string; input_tokens: number; output_tokens: number; cost_usd: number;
       agent_id?: string; task_id?: string; milestone_id?: string; project_id?: string;
     };
-    if (!model || !provider || !Number.isFinite(input_tokens) || !Number.isFinite(output_tokens) || !Number.isFinite(cost_usd)) {
-      res.status(400).json({ error: "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required" }); return;
-    }
-    if (input_tokens < 0 || output_tokens < 0 || cost_usd < 0) {
-      res.status(400).json({ error: "input_tokens, output_tokens, and cost_usd must be non-negative" }); return;
-    }
     const entry = logCost(db, {
       agent_id: agent_id ?? null,
       task_id: task_id ?? null,

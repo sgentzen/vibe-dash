@@ -2,6 +2,7 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { broadcast as wsBroadcast } from "../websocket.js";
 import { fireWebhooks } from "../db/index.js";
+import { logger } from "../logger.js";
 import type { WsEvent } from "../types.js";
 import { systemRoutes } from "./system.js";
 import { projectRoutes } from "./projects.js";
@@ -21,12 +22,15 @@ import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
+import { bulkRoutes } from "./bulk.js";
 import type { RouteFactory } from "./types.js";
 
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
-    void fireWebhooks(db, event.type, event.payload);
+    fireWebhooks(db, event.type, event.payload).catch((err) => {
+      logger.warn({ err, event: event.type }, "webhook dispatch failed");
+    });
   };
 }
 
@@ -49,6 +53,7 @@ const routeFactories: RouteFactory[] = [
   templateRoutes,
   webhookRoutes,
   costRoutes,
+  bulkRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {
