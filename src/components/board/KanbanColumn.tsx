@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { TaskCard } from "../TaskCard";
 import { MilestoneGroup } from "./MilestoneGroup";
 import { groupByMilestone, getBlockingCount, resolveTaskTags } from "./boardHelpers";
@@ -46,12 +46,7 @@ export function KanbanColumn({
   onTaskCreated,
   api,
 }: KanbanColumnProps) {
-  const columnRef = useRef<HTMLDivElement | null>(null);
-  const setDragOver = (on: boolean) => {
-    const el = columnRef.current;
-    if (!el) return;
-    el.style.background = on ? "rgba(88,166,255,0.04)" : "transparent";
-  };
+  const [isDragOver, setIsDragOver] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const canAdd = (status === "planned" || status === "in_progress") && selectedProjectId !== null;
@@ -85,15 +80,14 @@ export function KanbanColumn({
 
   return (
     <div
-      ref={columnRef}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={() => { setDragOver(false); onDrop(); }}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={() => { setIsDragOver(false); onDrop(); }}
       style={{
         display: "flex",
         flexDirection: "column",
         borderRight: "1px solid var(--border)",
-        background: "transparent",
+        background: isDragOver ? "rgba(88,166,255,0.04)" : "transparent",
         transition: "background 0.15s",
         overflow: "hidden",
       }}
