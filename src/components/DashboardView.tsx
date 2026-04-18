@@ -8,6 +8,7 @@ import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboar
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { AgentContributionsCard, ActivityHeatmapCard } from "./dashboard/ActivityCards";
+import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
 import { ReportGeneratorCard } from "./dashboard/ReportGeneratorCard";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
@@ -25,7 +26,6 @@ export function DashboardView() {
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
 
-  // Project-scoped data — null means "all projects"
   const projectId = selectedProjectId ?? null;
   const projectMilestones = projectId ? milestones.filter((m) => m.project_id === projectId) : milestones;
   const projectTasks = projectId ? tasks.filter((t) => t.project_id === projectId) : tasks;
@@ -68,7 +68,6 @@ export function DashboardView() {
     load();
   }, [api, openMilestones.length > 0 ? openMilestones[0]?.id : null, projectId, milestoneTaskStatusKey, pollGeneration]);
 
-  // Cost data: refresh on project change or milestone task status changes
   useEffect(() => {
     async function loadCosts() {
       try {
@@ -92,17 +91,6 @@ export function DashboardView() {
   useEffect(() => {
     api.getAgentComparison().then(setAgentComparison).catch(() => {});
   }, [api, pollGeneration]);
-
-  async function handleGenerateReport() {
-    const reportProjectId = projectId ?? projects[0]?.id;
-    if (!reportProjectId) return;
-    try {
-      const report = await api.generateReport(reportProjectId, reportPeriod);
-      setReportText(report);
-    } catch {
-      setReportText("Failed to generate report.");
-    }
-  }
 
   const reportProjectId = projectId ?? projects[0]?.id ?? null;
 
@@ -130,39 +118,10 @@ export function DashboardView() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-        <div style={cardStyle}>
-          <div style={headerStyle}>Active Blockers ({unresolvedBlockers.length})</div>
-          {unresolvedBlockers.length === 0 ? (
-            <div style={{ color: "var(--accent-green)", fontSize: "12px" }}>No active blockers</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              {unresolvedBlockers.slice(0, 10).map((b) => (
-                <div key={b.id} style={{ fontSize: "12px", color: "var(--accent-yellow)" }}>
-                  {b.reason}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={cardStyle}>
-          <div style={headerStyle}>Overdue Tasks ({overdueTasks.length})</div>
-          {overdueTasks.length === 0 ? (
-            <div style={{ color: "var(--accent-green)", fontSize: "12px" }}>No overdue tasks</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              {overdueTasks.slice(0, 10).map((t) => (
-                <div key={t.id} style={{ fontSize: "12px", display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--text-primary)" }}>{t.title}</span>
-                  <span style={{ color: "var(--accent-red)", fontSize: "10px" }}>{t.due_date}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <BlockersCard blockers={unresolvedBlockers} />
+        <OverdueTasksCard tasks={overdueTasks} />
       </div>
 
-      {/* Cost & Token Tracking — only show details when cost data exists */}
       {costSummary && costSummary.entry_count > 0 ? (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
