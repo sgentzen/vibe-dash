@@ -2,6 +2,8 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { createAlertRule, listAlertRules, toggleAlertRule, deleteAlertRule } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
+import { requireEntity } from "./handlers.js";
 
 export function alertRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
@@ -12,14 +14,14 @@ export function alertRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
 
   router.post("/api/alert-rules", (req, res) => {
     const { event_type, filter_json } = req.body as { event_type: string; filter_json?: string };
-    if (!event_type) { res.status(400).json({ error: "event_type is required" }); return; }
+    if (!event_type) { badRequest(res, "event_type is required"); return; }
     res.status(201).json(createAlertRule(db, event_type, filter_json));
   });
 
   router.patch("/api/alert-rules/:id", (req, res) => {
     const { enabled } = req.body as { enabled: boolean };
     const rule = toggleAlertRule(db, req.params.id, enabled);
-    if (!rule) { res.status(404).json({ error: "Rule not found" }); return; }
+    if (!requireEntity(res, rule, "Rule")) return;
     res.json(rule);
   });
 

@@ -11,6 +11,7 @@ import {
 } from "../db/index.js";
 import { statsLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
 
 export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -21,10 +22,10 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       agent_id?: string; task_id?: string; sprint_id?: string; project_id?: string;
     };
     if (!model || !provider || !Number.isFinite(input_tokens) || !Number.isFinite(output_tokens) || !Number.isFinite(cost_usd)) {
-      res.status(400).json({ error: "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required" }); return;
+      badRequest(res, "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required"); return;
     }
     if (input_tokens < 0 || output_tokens < 0 || cost_usd < 0) {
-      res.status(400).json({ error: "input_tokens, output_tokens, and cost_usd must be non-negative" }); return;
+      badRequest(res, "input_tokens, output_tokens, and cost_usd must be non-negative"); return;
     }
     const entry = logCost(db, {
       agent_id: agent_id ?? null,

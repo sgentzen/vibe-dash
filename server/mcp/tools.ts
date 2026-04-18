@@ -481,7 +481,7 @@ export async function handleTool(
       if (args.status !== undefined) updates.status = args.status;
       if (args.priority !== undefined) updates.priority = args.priority;
       if (args.assigned_agent_id !== undefined) updates.assigned_agent_id = args.assigned_agent_id;
-      const tasks = bulkUpdateTasks(db, ids, updates as any);
+      const tasks = bulkUpdateTasks(db, ids, updates as Parameters<typeof bulkUpdateTasks>[2]);
       for (const t of tasks) {
         broadcast({ type: "task_updated", payload: t });
       }

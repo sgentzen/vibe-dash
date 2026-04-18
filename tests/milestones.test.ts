@@ -1,18 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import {
-  initDb,
   createProject,
   createTask,
   createMilestone,
   searchTasks,
 } from "../server/db/index.js";
+import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
 beforeEach(() => {
-  db = new Database(":memory:");
-  initDb(db);
+  db = createTestDb();
 });
 
 describe("searchTasks milestone_id filter", () => {

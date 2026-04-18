@@ -13,6 +13,7 @@ import {
   getAgentStats,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { requireEntity } from "./handlers.js";
 
 export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
@@ -37,7 +38,7 @@ export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
 
   router.get("/api/agents/:id", (req, res) => {
     const agent = getAgentById(db, req.params.id);
-    if (!agent) { res.status(404).json({ error: "Agent not found" }); return; }
+    if (!requireEntity(res, agent, "Agent")) return;
     const project = getAgentCurrentProject(db, agent.id);
     res.json({
       ...agent,

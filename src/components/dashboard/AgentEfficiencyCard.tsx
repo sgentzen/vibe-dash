@@ -1,14 +1,12 @@
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
+import { memo } from "react";
+import { CardWrapper } from "../ui/Card";
 import { agentColor } from "../../utils/agentColors";
 import type { AgentComparison } from "../../types";
 
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
-
-export function AgentEfficiencyCard({ agentComparison }: { agentComparison: AgentComparison }) {
+export const AgentEfficiencyCard = memo(function AgentEfficiencyCard({ agentComparison }: { agentComparison: AgentComparison }) {
   if (agentComparison.agents.length === 0) return null;
   return (
-    <div style={{ ...cardStyle, marginBottom: "16px" }}>
-      <div style={headerStyle}>Agent Efficiency</div>
+    <CardWrapper title="Agent Efficiency" style={{ marginBottom: "16px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {agentComparison.agents.slice(0, 5).map((agent) => {
           const color = agentColor(agent.agent_name);
@@ -36,6 +34,6 @@ export function AgentEfficiencyCard({ agentComparison }: { agentComparison: Agen
           );
         })}
       </div>
-    </div>
+    </CardWrapper>
   );
-}
+});

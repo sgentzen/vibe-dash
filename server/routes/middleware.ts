@@ -54,7 +54,8 @@ export function notFoundHandler(req: Request, res: Response, next: NextFunction)
  * Express identifies error handlers by their 4-parameter signature.
  */
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
-  const status = (err as any).status ?? (err as any).statusCode ?? 500;
+  const e = err as Error & { status?: number; statusCode?: number };
+  const status = e.status ?? e.statusCode ?? 500;
   logger.error({ err, status }, "Unhandled route error");
   res.status(status).json({ error: status === 500 ? "Internal server error" : err.message });
 }

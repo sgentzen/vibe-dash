@@ -1,6 +1,7 @@
+import { memo } from "react";
 import type { CSSProperties } from "react";
 
-export function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+export const KpiCard = memo(function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{
       background: "var(--bg-secondary)", border: "1px solid var(--border)",
@@ -10,7 +11,7 @@ export function KpiCard({ label, value, color }: { label: string; value: string;
       <div style={{ fontSize: "10px", color: "var(--text-muted)", letterSpacing: "0.05em", marginTop: "4px" }}>{label}</div>
     </div>
   );
-}
+});
 
 export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

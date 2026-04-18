@@ -17,10 +17,10 @@ export function createMilestone(
 ): Milestone {
   const id = genId();
   const ts = now();
-  db.prepare(
+  return db.prepare(
     "INSERT INTO milestones (id, project_id, name, description, acceptance_criteria, target_date, status, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
+  ).get(
     id,
     input.project_id,
     input.name,
@@ -30,8 +30,7 @@ export function createMilestone(
     input.status ?? "open",
     ts,
     ts
-  );
-  return db.prepare("SELECT * FROM milestones WHERE id = ?").get(id) as Milestone;
+  ) as Milestone;
 }
 
 export interface UpdateMilestoneInput {
@@ -62,8 +61,8 @@ export function updateMilestone(
   params.push(now());
   params.push(id);
 
-  db.prepare("UPDATE milestones SET " + sets.join(", ") + " WHERE id = ?").run(...params);
-  return getMilestone(db, id);
+  const row = db.prepare("UPDATE milestones SET " + sets.join(", ") + " WHERE id = ? RETURNING *").get(...params) as Milestone | undefined;
+  return row ?? null;
 }
 
 export function completeMilestone(
@@ -115,12 +114,10 @@ export function recordMilestoneDailyStats(db: Database.Database, milestoneId: st
   const today = new Date().toISOString().slice(0, 10);
   const progress = getMilestoneProgress(db, milestoneId);
 
-  db.prepare(
+  return db.prepare(
     `INSERT OR REPLACE INTO milestone_daily_stats (milestone_id, date, completed_tasks, total_tasks, completion_pct)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(milestoneId, today, progress.completed_count, progress.task_count, progress.completion_pct);
-
-  return db.prepare("SELECT * FROM milestone_daily_stats WHERE milestone_id = ? AND date = ?").get(milestoneId, today) as MilestoneDailyStats;
+     VALUES (?, ?, ?, ?, ?) RETURNING *`
+  ).get(milestoneId, today, progress.completed_count, progress.task_count, progress.completion_pct) as MilestoneDailyStats;
 }
 
 export function getMilestoneDailyStats(db: Database.Database, milestoneId: string): MilestoneDailyStats[] {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus } from "../types.js";
+import { BULK_UPDATE_MAX } from "../constants.js";
 import {
   listTasks,
   createTask,
@@ -16,6 +17,8 @@ import {
   getTimeSpent,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
+import { requireEntity } from "./handlers.js";
 
 export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -58,7 +61,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
         recurrence_rule?: string | null;
       };
     if (!project_id || !title || !priority) {
-      res.status(400).json({ error: "project_id, title, and priority are required" });
+      badRequest(res, "project_id, title, and priority are required");
       return;
     }
     const task = createTask(db, {
@@ -82,8 +85,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   // PATCH /api/tasks/bulk (must be before :id param route)
   router.patch("/api/tasks/bulk", (req, res) => {
     const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
-    if (!task_ids?.length || !updates) { res.status(400).json({ error: "task_ids and updates are required" }); return; }
-    if (task_ids.length > 200) { res.status(400).json({ error: "Maximum 200 tasks per bulk update" }); return; }
+    if (!task_ids?.length || !updates) { badRequest(res, "task_ids and updates are required"); return; }
+    if (task_ids.length > BULK_UPDATE_MAX) { badRequest(res, `Maximum ${BULK_UPDATE_MAX} tasks per bulk update`); return; }
     const tasks = bulkUpdateTasks(db, task_ids, updates as any);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
@@ -111,19 +114,13 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
 
   router.get("/api/tasks/:id", (req, res) => {
     const task = getTask(db, req.params.id);
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
+    if (!requireEntity(res, task, "Task")) return;
     res.json(task);
   });
 
   router.patch("/api/tasks/:id", (req, res) => {
     const task = getTask(db, req.params.id);
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
+    if (!requireEntity(res, task, "Task")) return;
     const body = req.body as Parameters<typeof updateTask>[2];
     const updated = updateTask(db, req.params.id, body);
     broadcast({ type: "task_updated", payload: updated! });
@@ -149,10 +146,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
 
   router.post("/api/tasks/:id/complete", (req, res) => {
     const task = getTask(db, req.params.id);
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
+    if (!requireEntity(res, task, "Task")) return;
     const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
@@ -180,7 +174,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
 
   router.get("/api/tasks/:id/time-spent", (req, res) => {
     const task = getTask(db, req.params.id);
-    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+    if (!requireEntity(res, task, "Task")) return;
     res.json({ time_spent_seconds: getTimeSpent(db, req.params.id) });
   });
 

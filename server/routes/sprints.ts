@@ -13,6 +13,8 @@ import {
   getVelocityTrend,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
+import { badRequest } from "./responses.js";
+import { requireEntity } from "./handlers.js";
 
 export function sprintRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -33,7 +35,7 @@ export function sprintRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
         end_date?: string | null;
       };
     if (!project_id || !name) {
-      res.status(400).json({ error: "project_id and name are required" });
+      badRequest(res, "project_id and name are required");
       return;
     }
     const sprint = createSprint(db, {
@@ -50,10 +52,7 @@ export function sprintRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
 
   router.patch("/api/sprints/:id", (req, res) => {
     const sprint = getSprint(db, req.params.id);
-    if (!sprint) {
-      res.status(404).json({ error: "Sprint not found" });
-      return;
-    }
+    if (!requireEntity(res, sprint, "Sprint")) return;
     const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
     broadcast({ type: "sprint_updated", payload: updated! });
     res.json(updated);
@@ -61,7 +60,7 @@ export function sprintRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
 
   router.get("/api/sprints/:id/capacity", (req, res) => {
     const sprint = getSprint(db, req.params.id);
-    if (!sprint) { res.status(404).json({ error: "Sprint not found" }); return; }
+    if (!requireEntity(res, sprint, "Sprint")) return;
     res.json(getSprintCapacity(db, req.params.id));
   });
 

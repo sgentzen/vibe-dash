@@ -4,11 +4,18 @@ import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
 import { registerAgent, touchAgent, startOrGetSession, closeAgentSessions, closeStaleSession, cleanupStaleAgents } from "../db/index.js";
 import { broadcast } from "../websocket.js";
-
-const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
-const PRIORITY_ENUM = z.enum(["low", "medium", "high", "urgent"]);
-const MILESTONE_STATUS_ENUM = z.enum(["open", "achieved"]);
-const AGENT_ROLE_ENUM = z.enum(["orchestrator", "coder", "reviewer", "explorer", "planner", "agent"]);
+import {
+  taskStatusEnum as STATUS_ENUM,
+  taskPrioritySchema as PRIORITY_ENUM,
+  milestoneStatusEnum as MILESTONE_STATUS_ENUM,
+  registerAgentSchema,
+  createProjectSchema,
+  updateProjectSchema,
+  createTaskSchema,
+  updateTaskSchema,
+  createMilestoneSchema,
+  updateMilestoneSchema,
+} from "../../shared/schemas.js";
 
 export interface McpServerHandle {
   server: McpServer;
@@ -66,23 +73,14 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "register_agent",
     "Register or update an AI agent",
-    {
-      name: z.string(),
-      model: z.string().optional(),
-      capabilities: z.array(z.string()).optional(),
-      role: AGENT_ROLE_ENUM.optional(),
-      parent_agent_name: z.string().optional(),
-    },
+    registerAgentSchema.shape,
     call("register_agent")
   );
 
   server.tool(
     "create_project",
     "Create a new project",
-    {
-      name: z.string(),
-      description: z.string().optional(),
-    },
+    createProjectSchema.shape,
     call("create_project")
   );
 
@@ -91,8 +89,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Update an existing project's name or description",
     {
       project_id: z.string(),
-      name: z.string().optional(),
-      description: z.string().nullable().optional(),
+      ...updateProjectSchema.shape,
     },
     call("update_project")
   );
@@ -107,16 +104,8 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "create_task",
     "Create a new task in a project",
-    {
-      project_id: z.string(),
-      parent_task_id: z.string().optional(),
-      milestone_id: z.string().optional(),
-      title: z.string(),
-      description: z.string().optional(),
-      status: STATUS_ENUM.optional(),
-      priority: PRIORITY_ENUM.optional(),
-      agent_name: z.string().optional(),
-    },
+    // Shared schema is stricter (priority required); allow optional here for back-compat
+    { ...createTaskSchema.shape, priority: PRIORITY_ENUM.optional() },
     call("create_task")
   );
 
@@ -146,19 +135,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Update task fields",
     {
       task_id: z.string(),
-      title: z.string().optional(),
-      description: z.string().nullable().optional(),
-      status: STATUS_ENUM.optional(),
-      priority: PRIORITY_ENUM.optional(),
-      progress: z.number().min(0).max(100).optional(),
-      parent_task_id: z.string().nullable().optional(),
-      milestone_id: z.string().nullable().optional(),
-      assigned_agent_id: z.string().nullable().optional(),
-      due_date: z.string().nullable().optional(),
-      start_date: z.string().nullable().optional(),
-      estimate: z.number().int().min(0).nullable().optional(),
-      recurrence_rule: z.string().nullable().optional(),
-      agent_name: z.string().optional(),
+      ...updateTaskSchema.shape,
     },
     call("update_task")
   );
@@ -227,14 +204,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "create_milestone",
     "Create a milestone for a project",
-    {
-      project_id: z.string(),
-      name: z.string(),
-      description: z.string().optional(),
-      acceptance_criteria: z.string().optional(),
-      target_date: z.string().optional(),
-      status: MILESTONE_STATUS_ENUM.optional(),
-    },
+    createMilestoneSchema.shape,
     call("create_milestone")
   );
 
@@ -252,11 +222,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Update milestone fields",
     {
       milestone_id: z.string(),
-      name: z.string().optional(),
-      description: z.string().nullable().optional(),
-      acceptance_criteria: z.string().nullable().optional(),
-      target_date: z.string().nullable().optional(),
-      status: MILESTONE_STATUS_ENUM.optional(),
+      ...updateMilestoneSchema.shape,
     },
     call("update_milestone")
   );

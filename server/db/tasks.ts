@@ -2,6 +2,8 @@ import type Database from "better-sqlite3";
 import type { Task, TaskStatus, TaskPriority } from "../types.js";
 import { now, genId } from "./helpers.js";
 import { getNextDueDate } from "../recurrence.js";
+import { DEFAULT_TASK_LIST_LIMIT, MAX_TASK_LIST_LIMIT } from "../constants.js";
+import { buildWhere } from "./where.js";
 
 export interface CreateTaskInput {
   project_id: string;
@@ -25,10 +27,10 @@ export function createTask(
   const id = genId();
   const ts = now();
   const status: TaskStatus = input.status ?? "planned";
-  db.prepare(
+  return db.prepare(
     "INSERT INTO tasks (id, project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, status, priority, progress, due_date, start_date, estimate, recurrence_rule, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)"
-  ).run(
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?) RETURNING *"
+  ).get(
     id,
     input.project_id,
     input.parent_task_id ?? null,
@@ -44,8 +46,7 @@ export function createTask(
     input.recurrence_rule ?? null,
     ts,
     ts
-  );
-  return db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as Task;
+  ) as Task;
 }
 
 export function getTask(db: Database.Database, id: string): Task | null {
@@ -68,32 +69,14 @@ export function listTasks(
   db: Database.Database,
   filter?: ListTasksFilter
 ): Task[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+  const { sql: where, params } = buildWhere([
+    filter?.project_id !== undefined ? ["project_id = ?", filter.project_id] : null,
+    filter?.status !== undefined ? ["status = ?", filter.status] : null,
+    filter?.parent_task_id !== undefined ? ["parent_task_id = ?", filter.parent_task_id] : null,
+    filter?.milestone_id !== undefined ? ["milestone_id = ?", filter.milestone_id] : null,
+    filter?.assigned_agent_id !== undefined ? ["assigned_agent_id = ?", filter.assigned_agent_id] : null,
+  ]);
 
-  if (filter?.project_id !== undefined) {
-    conditions.push("project_id = ?");
-    params.push(filter.project_id);
-  }
-  if (filter?.status !== undefined) {
-    conditions.push("status = ?");
-    params.push(filter.status);
-  }
-  if (filter?.parent_task_id !== undefined) {
-    conditions.push("parent_task_id = ?");
-    params.push(filter.parent_task_id);
-  }
-  if (filter?.milestone_id !== undefined) {
-    conditions.push("milestone_id = ?");
-    params.push(filter.milestone_id);
-  }
-  if (filter?.assigned_agent_id !== undefined) {
-    conditions.push("assigned_agent_id = ?");
-    params.push(filter.assigned_agent_id);
-  }
-
-  const where =
-    conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
   return db
     .prepare("SELECT * FROM tasks " + where + " ORDER BY created_at ASC")
     .all(...params) as Task[];
@@ -177,10 +160,10 @@ export function updateTask(
   params.push(now());
   params.push(id);
 
-  db.prepare("UPDATE tasks SET " + sets.join(", ") + " WHERE id = ?").run(
+  const row = db.prepare("UPDATE tasks SET " + sets.join(", ") + " WHERE id = ? RETURNING *").get(
     ...params
-  );
-  return getTask(db, id);
+  ) as Task | undefined;
+  return row ?? null;
 }
 
 export function completeTask(db: Database.Database, id: string): Task | null {
@@ -229,7 +212,7 @@ export function searchTasks(db: Database.Database, filter: SearchTasksFilter): T
 
   if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
 
-  const limit = Math.min(filter.limit ?? 200, 500);
+  const limit = Math.min(filter.limit ?? DEFAULT_TASK_LIST_LIMIT, MAX_TASK_LIST_LIMIT);
   const offset = filter.offset ?? 0;
   sql += ` ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 

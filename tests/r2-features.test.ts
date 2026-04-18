@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import {
-  initDb,
   createProject,
   createTask,
   updateTask,
@@ -27,12 +26,12 @@ import {
   getAgentActivity,
   getAgentCompletedToday,
 } from "../server/db/index.js";
+import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
 beforeEach(() => {
-  db = new Database(":memory:");
-  initDb(db);
+  db = createTestDb();
 });
 
 // ─── 2.2 Time Estimates ────────────────────────────────────────────────────
@@ -164,7 +163,7 @@ describe("2.5 Task Dependencies", () => {
 describe("1.3 Agent Sessions", () => {
   it("starts a new session on activity", () => {
     registerAgent(db, { name: "bot", model: null, capabilities: [] });
-    const agents = db.prepare("SELECT * FROM agents").all() as any[];
+    const agents = db.prepare("SELECT * FROM agents").all() as Array<{ id: string }>;
     const agent = agents[0];
 
     const session = startOrGetSession(db, agent.id);
@@ -175,7 +174,7 @@ describe("1.3 Agent Sessions", () => {
 
   it("increments activity on same session", () => {
     registerAgent(db, { name: "bot", model: null, capabilities: [] });
-    const agents = db.prepare("SELECT * FROM agents").all() as any[];
+    const agents = db.prepare("SELECT * FROM agents").all() as Array<{ id: string }>;
     const agent = agents[0];
 
     const s1 = startOrGetSession(db, agent.id);
@@ -186,7 +185,7 @@ describe("1.3 Agent Sessions", () => {
 
   it("lists agent sessions", () => {
     registerAgent(db, { name: "bot", model: null, capabilities: [] });
-    const agents = db.prepare("SELECT * FROM agents").all() as any[];
+    const agents = db.prepare("SELECT * FROM agents").all() as Array<{ id: string }>;
     const agent = agents[0];
 
     startOrGetSession(db, agent.id);
@@ -196,7 +195,7 @@ describe("1.3 Agent Sessions", () => {
 
   it("closes stale sessions", () => {
     registerAgent(db, { name: "bot", model: null, capabilities: [] });
-    const agents = db.prepare("SELECT * FROM agents").all() as any[];
+    const agents = db.prepare("SELECT * FROM agents").all() as Array<{ id: string }>;
     const agent = agents[0];
 
     // Insert a session with old started_at

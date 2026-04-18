@@ -13,6 +13,22 @@
 import { resolve } from "path";
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
+import {
+  RESET,
+  DIM,
+  RED,
+  GREEN,
+  header,
+  hr,
+  formatProjectRow,
+  formatMilestoneRow,
+  formatTaskHeaderRow,
+  formatTaskRow,
+  formatAgentHeaderRow,
+  formatAgentRow,
+  formatStatusSummary,
+  formatHelp,
+} from "./format.js";
 
 // ─── Parse args ──────────────────────────────────────────────────────────────
 
@@ -34,21 +50,6 @@ const dbPath = resolve(flags.db ?? "./vibe-dash.db");
 const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
-
-const RESET = "\x1b[0m";
-const BOLD = "\x1b[1m";
-const DIM = "\x1b[2m";
-const RED = "\x1b[31m";
-const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
-const BLUE = "\x1b[34m";
-const CYAN = "\x1b[36m";
-
-function pad(s: string, len: number): string {
-  return s.length >= len ? s.slice(0, len) : s + " ".repeat(len - s.length);
-}
-
 // ─── Open DB ─────────────────────────────────────────────────────────────────
 
 let db: Database.Database;
@@ -68,18 +69,17 @@ function cmdList() {
 
   if (target === "projects") {
     const projects = listProjects(db);
-    console.log(`${BOLD}${CYAN}Projects (${projects.length})${RESET}`);
-    console.log(`${DIM}${"─".repeat(60)}${RESET}`);
+    console.log(header(`Projects (${projects.length})`));
+    console.log(hr(60));
     for (const p of projects) {
-      console.log(`  ${BOLD}${p.name}${RESET}  ${DIM}${p.id.slice(0, 8)}${RESET}  ${p.description ?? ""}`);
+      console.log(formatProjectRow(p));
     }
   } else if (target === "milestones") {
     const milestones = listMilestones(db);
-    console.log(`${BOLD}${CYAN}Milestones (${milestones.length})${RESET}`);
-    console.log(`${DIM}${"─".repeat(60)}${RESET}`);
+    console.log(header(`Milestones (${milestones.length})`));
+    console.log(hr(60));
     for (const m of milestones) {
-      const color = m.status === "open" ? GREEN : m.status === "achieved" ? DIM : YELLOW;
-      console.log(`  ${color}${pad(m.status, 10)}${RESET} ${BOLD}${m.name}${RESET}  ${DIM}${m.id.slice(0, 8)}${RESET}`);
+      console.log(formatMilestoneRow(m));
     }
   } else {
     const projectName = flags.project;
@@ -88,17 +88,12 @@ function cmdList() {
     const tasks = listTasks(db, project ? { project_id: project.id } : undefined);
     const topLevel = tasks.filter((t) => !t.parent_task_id);
 
-    console.log(`${BOLD}${CYAN}Tasks (${topLevel.length})${RESET}${project ? ` — ${project.name}` : ""}`);
-    console.log(`${DIM}${"─".repeat(80)}${RESET}`);
-    console.log(`  ${DIM}${pad("STATUS", 12)}${pad("PRIORITY", 10)}${pad("TITLE", 40)}${pad("DUE", 12)}${RESET}`);
-
-    const statusColor: Record<string, string> = { done: GREEN, in_progress: BLUE, blocked: RED, planned: DIM };
-    const priColor: Record<string, string> = { urgent: RED, high: YELLOW, medium: RESET, low: DIM };
+    console.log(`${header(`Tasks (${topLevel.length})`)}${project ? ` — ${project.name}` : ""}`);
+    console.log(hr(80));
+    console.log(formatTaskHeaderRow());
 
     for (const t of topLevel) {
-      const sc = statusColor[t.status] ?? RESET;
-      const pc = priColor[t.priority] ?? RESET;
-      console.log(`  ${sc}${pad(t.status, 12)}${RESET}${pc}${pad(t.priority, 10)}${RESET}${pad(t.title, 40)}${DIM}${t.due_date ?? "-"}${RESET}`);
+      console.log(formatTaskRow(t));
     }
   }
 }
@@ -162,60 +157,44 @@ function cmdStatus() {
   const openMilestone = milestones.find((m) => m.status === "open");
   const blockers = getActiveBlockers(db);
 
-  console.log(`${BOLD}${CYAN}Status: ${project.name}${RESET}`);
-  console.log(`${DIM}${"─".repeat(40)}${RESET}`);
-  console.log(`  ${DIM}Planned:     ${RESET}${byStatus.planned}`);
-  console.log(`  ${BLUE}In Progress: ${RESET}${byStatus.in_progress}`);
-  console.log(`  ${RED}Blocked:     ${RESET}${byStatus.blocked}`);
-  console.log(`  ${GREEN}Done:        ${RESET}${byStatus.done}`);
-  console.log(`  ${DIM}${"─".repeat(30)}${RESET}`);
-  console.log(`  Total:       ${tasks.length}`);
+  const openMilestoneSummary = openMilestone
+    ? (() => {
+        const progress = getMilestoneProgress(db, openMilestone.id);
+        return {
+          name: openMilestone.name,
+          completed_count: progress.completed_count,
+          task_count: progress.task_count,
+          completion_pct: progress.completion_pct,
+        };
+      })()
+    : undefined;
 
-  if (openMilestone) {
-    const progress = getMilestoneProgress(db, openMilestone.id);
-    console.log(`\n  ${BOLD}Open Milestone:${RESET} ${openMilestone.name}`);
-    console.log(`  Tasks: ${progress.completed_count}/${progress.task_count} done`);
-    console.log(`  Progress: ${progress.completion_pct}% completed`);
-  }
-
-  if (blockers.length > 0) {
-    console.log(`\n  ${RED}${BOLD}Active Blockers (${blockers.length}):${RESET}`);
-    for (const b of blockers.slice(0, 5)) {
-      console.log(`    ${RED}- ${b.reason}${RESET}`);
-    }
-  }
+  console.log(
+    formatStatusSummary({
+      projectName: project.name,
+      byStatus,
+      total: tasks.length,
+      openMilestone: openMilestoneSummary,
+      blockers,
+    }),
+  );
 }
 
 function cmdAgents() {
   const agents = listAgents(db);
-  console.log(`${BOLD}${CYAN}Agents (${agents.length})${RESET}`);
-  console.log(`${DIM}${"─".repeat(60)}${RESET}`);
-  console.log(`  ${DIM}${pad("NAME", 20)}${pad("MODEL", 15)}${pad("HEALTH", 10)}${pad("LAST SEEN", 20)}${RESET}`);
-
-  const healthColor: Record<string, string> = { active: GREEN, idle: YELLOW, offline: DIM };
+  console.log(header(`Agents (${agents.length})`));
+  console.log(hr(60));
+  console.log(formatAgentHeaderRow());
 
   for (const a of agents) {
     const health = getAgentHealthStatus(a.last_seen_at);
-    const hc = healthColor[health] ?? RESET;
     const lastSeen = new Date(a.last_seen_at).toLocaleString();
-    console.log(`  ${BOLD}${pad(a.name, 20)}${RESET}${DIM}${pad(a.model ?? "-", 15)}${RESET}${hc}${pad(health, 10)}${RESET}${DIM}${lastSeen}${RESET}`);
+    console.log(formatAgentRow(a, health, lastSeen));
   }
 }
 
 function cmdHelp() {
-  console.log(`${BOLD}${CYAN}vibe-dash${RESET} — CLI companion for Vibe Dash`);
-  console.log();
-  console.log("Commands:");
-  console.log(`  ${BOLD}list${RESET} [projects|tasks|milestones]  List entities`);
-  console.log(`  ${BOLD}add-task${RESET} --project <n> --title <t>  Create a task`);
-  console.log(`  ${BOLD}status${RESET} [project-name]            Project status summary`);
-  console.log(`  ${BOLD}agents${RESET}                           List agents with health`);
-  console.log();
-  console.log("Flags:");
-  console.log(`  --db <path>      Database file (default: ./vibe-dash.db)`);
-  console.log(`  --project <n>    Filter by project name`);
-  console.log(`  --priority <p>   Task priority (low|medium|high|urgent)`);
-  console.log(`  --milestone <n>  Milestone name for add-task`);
+  console.log(formatHelp());
 }
 
 // ─── Dispatch ────────────────────────────────────────────────────────────────
