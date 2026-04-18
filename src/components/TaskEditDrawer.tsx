@@ -5,6 +5,7 @@ import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle, sectionHeader } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
+import { TagPicker } from "./task/TagPicker";
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -224,8 +225,9 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         {/* Milestone */}
         {taskMilestones.length > 0 && (
           <div>
-            <label style={labelStyle}>Milestone</label>
+            <label htmlFor="task-milestone" style={labelStyle}>Milestone</label>
             <select
+              id="task-milestone"
               value={milestoneId ?? ""}
               onChange={(e) => setMilestoneId(e.target.value || null)}
               style={inputStyle}
@@ -312,72 +314,12 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         </div>
 
         {/* Tags */}
-        <div>
-          <label htmlFor="task-tags" style={labelStyle}>Tags</label>
-          {currentTags.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
-              {currentTags.map((tag) => (
-                <span
-                  key={tag.id}
-                  style={{
-                    fontSize: "11px",
-                    padding: "2px 8px",
-                    borderRadius: "4px",
-                    background: `${tag.color}20`,
-                    color: tag.color,
-                    border: `1px solid ${tag.color}40`,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "4px",
-                  }}
-                >
-                  {tag.name}
-                  <button
-                    onClick={async () => {
-                      await api.removeTagFromTask(task.id, tag.id);
-                      dispatch({
-                        type: "WS_EVENT",
-                        payload: { type: "tag_removed", payload: { id: "", task_id: task.id, tag_id: tag.id } },
-                      });
-                    }}
-                    style={{
-                      background: "none", border: "none", color: tag.color,
-                      cursor: "pointer", padding: "0", fontSize: "13px", lineHeight: 1,
-                    }}
-                  >
-                    x
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          {availableTags.length > 0 && (
-            <select
-              value=""
-              onChange={async (e) => {
-                const tagId = e.target.value;
-                if (!tagId) return;
-                const taskTag = await api.addTagToTask(task.id, tagId);
-                dispatch({
-                  type: "WS_EVENT",
-                  payload: { type: "tag_added", payload: taskTag },
-                });
-              }}
-              id="task-tags"
-              style={inputStyle}
-            >
-              <option value="">Add tag...</option>
-              {availableTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>{tag.name}</option>
-              ))}
-            </select>
-          )}
-          {projectTags.length === 0 && (
-            <div style={{ color: "var(--text-muted)", fontSize: "11px", fontStyle: "italic" }}>
-              No tags in this project yet
-            </div>
-          )}
-        </div>
+        <TagPicker
+          taskId={task.id}
+          currentTags={currentTags}
+          availableTags={availableTags}
+          projectTagCount={projectTags.length}
+        />
 
         {/* Progress */}
         <div>

@@ -17,4 +17,7 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 // Load jest-dom matchers when running in jsdom environment
 if (typeof document !== "undefined") {
   await import("@testing-library/jest-dom/vitest");
+  const { cleanup } = await import("@testing-library/react");
+  const { afterEach } = await import("vitest");
+  afterEach(() => cleanup());
 }

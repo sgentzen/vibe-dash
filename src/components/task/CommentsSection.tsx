@@ -13,7 +13,7 @@ interface CommentsSectionProps {
 export function CommentsSection({ comments, newComment, onNewCommentChange, onSubmitComment }: CommentsSectionProps) {
   return (
     <div>
-      <label style={labelStyle}>Comments ({comments.length})</label>
+      <div style={labelStyle}>Comments ({comments.length})</div>
       <div style={{
         maxHeight: "200px", overflowY: "auto",
         border: "1px solid var(--border)", borderRadius: "6px",
