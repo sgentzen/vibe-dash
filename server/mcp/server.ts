@@ -4,11 +4,18 @@ import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
 import { registerAgent, touchAgent, startOrGetSession, closeAgentSessions, closeStaleSession, cleanupStaleAgents } from "../db/index.js";
 import { broadcast } from "../websocket.js";
-
-const STATUS_ENUM = z.enum(["planned", "in_progress", "blocked", "done"]);
-const PRIORITY_ENUM = z.enum(["low", "medium", "high", "urgent"]);
-const SPRINT_STATUS_ENUM = z.enum(["planned", "active", "completed"]);
-const AGENT_ROLE_ENUM = z.enum(["orchestrator", "coder", "reviewer", "explorer", "planner", "agent"]);
+import {
+  taskStatusEnum as STATUS_ENUM,
+  taskPrioritySchema as PRIORITY_ENUM,
+  milestoneStatusEnum as MILESTONE_STATUS_ENUM,
+  registerAgentSchema,
+  createProjectSchema,
+  updateProjectSchema,
+  createTaskSchema,
+  updateTaskSchema,
+  createMilestoneSchema,
+  updateMilestoneSchema,
+} from "../../shared/schemas.js";
 
 export interface McpServerHandle {
   server: McpServer;
@@ -66,24 +73,25 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "register_agent",
     "Register or update an AI agent",
-    {
-      name: z.string(),
-      model: z.string().optional(),
-      capabilities: z.array(z.string()).optional(),
-      role: AGENT_ROLE_ENUM.optional(),
-      parent_agent_name: z.string().optional(),
-    },
+    registerAgentSchema.shape,
     call("register_agent")
   );
 
   server.tool(
     "create_project",
     "Create a new project",
-    {
-      name: z.string(),
-      description: z.string().optional(),
-    },
+    createProjectSchema.shape,
     call("create_project")
+  );
+
+  server.tool(
+    "update_project",
+    "Update an existing project's name or description",
+    {
+      project_id: z.string(),
+      ...updateProjectSchema.shape,
+    },
+    call("update_project")
   );
 
   server.tool(
@@ -96,16 +104,8 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "create_task",
     "Create a new task in a project",
-    {
-      project_id: z.string(),
-      parent_task_id: z.string().optional(),
-      sprint_id: z.string().optional(),
-      title: z.string(),
-      description: z.string().optional(),
-      status: STATUS_ENUM.optional(),
-      priority: PRIORITY_ENUM.optional(),
-      agent_name: z.string().optional(),
-    },
+    // Shared schema is stricter (priority required); allow optional here for back-compat
+    { ...createTaskSchema.shape, priority: PRIORITY_ENUM.optional() },
     call("create_task")
   );
 
@@ -135,19 +135,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Update task fields",
     {
       task_id: z.string(),
-      title: z.string().optional(),
-      description: z.string().nullable().optional(),
-      status: STATUS_ENUM.optional(),
-      priority: PRIORITY_ENUM.optional(),
-      progress: z.number().min(0).max(100).optional(),
-      parent_task_id: z.string().nullable().optional(),
-      sprint_id: z.string().nullable().optional(),
-      assigned_agent_id: z.string().nullable().optional(),
-      due_date: z.string().nullable().optional(),
-      start_date: z.string().nullable().optional(),
-      estimate: z.number().int().min(0).nullable().optional(),
-      recurrence_rule: z.string().nullable().optional(),
-      agent_name: z.string().optional(),
+      ...updateTaskSchema.shape,
     },
     call("update_task")
   );
@@ -214,40 +202,38 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   );
 
   server.tool(
-    "create_sprint",
-    "Create a sprint for a project",
-    {
-      project_id: z.string(),
-      name: z.string(),
-      description: z.string().optional(),
-      status: SPRINT_STATUS_ENUM.optional(),
-      start_date: z.string().optional(),
-      end_date: z.string().optional(),
-    },
-    call("create_sprint")
+    "create_milestone",
+    "Create a milestone for a project",
+    createMilestoneSchema.shape,
+    call("create_milestone")
   );
 
   server.tool(
-    "list_sprints",
-    "List sprints, optionally filtered by project",
+    "list_milestones",
+    "List milestones, optionally filtered by project",
     {
       project_id: z.string().optional(),
     },
-    call("list_sprints")
+    call("list_milestones")
   );
 
   server.tool(
-    "update_sprint",
-    "Update sprint fields",
+    "update_milestone",
+    "Update milestone fields",
     {
-      sprint_id: z.string(),
-      name: z.string().optional(),
-      description: z.string().nullable().optional(),
-      status: SPRINT_STATUS_ENUM.optional(),
-      start_date: z.string().nullable().optional(),
-      end_date: z.string().nullable().optional(),
+      milestone_id: z.string(),
+      ...updateMilestoneSchema.shape,
     },
-    call("update_sprint")
+    call("update_milestone")
+  );
+
+  server.tool(
+    "complete_milestone",
+    "Mark a milestone as achieved",
+    {
+      milestone_id: z.string(),
+    },
+    call("complete_milestone")
   );
 
   server.tool(
@@ -348,7 +334,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     {
       query: z.string().optional(),
       project_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       status: STATUS_ENUM.optional(),
       priority: PRIORITY_ENUM.optional(),
       assigned_agent_id: z.string().optional(),
@@ -407,7 +393,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get performance metrics for an agent",
     {
       agent_id: z.string(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
     },
     call("get_agent_stats")
   );
@@ -417,7 +403,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Generate a markdown status report for a project",
     {
       project_id: z.string(),
-      period: z.enum(["day", "week", "sprint"]),
+      period: z.enum(["day", "week", "milestone"]),
     },
     call("generate_report")
   );
@@ -505,7 +491,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       cost_usd: z.number(),
       agent_id: z.string().optional(),
       task_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       project_id: z.string().optional(),
     },
     call("log_cost")
@@ -513,10 +499,10 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
 
   server.tool(
     "get_cost_summary",
-    "Get cost summary for an agent, sprint, or project",
+    "Get cost summary for an agent, milestone, or project",
     {
       agent_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       project_id: z.string().optional(),
     },
     call("get_cost_summary")
@@ -527,7 +513,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get daily cost timeseries data",
     {
       agent_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       project_id: z.string().optional(),
       days: z.number().optional(),
     },
@@ -539,7 +525,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get cost breakdown by model",
     {
       project_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
     },
     call("get_cost_by_model")
   );
@@ -549,9 +535,52 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Get cost breakdown by agent",
     {
       project_id: z.string().optional(),
-      sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
     },
     call("get_cost_by_agent")
+  );
+
+  // ─── Agent Performance Metrics ──────────────────────────────────────────
+
+  server.tool(
+    "log_completion_metrics",
+    "Log completion metrics for a task (lines changed, files, tests, duration)",
+    {
+      task_id: z.string(),
+      agent_id: z.string(),
+      lines_added: z.number().optional(),
+      lines_removed: z.number().optional(),
+      files_changed: z.number().optional(),
+      tests_added: z.number().optional(),
+      tests_passing: z.number().optional(),
+      duration_seconds: z.number().optional(),
+    },
+    call("log_completion_metrics")
+  );
+
+  server.tool(
+    "get_agent_comparison",
+    "Compare performance metrics across all agents",
+    {},
+    call("get_agent_comparison")
+  );
+
+  server.tool(
+    "get_agent_performance",
+    "Get detailed performance metrics for a specific agent",
+    {
+      agent_id: z.string(),
+    },
+    call("get_agent_performance")
+  );
+
+  server.tool(
+    "get_task_type_breakdown",
+    "Get task type breakdown for a specific agent",
+    {
+      agent_id: z.string(),
+    },
+    call("get_task_type_breakdown")
   );
 
   return { server, cleanup };

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import FocusTrap from "focus-trap-react";
 import { useApi } from "../hooks/useApi";
 import { inputStyle, buttonPrimary } from "../styles/shared.js";
 import type { Webhook } from "../types";
@@ -52,12 +53,16 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
   const localInputStyle: React.CSSProperties = { ...inputStyle, padding: "6px 10px", fontSize: "12px" };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }} onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
+    <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: true, escapeDeactivates: true, onDeactivate: onClose }}>
+      <div style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Webhook settings"
+          onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-secondary)", border: "1px solid var(--border)",
           borderRadius: "12px", padding: "20px", width: "500px", maxHeight: "80vh",
@@ -161,7 +166,8 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </FocusTrap>
   );
 }

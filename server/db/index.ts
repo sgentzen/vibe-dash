@@ -2,19 +2,21 @@
 // and get the same public API as the original monolithic db.ts.
 
 export { initDb, openDb } from "./schema.js";
-export { createProject, listProjects } from "./projects.js";
+export { createProject, updateProject, listProjects } from "./projects.js";
 export {
-  createSprint,
-  updateSprint,
-  getSprint,
-  listSprints,
-  getSprintCapacity,
-  recordDailyStats,
-  getSprintDailyStats,
-  getVelocityTrend,
+  createMilestone,
+  updateMilestone,
+  completeMilestone,
+  getMilestone,
+  listMilestones,
+  deleteMilestone,
+  getMilestoneProgress,
+  recordMilestoneDailyStats,
+  getMilestoneDailyStats,
+  backfillMilestoneDailyStats,
   getTimeSpent,
-} from "./sprints.js";
-export type { CreateSprintInput, UpdateSprintInput } from "./sprints.js";
+} from "./milestones.js";
+export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
 export {
   createTask,
   getTask,
@@ -38,7 +40,7 @@ export {
   getAgentCurrentProject,
   getAllAgentCurrentProjects,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   startOrGetSession,
   closeAgentSessions,
   closeStaleSession,
@@ -66,6 +68,8 @@ export type { CreateBlockerInput } from "./blockers.js";
 export { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags, getTag } from "./tags.js";
 export type { CreateTagInput } from "./tags.js";
 export { addDependency, removeDependency, listDependencies, getBlockingTasks } from "./dependencies.js";
+export { getTaskTagsForProject, getDependenciesForProject } from "./bulk.js";
+export type { TaskTagPair } from "./bulk.js";
 export { createSavedFilter, listSavedFilters, deleteSavedFilter } from "./filters.js";
 export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
 export {
@@ -100,10 +104,18 @@ export { generateReport } from "./reports.js";
 export {
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  getGlobalCostSummary,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
+export {
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
+} from "./metrics.js";
+export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
