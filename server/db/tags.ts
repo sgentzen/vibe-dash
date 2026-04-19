@@ -11,10 +11,9 @@ export interface CreateTagInput {
 export function createTag(db: Database.Database, input: CreateTagInput): Tag {
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT INTO tags (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, input.project_id, input.name, input.color ?? "#6366f1", ts);
-  return db.prepare("SELECT * FROM tags WHERE id = ?").get(id) as Tag;
+  return db.prepare(
+    "INSERT INTO tags (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
+  ).get(id, input.project_id, input.name, input.color ?? "#6366f1", ts) as Tag;
 }
 
 export function listTags(db: Database.Database, projectId: string): Tag[] {
@@ -29,9 +28,10 @@ export function addTagToTask(
   tagId: string
 ): TaskTag {
   const id = genId();
-  db.prepare(
-    "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)"
-  ).run(id, taskId, tagId);
+  const inserted = db.prepare(
+    "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?) RETURNING *"
+  ).get(id, taskId, tagId) as TaskTag | undefined;
+  if (inserted) return inserted;
   return db
     .prepare("SELECT * FROM task_tags WHERE task_id = ? AND tag_id = ?")
     .get(taskId, tagId) as TaskTag;

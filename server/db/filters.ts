@@ -5,8 +5,7 @@ import { now, genId } from "./helpers.js";
 export function createSavedFilter(db: Database.Database, name: string, filterJson: string): SavedFilter {
   const id = genId();
   const ts = now();
-  db.prepare("INSERT INTO saved_filters (id, name, filter_json, created_at) VALUES (?, ?, ?, ?)").run(id, name, filterJson, ts);
-  return db.prepare("SELECT * FROM saved_filters WHERE id = ?").get(id) as SavedFilter;
+  return db.prepare("INSERT INTO saved_filters (id, name, filter_json, created_at) VALUES (?, ?, ?, ?) RETURNING *").get(id, name, filterJson, ts) as SavedFilter;
 }
 
 export function listSavedFilters(db: Database.Database): SavedFilter[] {

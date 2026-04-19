@@ -43,11 +43,11 @@ export function App() {
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
-          const [stats, projects, sprints, tasks, agents, activity, blockerList] =
+          const [stats, projects, milestones, tasks, agents, activity, blockerList] =
             await Promise.all([
               api.getStats(),
               api.getProjects(),
-              api.getSprints(),
+              api.getMilestones(),
               api.getTasks(),
               api.getAgents(),
               api.getActivity(),
@@ -56,41 +56,34 @@ export function App() {
           if (cancelled) return;
           dispatch({ type: "SET_STATS", payload: stats });
           dispatch({ type: "SET_PROJECTS", payload: projects });
-          dispatch({ type: "SET_SPRINTS", payload: sprints });
+          dispatch({ type: "SET_MILESTONES", payload: milestones });
           dispatch({ type: "SET_TASKS", payload: tasks });
           dispatch({ type: "SET_AGENTS", payload: agents });
           dispatch({ type: "SET_ACTIVITY", payload: activity });
           dispatch({ type: "SET_BLOCKERS", payload: blockerList });
 
-          // Load tags for all projects
-          const allTags = (await Promise.all(
-            projects.map((p) => api.getTags(p.id))
-          )).flat();
+          // Load tags and milestones for all projects
+          const [allTags, allMilestones] = await Promise.all([
+            Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
+            Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
+          ]);
           dispatch({ type: "SET_TAGS", payload: allTags });
+          dispatch({ type: "SET_MILESTONES", payload: allMilestones });
 
-          // Load task tags for all tasks
-          const taskTagEntries = await Promise.all(
-            tasks.map(async (t) => {
-              const tags = await api.getTaskTags(t.id);
-              return [t.id, tags.map((tag) => tag.id)] as [string, string[]];
-            })
-          );
+          // Load task tags and dependencies in bulk (one request per project instead of N per task)
+          const [taskTagPairs, allDeps] = await Promise.all([
+            Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
+            Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
+          ]);
           const tagMap: Record<string, string[]> = {};
-          for (const [taskId, tagIds] of taskTagEntries) {
-            if (tagIds.length > 0) tagMap[taskId] = tagIds;
+          for (const { task_id, tag } of taskTagPairs) {
+            (tagMap[task_id] ??= []).push(tag.id);
           }
           dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
 
-          // Load task dependencies for all tasks
-          const depsEntries = await Promise.all(
-            tasks.map(async (t) => {
-              const deps = await api.getDependencies(t.id);
-              return [t.id, deps.map((d) => d.depends_on_task_id)] as [string, string[]];
-            })
-          );
           const depsMap: Record<string, string[]> = {};
-          for (const [taskId, depIds] of depsEntries) {
-            if (depIds.length > 0) depsMap[taskId] = depIds;
+          for (const d of allDeps) {
+            (depsMap[d.task_id] ??= []).push(d.depends_on_task_id);
           }
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 
@@ -127,15 +120,15 @@ export function App() {
     setShowOnboarding(false);
     // Reload data to reflect newly created project/task
     try {
-      const [stats, projects, sprints, tasks] = await Promise.all([
+      const [stats, projects, milestones, tasks] = await Promise.all([
         api.getStats(),
         api.getProjects(),
-        api.getSprints(),
+        api.getMilestones(),
         api.getTasks(),
       ]);
       dispatch({ type: "SET_STATS", payload: stats });
       dispatch({ type: "SET_PROJECTS", payload: projects });
-      dispatch({ type: "SET_SPRINTS", payload: sprints });
+      dispatch({ type: "SET_MILESTONES", payload: milestones });
       dispatch({ type: "SET_TASKS", payload: tasks });
       if (projects.length > 0) {
         dispatch({ type: "SELECT_PROJECT", payload: projects[0].id });

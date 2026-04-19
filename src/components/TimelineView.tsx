@@ -1,112 +1,155 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAppState } from "../store";
-import { PRIORITY_COLORS } from "../constants/colors.js";
-import type { Task, Sprint, TaskStatus } from "../types";
-
-const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
-  done: "var(--accent-green)",
-  in_progress: "var(--accent-blue)",
-  blocked: "var(--accent-yellow)",
-  planned: "var(--text-muted)",
-};
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const BAR_HEIGHT = 24;
-const ROW_HEIGHT = 32;
-const LEFT_LABEL_WIDTH = 200;
-const HEADER_HEIGHT = 40;
-
-function getTaskDates(task: Task, sprintMap: Map<string, Sprint>): { start: number; end: number } | null {
-  const taskStart = task.start_date ? new Date(task.start_date).getTime() : null;
-  const taskEnd = task.due_date ? new Date(task.due_date).getTime() : null;
-
-  if (taskStart || taskEnd) {
-    const start = taskStart ?? (taskEnd! - 7 * DAY_MS);
-    const end = taskEnd ?? (taskStart! + 7 * DAY_MS);
-    return { start, end };
-  }
-
-  // Fall back to sprint dates if the task belongs to a sprint with dates
-  if (task.sprint_id) {
-    const sprint = sprintMap.get(task.sprint_id);
-    if (sprint) {
-      const sprintStart = sprint.start_date ? new Date(sprint.start_date).getTime() : null;
-      const sprintEnd = sprint.end_date ? new Date(sprint.end_date).getTime() : null;
-      if (sprintStart || sprintEnd) {
-        const start = sprintStart ?? (sprintEnd! - 14 * DAY_MS);
-        const end = sprintEnd ?? (sprintStart! + 14 * DAY_MS);
-        return { start, end };
-      }
-    }
-  }
-
-  return null;
-}
+import type { Milestone, Project, Task } from "../types";
+import {
+  DAY_MS,
+  DEFAULT_LABEL_WIDTH,
+  GROUP_HEADER_HEIGHT,
+  HEADER_HEIGHT,
+  MAX_LABEL_WIDTH,
+  MIN_LABEL_WIDTH,
+  ROW_HEIGHT,
+} from "./timeline/constants";
+import { buildGroups, getTaskDates, type TaskGroup } from "./timeline/utils";
+import { DateHeader } from "./timeline/DateHeader";
+import { GroupHeaderRow } from "./timeline/GroupHeaderRow";
+import { TaskRow } from "./timeline/TaskRow";
 
 export function TimelineView() {
-  const { tasks, sprints, selectedProjectId, selectedSprintId, taskDepsMap } = useAppState();
+  const { tasks, milestones, projects, selectedProjectId, selectedMilestoneId, taskDepsMap } =
+    useAppState();
   const [showUndated, setShowUndated] = useState(false);
+  const [labelWidth, setLabelWidth] = useState(DEFAULT_LABEL_WIDTH);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  const sprintMap = useMemo(() => {
-    const m = new Map<string, Sprint>();
-    for (const s of sprints) m.set(s.id, s);
+  const milestoneMap = useMemo(() => {
+    const m = new Map<string, Milestone>();
+    for (const s of milestones) m.set(s.id, s);
     return m;
-  }, [sprints]);
+  }, [milestones]);
+
+  const projectMap = useMemo(() => {
+    const m = new Map<string, Project>();
+    for (const p of projects) m.set(p.id, p);
+    return m;
+  }, [projects]);
 
   const allMatchingTasks = tasks.filter(
     (t) =>
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedSprintId === null || t.sprint_id === selectedSprintId)
+      (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId),
   );
 
-  const datedTasks = allMatchingTasks.filter((t) => getTaskDates(t, sprintMap) !== null);
+  const datedTasks = allMatchingTasks.filter((t) => getTaskDates(t, milestoneMap) !== null);
   const undatedCount = allMatchingTasks.length - datedTasks.length;
-  const unsortedTasks = showUndated ? allMatchingTasks : datedTasks;
+  const activeTasks = showUndated ? allMatchingTasks : datedTasks;
 
-  // Sort: dated tasks by start date ascending, then undated by created_at
-  const filteredTasks = [...unsortedTasks].sort((a, b) => {
-    const aDates = getTaskDates(a, sprintMap);
-    const bDates = getTaskDates(b, sprintMap);
-    if (aDates && !bDates) return -1;
-    if (!aDates && bDates) return 1;
-    const aStart = aDates ? aDates.start : new Date(a.created_at).getTime();
-    const bStart = bDates ? bDates.start : new Date(b.created_at).getTime();
-    return aStart - bStart;
-  });
+  // Sort tasks by start date
+  const sortedTasks = useMemo(() => {
+    return [...activeTasks].sort((a, b) => {
+      const aDates = getTaskDates(a, milestoneMap);
+      const bDates = getTaskDates(b, milestoneMap);
+      if (aDates && !bDates) return -1;
+      if (!aDates && bDates) return 1;
+      const aStart = aDates ? aDates.start : new Date(a.created_at).getTime();
+      const bStart = bDates ? bDates.start : new Date(b.created_at).getTime();
+      return aStart - bStart;
+    });
+  }, [activeTasks, milestoneMap]);
+
+  // Group tasks
+  const groups = useMemo(
+    () => buildGroups(sortedTasks, milestoneMap, projectMap),
+    [sortedTasks, milestoneMap, projectMap],
+  );
+
+  // Build flat render list (group headers + visible task rows) for positioning
+  const flatRows = useMemo(() => {
+    const rows: { type: "group"; group: TaskGroup }[] | { type: "task"; task: Task }[] = [];
+    for (const g of groups) {
+      (rows as { type: "group"; group: TaskGroup }[]).push({ type: "group", group: g });
+      if (!collapsedGroups.has(g.key)) {
+        for (const t of g.tasks) {
+          (rows as { type: "task"; task: Task }[]).push({ type: "task", task: t });
+        }
+      }
+    }
+    return rows as ({ type: "group"; group: TaskGroup } | { type: "task"; task: Task })[];
+  }, [groups, collapsedGroups]);
+
+  // Visible tasks only (for date range calculation)
+  const visibleTasks = useMemo(
+    () => flatRows.filter((r): r is { type: "task"; task: Task } => r.type === "task").map((r) => r.task),
+    [flatRows],
+  );
 
   const { minDate, maxDate, totalDays } = useMemo(() => {
-    if (filteredTasks.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 30 };
+    if (visibleTasks.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 30 };
     let min = Infinity;
     let max = -Infinity;
-    for (const t of filteredTasks) {
-      const dates = getTaskDates(t, sprintMap);
+    for (const t of visibleTasks) {
+      const dates = getTaskDates(t, milestoneMap);
       const start = dates ? dates.start : new Date(t.created_at).getTime();
       const end = dates ? dates.end : start + 7 * DAY_MS;
       if (start < min) min = start;
       if (end > max) max = end;
     }
-    // Add padding
     min -= 2 * DAY_MS;
     max += 2 * DAY_MS;
     return { minDate: new Date(min), maxDate: new Date(max), totalDays: Math.ceil((max - min) / DAY_MS) };
-  }, [filteredTasks, sprintMap]);
+  }, [visibleTasks, milestoneMap]);
 
   const timelineWidth = Math.max(totalDays * 30, 600);
 
-  function dateToX(timeMs: number): number {
-    return ((timeMs - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
-  }
-
-  const statusOpacity: Record<string, number> = {
-    done: 0.4, blocked: 0.6, in_progress: 1, planned: 0.8,
-  };
-
-  // Sprint boundaries
-  const activeSprints = sprints.filter((s) =>
-    (selectedProjectId === null || s.project_id === selectedProjectId) &&
-    (s.start_date || s.end_date)
+  const dateToX = useCallback(
+    (timeMs: number): number => {
+      return ((timeMs - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+    },
+    [minDate, maxDate, timelineWidth],
   );
+
+  // Milestone boundaries
+  const activeMilestones = milestones.filter(
+    (m) => (selectedProjectId === null || m.project_id === selectedProjectId) && m.target_date,
+  );
+
+  const handleResize = useCallback((delta: number) => {
+    setLabelWidth((w) => Math.max(MIN_LABEL_WIDTH, Math.min(MAX_LABEL_WIDTH, w + delta)));
+  }, []);
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Total content height for markers
+  const totalContentHeight = useMemo(() => {
+    let h = 0;
+    for (const r of flatRows) {
+      h += r.type === "group" ? GROUP_HEADER_HEIGHT : ROW_HEIGHT;
+    }
+    return h;
+  }, [flatRows]);
+
+  // Build a lookup: task.id → y-offset for dependency arrows
+  const taskYMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let y = 0;
+    for (const r of flatRows) {
+      if (r.type === "group") {
+        y += GROUP_HEADER_HEIGHT;
+      } else {
+        map.set(r.task.id, y);
+        y += ROW_HEIGHT;
+      }
+    }
+    return map;
+  }, [flatRows]);
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
@@ -121,7 +164,7 @@ export function TimelineView() {
               background: "transparent",
               border: "1px solid var(--border)",
               borderRadius: "4px",
-              padding: "2px 8px",
+              padding: "4px 10px",
               fontSize: "11px",
               color: "var(--text-muted)",
               cursor: "pointer",
@@ -132,8 +175,15 @@ export function TimelineView() {
         )}
       </div>
 
-      {filteredTasks.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "40px" }}>
+      {sortedTasks.length === 0 ? (
+        <div
+          style={{
+            color: "var(--text-muted)",
+            fontSize: "13px",
+            textAlign: "center",
+            padding: "40px",
+          }}
+        >
           {undatedCount > 0 && datedTasks.length === 0 ? (
             <div>
               <div style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "8px" }}>
@@ -141,81 +191,90 @@ export function TimelineView() {
               </div>
               <div style={{ fontSize: "12px" }}>
                 Add start_date and due_date to tasks to build a useful timeline.
-                {!showUndated && ` ${undatedCount} undated task${undatedCount !== 1 ? "s" : ""} hidden.`}
+                {!showUndated &&
+                  ` ${undatedCount} undated task${undatedCount !== 1 ? "s" : ""} hidden.`}
               </div>
             </div>
           ) : (
-            <>No tasks to display.{undatedCount > 0 ? ` ${undatedCount} tasks have no dates set.` : ""}</>
+            <>
+              No tasks to display.
+              {undatedCount > 0 ? ` ${undatedCount} tasks have no dates set.` : ""}
+            </>
           )}
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ position: "relative", minWidth: LEFT_LABEL_WIDTH + timelineWidth + 20 }}>
-            {/* Date header */}
-            <div style={{ display: "flex", marginLeft: LEFT_LABEL_WIDTH, height: HEADER_HEIGHT, borderBottom: "1px solid var(--border)" }}>
-              {Array.from({ length: Math.min(totalDays, 60) }, (_, i) => {
-                const d = new Date(minDate.getTime() + i * DAY_MS);
-                const isWeekStart = d.getUTCDay() === 1;
-                return (
-                  <div
-                    key={i}
+          <div style={{ position: "relative", minWidth: labelWidth + timelineWidth + 20 }}>
+            {/* ── Two-tier date header ─────────────────────────────── */}
+            <DateHeader
+              minDate={minDate}
+              totalDays={totalDays}
+              timelineWidth={timelineWidth}
+              labelWidth={labelWidth}
+            />
+
+            {/* ── Milestone boundary lines ────────────────────────── */}
+            {activeMilestones.map((m) => {
+              if (!m.target_date) return null;
+              const targetX = dateToX(new Date(m.target_date).getTime());
+              return (
+                <div
+                  key={m.id}
+                  style={{
+                    position: "absolute",
+                    left: labelWidth + targetX,
+                    top: HEADER_HEIGHT,
+                    width: 2,
+                    height: totalContentHeight,
+                    background: "var(--accent-purple)",
+                    zIndex: 0,
+                  }}
+                >
+                  <span
                     style={{
-                      width: `${timelineWidth / totalDays}px`,
-                      textAlign: "center",
-                      fontSize: "9px",
-                      color: isWeekStart ? "var(--text-primary)" : "var(--text-muted)",
-                      fontWeight: isWeekStart ? 600 : 400,
-                      borderLeft: isWeekStart ? "1px solid var(--border)" : "none",
-                      paddingTop: "4px",
+                      position: "absolute",
+                      top: -16,
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "var(--accent-purple)",
+                      whiteSpace: "nowrap",
+                      left: 6,
                     }}
                   >
-                    {isWeekStart ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}` : ""}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Sprint boundaries */}
-            {activeSprints.map((s) => {
-              if (!s.start_date && !s.end_date) return null;
-              const startX = dateToX(new Date(s.start_date ?? s.created_at).getTime());
-              const endX = s.end_date ? dateToX(new Date(s.end_date).getTime()) : timelineWidth;
-              return (
-                <div key={s.id} style={{
-                  position: "absolute", left: LEFT_LABEL_WIDTH + startX, top: HEADER_HEIGHT,
-                  width: Math.max(endX - startX, 1), height: filteredTasks.length * ROW_HEIGHT,
-                  background: "rgba(99,102,241,0.03)", borderLeft: "1px dashed rgba(99,102,241,0.3)",
-                  borderRight: "1px dashed rgba(99,102,241,0.3)", zIndex: 0,
-                }}>
-                  <span style={{ position: "absolute", top: -14, fontSize: "9px", color: "var(--accent-purple)", whiteSpace: "nowrap" }}>{s.name}</span>
+                    {m.name}
+                  </span>
                 </div>
               );
             })}
 
-            {/* Today marker */}
+            {/* ── Today marker ────────────────────────────────────── */}
             {(() => {
               const todayX = dateToX(Date.now());
               if (todayX > 0 && todayX < timelineWidth) {
                 return (
-                  <div style={{
-                    position: "absolute",
-                    left: LEFT_LABEL_WIDTH + todayX,
-                    top: 0,
-                    width: "2px",
-                    height: HEADER_HEIGHT + filteredTasks.length * ROW_HEIGHT,
-                    background: "var(--accent-red)",
-                    zIndex: 2,
-                    pointerEvents: "none",
-                  }}>
-                    <span style={{
+                  <div
+                    style={{
                       position: "absolute",
-                      top: "2px",
-                      left: "4px",
-                      fontSize: "9px",
-                      color: "var(--accent-red)",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                    }}>
+                      left: labelWidth + todayX,
+                      top: 0,
+                      width: "2px",
+                      height: HEADER_HEIGHT + totalContentHeight,
+                      background: "var(--accent-red)",
+                      zIndex: 2,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: "2px",
+                        left: "4px",
+                        fontSize: "11px",
+                        color: "var(--accent-red)",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       Today
                     </span>
                   </div>
@@ -224,73 +283,34 @@ export function TimelineView() {
               return null;
             })()}
 
-            {/* Task rows */}
-            {filteredTasks.map((task, i) => {
-              const dates = getTaskDates(task, sprintMap);
-              const start = dates ? dates.start : new Date(task.created_at).getTime();
-              const end = dates ? dates.end : start + 7 * DAY_MS;
-              const startX = dateToX(start);
-              const endX = dateToX(end);
-              const barWidth = Math.max(endX - startX, 8);
-              const color = PRIORITY_COLORS[task.priority] ?? "var(--accent-purple)";
-              const opacity = statusOpacity[task.status] ?? 1;
-              const hasDates = dates !== null;
+            {/* ── Grouped rows ────────────────────────────────────── */}
+            {flatRows.map((row) => {
+              if (row.type === "group") {
+                return (
+                  <GroupHeaderRow
+                    key={row.group.key}
+                    group={row.group}
+                    collapsed={collapsedGroups.has(row.group.key)}
+                    onToggle={() => toggleGroup(row.group.key)}
+                    labelWidth={labelWidth}
+                    timelineWidth={timelineWidth}
+                  />
+                );
+              }
 
               return (
-                <div key={task.id} style={{ display: "flex", alignItems: "center", height: ROW_HEIGHT, position: "relative", zIndex: 1 }}>
-                  {/* Label with status dot */}
-                  <div style={{
-                    width: LEFT_LABEL_WIDTH, fontSize: "11px", color: "var(--text-primary)",
-                    padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    flexShrink: 0, display: "flex", alignItems: "center", gap: "6px",
-                  }}>
-                    <span style={{
-                      width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
-                      background: STATUS_DOT_COLORS[task.status] ?? "var(--text-muted)",
-                    }} />
-                    {task.title}
-                  </div>
-                  {/* Bar */}
-                  <div style={{ position: "relative", width: timelineWidth }}>
-                    <div
-                      title={`${task.title}\n${task.start_date ?? "no start"} → ${task.due_date ?? "no due"}\nStatus: ${task.status} | Priority: ${task.priority}`}
-                      style={{
-                        position: "absolute", left: startX, top: (ROW_HEIGHT - BAR_HEIGHT) / 2,
-                        width: barWidth, height: BAR_HEIGHT, borderRadius: "4px",
-                        background: color, opacity: hasDates ? opacity : opacity * 0.3,
-                        display: "flex", alignItems: "center", paddingLeft: "6px",
-                        fontSize: "10px", color: "var(--text-on-accent)", fontWeight: 500,
-                        overflow: "hidden", whiteSpace: "nowrap",
-                        border: hasDates ? "none" : "1px dashed rgba(255,255,255,0.3)",
-                      }}
-                    >
-                      {barWidth > 60 ? task.title : ""}
-                    </div>
-
-                    {/* Dependency arrows */}
-                    {(taskDepsMap[task.id] ?? []).map((depId) => {
-                      const depTask = filteredTasks.find((t) => t.id === depId);
-                      if (!depTask) return null;
-                      const depDates = getTaskDates(depTask, sprintMap);
-                      const depEnd = depDates ? depDates.end : new Date(depTask.created_at).getTime() + 7 * DAY_MS;
-                      const depEndX = dateToX(depEnd);
-                      const depRow = filteredTasks.indexOf(depTask);
-                      if (depRow === -1) return null;
-                      const fromY = (depRow - i) * ROW_HEIGHT;
-
-                      return (
-                        <svg key={depId} style={{ position: "absolute", left: 0, top: 0, width: timelineWidth, height: ROW_HEIGHT, overflow: "visible", pointerEvents: "none" }}>
-                          <line
-                            x1={depEndX} y1={fromY + ROW_HEIGHT / 2}
-                            x2={startX} y2={ROW_HEIGHT / 2}
-                            stroke="var(--accent-red)" strokeWidth={1} strokeDasharray="4,2"
-                            markerEnd="url(#arrowhead)"
-                          />
-                        </svg>
-                      );
-                    })}
-                  </div>
-                </div>
+                <TaskRow
+                  key={row.task.id}
+                  task={row.task}
+                  labelWidth={labelWidth}
+                  timelineWidth={timelineWidth}
+                  milestoneMap={milestoneMap}
+                  dateToX={dateToX}
+                  onResize={handleResize}
+                  depIds={taskDepsMap[row.task.id] ?? []}
+                  taskYMap={taskYMap}
+                  visibleTasks={visibleTasks}
+                />
               );
             })}
 

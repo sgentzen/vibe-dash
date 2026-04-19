@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
 import type { WsEvent } from "./types.js";
+import { logger } from "./logger.js";
 
 let wss: WebSocketServer | null = null;
 
@@ -8,7 +9,7 @@ export function initWebSocket(server: Server): WebSocketServer {
   wss = new WebSocketServer({ server, path: "/ws" });
   wss.on("connection", (ws) => {
     ws.on("error", (err) => {
-      console.error("WebSocket client error:", err.message);
+      logger.error({ err }, "WebSocket client error");
     });
   });
   return wss;

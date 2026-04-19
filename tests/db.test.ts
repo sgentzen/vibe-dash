@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import {
   createProject,
+  updateProject,
   listProjects,
   createTask,
   getTask,
@@ -47,6 +48,36 @@ describe("projects", () => {
 
   it("returns empty array when no projects exist", () => {
     expect(listProjects(db)).toHaveLength(0);
+  });
+
+  it("updates a project name", () => {
+    const p = createProject(db, { name: "Old", description: "desc" });
+    const updated = updateProject(db, p.id, { name: "New" });
+
+    expect(updated).not.toBeNull();
+    expect(updated!.name).toBe("New");
+    expect(updated!.description).toBe("desc");
+    expect(updated!.updated_at).not.toBe(p.updated_at);
+  });
+
+  it("updates a project description", () => {
+    const p = createProject(db, { name: "P", description: "old desc" });
+    const updated = updateProject(db, p.id, { description: "new desc" });
+
+    expect(updated!.name).toBe("P");
+    expect(updated!.description).toBe("new desc");
+  });
+
+  it("clears description by setting it to null", () => {
+    const p = createProject(db, { name: "P", description: "has desc" });
+    const updated = updateProject(db, p.id, { description: null });
+
+    expect(updated!.description).toBeNull();
+  });
+
+  it("returns null for non-existent project", () => {
+    const result = updateProject(db, "non-existent-id", { name: "X" });
+    expect(result).toBeNull();
   });
 });
 
@@ -320,5 +351,115 @@ describe("blockers", () => {
 
   it("returns empty array when no active blockers", () => {
     expect(getActiveBlockers(db)).toHaveLength(0);
+  });
+});
+
+// ─── Schema indexes ─────────────────────────────────────────────────────────
+
+describe("schema indexes", () => {
+  const EXPECTED_INDEXES = [
+    "idx_tasks_project_id",
+    "idx_tasks_milestone_id",
+    "idx_tasks_assigned_agent_id",
+    "idx_tasks_status",
+    "idx_tasks_priority",
+    "idx_activity_log_agent_id",
+    "idx_activity_log_task_id",
+    "idx_activity_log_timestamp",
+    "idx_task_tags_tag_id",
+    "idx_task_dependencies_depends_on",
+    "idx_blockers_task_id",
+    "idx_agent_sessions_agent_id",
+    "idx_tags_project_id",
+    "idx_milestones_project_id",
+    "idx_task_comments_task_id",
+    "idx_agent_file_locks_agent_id",
+    "idx_cost_entries_agent_id",
+    "idx_cost_entries_project_id",
+    "idx_cost_entries_milestone_id",
+  ];
+
+  it("creates all expected foreign-key and hot-path indexes", () => {
+    const rows = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='index'")
+      .all() as { name: string }[];
+    const names = new Set(rows.map((r) => r.name));
+    for (const idx of EXPECTED_INDEXES) {
+      expect(names.has(idx), `missing index: ${idx}`).toBe(true);
+    }
+  });
+
+  it("fresh tasks table has all migrated columns without running migrate()", () => {
+    const cols = db.pragma("table_info(tasks)") as { name: string }[];
+    const names = new Set(cols.map((c) => c.name));
+    for (const col of [
+      "id", "project_id", "parent_task_id", "milestone_id", "assigned_agent_id",
+      "title", "description", "status", "priority", "progress",
+      "due_date", "start_date", "estimate", "recurrence_rule",
+      "created_at", "updated_at",
+    ]) {
+      expect(names.has(col), `missing column: ${col}`).toBe(true);
+    }
+  });
+
+  it("tasks.milestone_id FK points at milestones, not a legacy sprints table", () => {
+    const fks = db.pragma("foreign_key_list(tasks)") as { from: string; table: string }[];
+    const milestoneFk = fks.find((fk) => fk.from === "milestone_id");
+    expect(milestoneFk?.table).toBe("milestones");
+  });
+
+});
+
+// ─── FK rebuild migration ───────────────────────────────────────────────────
+// Simulates the legacy bug: `ALTER TABLE tasks RENAME COLUMN sprint_id → milestone_id`
+// on SQLite preserves the original FK (→ sprints). After sprints is dropped,
+// inserts on the renamed column fail. initDb() must detect and rebuild.
+
+describe("milestone_id FK rebuild", () => {
+  it("rebuilds tasks when milestone_id FK still points at dropped sprints", async () => {
+    const Database = (await import("better-sqlite3")).default;
+    const { initDb } = await import("../server/db/schema.js");
+    const d = new Database(":memory:");
+    d.pragma("foreign_keys = ON");
+
+    // Build legacy schema with sprints + tasks.sprint_id FK → sprints
+    d.exec(`
+      CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE sprints (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), name TEXT NOT NULL, description TEXT, end_date TEXT, status TEXT DEFAULT 'active', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id),
+        parent_task_id TEXT REFERENCES tasks(id),
+        sprint_id TEXT REFERENCES sprints(id),
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'planned',
+        priority TEXT NOT NULL DEFAULT 'medium',
+        progress INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO projects VALUES ('p1','proj',NULL,'2026-01-01','2026-01-01');
+      INSERT INTO sprints VALUES ('s1','p1','sprint',NULL,NULL,'active','2026-01-01','2026-01-01');
+      INSERT INTO tasks VALUES ('t1','p1',NULL,'s1','existing task',NULL,'planned','medium',0,'2026-01-01','2026-01-01');
+    `);
+
+    // Run the full init — migrate should rename sprint_id → milestone_id,
+    // detect the stale FK to sprints, and rebuild tasks pointing at milestones.
+    initDb(d);
+
+    const fks = d.pragma("foreign_key_list(tasks)") as { from: string; table: string }[];
+    const mFk = fks.find((f) => f.from === "milestone_id");
+    expect(mFk?.table).toBe("milestones");
+
+    // After rebuild + sprints→milestones row migration, insert a task with a
+    // real milestone_id succeeds (was failing before the fix).
+    const msId = (d.prepare("SELECT id FROM milestones LIMIT 1").get() as { id: string }).id;
+    expect(() => {
+      d.prepare("INSERT INTO tasks (id, project_id, milestone_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .run("t-new", "p1", msId, "new", "2026-01-02", "2026-01-02");
+    }).not.toThrow();
+
+    d.close();
   });
 });

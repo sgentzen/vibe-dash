@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import {
-  initDb,
   createProject,
   createTask,
   registerAgent,
@@ -25,12 +24,12 @@ import {
   evaluateAlertRules,
   bulkUpdateTasks,
 } from "../server/db/index.js";
+import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
 beforeEach(() => {
-  db = new Database(":memory:");
-  initDb(db);
+  db = createTestDb();
 });
 
 // ─── 4.1 Task Comments ──────────────────────────────────────────────────────
@@ -219,7 +218,7 @@ describe("3.2 Bulk Update", () => {
     expect(updated[1].priority).toBe("high");
 
     // t3 should be unchanged
-    const t3After = db.prepare("SELECT * FROM tasks WHERE id = ?").get(t3.id) as any;
+    const t3After = db.prepare("SELECT * FROM tasks WHERE id = ?").get(t3.id) as { priority: string };
     expect(t3After.priority).toBe("medium");
   });
 
