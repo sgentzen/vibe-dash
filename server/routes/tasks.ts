@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import type { TaskStatus } from "../types.js";
+import type { TaskStatus, TaskPriority } from "../types.js";
+import type { UpdateTaskInput } from "../db/tasks.js";
 import { BULK_UPDATE_MAX } from "../constants.js";
 import {
   listTasks,
@@ -87,7 +88,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
     if (!task_ids?.length || !updates) { badRequest(res, "task_ids and updates are required"); return; }
     if (task_ids.length > BULK_UPDATE_MAX) { badRequest(res, `Maximum ${BULK_UPDATE_MAX} tasks per bulk update`); return; }
-    const tasks = bulkUpdateTasks(db, task_ids, updates as any);
+    const tasks = bulkUpdateTasks(db, task_ids, updates as UpdateTaskInput);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
       const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
@@ -103,8 +104,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       query: q.q,
       project_id: q.project_id,
       sprint_id: q.sprint_id,
-      status: q.status as any,
-      priority: q.priority as any,
+      status: q.status as TaskStatus | undefined,
+      priority: q.priority as TaskPriority | undefined,
       assigned_agent_id: q.assigned_agent_id,
       tag_id: q.tag_id,
       due_before: q.due_before,

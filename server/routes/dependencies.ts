@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import { addDependency, removeDependency, listDependencies, getBlockingTasks } from "../db/index.js";
+import type { TaskDependency } from "../../shared/types.js";
 import { dependencyDeleteLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
@@ -25,7 +26,7 @@ export function dependencyRoutes(db: Database.Database, broadcast: BroadcastFn):
   });
 
   router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
-    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as any;
+    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as TaskDependency | undefined;
     const removed = removeDependency(db, req.params.id as string);
     if (removed && dep) {
       broadcast({ type: "dependency_removed", payload: dep });
