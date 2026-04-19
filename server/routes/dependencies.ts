@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import { addDependency, removeDependency, listDependencies, getBlockingTasks } from "../db/index.js";
-import type { TaskDependency } from "../../shared/types.js";
+import type { TaskDependency } from "../types.js";
 import { dependencyDeleteLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
