@@ -20,6 +20,7 @@ import {
   getMilestone,
   updateMilestone,
   completeMilestone,
+  deleteMilestone,
   logActivity,
   getAgentCurrentTask,
   getAgentCurrentProject,
@@ -90,6 +91,10 @@ import {
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
 import { logger } from "./logger.js";
@@ -582,6 +587,13 @@ export function createRouter(db: Database.Database): Router {
     res.json({ success: removed });
   });
 
+  // ─── Agent Performance Metrics ─────────────────────────────────────────
+
+  // Must be before /api/agents/:id to avoid "comparison" being treated as an id
+  router.get("/api/agents/comparison", (_req, res) => {
+    res.json(getAgentComparison(db));
+  });
+
   // ─── R2: Agent Detail ──────────────────────────────────────────────────
 
   router.get("/api/agents/:id", (req, res) => {
@@ -888,6 +900,86 @@ export function createRouter(db: Database.Database): Router {
     const project_id = req.query.project_id as string | undefined;
     const milestone_id = req.query.milestone_id as string | undefined;
     res.json(getCostByAgent(db, { project_id, milestone_id }));
+  });
+
+  // ─── Completion Metrics ───────────────────────────────────────────────────
+
+  router.post("/api/metrics", (req, res) => {
+    const { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds } = req.body;
+    if (!task_id || !agent_id) {
+      res.status(400).json({ error: "task_id and agent_id are required" });
+      return;
+    }
+    const entry = logCompletionMetrics(db, { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds });
+    broadcast({ type: "metrics_logged", payload: entry });
+    res.status(201).json(entry);
+  });
+
+  router.get("/api/agents/:id/performance", (req, res) => {
+    const perf = getAgentPerformance(db, req.params.id);
+    if (!perf) { res.status(404).json({ error: "No metrics found for this agent" }); return; }
+    res.json(perf);
+  });
+
+  router.get("/api/agents/:id/task-type-breakdown", (req, res) => {
+    res.json(getTaskTypeBreakdown(db, req.params.id));
+  });
+
+  // ─── Milestones ─────────────────────────────────────────────────────────────
+
+  router.get("/api/milestones", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    res.json(listMilestones(db, project_id));
+  });
+
+  router.post("/api/milestones", (req, res) => {
+    const { project_id, name, description, acceptance_criteria, target_date } = req.body;
+    if (!project_id || !name) {
+      res.status(400).json({ error: "project_id and name are required" });
+      return;
+    }
+    const milestone = createMilestone(db, { project_id, name, description, acceptance_criteria, target_date });
+    broadcast({ type: "milestone_created", payload: milestone });
+    res.status(201).json(milestone);
+  });
+
+  router.get("/api/milestones/:id", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    res.json(milestone);
+  });
+
+  const MILESTONE_STATUSES = ["open", "achieved", "cancelled"] as const;
+
+  router.patch("/api/milestones/:id", (req, res) => {
+    const { name, description, acceptance_criteria, target_date, status } = req.body;
+    if (status !== undefined && !MILESTONE_STATUSES.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${MILESTONE_STATUSES.join(", ")}` });
+      return;
+    }
+    if (acceptance_criteria !== undefined && !Array.isArray(acceptance_criteria)) {
+      res.status(400).json({ error: "acceptance_criteria must be an array of strings" });
+      return;
+    }
+    const milestone = updateMilestone(db, req.params.id, { name, description, acceptance_criteria, target_date, status });
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    broadcast({ type: "milestone_updated", payload: milestone });
+    res.json(milestone);
+  });
+
+  router.post("/api/milestones/:id/complete", (req, res) => {
+    const milestone = completeMilestone(db, req.params.id);
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    broadcast({ type: "milestone_completed", payload: milestone });
+    res.json(milestone);
+  });
+
+  router.delete("/api/milestones/:id", (req, res) => {
+    const existing = getMilestone(db, req.params.id);
+    if (!existing) { res.status(404).json({ error: "Milestone not found" }); return; }
+    deleteMilestone(db, req.params.id);
+    broadcast({ type: "milestone_deleted", payload: existing });
+    res.json({ success: true });
   });
 
   return router;

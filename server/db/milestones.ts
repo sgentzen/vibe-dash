@@ -11,6 +11,14 @@ export interface CreateMilestoneInput {
   status?: MilestoneStatus;
 }
 
+export interface UpdateMilestoneInput {
+  name?: string;
+  description?: string | null;
+  acceptance_criteria?: string | null;
+  target_date?: string | null;
+  status?: MilestoneStatus;
+}
+
 export function createMilestone(
   db: Database.Database,
   input: CreateMilestoneInput
@@ -31,14 +39,6 @@ export function createMilestone(
     ts,
     ts
   ) as Milestone;
-}
-
-export interface UpdateMilestoneInput {
-  name?: string;
-  description?: string | null;
-  acceptance_criteria?: string | null;
-  target_date?: string | null;
-  status?: MilestoneStatus;
 }
 
 export function updateMilestone(
@@ -90,6 +90,11 @@ export function listMilestones(
   return db
     .prepare("SELECT * FROM milestones ORDER BY created_at ASC")
     .all() as Milestone[];
+}
+
+export function deleteMilestone(db: Database.Database, id: string): boolean {
+  const result = db.prepare("DELETE FROM milestones WHERE id = ?").run(id);
+  return result.changes > 0;
 }
 
 // ─── Milestone Progress ─────────────────────────────────────────────────────

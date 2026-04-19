@@ -9,6 +9,7 @@ export {
   completeMilestone,
   getMilestone,
   listMilestones,
+  deleteMilestone,
   getMilestoneProgress,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,

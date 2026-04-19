@@ -279,6 +279,8 @@ export type WsEventType =
   | "milestone_created"
   | "milestone_updated"
   | "milestone_achieved"
+  | "milestone_completed"
+  | "milestone_deleted"
   | "tag_created"
   | "tag_added"
   | "tag_removed"

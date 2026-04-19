@@ -2,10 +2,24 @@ import { useState, useEffect } from "react";
 import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
-import { inputStyle as sharedInputStyle } from "../styles/shared.js";
+import { inputStyle } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
 import { TagPicker } from "./task/TagPicker";
+import { ModalBackdrop } from "./ui/ModalBackdrop";
+import { ModalDrawer } from "./ui/ModalDrawer";
+import { FormField } from "./ui/FormField";
+import { TaskDrawerHeader } from "./task-edit/TaskDrawerHeader";
+import { TaskDateFields } from "./task-edit/TaskDateFields";
+import { TaskDrawerActions } from "./task-edit/TaskDrawerActions";
+
+const labelStyle: import("react").CSSProperties = {
+  display: "block",
+  fontSize: "12px",
+  fontWeight: 600,
+  color: "var(--text-secondary)",
+  marginBottom: "4px",
+};
 
 interface TaskEditDrawerProps {
   task: Task;
@@ -126,7 +140,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             rows={4}
             style={{ ...inputStyle, resize: "vertical" }}
           />
-        </div>
+        </FormField>
 
         {/* Status */}
         <div>
@@ -196,44 +210,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           </div>
         )}
 
-        {/* Due Date */}
-        <div>
-          <label htmlFor="task-due-date" style={labelStyle}>Due Date</label>
-          <input
-            id="task-due-date"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Estimate */}
-        <div>
-          <label htmlFor="task-estimate" style={labelStyle}>Estimate (story points)</label>
-          <input
-            id="task-estimate"
-            type="number"
-            min={0}
-            value={estimate}
-            onChange={(e) => setEstimate(e.target.value)}
-            placeholder="0"
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Start Date */}
-        <div>
-          <label htmlFor="task-start-date" style={labelStyle}>Start Date</label>
-          <input
-            id="task-start-date"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-
         <TaskDateFields
           dueDate={dueDate}
           onDueDateChange={setDueDate}
@@ -285,4 +261,3 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   );
 }
 
-const inputStyle: React.CSSProperties = sharedInputStyle;
