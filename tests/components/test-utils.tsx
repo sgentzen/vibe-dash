@@ -67,7 +67,7 @@ export function makeMilestone(overrides: Partial<Milestone> = {}): Milestone {
     project_id: "proj-1",
     name: `Milestone ${id}`,
     description: null,
-    acceptance_criteria: null,
+    acceptance_criteria: "[]",
     target_date: null,
     status: "open",
     created_at: "2026-01-01T00:00:00.000Z",
