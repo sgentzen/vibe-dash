@@ -1,6 +1,19 @@
 export type TaskStatus = "planned" | "in_progress" | "blocked" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type SprintStatus = "planned" | "active" | "completed";
+export type MilestoneStatus = "open" | "achieved" | "cancelled";
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  acceptance_criteria: string[];
+  target_date: string | null;
+  status: MilestoneStatus;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Project {
   id: string;
@@ -37,6 +50,7 @@ export interface Task {
   start_date: string | null;
   estimate: number | null;
   recurrence_rule: string | null;
+  milestone_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -259,9 +273,13 @@ export type WsEventType =
   | "file_conflict_detected"
   | "notification_created"
   | "daily_stats_recorded"
-  | "cost_logged";
+  | "cost_logged"
+  | "milestone_created"
+  | "milestone_updated"
+  | "milestone_completed"
+  | "milestone_deleted";
 
 export interface WsEvent {
   type: WsEventType;
-  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats | CostEntry;
+  payload: Project | Task | Agent | ActivityEntry | Blocker | Sprint | Tag | TaskTag | AgentSession | TaskDependency | TaskComment | AgentFileLock | FileConflict | AppNotification | SprintDailyStats | CostEntry | Milestone;
 }

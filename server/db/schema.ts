@@ -159,6 +159,19 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);",
   "CREATE INDEX IF NOT EXISTS idx_agent_file_locks_agent_id ON agent_file_locks(agent_id);",
   "CREATE INDEX IF NOT EXISTS idx_notifications_rule_id ON notifications(rule_id);",
+  "CREATE TABLE IF NOT EXISTS milestones (",
+  "  id TEXT PRIMARY KEY,",
+  "  project_id TEXT NOT NULL REFERENCES projects(id),",
+  "  name TEXT NOT NULL,",
+  "  description TEXT,",
+  "  acceptance_criteria TEXT NOT NULL DEFAULT '[]',",
+  "  target_date TEXT,",
+  "  status TEXT NOT NULL DEFAULT 'open'",
+  "    CHECK (status IN ('open', 'achieved', 'cancelled')),",
+  "  created_at TEXT NOT NULL,",
+  "  updated_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);",
 ].join("\n");
 
 function migrate(db: Database.Database): void {
@@ -181,6 +194,9 @@ function migrate(db: Database.Database): void {
   if (!cols.some((c) => c.name === "start_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
   }
+  if (!cols.some((c) => c.name === "milestone_id")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN milestone_id TEXT REFERENCES milestones(id)").run();
+  }
 
   const agentCols = db.pragma("table_info(agents)") as { name: string }[];
   if (!agentCols.some((c) => c.name === "role")) {
@@ -195,6 +211,7 @@ function migrate(db: Database.Database): void {
 const POST_MIGRATE_INDEXES = [
   "CREATE INDEX IF NOT EXISTS idx_tasks_sprint_id ON tasks(sprint_id);",
   "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent_id ON tasks(assigned_agent_id);",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_milestone_id ON tasks(milestone_id);",
 ].join("\n");
 
 export function initDb(db: Database.Database): void {

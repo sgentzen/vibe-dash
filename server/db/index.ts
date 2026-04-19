@@ -98,6 +98,15 @@ export {
 } from "./webhooks.js";
 export { generateReport } from "./reports.js";
 export {
+  createMilestone,
+  getMilestone,
+  listMilestones,
+  updateMilestone,
+  completeMilestone,
+  deleteMilestone,
+} from "./milestones.js";
+export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
+export {
   logCost,
   getAgentCostSummary,
   getSprintCostSummary,

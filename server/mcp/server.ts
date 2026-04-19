@@ -100,6 +100,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       project_id: z.string(),
       parent_task_id: z.string().optional(),
       sprint_id: z.string().optional(),
+      milestone_id: z.string().optional(),
       title: z.string(),
       description: z.string().optional(),
       status: STATUS_ENUM.optional(),
@@ -143,6 +144,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       parent_task_id: z.string().nullable().optional(),
       sprint_id: z.string().nullable().optional(),
       assigned_agent_id: z.string().nullable().optional(),
+      milestone_id: z.string().nullable().optional(),
       due_date: z.string().nullable().optional(),
       start_date: z.string().nullable().optional(),
       estimate: z.number().int().min(0).nullable().optional(),
@@ -552,6 +554,62 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       sprint_id: z.string().optional(),
     },
     call("get_cost_by_agent")
+  );
+
+  // ─── Milestones ────────────────────────────────────────────────────────────
+
+  server.tool(
+    "create_milestone",
+    "Create a milestone for a project",
+    {
+      project_id: z.string(),
+      name: z.string(),
+      description: z.string().optional(),
+      acceptance_criteria: z.array(z.string()).optional(),
+      target_date: z.string().optional(),
+    },
+    call("create_milestone")
+  );
+
+  server.tool(
+    "list_milestones",
+    "List milestones, optionally filtered by project",
+    {
+      project_id: z.string().optional(),
+    },
+    call("list_milestones")
+  );
+
+  server.tool(
+    "get_milestone",
+    "Get a milestone by ID",
+    {
+      milestone_id: z.string(),
+    },
+    call("get_milestone")
+  );
+
+  server.tool(
+    "update_milestone",
+    "Update milestone fields or status",
+    {
+      milestone_id: z.string(),
+      name: z.string().optional(),
+      description: z.string().nullable().optional(),
+      acceptance_criteria: z.array(z.string()).optional(),
+      target_date: z.string().nullable().optional(),
+      status: z.enum(["open", "achieved", "cancelled"]).optional(),
+    },
+    call("update_milestone")
+  );
+
+  server.tool(
+    "complete_milestone",
+    "Mark a milestone as achieved",
+    {
+      milestone_id: z.string(),
+    },
+    call("complete_milestone")
   );
 
   return { server, cleanup };
