@@ -467,7 +467,7 @@ interface CostSummary {
   entry_count: number;
 }
 
-interface CostTimeseriesEntry {
+export interface CostTimeseriesEntry {
   date: string;
   total_cost_usd: number;
   total_input_tokens: number;

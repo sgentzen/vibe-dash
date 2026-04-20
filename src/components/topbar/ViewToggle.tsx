@@ -2,6 +2,7 @@ import type { ActiveView } from "../../state/types";
 import { viewBtnStyle } from "./styles";
 
 const VIEWS: { key: ActiveView; label: string }[] = [
+  { key: "orchestration", label: "Overview" },
   { key: "board", label: "Board" },
   { key: "agents", label: "Agents" },
   { key: "list", label: "List" },

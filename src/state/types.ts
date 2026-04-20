@@ -13,7 +13,7 @@ import type {
 
 export type Theme = "dark" | "light";
 
-export type ActiveView = "board" | "agents" | "list" | "dashboard" | "timeline" | "activity";
+export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity";
 
 export interface AppState {
   projects: Project[];
