@@ -56,6 +56,57 @@
   --accent-blue: var(--accent-user);
 }
 
+/* Display typeface — used only for timeline group header labels */
+:root {
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+}
+
+/* Timeline balloon anomaly indicator */
+@keyframes balloonPulse {
+  0%, 100% { opacity: 0.55; transform: translateY(0) scale(1); }
+  50%       { opacity: 1;    transform: translateY(-2px) scale(1.06); }
+}
+
+.timeline-balloon {
+  position: absolute;
+  pointer-events: none;
+  animation: balloonPulse 1.4s ease-in-out infinite;
+}
+.timeline-balloon--blocked  { color: var(--accent-red); }
+.timeline-balloon--overdue  { color: var(--accent-yellow); }
+.timeline-balloon--stale    { color: var(--accent-yellow); }
+
+/* Timeline bar button reset + hover */
+.timeline-bar {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+.timeline-bar:hover { transform: scale(1.02); }
+.timeline-bar:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Timeline row hover */
+.timeline-task-row:hover { background: var(--bg-secondary); }
+
+/* Legend dots */
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 *,
 *::before,
 *::after {
