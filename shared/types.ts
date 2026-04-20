@@ -265,6 +265,22 @@ export interface TaskTypeBreakdown {
   avg_lines_added: number;
 }
 
+export interface AgentScore {
+  agent_id: string;
+  agent_name: string;
+  score: number;
+  speed_score: number;
+  quality_score: number;
+  cost_score: number;
+  familiarity_score: number;
+  task_count: number;
+}
+
+export interface AgentSuggestion {
+  agent: AgentScore;
+  confidence: number;
+}
+
 export type WsEventType =
   | "project_created"
   | "project_updated"
