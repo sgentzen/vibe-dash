@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage } from "http";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { createRouter } from "../server/routes.js";
+import { createRouter } from "../server/routes/index.js";
 import {
   createProject,
   createTask,
@@ -103,9 +103,8 @@ describe("GET /api/tasks/:id/suggest-agent", () => {
     expect(typeof suggestion.confidence).toBe("number");
   });
 
-  it("returns null for a nonexistent task id", async () => {
-    const { status, body } = await request("GET", "/api/tasks/nonexistent-task-id/suggest-agent");
-    expect(status).toBe(200);
-    expect(body).toBeNull();
+  it("returns 404 for a nonexistent task id", async () => {
+    const { status } = await request("GET", "/api/tasks/nonexistent-task-id/suggest-agent");
+    expect(status).toBe(404);
   });
 });

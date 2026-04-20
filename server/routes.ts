@@ -95,7 +95,6 @@ import {
   getAgentPerformance,
   getAgentComparison,
   getTaskTypeBreakdown,
-  suggestAgent,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
 import { logger } from "./logger.js";
@@ -983,17 +982,6 @@ export function createRouter(db: Database.Database): Router {
     res.json({ success: true });
   });
 
-  // ─── R10: Intelligent Routing ───────────────────────────────────────
-
-  router.get("/api/tasks/:id/suggest-agent", (req, res) => {
-    const { id } = req.params;
-    const suggestion = suggestAgent(db, id);
-    if (!suggestion) {
-      res.json(null);
-      return;
-    }
-    res.json(suggestion);
-  });
 
   return router;
 }

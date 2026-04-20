@@ -115,7 +115,6 @@ export const createCommentSchema = z.object({
 
 export const suggestAgentSchema = z.object({
   task_id: z.string().min(1),
-  agent_name: z.string().optional(),
 });
 
 // ─── Costs ──────────────────────────────────────────────────────────────
