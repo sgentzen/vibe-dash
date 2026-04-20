@@ -1,16 +1,14 @@
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
+import { memo } from "react";
+import { CardWrapper } from "../ui/Card";
 import type { Blocker, Task } from "../../types";
-
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 interface BlockersCardProps {
   blockers: Blocker[];
 }
 
-export function BlockersCard({ blockers }: BlockersCardProps) {
+export const BlockersCard = memo(function BlockersCard({ blockers }: BlockersCardProps) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Active Blockers ({blockers.length})</div>
+    <CardWrapper title={`Active Blockers (${blockers.length})`}>
       {blockers.length === 0 ? (
         <div style={{ color: "var(--accent-green)", fontSize: "12px" }}>No active blockers</div>
       ) : (
@@ -22,18 +20,17 @@ export function BlockersCard({ blockers }: BlockersCardProps) {
           ))}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
 interface OverdueTasksCardProps {
   tasks: Task[];
 }
 
-export function OverdueTasksCard({ tasks }: OverdueTasksCardProps) {
+export const OverdueTasksCard = memo(function OverdueTasksCard({ tasks }: OverdueTasksCardProps) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Overdue Tasks ({tasks.length})</div>
+    <CardWrapper title={`Overdue Tasks (${tasks.length})`}>
       {tasks.length === 0 ? (
         <div style={{ color: "var(--accent-green)", fontSize: "12px" }}>No overdue tasks</div>
       ) : (
@@ -46,6 +43,6 @@ export function OverdueTasksCard({ tasks }: OverdueTasksCardProps) {
           ))}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});

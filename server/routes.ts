@@ -982,5 +982,6 @@ export function createRouter(db: Database.Database): Router {
     res.json({ success: true });
   });
 
+
   return router;
 }

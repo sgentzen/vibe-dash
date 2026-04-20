@@ -1,17 +1,15 @@
-import { cardStyle, sectionHeader } from "../../styles/shared.js";
+import { memo } from "react";
+import { CardWrapper } from "../ui/Card";
 import type { MilestoneDailyStats, Milestone, Task } from "../../types";
-
-const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 interface MilestoneProgressCardProps {
   dailyStats: MilestoneDailyStats[];
   openMilestones: Milestone[];
 }
 
-export function MilestoneProgressCard({ dailyStats, openMilestones }: MilestoneProgressCardProps) {
+export const MilestoneProgressCard = memo(function MilestoneProgressCard({ dailyStats, openMilestones }: MilestoneProgressCardProps) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Milestone Progress {openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}</div>
+    <CardWrapper title={`Milestone Progress ${openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}`}>
       {dailyStats.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
           {openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
@@ -31,19 +29,18 @@ export function MilestoneProgressCard({ dailyStats, openMilestones }: MilestoneP
           ))}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});
 
 interface MilestoneOverviewCardProps {
   openMilestones: Milestone[];
   projectTasks: Task[];
 }
 
-export function MilestoneOverviewCard({ openMilestones, projectTasks }: MilestoneOverviewCardProps) {
+export const MilestoneOverviewCard = memo(function MilestoneOverviewCard({ openMilestones, projectTasks }: MilestoneOverviewCardProps) {
   return (
-    <div style={cardStyle}>
-      <div style={headerStyle}>Open Milestones Overview</div>
+    <CardWrapper title="Open Milestones Overview">
       {openMilestones.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No open milestones. Create a milestone to track progress.</div>
       ) : (
@@ -67,6 +64,6 @@ export function MilestoneOverviewCard({ openMilestones, projectTasks }: Mileston
           })}
         </div>
       )}
-    </div>
+    </CardWrapper>
   );
-}
+});

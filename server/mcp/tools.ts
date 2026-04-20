@@ -62,7 +62,10 @@ import {
   getAgentPerformance,
   getAgentComparison,
   getTaskTypeBreakdown,
+  suggestAgent,
 } from "../db/index.js";
+
+import { suggestAgentSchema } from "../../shared/schemas.js";
 
 import { broadcast } from "../websocket.js";
 
@@ -590,6 +593,16 @@ export async function handleTool(
 
     case "get_task_type_breakdown": {
       return ok(getTaskTypeBreakdown(db, args.agent_id as string));
+    }
+
+    // ─── R10: Intelligent Routing ─────────────────────────────────────────
+
+    case "suggest_agent": {
+      const { task_id } = suggestAgentSchema.parse(args);
+      const taskExists = db.prepare("SELECT id FROM tasks WHERE id = ?").get(task_id);
+      if (!taskExists) return ok({ error: "Task not found" });
+      const suggestion = suggestAgent(db, task_id);
+      return ok(suggestion);
     }
 
     default:

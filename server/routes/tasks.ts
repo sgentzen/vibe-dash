@@ -16,6 +16,7 @@ import {
   evaluateAlertRules,
   handleRecurringTaskCompletion,
   getTimeSpent,
+  suggestAgent,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
@@ -177,6 +178,13 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
     res.json({ time_spent_seconds: getTimeSpent(db, req.params.id) });
+  });
+
+  router.get("/api/tasks/:id/suggest-agent", (req, res) => {
+    const task = getTask(db, req.params.id);
+    if (!requireEntity(res, task, "Task")) return;
+    const suggestion = suggestAgent(db, req.params.id);
+    res.json(suggestion ?? null);
   });
 
   return router;

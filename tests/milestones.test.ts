@@ -18,6 +18,7 @@ import {
   completeMilestone,
   searchTasks,
 } from "../server/db/index.js";
+import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
