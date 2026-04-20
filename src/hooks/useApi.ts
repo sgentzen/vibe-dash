@@ -548,7 +548,8 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
 async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/suggest-agent`);
   if (!res.ok) throw new Error(`getSuggestedAgent failed: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  return data ?? null;
 }
 
 export function useApi() {

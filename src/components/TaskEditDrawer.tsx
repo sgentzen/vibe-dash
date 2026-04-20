@@ -57,6 +57,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
   // Keep local state fresh if task changes externally
   useEffect(() => {
+    setSuggestion(null);
     setTitle(task.title);
     setDescription(task.description ?? "");
     setStatus(task.status);
