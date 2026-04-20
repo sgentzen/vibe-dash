@@ -15,6 +15,7 @@ import {
   updateTaskSchema,
   createMilestoneSchema,
   updateMilestoneSchema,
+  suggestAgentSchema,
 } from "../../shared/schemas.js";
 
 export interface McpServerHandle {
@@ -581,6 +582,15 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       agent_id: z.string(),
     },
     call("get_task_type_breakdown")
+  );
+
+  // ─── R10: Intelligent Routing ──────────────────────────────────────────
+
+  server.tool(
+    "suggest_agent",
+    "Suggest the best agent for a task based on historical performance metrics",
+    suggestAgentSchema.shape,
+    call("suggest_agent")
   );
 
   return { server, cleanup };

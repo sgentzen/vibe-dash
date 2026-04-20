@@ -111,6 +111,13 @@ export const createCommentSchema = z.object({
   message: z.string().min(1),
 });
 
+// ─── Routing ────────────────────────────────────────────────────────────
+
+export const suggestAgentSchema = z.object({
+  task_id: z.string().min(1),
+  agent_name: z.string().optional(),
+});
+
 // ─── Costs ──────────────────────────────────────────────────────────────
 
 export const logCostSchema = z.object({
