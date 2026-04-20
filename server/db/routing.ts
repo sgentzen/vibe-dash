@@ -62,12 +62,12 @@ export function scoreAgents(db: Database.Database, taskId: string): AgentScore[]
     FROM completion_metrics cm
     JOIN agents a ON a.id = cm.agent_id
     GROUP BY cm.agent_id
-    HAVING COUNT(*) >= 1
   `).all() as AgentMetricsRow[];
 
   if (agentRows.length === 0) return [];
 
   const agentIds = agentRows.map((r) => r.agent_id);
+  if (agentIds.length === 0) return [];
   const placeholders = agentIds.map(() => "?").join(", ");
 
   const costRows = db.prepare(`
@@ -96,22 +96,26 @@ export function scoreAgents(db: Database.Database, taskId: string): AgentScore[]
   }
 
   const scores: AgentScore[] = agentRows.map((row) => {
-    const avgDuration = row.avg_duration ?? SPEED_SLOW_SECONDS;
-    const speed_score = avgDuration <= SPEED_FAST_SECONDS
-      ? 100
-      : avgDuration >= SPEED_SLOW_SECONDS
-        ? 0
-        : Math.round((1 - (avgDuration - SPEED_FAST_SECONDS) / (SPEED_SLOW_SECONDS - SPEED_FAST_SECONDS)) * 100);
+    const avgDuration = row.avg_duration ?? null;
+    const speed_score = avgDuration === null
+      ? 50
+      : avgDuration <= SPEED_FAST_SECONDS
+        ? 100
+        : avgDuration >= SPEED_SLOW_SECONDS
+          ? 0
+          : Math.round((1 - (avgDuration - SPEED_FAST_SECONDS) / (SPEED_SLOW_SECONDS - SPEED_FAST_SECONDS)) * 100);
 
     const avgQuality = row.avg_quality;
     const quality_score = avgQuality === null ? 50 : Math.round(Math.min(avgQuality, 1) * 100);
 
-    const avgCost = costMap.get(row.agent_id) ?? 0;
-    const cost_score = avgCost <= 0
-      ? 100
-      : avgCost >= COST_EXPENSIVE_USD
-        ? 0
-        : Math.round((1 - avgCost / COST_EXPENSIVE_USD) * 100);
+    const avgCostRaw = costMap.get(row.agent_id);
+    const cost_score = avgCostRaw === undefined
+      ? 50
+      : avgCostRaw <= 0
+        ? 100
+        : avgCostRaw >= COST_EXPENSIVE_USD
+          ? 0
+          : Math.round((1 - avgCostRaw / COST_EXPENSIVE_USD) * 100);
 
     const projectTaskCount = familiarityMap.get(row.agent_id) ?? 0;
     const familiarity_score = Math.min(Math.round((projectTaskCount / FAMILIARITY_MAX_TASKS) * 100), 100);

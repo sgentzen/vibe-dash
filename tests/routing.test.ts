@@ -43,11 +43,11 @@ describe("intelligent agent routing", () => {
       tests_passing: 0,
     });
 
-    // slow agent: 80000s (beyond SPEED_SLOW threshold)
+    // slow agent: 90000s (>= 86400, clamps to zero on speed_score)
     logCompletionMetrics(db, {
       task_id: task2.id,
       agent_id: slowAgent.id,
-      duration_seconds: 80000,
+      duration_seconds: 90000,
       tests_added: 0,
       tests_passing: 0,
     });
