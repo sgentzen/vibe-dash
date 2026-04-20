@@ -15,7 +15,11 @@
       "mcp__vibe-dash__complete_task",
       "Bash(npx tsc:*)",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm test *)",
+      "Bash(node -e ' *)",
+      "Bash(mkdir -p .claude)",
+      "Bash(touch .claude/.last-code-review)"
     ]
   }
 }

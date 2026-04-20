@@ -52,6 +52,10 @@ describe("projects", () => {
 
   it("updates a project name", () => {
     const p = createProject(db, { name: "Old", description: "desc" });
+    // Synchronous sleep so updated_at (millisecond ISO string) advances.
+    // Safe in Vitest's default 'forks' pool (child process); would throw in
+    // 'threads' pool where Atomics.wait is forbidden on Worker threads.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
     const updated = updateProject(db, p.id, { name: "New" });
 
     expect(updated).not.toBeNull();
