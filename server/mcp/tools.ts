@@ -599,6 +599,8 @@ export async function handleTool(
 
     case "suggest_agent": {
       const { task_id } = suggestAgentSchema.parse(args);
+      const taskExists = db.prepare("SELECT id FROM tasks WHERE id = ?").get(task_id);
+      if (!taskExists) return ok({ error: "Task not found" });
       const suggestion = suggestAgent(db, task_id);
       return ok(suggestion);
     }

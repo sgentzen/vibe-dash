@@ -16,8 +16,9 @@ const updateTask = vi.fn();
 const completeTask = vi.fn();
 const addComment = vi.fn();
 const getComments = vi.fn();
+const getSuggestedAgent = vi.fn().mockResolvedValue(null);
 
-const stableApi = { updateTask, completeTask, addComment, getComments };
+const stableApi = { updateTask, completeTask, addComment, getComments, getSuggestedAgent };
 vi.mock("../../src/hooks/useApi", () => ({
   useApi: () => stableApi,
 }));

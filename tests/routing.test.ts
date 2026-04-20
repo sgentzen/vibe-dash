@@ -126,6 +126,40 @@ describe("intelligent agent routing", () => {
     expect(suggestion!.confidence).toBe(100);
   });
 
+  it("ranks agent with higher test pass rate above one with no tests", () => {
+    const project = createProject(db, { name: "P1", description: null });
+    const goodAgent = registerAgent(db, { name: "tdd-agent", model: null, capabilities: [] });
+    const noTestAgent = registerAgent(db, { name: "notdd-agent", model: null, capabilities: [] });
+    const targetTask = createTask(db, { project_id: project.id, title: "Target", description: null, priority: "medium" });
+
+    const t1 = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
+    const t2 = createTask(db, { project_id: project.id, title: "T2", description: null, priority: "medium" });
+
+    logCompletionMetrics(db, {
+      task_id: t1.id,
+      agent_id: goodAgent.id,
+      duration_seconds: 3600,
+      tests_added: 4,
+      tests_passing: 4,
+    });
+
+    logCompletionMetrics(db, {
+      task_id: t2.id,
+      agent_id: noTestAgent.id,
+      duration_seconds: 3600,
+      tests_added: 0,
+      tests_passing: 0,
+    });
+
+    const scores = scoreAgents(db, targetTask.id);
+    const good = scores.find((s) => s.agent_id === goodAgent.id)!;
+    const noTest = scores.find((s) => s.agent_id === noTestAgent.id)!;
+
+    expect(good.quality_score).toBe(100);
+    expect(noTest.quality_score).toBe(50);
+    expect(good.score).toBeGreaterThan(noTest.score);
+  });
+
   it("confidence is proportional below threshold", () => {
     const project = createProject(db, { name: "P", description: null });
     const targetTask = createTask(db, { project_id: project.id, title: "Target", priority: "medium" });
