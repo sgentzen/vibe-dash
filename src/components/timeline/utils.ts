@@ -1,5 +1,11 @@
-import type { Task, Milestone, Project } from "../../types";
+import type { Task, Milestone, Project, Agent } from "../../types";
 import { DAY_MS } from "./constants";
+
+export interface AgentLane {
+  agentId: string | null;
+  agentName: string;
+  tasks: Task[];
+}
 
 export interface TaskGroup {
   key: string;
@@ -9,6 +15,11 @@ export interface TaskGroup {
   totalCount: number;
   tasks: Task[];
 }
+
+export type SwimRow =
+  | { kind: "project"; project: Project; totalCount: number; completedCount: number }
+  | { kind: "milestone"; milestone: Milestone }
+  | { kind: "agent"; agentId: string | null; agentName: string; projectId: string; tasks: Task[] };
 
 export function getTaskDates(
   task: Task,
@@ -40,12 +51,90 @@ export function formatWeekLabel(d: Date): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
+export function buildSwimRows(
+  tasks: Task[],
+  milestones: Milestone[],
+  projects: Project[],
+  agents: Agent[],
+): SwimRow[] {
+  const agentMap = new Map<string, Agent>(agents.map((a) => [a.id, a]));
+
+  // Group tasks by project
+  const tasksByProject = new Map<string, Task[]>();
+  for (const t of tasks) {
+    const pid = t.project_id ?? "__none__";
+    const arr = tasksByProject.get(pid) ?? [];
+    arr.push(t);
+    tasksByProject.set(pid, arr);
+  }
+
+  // Milestones by project
+  const milestonesByProject = new Map<string, Milestone[]>();
+  for (const m of milestones) {
+    const pid = m.project_id ?? "__none__";
+    const arr = milestonesByProject.get(pid) ?? [];
+    arr.push(m);
+    milestonesByProject.set(pid, arr);
+  }
+
+  const rows: SwimRow[] = [];
+
+  // Emit rows in projects array order
+  for (const project of projects) {
+    const projectTasks = tasksByProject.get(project.id) ?? [];
+    if (projectTasks.length === 0 && !(milestonesByProject.get(project.id)?.length)) continue;
+
+    const completedCount = projectTasks.filter((t) => t.status === "done").length;
+    rows.push({ kind: "project", project, totalCount: projectTasks.length, completedCount });
+
+    // Milestone bars for this project (sorted by target_date)
+    const projectMilestones = (milestonesByProject.get(project.id) ?? [])
+      .filter((m) => m.target_date)
+      .sort((a, b) => (a.target_date ?? "").localeCompare(b.target_date ?? ""));
+    for (const m of projectMilestones) {
+      rows.push({ kind: "milestone", milestone: m });
+    }
+
+    // Group tasks by agent within this project
+    const tasksByAgent = new Map<string, Task[]>();
+    for (const t of projectTasks) {
+      const key = t.assigned_agent_id ?? "__unassigned__";
+      const arr = tasksByAgent.get(key) ?? [];
+      arr.push(t);
+      tasksByAgent.set(key, arr);
+    }
+
+    // Sort agents by name; unassigned last
+    const agentEntries = [...tasksByAgent.entries()].sort(([aId], [bId]) => {
+      if (aId === "__unassigned__") return 1;
+      if (bId === "__unassigned__") return -1;
+      const aName = agentMap.get(aId)?.name ?? aId;
+      const bName = agentMap.get(bId)?.name ?? bId;
+      return aName.localeCompare(bName);
+    });
+
+    for (const [agentKey, agentTasks] of agentEntries) {
+      const agent = agentKey !== "__unassigned__" ? agentMap.get(agentKey) : null;
+      const agentName = agent?.name ?? (agentKey !== "__unassigned__" ? agentKey.slice(0, 8) : "Unassigned");
+      rows.push({
+        kind: "agent",
+        agentId: agentKey !== "__unassigned__" ? agentKey : null,
+        agentName,
+        projectId: project.id,
+        tasks: agentTasks,
+      });
+    }
+  }
+
+  return rows;
+}
+
+// Keep for backward compat (GroupHeaderRow still uses TaskGroup)
 export function buildGroups(
   tasks: Task[],
   milestoneMap: Map<string, Milestone>,
   projectMap: Map<string, Project>,
 ): TaskGroup[] {
-  // Bucket tasks by milestone first, then by project for un-milestoned tasks
   const milestoneGroups = new Map<string, Task[]>();
   const projectGroups = new Map<string, Task[]>();
   const ungrouped: Task[] = [];
@@ -66,7 +155,6 @@ export function buildGroups(
 
   const groups: TaskGroup[] = [];
 
-  // Milestone groups (sorted by target_date, then name)
   const msEntries = [...milestoneGroups.entries()].sort((a, b) => {
     const mA = milestoneMap.get(a[0])!;
     const mB = milestoneMap.get(b[0])!;
@@ -90,7 +178,6 @@ export function buildGroups(
     });
   }
 
-  // Project groups (for tasks with no milestone)
   const projEntries = [...projectGroups.entries()].sort((a, b) => {
     const pA = projectMap.get(a[0])!;
     const pB = projectMap.get(b[0])!;
@@ -110,7 +197,6 @@ export function buildGroups(
     });
   }
 
-  // Ungrouped
   if (ungrouped.length > 0) {
     const completed = ungrouped.filter((t) => t.status === "done").length;
     groups.push({
