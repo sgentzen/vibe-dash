@@ -1,5 +1,4 @@
 import type Database from "better-sqlite3";
-import type { Agent } from "../types.js";
 import {
   registerAgent,
   createProject,
@@ -68,9 +67,12 @@ import {
   updateReview,
   suggestAgent,
 } from "../db/index.js";
-import type { ReviewStatus } from "../types.js";
-
-import { suggestAgentSchema } from "../../shared/schemas.js";
+import {
+  suggestAgentSchema,
+  registerAgentSchema,
+  createReviewSchema,
+  updateReviewSchema,
+} from "../../shared/schemas.js";
 
 import { broadcast } from "../websocket.js";
 
@@ -115,12 +117,13 @@ export async function handleTool(
   const agentName = (args.agent_name as string | undefined) ?? defaultAgentName;
   switch (toolName) {
     case "register_agent": {
+      const { name, model, capabilities, role, parent_agent_name } = registerAgentSchema.parse(args);
       const agent = registerAgent(db, {
-        name: args.name as string,
-        model: (args.model as string | undefined) ?? null,
-        capabilities: (args.capabilities as string[] | undefined) ?? [],
-        role: args.role as Agent["role"] | undefined,
-        parent_agent_name: args.parent_agent_name as string | undefined,
+        name,
+        model: model ?? null,
+        capabilities: capabilities ?? [],
+        role,
+        parent_agent_name,
       });
       broadcast({ type: "agent_registered", payload: agent });
       return ok({ agent_id: agent.id });
@@ -609,13 +612,14 @@ export async function handleTool(
     }
 
     case "create_review": {
+      const { task_id, reviewer_name, reviewer_agent_id, status, comments, diff_summary } = createReviewSchema.parse(args);
       const review = createReview(db, {
-        task_id: args.task_id as string,
-        reviewer_name: (args.reviewer_name as string | undefined) ?? agentName ?? "unknown",
-        reviewer_agent_id: (args.reviewer_agent_id as string | undefined) ?? null,
-        status: args.status as ReviewStatus | undefined,
-        comments: (args.comments as string | undefined) ?? null,
-        diff_summary: (args.diff_summary as string | undefined) ?? null,
+        task_id,
+        reviewer_name: reviewer_name ?? agentName ?? "unknown",
+        reviewer_agent_id: reviewer_agent_id ?? null,
+        status,
+        comments: comments ?? null,
+        diff_summary: diff_summary ?? null,
       });
       broadcast({ type: "review_created", payload: review });
       autoLog(db, review.task_id, `Review submitted: ${review.status}`, agentName);
@@ -627,11 +631,8 @@ export async function handleTool(
     }
 
     case "update_review": {
-      const updated = updateReview(db, args.review_id as string, {
-        status: args.status as ReviewStatus | undefined,
-        comments: args.comments as string | null | undefined,
-        diff_summary: args.diff_summary as string | null | undefined,
-      });
+      const { status, comments, diff_summary } = updateReviewSchema.parse(args);
+      const updated = updateReview(db, args.review_id as string, { status, comments, diff_summary });
       if (!updated) return ok({ error: "Review not found" });
       broadcast({ type: "review_updated", payload: updated });
       autoLog(db, updated.task_id, `Review updated: ${updated.status}`, agentName);
