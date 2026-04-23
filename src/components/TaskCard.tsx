@@ -108,7 +108,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
             <span style={{ color: "var(--accent-green)", flexShrink: 0 }}>{"\u2713"}</span>
           )}
           {isActive && (
-            <span className="pulse-dot" style={{ marginTop: "5px", flexShrink: 0 }} />
+            <span className="pulse-dot" aria-hidden="true" style={{ marginTop: "5px", flexShrink: 0 }} />
           )}
           <span>{task.title}</span>
         </div>
@@ -170,6 +170,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           {/* Priority badge */}
           {(task.priority === "urgent" || task.priority === "high") && (
             <span
+              aria-label={`Priority: ${task.priority}`}
               style={{
                 fontSize: "10px",
                 padding: "1px 6px",

@@ -37,6 +37,12 @@ export function listActiveWorktrees(db: Database.Database): TaskWorktree[] {
     .all() as TaskWorktree[];
 }
 
+export function listAllWorktrees(db: Database.Database): TaskWorktree[] {
+  return db
+    .prepare("SELECT * FROM task_worktrees ORDER BY created_at DESC")
+    .all() as TaskWorktree[];
+}
+
 export function updateWorktreeStatus(
   db: Database.Database,
   id: string,

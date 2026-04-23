@@ -20,6 +20,7 @@ import {
   createReviewSchema,
   updateReviewSchema,
   worktreeStatusEnum,
+  safeGitBranchName,
 } from "../../shared/schemas.js";
 
 export interface McpServerHandle {
@@ -628,7 +629,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     {
       task_id: z.string(),
       repo_path: z.string().describe("Absolute path to the git repository"),
-      branch_name: z.string().describe("Branch name for the new worktree"),
+      branch_name: safeGitBranchName.describe("Branch name for the new worktree"),
       worktree_path: z.string().describe("Absolute path where the worktree should be created"),
     },
     call("create_worktree")

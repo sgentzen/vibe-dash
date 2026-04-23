@@ -218,7 +218,7 @@ export const createDependencySchema = z.object({
 
 export const worktreeStatusEnum = z.enum(["active", "merged", "abandoned", "removed"]);
 
-const safeGitBranchName = z.string().min(1).regex(
+export const safeGitBranchName = z.string().min(1).regex(
   /^[a-zA-Z0-9._/-]+$/,
   "branch name must contain only alphanumeric characters, dots, dashes, underscores, and slashes"
 ).refine((s) => !s.startsWith("-"), "branch name must not start with a dash");

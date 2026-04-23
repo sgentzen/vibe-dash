@@ -130,6 +130,7 @@ export {
   getWorktreeById,
   getTaskWorktree,
   listActiveWorktrees,
+  listAllWorktrees,
   updateWorktreeStatus,
 } from "./worktrees.js";
 export type { CreateWorktreeInput } from "./worktrees.js";

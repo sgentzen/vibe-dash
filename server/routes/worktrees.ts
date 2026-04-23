@@ -4,7 +4,7 @@ import {
   createWorktree,
   getWorktreeById,
   getTaskWorktree,
-  listActiveWorktrees,
+  listAllWorktrees,
   updateWorktreeStatus,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
@@ -17,7 +17,7 @@ export function worktreeRoutes(db: Database.Database, broadcast: BroadcastFn): R
   const router = Router();
 
   router.get("/api/worktrees", (_req, res) => {
-    res.json(listActiveWorktrees(db));
+    res.json(listAllWorktrees(db));
   });
 
   // Record-only: the MCP create_worktree tool runs `git worktree add` before calling this
