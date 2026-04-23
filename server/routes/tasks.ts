@@ -15,6 +15,7 @@ import {
   evaluateAlertRules,
   handleRecurringTaskCompletion,
   getTimeSpent,
+  resolveBlockersForTask,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
@@ -124,6 +125,11 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const body = req.body as Parameters<typeof updateTask>[2];
     const updated = updateTask(db, req.params.id, body);
     broadcast({ type: "task_updated", payload: updated! });
+    if (body.status && body.status !== task.status && (body.status === "done" || task.status === "blocked")) {
+      for (const b of resolveBlockersForTask(db, req.params.id)) {
+        broadcast({ type: "blocker_resolved", payload: b });
+      }
+    }
     const changes: string[] = [];
     if (body.status && body.status !== task.status) changes.push(`status → ${body.status}`);
     if (body.progress !== undefined && body.progress !== task.progress) changes.push(`progress → ${body.progress}%`);
@@ -149,6 +155,9 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     if (!requireEntity(res, task, "Task")) return;
     const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
+    for (const b of resolveBlockersForTask(db, req.params.id)) {
+      broadcast({ type: "blocker_resolved", payload: b });
+    }
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     if (completed?.sprint_id) {
