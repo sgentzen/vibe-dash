@@ -589,10 +589,19 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
 
   // ─── 5.4: Code Review ──────────────────────────────────────────────────
 
+  const reviewStatus = z.enum(["pending", "approved", "changes_requested"]);
+
   server.tool(
     "create_review",
     "Create a code review for a task (diff summary, status, comments)",
-    createReviewSchema.shape,
+    {
+      task_id: z.string(),
+      reviewer_name: z.string().optional(),
+      reviewer_agent_id: z.string().optional(),
+      status: reviewStatus.optional(),
+      comments: z.string().optional(),
+      diff_summary: z.string().optional(),
+    },
     call("create_review")
   );
 
@@ -606,7 +615,12 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "update_review",
     "Update a review's status, comments, or diff summary",
-    { review_id: z.string(), ...updateReviewSchema.shape },
+    {
+      review_id: z.string(),
+      status: reviewStatus.optional(),
+      comments: z.string().optional(),
+      diff_summary: z.string().optional(),
+    },
     call("update_review")
   );
 
