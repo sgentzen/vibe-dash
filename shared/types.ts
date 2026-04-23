@@ -329,25 +329,38 @@ export type WsEventType =
   | "review_created"
   | "review_updated";
 
-export interface WsEvent {
-  type: WsEventType;
-  payload:
-    | Project
-    | Task
-    | Agent
-    | ActivityEntry
-    | Blocker
-    | Milestone
-    | Tag
-    | TaskTag
-    | AgentSession
-    | TaskDependency
-    | TaskComment
-    | AgentFileLock
-    | FileConflict
-    | AppNotification
-    | MilestoneDailyStats
-    | CostEntry
-    | CompletionMetrics
-    | TaskReview;
-}
+type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
+
+export type WsEvent =
+  | WsEventOf<"project_created", Project>
+  | WsEventOf<"project_updated", Project>
+  | WsEventOf<"task_created", Task>
+  | WsEventOf<"task_updated", Task>
+  | WsEventOf<"task_completed", Task>
+  | WsEventOf<"task_assigned", Task>
+  | WsEventOf<"task_unassigned", Task>
+  | WsEventOf<"agent_registered", Agent>
+  | WsEventOf<"agent_activity", ActivityEntry>
+  | WsEventOf<"blocker_reported", Blocker>
+  | WsEventOf<"blocker_resolved", Blocker>
+  | WsEventOf<"milestone_created", Milestone>
+  | WsEventOf<"milestone_updated", Milestone>
+  | WsEventOf<"milestone_achieved", Milestone>
+  | WsEventOf<"milestone_completed", Milestone>
+  | WsEventOf<"milestone_deleted", Milestone>
+  | WsEventOf<"tag_created", Tag>
+  | WsEventOf<"tag_added", TaskTag>
+  | WsEventOf<"tag_removed", TaskTag>
+  | WsEventOf<"dependency_added", TaskDependency>
+  | WsEventOf<"dependency_removed", TaskDependency>
+  | WsEventOf<"session_started", AgentSession>
+  | WsEventOf<"session_ended", AgentSession>
+  | WsEventOf<"comment_added", TaskComment>
+  | WsEventOf<"file_lock_acquired", AgentFileLock>
+  | WsEventOf<"file_conflict_detected", FileConflict>
+  | WsEventOf<"notification_created", AppNotification>
+  | WsEventOf<"daily_stats_recorded", MilestoneDailyStats>
+  | WsEventOf<"cost_logged", CostEntry>
+  | WsEventOf<"metrics_logged", CompletionMetrics>
+  | WsEventOf<"review_created", TaskReview>
+  | WsEventOf<"review_updated", TaskReview>;
