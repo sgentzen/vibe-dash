@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { listProjects, createProject, generateReport } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { validateBody } from "./validate.js";
-import { createProjectSchema } from "../../shared/schemas.js";
+import { createProjectSchema, generateReportSchema } from "../../shared/schemas.js";
 
 export function projectRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -19,7 +19,7 @@ export function projectRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
     res.status(201).json(project);
   });
 
-  router.post("/api/projects/:id/report", (req, res) => {
+  router.post("/api/projects/:id/report", validateBody(generateReportSchema), (req, res) => {
     const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
     res.json({ report: generateReport(db, req.params.id, period) });
   });
