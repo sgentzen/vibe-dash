@@ -54,11 +54,11 @@ function barStyle(task: Task, hasDates: boolean, anomaly: Anomaly): React.CSSPro
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
   };
 
-  if (anomaly === "blocked" || anomaly === "overdue") {
-    return { ...base, background: anomaly === "blocked" ? "var(--accent-red)" : "var(--accent-yellow)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+  if (anomaly === "blocked") {
+    return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
   }
-  if (anomaly === "stale") {
-    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-accent)", opacity: hasDates ? 0.8 : 0.5 };
+  if (anomaly === "overdue" || anomaly === "stale") {
+    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-yellow)", opacity: hasDates ? (anomaly === "stale" ? 0.8 : 1) : 0.5 };
   }
 
   switch (task.status) {
