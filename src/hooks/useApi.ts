@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -295,6 +295,43 @@ async function addCommentApi(taskId: string, message: string, authorName: string
   return res.json();
 }
 
+// ─── 5.4: Code Reviews ──────────────────────────────────────────────────
+
+async function getReviews(taskId: string): Promise<TaskReview[]> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/reviews`);
+  if (!res.ok) throw new Error(`getReviews failed: ${res.status}`);
+  return res.json();
+}
+
+async function createReviewApi(taskId: string, input: {
+  reviewer_name: string;
+  status?: ReviewStatus;
+  comments?: string | null;
+  diff_summary?: string | null;
+}): Promise<TaskReview> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/reviews`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`createReview failed: ${res.status}`);
+  return res.json();
+}
+
+async function updateReviewApi(reviewId: string, patch: {
+  status?: ReviewStatus;
+  comments?: string | null;
+  diff_summary?: string | null;
+}): Promise<TaskReview> {
+  const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`updateReview failed: ${res.status}`);
+  return res.json();
+}
+
 // ─── R3: File Locks ──────────────────────────────────────────────────
 
 async function getFileConflicts(): Promise<FileConflict[]> {
@@ -581,6 +618,9 @@ export function useApi() {
     deleteSavedFilter,
     getComments,
     addComment: addCommentApi,
+    getReviews,
+    createReview: createReviewApi,
+    updateReview: updateReviewApi,
     getFileConflicts,
     getNotifications,
     getUnreadCount,

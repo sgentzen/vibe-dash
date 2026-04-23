@@ -13,6 +13,7 @@ import {
   logActivity,
   createBlocker,
   resolveBlocker,
+  resolveBlockersForTask,
   touchAgent,
   createMilestone,
   listMilestones,
@@ -62,7 +63,11 @@ import {
   getAgentPerformance,
   getAgentComparison,
   getTaskTypeBreakdown,
+  createReview,
+  listReviewsForTask,
+  updateReview,
 } from "../db/index.js";
+import type { ReviewStatus } from "../types.js";
 
 import { broadcast } from "../websocket.js";
 
@@ -215,6 +220,11 @@ export async function handleTool(
           updateTask(db, updated.id, { assigned_agent_id: agent.id });
         }
         broadcast({ type: "task_updated", payload: updated });
+        if (args.status && prior && args.status !== prior.status && (args.status === "done" || prior.status === "blocked")) {
+          for (const b of resolveBlockersForTask(db, updated.id)) {
+            broadcast({ type: "blocker_resolved", payload: b });
+          }
+        }
         const changes: string[] = [];
         if (args.status) changes.push(`status → ${args.status}`);
         if (args.progress !== undefined) changes.push(`progress → ${args.progress}%`);
@@ -243,6 +253,9 @@ export async function handleTool(
       const completed = completeTask(db, args.task_id as string);
       if (completed) {
         broadcast({ type: "task_completed", payload: completed });
+        for (const b of resolveBlockersForTask(db, completed.id)) {
+          broadcast({ type: "blocker_resolved", payload: b });
+        }
         autoLog(db, completed.id, `Completed "${completed.title}"`, agentName);
         // Record milestone daily stats
         if (completed.milestone_id) {
@@ -590,6 +603,36 @@ export async function handleTool(
 
     case "get_task_type_breakdown": {
       return ok(getTaskTypeBreakdown(db, args.agent_id as string));
+    }
+
+    case "create_review": {
+      const review = createReview(db, {
+        task_id: args.task_id as string,
+        reviewer_name: (args.reviewer_name as string | undefined) ?? agentName ?? "unknown",
+        reviewer_agent_id: (args.reviewer_agent_id as string | undefined) ?? null,
+        status: args.status as ReviewStatus | undefined,
+        comments: (args.comments as string | undefined) ?? null,
+        diff_summary: (args.diff_summary as string | undefined) ?? null,
+      });
+      broadcast({ type: "review_created", payload: review });
+      autoLog(db, review.task_id, `Review submitted: ${review.status}`, agentName);
+      return ok({ review_id: review.id });
+    }
+
+    case "list_reviews": {
+      return ok({ reviews: listReviewsForTask(db, args.task_id as string) });
+    }
+
+    case "update_review": {
+      const updated = updateReview(db, args.review_id as string, {
+        status: args.status as ReviewStatus | undefined,
+        comments: args.comments as string | null | undefined,
+        diff_summary: args.diff_summary as string | null | undefined,
+      });
+      if (!updated) return ok({ error: "Review not found" });
+      broadcast({ type: "review_updated", payload: updated });
+      autoLog(db, updated.task_id, `Review updated: ${updated.status}`, agentName);
+      return ok({ review: updated });
     }
 
     default:

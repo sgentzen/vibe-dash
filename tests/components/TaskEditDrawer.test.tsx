@@ -16,8 +16,11 @@ const updateTask = vi.fn();
 const completeTask = vi.fn();
 const addComment = vi.fn();
 const getComments = vi.fn();
+const getReviews = vi.fn();
+const createReview = vi.fn();
+const updateReview = vi.fn();
 
-const stableApi = { updateTask, completeTask, addComment, getComments };
+const stableApi = { updateTask, completeTask, addComment, getComments, getReviews, createReview, updateReview };
 vi.mock("../../src/hooks/useApi", () => ({
   useApi: () => stableApi,
 }));
@@ -46,6 +49,13 @@ describe("TaskEditDrawer", () => {
       message: "hi", created_at: new Date().toISOString(),
     });
     getComments.mockReset().mockResolvedValue([]);
+    getReviews.mockReset().mockResolvedValue([]);
+    createReview.mockReset().mockResolvedValue({
+      id: "r1", task_id: "t1", reviewer_agent_id: null, reviewer_name: "User",
+      status: "pending", comments: null, diff_summary: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    updateReview.mockReset();
   });
 
   it("renders Edit Task heading and form fields", async () => {

@@ -213,6 +213,20 @@ export interface Blocker {
   resolved_at: string | null;
 }
 
+export type ReviewStatus = "pending" | "approved" | "changes_requested";
+
+export interface TaskReview {
+  id: string;
+  task_id: string;
+  reviewer_agent_id: string | null;
+  reviewer_name: string;
+  status: ReviewStatus;
+  comments: string | null;
+  diff_summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CostEntry {
   id: string;
   agent_id: string | null;
@@ -292,7 +306,9 @@ export type WsEventType =
   | "notification_created"
   | "daily_stats_recorded"
   | "cost_logged"
-  | "metrics_logged";
+  | "metrics_logged"
+  | "review_created"
+  | "review_updated";
 
 export interface WsEvent {
   type: WsEventType;
@@ -313,5 +329,6 @@ export interface WsEvent {
     | AppNotification
     | MilestoneDailyStats
     | CostEntry
-    | CompletionMetrics;
+    | CompletionMetrics
+    | TaskReview;
 }

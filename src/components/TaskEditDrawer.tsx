@@ -5,6 +5,7 @@ import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle } from "../styles/shared.js";
 import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
+import { ReviewPanel } from "./task/ReviewPanel";
 import { TagPicker } from "./task/TagPicker";
 import { ModalBackdrop } from "./ui/ModalBackdrop";
 import { ModalDrawer } from "./ui/ModalDrawer";
@@ -178,6 +179,11 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             style={{ width: "100%", accentColor: "var(--accent-green)" }}
           />
         </FormField>
+
+        {/* Code Reviews */}
+        <div style={{ marginTop: "12px" }}>
+          <ReviewPanel taskId={task.id} />
+        </div>
 
         {/* Comments */}
         <CommentsSection
