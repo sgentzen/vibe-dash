@@ -131,6 +131,19 @@ export const logCostSchema = z.object({
   project_id: z.string().optional(),
 });
 
+// ─── Blockers ───────────────────────────────────────────────────────────
+
+export const createBlockerSchema = z.object({
+  task_id: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+// ─── Dependencies ────────────────────────────────────────────────────────
+
+export const createDependencySchema = z.object({
+  depends_on_task_id: z.string().min(1),
+});
+
 // ─── Reviews ────────────────────────────────────────────────────────────
 
 export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested"]);

@@ -4,7 +4,8 @@ import { addDependency, removeDependency, listDependencies, getBlockingTasks } f
 import type { TaskDependency } from "../types.js";
 import { dependencyDeleteLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
+import { validateBody } from "./validate.js";
+import { createDependencySchema } from "../../shared/schemas.js";
 
 export function dependencyRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -17,9 +18,8 @@ export function dependencyRoutes(db: Database.Database, broadcast: BroadcastFn):
     res.json(getBlockingTasks(db, req.params.id));
   });
 
-  router.post("/api/tasks/:id/dependencies", (req, res) => {
+  router.post("/api/tasks/:id/dependencies", validateBody(createDependencySchema), (req, res) => {
     const { depends_on_task_id } = req.body as { depends_on_task_id: string };
-    if (!depends_on_task_id) { badRequest(res, "depends_on_task_id is required"); return; }
     const dep = addDependency(db, req.params.id, depends_on_task_id);
     broadcast({ type: "dependency_added", payload: dep });
     res.status(201).json(dep);
