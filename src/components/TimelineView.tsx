@@ -281,22 +281,25 @@ export function TimelineView() {
             if (row.kind === "project") {
               const collapsed = collapsedProjects.has(row.project.id);
               return (
-                <div
+                <button
                   key={`proj-${row.project.id}`}
+                  type="button"
+                  aria-expanded={!collapsed}
+                  aria-label={`${row.project.name} project, ${row.completedCount} of ${row.totalCount} tasks complete. ${collapsed ? "Expand" : "Collapse"}.`}
                   onClick={() => toggleProject(row.project.id)}
-                  style={{ display: "flex", alignItems: "center", height: PROJECT_HEADER_HEIGHT, cursor: "pointer", background: "color-mix(in srgb, var(--accent-blue) 8%, var(--bg-secondary))", borderTop: "1px solid color-mix(in srgb, var(--accent-blue) 20%, var(--border))", borderBottom: "1px solid color-mix(in srgb, var(--accent-blue) 20%, var(--border))", position: "relative", zIndex: 1 }}
+                  style={{ display: "flex", alignItems: "center", width: "100%", height: PROJECT_HEADER_HEIGHT, cursor: "pointer", background: "color-mix(in srgb, var(--accent-blue) 8%, var(--bg-secondary))", borderTop: "1px solid color-mix(in srgb, var(--accent-blue) 20%, var(--border))", borderBottom: "1px solid color-mix(in srgb, var(--accent-blue) 20%, var(--border))", border: "none", position: "relative", zIndex: 1, textAlign: "left" }}
                 >
                   <div style={{ width: labelWidth, flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", padding: "0 12px" }}>
-                    <span style={{ fontSize: "9px", color: "var(--accent-blue)", transition: "transform 0.15s", transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</span>
+                    <span aria-hidden="true" style={{ fontSize: "9px", color: "var(--accent-blue)", transition: "transform 0.15s", transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</span>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: "0.06em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {row.project.name}
                     </span>
-                    <span style={{ fontSize: "10px", color: "var(--text-muted)", flexShrink: 0 }}>
+                    <span aria-hidden="true" style={{ fontSize: "10px", color: "var(--text-muted)", flexShrink: 0 }}>
                       {row.completedCount}/{row.totalCount}
                     </span>
                   </div>
-                  <div style={{ flex: 1, height: "100%", borderLeft: "1px solid var(--border)" }} />
-                </div>
+                  <div aria-hidden="true" style={{ flex: 1, height: "100%", borderLeft: "1px solid var(--border)" }} />
+                </button>
               );
             }
 
@@ -370,7 +373,8 @@ export function TimelineView() {
                         {/* Gaussian hump anomaly indicator */}
                         {showHump && (
                           <svg
-                            aria-hidden="true"
+                            role="img"
+                            aria-label={`Anomaly: ${anomaly}`}
                             style={{ position: "absolute", left: sx + bw / 2 - hw / 2, top: barTop - 18, width: hw, height: 18, overflow: "visible", pointerEvents: "none" }}
                             className={`timeline-balloon timeline-balloon--${anomaly}`}
                           >
@@ -384,7 +388,7 @@ export function TimelineView() {
                         )}
                         <button
                           className="timeline-bar"
-                          aria-label={`${task.title} — ${task.status}${anomaly ? `, ${anomaly}` : ""}, ${task.start_date ?? "no start"} to ${task.due_date ?? "no due date"}`}
+                          aria-label={`${task.title} — ${task.status}${anomaly ? `, ${anomaly}` : ""}, agent: ${agentName}, ${task.start_date ?? "no start"} to ${task.due_date ?? "no due date"}`}
                           onClick={() => setEditingTask(task)}
                           style={{ ...style, position: "absolute", left: sx, top: barTop, width: bw }}
                         >
