@@ -123,3 +123,11 @@ export {
 export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
 export { scoreAgents, suggestAgent } from "./routing.js";
 export type { AgentScore, AgentSuggestion } from "./routing.js";
+export {
+  createWorktree,
+  getWorktreeById,
+  getTaskWorktree,
+  listActiveWorktrees,
+  updateWorktreeStatus,
+} from "./worktrees.js";
+export type { CreateWorktreeInput } from "./worktrees.js";

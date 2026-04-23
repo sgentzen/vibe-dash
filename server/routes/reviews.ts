@@ -11,8 +11,9 @@ import type { ReviewStatus } from "../types.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest, notFound } from "./responses.js";
 import { requireEntity } from "./handlers.js";
+import { reviewStatusEnum } from "../../shared/schemas.js";
 
-const VALID_STATUSES: ReviewStatus[] = ["pending", "approved", "changes_requested"];
+const VALID_STATUSES = reviewStatusEnum.options;
 
 export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();

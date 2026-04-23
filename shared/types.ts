@@ -216,6 +216,19 @@ export interface Blocker {
 
 export type ReviewStatus = "pending" | "approved" | "changes_requested";
 
+export type WorktreeStatus = "active" | "merged" | "abandoned" | "removed";
+
+export interface TaskWorktree {
+  id: string;
+  task_id: string;
+  repo_path: string;
+  branch_name: string;
+  worktree_path: string;
+  status: WorktreeStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TaskReview {
   id: string;
   task_id: string;
@@ -327,7 +340,9 @@ export type WsEventType =
   | "cost_logged"
   | "metrics_logged"
   | "review_created"
-  | "review_updated";
+  | "review_updated"
+  | "worktree_created"
+  | "worktree_updated";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -363,4 +378,6 @@ export type WsEvent =
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>
   | WsEventOf<"review_created", TaskReview>
-  | WsEventOf<"review_updated", TaskReview>;
+  | WsEventOf<"review_updated", TaskReview>
+  | WsEventOf<"worktree_created", TaskWorktree>
+  | WsEventOf<"worktree_updated", TaskWorktree>;

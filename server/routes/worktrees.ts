@@ -1,0 +1,53 @@
+import { Router } from "express";
+import type Database from "better-sqlite3";
+import {
+  createWorktree,
+  getWorktreeById,
+  getTaskWorktree,
+  listActiveWorktrees,
+  updateWorktreeStatus,
+} from "../db/index.js";
+import type { BroadcastFn } from "./types.js";
+import type { WorktreeStatus } from "../types.js";
+import { requireEntity } from "./handlers.js";
+import { validateBody } from "./validate.js";
+import { createWorktreeSchema, updateWorktreeStatusSchema } from "../../shared/schemas.js";
+
+export function worktreeRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
+  const router = Router();
+
+  router.get("/api/worktrees", (_req, res) => {
+    res.json(listActiveWorktrees(db));
+  });
+
+  // Record-only: the MCP create_worktree tool runs `git worktree add` before calling this
+  router.post("/api/worktrees", validateBody(createWorktreeSchema), (req, res) => {
+    const { task_id, repo_path, branch_name, worktree_path } = req.body as {
+      task_id: string;
+      repo_path: string;
+      branch_name: string;
+      worktree_path: string;
+    };
+    const worktree = createWorktree(db, { task_id, repo_path, branch_name, worktree_path });
+    broadcast({ type: "worktree_created", payload: worktree });
+    res.status(201).json(worktree);
+  });
+
+  router.get("/api/tasks/:id/worktree", (req, res) => {
+    const worktree = getTaskWorktree(db, req.params.id);
+    if (!requireEntity(res, worktree, "Worktree")) return;
+    res.json(worktree);
+  });
+
+  router.patch("/api/worktrees/:id", validateBody(updateWorktreeStatusSchema), (req, res) => {
+    const existing = getWorktreeById(db, req.params.id);
+    if (!requireEntity(res, existing, "Worktree")) return;
+    const { status } = req.body as { status: WorktreeStatus };
+    const updated = updateWorktreeStatus(db, req.params.id, status);
+    if (!updated) { res.status(500).json({ error: "Update failed" }); return; }
+    broadcast({ type: "worktree_updated", payload: updated });
+    res.json(updated);
+  });
+
+  return router;
+}

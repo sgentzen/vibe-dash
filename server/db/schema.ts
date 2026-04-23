@@ -206,6 +206,19 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_cost_entries_task_id ON cost_entries(task_id);",
   "CREATE INDEX IF NOT EXISTS idx_completion_metrics_created_at ON completion_metrics(created_at);",
   "CREATE INDEX IF NOT EXISTS idx_blockers_resolved_at ON blockers(resolved_at);",
+
+  "CREATE TABLE IF NOT EXISTS task_worktrees (",
+  "  id TEXT PRIMARY KEY,",
+  "  task_id TEXT NOT NULL REFERENCES tasks(id),",
+  "  repo_path TEXT NOT NULL,",
+  "  branch_name TEXT NOT NULL,",
+  "  worktree_path TEXT NOT NULL,",
+  "  status TEXT NOT NULL DEFAULT 'active',",
+  "  created_at TEXT NOT NULL,",
+  "  updated_at TEXT NOT NULL",
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_task_worktrees_task_id ON task_worktrees(task_id);",
+  "CREATE INDEX IF NOT EXISTS idx_task_worktrees_status ON task_worktrees(status);",
 ].join("\n");
 
 function migrate(db: Database.Database): void {

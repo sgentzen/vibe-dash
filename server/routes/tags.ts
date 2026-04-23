@@ -34,9 +34,9 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
   router.delete("/api/tasks/:id/tags/:tagId", (req, res) => {
     const removed = removeTagFromTask(db, req.params.id, req.params.tagId);
     if (removed) {
-      broadcast({ type: "tag_removed", payload: { id: "", task_id: req.params.id, tag_id: req.params.tagId } });
+      broadcast({ type: "tag_removed", payload: removed });
     }
-    res.json({ success: removed });
+    res.json({ success: removed !== null });
   });
 
   return router;

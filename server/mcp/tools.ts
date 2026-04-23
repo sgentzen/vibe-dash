@@ -66,6 +66,11 @@ import {
   listReviewsForTask,
   updateReview,
   suggestAgent,
+  createWorktree,
+  getWorktreeById,
+  getTaskWorktree,
+  listActiveWorktrees,
+  updateWorktreeStatus,
 } from "../db/index.js";
 import {
   suggestAgentSchema,
@@ -73,6 +78,7 @@ import {
   createReviewSchema,
   updateReviewSchema,
 } from "../../shared/schemas.js";
+import { execFileSync } from "child_process";
 
 import { broadcast } from "../websocket.js";
 
@@ -637,6 +643,73 @@ export async function handleTool(
       broadcast({ type: "review_updated", payload: updated });
       autoLog(db, updated.task_id, `Review updated: ${updated.status}`, agentName);
       return ok({ review: updated });
+    }
+
+    // ─── R9a: Git Worktrees ────────────────────────────────────────────────
+
+    case "create_worktree": {
+      const task_id = args.task_id as string;
+      const repo_path = args.repo_path as string;
+      const branch_name = args.branch_name as string;
+      const worktree_path = args.worktree_path as string;
+      // Validate task exists before touching the filesystem
+      const task = getTask(db, task_id);
+      if (!task) return ok({ error: "Task not found" });
+      // Prevent path traversal — both paths must be absolute and contain no ..
+      if (!repo_path.startsWith("/") && !repo_path.match(/^[A-Za-z]:\\/)) {
+        return ok({ error: "repo_path must be an absolute path" });
+      }
+      if (!worktree_path.startsWith("/") && !worktree_path.match(/^[A-Za-z]:\\/)) {
+        return ok({ error: "worktree_path must be an absolute path" });
+      }
+      if (repo_path.includes("..") || worktree_path.includes("..")) {
+        return ok({ error: "paths must not contain .." });
+      }
+      try {
+        execFileSync("git", ["-C", repo_path, "worktree", "add", "-b", branch_name, worktree_path], {
+          timeout: 30000,
+          stdio: "pipe",
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return ok({ error: `git worktree add failed: ${msg}` });
+      }
+      const worktree = createWorktree(db, { task_id, repo_path, branch_name, worktree_path });
+      broadcast({ type: "worktree_created", payload: worktree });
+      autoLog(db, task_id, `Worktree created: ${branch_name}`, agentName);
+      return ok(worktree);
+    }
+
+    case "cleanup_worktree": {
+      const worktree = getWorktreeById(db, args.worktree_id as string);
+      if (!worktree) return ok({ error: "Worktree not found" });
+      const force = args.force as boolean | undefined;
+      const gitArgs = ["worktree", "remove", worktree.worktree_path];
+      if (force) gitArgs.push("--force");
+      try {
+        execFileSync("git", ["-C", worktree.repo_path, ...gitArgs], {
+          timeout: 30000,
+          stdio: "pipe",
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return ok({ error: `git worktree remove failed: ${msg}` });
+      }
+      const newStatus = ((args.status as string | undefined) ?? "removed") as import("../../shared/types.js").WorktreeStatus;
+      const updated = updateWorktreeStatus(db, worktree.id, newStatus);
+      if (updated) broadcast({ type: "worktree_updated", payload: updated });
+      autoLog(db, worktree.task_id, `Worktree cleaned up: ${worktree.branch_name} (${newStatus})`, agentName);
+      return ok(updated ?? worktree);
+    }
+
+    case "list_worktrees": {
+      return ok(listActiveWorktrees(db));
+    }
+
+    case "get_worktree_status": {
+      const worktree = getTaskWorktree(db, args.task_id as string);
+      if (!worktree) return ok({ error: "No worktree found for this task" });
+      return ok(worktree);
     }
 
     // ─── R10: Intelligent Routing ─────────────────────────────────────────

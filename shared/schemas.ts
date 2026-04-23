@@ -118,7 +118,7 @@ export const createCommentSchema = z.object({
 // ─── Bulk operations ────────────────────────────────────────────────────
 
 export const bulkUpdateTasksSchema = z.object({
-  task_ids: z.array(z.string().min(1)).nonempty(),
+  task_ids: z.array(z.string().min(1)).nonempty().max(200),
   updates: updateTaskSchema,
 });
 
@@ -147,14 +147,12 @@ export const logCostSchema = z.object({
 export const createWebhookSchema = z.object({
   url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed"),
   event_types: z.array(z.string().min(1)).nonempty(),
-  secret: z.string().optional(),
 });
 
 export const updateWebhookSchema = z.object({
   url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed").optional(),
   event_types: z.array(z.string().min(1)).optional(),
   active: z.boolean().optional(),
-  secret: z.string().nullable().optional(),
 });
 
 // ─── File locks ──────────────────────────────────────────────────────────
@@ -164,12 +162,16 @@ export const reportWorkingOnSchema = z.object({
   file_paths: z.array(z.string().min(1)).nonempty(),
 });
 
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");
+
 // ─── Templates ──────────────────────────────────────────────────────────
 
 export const createTemplateSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
-  template_json: z.string().min(1).refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON"),
+  template_json: validJson,
 });
 
 export const instantiateTemplateSchema = z.object({
@@ -185,7 +187,7 @@ export const generateReportSchema = z.object({
 
 export const createAlertRuleSchema = z.object({
   event_type: z.string().min(1),
-  filter_json: z.string().optional(),
+  filter_json: validJson.optional(),
 });
 
 export const updateAlertRuleSchema = z.object({
@@ -196,7 +198,7 @@ export const updateAlertRuleSchema = z.object({
 
 export const createSavedFilterSchema = z.object({
   name: z.string().min(1),
-  filter_json: z.string().min(1),
+  filter_json: validJson,
 });
 
 // ─── Blockers ───────────────────────────────────────────────────────────
@@ -210,6 +212,26 @@ export const createBlockerSchema = z.object({
 
 export const createDependencySchema = z.object({
   depends_on_task_id: z.string().min(1),
+});
+
+// ─── Worktrees ──────────────────────────────────────────────────────────
+
+export const worktreeStatusEnum = z.enum(["active", "merged", "abandoned", "removed"]);
+
+const safeGitBranchName = z.string().min(1).regex(
+  /^[a-zA-Z0-9._/-]+$/,
+  "branch name must contain only alphanumeric characters, dots, dashes, underscores, and slashes"
+).refine((s) => !s.startsWith("-"), "branch name must not start with a dash");
+
+export const createWorktreeSchema = z.object({
+  task_id: z.string().min(1),
+  repo_path: z.string().min(1),
+  branch_name: safeGitBranchName,
+  worktree_path: z.string().min(1),
+});
+
+export const updateWorktreeStatusSchema = z.object({
+  status: worktreeStatusEnum,
 });
 
 // ─── Reviews ────────────────────────────────────────────────────────────
