@@ -106,11 +106,15 @@ export function TimelineView() {
     return result;
   }, [tasks, selectedProjectId, selectedMilestoneId, hideCompleted, showUndated, milestoneMap]);
 
-  const allMatchingTasks = tasks.filter(
-    (t) =>
-      t.parent_task_id === null &&
-      (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId),
+  const allMatchingTasks = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          t.parent_task_id === null &&
+          (selectedProjectId === null || t.project_id === selectedProjectId) &&
+          (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId),
+      ),
+    [tasks, selectedProjectId, selectedMilestoneId],
   );
   const undatedCount = allMatchingTasks.filter((t) => getTaskDates(t, milestoneMap) === null).length;
   const completedCount = allMatchingTasks.filter((t) => t.status === "done").length;
