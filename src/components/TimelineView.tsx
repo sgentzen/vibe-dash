@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { useAppState } from "../store";
+import { useDataState, useNavigationState } from "../store";
 import type { Milestone, Task } from "../types";
 import {
   DAY_MS,
@@ -81,8 +81,8 @@ function rowHeight(row: SwimRow): number {
 }
 
 export function TimelineView() {
-  const { tasks, milestones, projects, agents, selectedProjectId, selectedMilestoneId, blockers, taskDepsMap } =
-    useAppState();
+  const { tasks, milestones, projects, agents, blockers, taskDepsMap } = useDataState();
+  const { selectedProjectId, selectedMilestoneId } = useNavigationState();
   const [showUndated, setShowUndated] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(true);
   const [labelWidth, setLabelWidth] = useState(DEFAULT_LABEL_WIDTH);

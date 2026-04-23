@@ -1,13 +1,13 @@
 import { TaskCard } from "../TaskCard";
 import { getBlockingCount, resolveTaskTags } from "./boardHelpers";
-import type { useAppState } from "../../store";
+import type { DataState } from "../../store";
 import type { Task, Milestone, Agent, Tag } from "../../types";
 
 interface MilestoneGroupProps {
   milestone: Milestone | null;
   tasks: Task[];
   allTasks: Task[];
-  activity: ReturnType<typeof useAppState>["activity"];
+  activity: DataState["activity"];
   agents: Agent[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>;

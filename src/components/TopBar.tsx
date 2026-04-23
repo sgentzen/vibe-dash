@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAppState, useAppDispatch } from "../store";
+import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { WebhookSettings } from "./WebhookSettings";
 import { StatPill } from "./topbar/StatPill";
@@ -8,7 +8,9 @@ import { NotificationBell } from "./topbar/NotificationBell";
 import { AddProjectControl } from "./topbar/AddProjectControl";
 
 export function TopBar() {
-  const { stats, theme, activeView, searchQuery, unreadCount, notifications } = useAppState();
+  const { stats } = useDataState();
+  const { theme, activeView, searchQuery } = useNavigationState();
+  const { unreadCount, notifications } = useNotificationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showSettings, setShowSettings] = useState(false);

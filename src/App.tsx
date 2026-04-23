@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
-import { useAppState, useAppDispatch } from "./store";
+import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
 import { useApi } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
@@ -21,7 +21,9 @@ import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export function App() {
   const dispatch = useAppDispatch();
-  const { blockers, theme, activeView, fileConflicts } = useAppState();
+  const { blockers } = useDataState();
+  const { theme, activeView } = useNavigationState();
+  const { fileConflicts } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);

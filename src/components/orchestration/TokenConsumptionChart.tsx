@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApi } from "../../hooks/useApi";
-import { useAppState } from "../../store";
+import { usePollingState } from "../../store";
 import type { CostTimeseriesEntry } from "../../hooks/useApi.js";
 
 interface Props {
@@ -30,7 +30,7 @@ function linearRegression(ys: number[]): number[] {
 
 export function TokenConsumptionChart({ activeProjectId }: Props) {
   const api = useApi();
-  const { pollGeneration } = useAppState();
+  const { pollGeneration } = usePollingState();
   const [data, setData] = useState<CostTimeseriesEntry[]>([]);
 
   useEffect(() => {

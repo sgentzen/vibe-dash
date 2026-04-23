@@ -3,7 +3,7 @@ import { TaskCard } from "../TaskCard";
 import { MilestoneGroup } from "./MilestoneGroup";
 import { groupByMilestone, getBlockingCount, resolveTaskTags } from "./boardHelpers";
 import { STATUS_COLORS } from "../../constants/colors.js";
-import type { useAppState } from "../../store";
+import type { DataState } from "../../store";
 import type { useApi } from "../../hooks/useApi";
 import type { Task, Milestone, TaskStatus, Agent, Tag } from "../../types";
 
@@ -13,7 +13,7 @@ interface KanbanColumnProps {
   tasks: Task[];
   allTasks: Task[];
   milestones: Milestone[];
-  activity: ReturnType<typeof useAppState>["activity"];
+  activity: DataState["activity"];
   agents: Agent[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>;

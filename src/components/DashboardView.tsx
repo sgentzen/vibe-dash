@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAppState } from "../store";
+import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader } from "../styles/shared.js";
 import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
@@ -14,7 +14,9 @@ import { ReportGeneratorCard } from "./dashboard/ReportGeneratorCard";
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 export function DashboardView() {
-  const { projects, milestones, blockers, tasks, selectedProjectId, pollGeneration } = useAppState();
+  const { projects, milestones, blockers, tasks } = useDataState();
+  const { selectedProjectId } = useNavigationState();
+  const { pollGeneration } = usePollingState();
   const api = useApi();
 
   const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);

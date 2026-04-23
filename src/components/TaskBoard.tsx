@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
-import { useAppState, useAppDispatch } from "../store";
+import { useDataState, useNavigationState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskEditDrawer } from "./TaskEditDrawer";
 import { MilestoneFilter } from "./board/MilestoneFilter";
@@ -15,7 +15,8 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
 const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 
 export function TaskBoard() {
-  const { tasks, projects, milestones, selectedProjectId, selectedMilestoneId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
+  const { tasks, projects, milestones, activity, agents, tags, taskTagMap, taskDepsMap } = useDataState();
+  const { selectedProjectId, selectedMilestoneId, searchQuery } = useNavigationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
