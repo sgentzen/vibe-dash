@@ -103,12 +103,23 @@ export const createTagSchema = z.object({
   color: hexColor.optional(),
 });
 
+export const addTagToTaskSchema = z.object({
+  tag_id: z.string().min(1),
+});
+
 // ─── Comments ───────────────────────────────────────────────────────────
 
 export const createCommentSchema = z.object({
   agent_id: z.string().nullable().optional(),
   author_name: z.string().min(1),
   message: z.string().min(1),
+});
+
+// ─── Bulk operations ────────────────────────────────────────────────────
+
+export const bulkUpdateTasksSchema = z.object({
+  task_ids: z.array(z.string().min(1)).nonempty(),
+  updates: updateTaskSchema,
 });
 
 // ─── Routing ────────────────────────────────────────────────────────────

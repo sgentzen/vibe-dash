@@ -23,7 +23,7 @@ import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
 import { requireEntity } from "./handlers.js";
 import { validateBody } from "./validate.js";
-import { createTaskSchema, updateTaskSchema } from "../../shared/schemas.js";
+import { createTaskSchema, updateTaskSchema, bulkUpdateTasksSchema } from "../../shared/schemas.js";
 
 export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -70,11 +70,10 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   // PATCH /api/tasks/bulk (must be before :id param route)
-  router.patch("/api/tasks/bulk", (req, res) => {
-    const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
-    if (!task_ids?.length || !updates) { badRequest(res, "task_ids and updates are required"); return; }
+  router.patch("/api/tasks/bulk", validateBody(bulkUpdateTasksSchema), (req, res) => {
+    const { task_ids, updates } = req.body as { task_ids: string[]; updates: UpdateTaskInput };
     if (task_ids.length > BULK_UPDATE_MAX) { badRequest(res, `Maximum ${BULK_UPDATE_MAX} tasks per bulk update`); return; }
-    const tasks = bulkUpdateTasks(db, task_ids, updates as UpdateTaskInput);
+    const tasks = bulkUpdateTasks(db, task_ids, updates);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
       const milestoneIds = new Set(tasks.filter((t) => t.milestone_id).map((t) => t.milestone_id!));
