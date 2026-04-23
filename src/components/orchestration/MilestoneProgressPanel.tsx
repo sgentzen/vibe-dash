@@ -34,7 +34,7 @@ export function MilestoneProgressPanel({ milestones, tasks, activeProjectId }: P
   const activeName = open[0]?.name ?? null;
 
   return (
-    <div className="orch-card">
+    <div className="orch-card" style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
         <div className="orch-section-header" style={{ marginBottom: 0 }}>Milestone Progress</div>
         {activeName && (
@@ -49,7 +49,7 @@ export function MilestoneProgressPanel({ milestones, tasks, activeProjectId }: P
           No milestones yet
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", overflowY: "auto", flex: 1, minHeight: 0 }}>
           {ordered.map((m) => {
             const mTasks = tasksByMilestone.get(m.id) ?? [];
             const done = mTasks.filter((t) => t.status === "done").length;

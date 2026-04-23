@@ -44,10 +44,10 @@ export function ActiveBlockersPanel({ blockers, tasks }: Props) {
   });
 
   return (
-    <div className="orch-card" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+    <div className="orch-card" style={{ display: "flex", flexDirection: "column", maxHeight: 260, minHeight: 0 }}>
       <div className="orch-section-header">Active Blockers</div>
       {sorted.length === 0 ? (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "12px" }}>
+        <div style={{ padding: "16px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "12px" }}>
           No active blockers
         </div>
       ) : (

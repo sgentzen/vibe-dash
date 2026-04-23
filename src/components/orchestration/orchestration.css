@@ -1,10 +1,11 @@
 .orch-wrapper {
   flex: 1;
   padding: 16px;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 .orch-subheader {
@@ -41,36 +42,20 @@
   min-height: 0;
 }
 
-.orch-left-rail {
-  grid-column: 1 / 4;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-}
-
-.orch-left-rail-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-  padding-bottom: 4px;
-  flex-shrink: 0;
-}
-
 .orch-center-col {
-  grid-column: 4 / 7;
+  grid-column: 1 / 5;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .orch-right-col {
-  grid-column: 7 / 13;
+  grid-column: 5 / 13;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .orch-right-bottom {
@@ -110,54 +95,20 @@
   transition: width 400ms ease-out;
 }
 
-/* Scrollbar polish */
-.orch-left-rail::-webkit-scrollbar {
-  width: 4px;
-}
-.orch-left-rail::-webkit-scrollbar-track {
-  background: transparent;
-}
-.orch-left-rail::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
-
-/* Responsive: below 1280px, left rail spans full width (row 1),
-   center spans left half (row 2), right spans right half (row 2).
-   Below 900px, all three stack vertically. */
-@media (max-width: 1280px) {
+/* Responsive: below 900px, center and right stack vertically. */
+@media (max-width: 900px) {
   .orch-grid {
     grid-template-rows: auto auto;
   }
-  .orch-left-rail {
+  .orch-center-col {
     grid-column: 1 / 13;
     grid-row: 1;
-    flex-direction: row;
-    flex-wrap: wrap;
-    overflow-y: visible;
-    overflow-x: auto;
-    max-height: none;
-  }
-  .orch-center-col {
-    grid-column: 1 / 7;
-    grid-row: 2;
   }
   .orch-right-col {
-    grid-column: 7 / 13;
+    grid-column: 1 / 13;
     grid-row: 2;
   }
   .orch-right-bottom {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px) {
-  .orch-center-col {
-    grid-column: 1 / 13;
-    grid-row: 2;
-  }
-  .orch-right-col {
-    grid-column: 1 / 13;
-    grid-row: 3;
   }
 }

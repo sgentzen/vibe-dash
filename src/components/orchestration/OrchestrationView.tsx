@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useAppState } from "../../store";
-import { ProjectRailCard } from "./ProjectRailCard";
 import { HealthScoreGauge } from "./HealthScoreGauge";
 import { ActiveBlockersPanel } from "./ActiveBlockersPanel";
 import { MilestoneProgressPanel } from "./MilestoneProgressPanel";
@@ -40,31 +39,6 @@ export function OrchestrationView() {
       </div>
 
       <div className="orch-grid">
-        {/* Left rail — project list */}
-        <div className="orch-left-rail">
-          <div className="orch-left-rail-title">Projects</div>
-          {projects.length === 0 ? (
-            <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "8px 0" }}>No projects yet</div>
-          ) : (
-            projects.map((project) => {
-              const ptasks = tasks.filter((t) => t.project_id === project.id);
-              const ptaskIds = new Set(ptasks.map((t) => t.id));
-              const pblockers = blockers.filter(
-                (b) => b.resolved_at === null && ptaskIds.has(b.task_id),
-              ).length;
-              return (
-                <ProjectRailCard
-                  key={project.id}
-                  project={project}
-                  tasks={ptasks}
-                  blockerCount={pblockers}
-                  isActive={project.id === activeProjectId}
-                />
-              );
-            })
-          )}
-        </div>
-
         {/* Center column */}
         <div className="orch-center-col">
           <HealthScoreGauge
