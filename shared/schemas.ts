@@ -142,6 +142,28 @@ export const logCostSchema = z.object({
   project_id: z.string().optional(),
 });
 
+// ─── Webhooks ───────────────────────────────────────────────────────────
+
+export const createWebhookSchema = z.object({
+  url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed"),
+  event_types: z.array(z.string().min(1)).nonempty(),
+  secret: z.string().optional(),
+});
+
+export const updateWebhookSchema = z.object({
+  url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed").optional(),
+  event_types: z.array(z.string().min(1)).optional(),
+  active: z.boolean().optional(),
+  secret: z.string().nullable().optional(),
+});
+
+// ─── File locks ──────────────────────────────────────────────────────────
+
+export const reportWorkingOnSchema = z.object({
+  task_id: z.string().min(1),
+  file_paths: z.array(z.string().min(1)).nonempty(),
+});
+
 // ─── Templates ──────────────────────────────────────────────────────────
 
 export const createTemplateSchema = z.object({

@@ -2,8 +2,9 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { createWebhook, listWebhooks, updateWebhook, deleteWebhook } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
 import { requireEntity } from "./handlers.js";
+import { validateBody } from "./validate.js";
+import { createWebhookSchema, updateWebhookSchema } from "../../shared/schemas.js";
 
 export function webhookRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
@@ -12,17 +13,12 @@ export function webhookRoutes(db: Database.Database, _broadcast: BroadcastFn): R
     res.json(listWebhooks(db));
   });
 
-  router.post("/api/webhooks", (req, res) => {
+  router.post("/api/webhooks", validateBody(createWebhookSchema), (req, res) => {
     const { url, event_types } = req.body as { url: string; event_types: string[] };
-    if (!url || !event_types || !Array.isArray(event_types)) { badRequest(res, "url and event_types (array) are required"); return; }
-    try {
-      const parsed = new URL(url);
-      if (!["http:", "https:"].includes(parsed.protocol)) { badRequest(res, "Only http/https URLs allowed"); return; }
-    } catch { badRequest(res, "Invalid URL"); return; }
     res.status(201).json(createWebhook(db, url, event_types));
   });
 
-  router.patch("/api/webhooks/:id", (req, res) => {
+  router.patch("/api/webhooks/:id", validateBody(updateWebhookSchema), (req, res) => {
     const updates = req.body as { url?: string; event_types?: string[]; active?: boolean };
     const hook = updateWebhook(db, req.params.id, updates);
     if (!requireEntity(res, hook, "Webhook")) return;
