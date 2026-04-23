@@ -11,22 +11,14 @@ import {
 } from "../db/index.js";
 import { statsLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
+import { validateBody } from "./validate.js";
+import { logCostSchema } from "../../shared/schemas.js";
 
 export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
 
-  router.post("/api/costs", statsLimiter, (req, res) => {
-    const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body as {
-      model: string; provider: string; input_tokens: number; output_tokens: number; cost_usd: number;
-      agent_id?: string; task_id?: string; milestone_id?: string; project_id?: string;
-    };
-    if (!model || !provider || !Number.isFinite(input_tokens) || !Number.isFinite(output_tokens) || !Number.isFinite(cost_usd)) {
-      badRequest(res, "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required"); return;
-    }
-    if (input_tokens < 0 || output_tokens < 0 || cost_usd < 0) {
-      badRequest(res, "input_tokens, output_tokens, and cost_usd must be non-negative"); return;
-    }
+  router.post("/api/costs", statsLimiter, validateBody(logCostSchema), (req, res) => {
+    const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body;
     const entry = logCost(db, {
       agent_id: agent_id ?? null,
       task_id: task_id ?? null,

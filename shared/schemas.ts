@@ -35,7 +35,7 @@ export const registerAgentSchema = z.object({
 
 export const createProjectSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
 });
 
 export const updateProjectSchema = z.object({
@@ -122,8 +122,8 @@ export const suggestAgentSchema = z.object({
 export const logCostSchema = z.object({
   model: z.string().min(1),
   provider: z.string().min(1),
-  input_tokens: z.number().finite().nonnegative(),
-  output_tokens: z.number().finite().nonnegative(),
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
   cost_usd: z.number().finite().nonnegative(),
   agent_id: z.string().optional(),
   task_id: z.string().optional(),

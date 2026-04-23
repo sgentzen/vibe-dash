@@ -22,6 +22,8 @@ import {
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
 import { requireEntity } from "./handlers.js";
+import { validateBody } from "./validate.js";
+import { createTaskSchema, updateTaskSchema } from "../../shared/schemas.js";
 
 export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -47,26 +49,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     );
   });
 
-  router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
-      req.body as {
-        project_id: string;
-        parent_task_id?: string | null;
-        milestone_id?: string | null;
-        assigned_agent_id?: string | null;
-        title: string;
-        description?: string | null;
-        priority: string;
-        status?: string;
-        due_date?: string | null;
-        start_date?: string | null;
-        estimate?: number | null;
-        recurrence_rule?: string | null;
-      };
-    if (!project_id || !title || !priority) {
-      badRequest(res, "project_id, title, and priority are required");
-      return;
-    }
+  router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } = req.body;
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
@@ -74,8 +58,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
-      priority: priority as Parameters<typeof createTask>[1]["priority"],
-      status: status as Parameters<typeof createTask>[1]["status"],
+      priority,
+      status,
       due_date: due_date ?? null,
       start_date: start_date ?? null,
       estimate: estimate ?? null,
@@ -121,7 +105,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     res.json(task);
   });
 
-  router.patch("/api/tasks/:id", (req, res) => {
+  router.patch("/api/tasks/:id", validateBody(updateTaskSchema), (req, res) => {
     const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
     const body = req.body as Parameters<typeof updateTask>[2];
