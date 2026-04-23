@@ -9,6 +9,7 @@ export {
   completeMilestone,
   getMilestone,
   listMilestones,
+  deleteMilestone,
   getMilestoneProgress,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
@@ -120,3 +121,5 @@ export {
   getTaskTypeBreakdown,
 } from "./metrics.js";
 export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
+export { scoreAgents, suggestAgent } from "./routing.js";
+export type { AgentScore, AgentSuggestion } from "./routing.js";

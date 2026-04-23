@@ -30,6 +30,7 @@ const SCHEMA = [
   "  start_date TEXT,",
   "  estimate INTEGER,",
   "  recurrence_rule TEXT,",
+  "  task_type TEXT,",
   "  created_at TEXT NOT NULL, updated_at TEXT NOT NULL",
   ");",
   "CREATE TABLE IF NOT EXISTS agents (",
@@ -232,6 +233,9 @@ function migrate(db: Database.Database): void {
   if (!cols.some((c) => c.name === "start_date")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN start_date TEXT").run();
   }
+  if (!cols.some((c) => c.name === "task_type")) {
+    db.prepare("ALTER TABLE tasks ADD COLUMN task_type TEXT").run();
+  }
 
   const agentCols = db.pragma("table_info(agents)") as { name: string }[];
   if (!agentCols.some((c) => c.name === "role")) {
@@ -311,15 +315,16 @@ function rebuildTasksIfFkStale(db: Database.Database): void {
         start_date TEXT,
         estimate INTEGER,
         recurrence_rule TEXT,
+        task_type TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       INSERT INTO tasks_new
         (id, project_id, parent_task_id, milestone_id, assigned_agent_id,
          title, description, status, priority, progress,
-         due_date, start_date, estimate, recurrence_rule, created_at, updated_at)
+         due_date, start_date, estimate, recurrence_rule, task_type, created_at, updated_at)
       SELECT id, project_id, parent_task_id, milestone_id, assigned_agent_id,
          title, description, status, priority, progress,
-         due_date, start_date, estimate, recurrence_rule, created_at, updated_at
+         due_date, start_date, estimate, recurrence_rule, task_type, created_at, updated_at
       FROM tasks;
       DROP TABLE tasks;
       ALTER TABLE tasks_new RENAME TO tasks;

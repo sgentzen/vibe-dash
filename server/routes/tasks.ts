@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import type { TaskStatus } from "../types.js";
+import type { TaskStatus, TaskPriority } from "../types.js";
+import type { UpdateTaskInput } from "../db/tasks.js";
 import { BULK_UPDATE_MAX } from "../constants.js";
 import {
   listTasks,
@@ -11,11 +12,12 @@ import {
   searchTasks,
   bulkUpdateTasks,
   logActivity,
-  recordDailyStats,
+  recordMilestoneDailyStats,
   evaluateAlertRules,
   handleRecurringTaskCompletion,
   getTimeSpent,
   resolveBlockersForTask,
+  suggestAgent,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
@@ -46,11 +48,11 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
-        sprint_id?: string | null;
+        milestone_id?: string | null;
         assigned_agent_id?: string | null;
         title: string;
         description?: string | null;
@@ -68,7 +70,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
-      sprint_id: sprint_id ?? null,
+      milestone_id: milestone_id ?? null,
       assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
@@ -88,11 +90,11 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
     if (!task_ids?.length || !updates) { badRequest(res, "task_ids and updates are required"); return; }
     if (task_ids.length > BULK_UPDATE_MAX) { badRequest(res, `Maximum ${BULK_UPDATE_MAX} tasks per bulk update`); return; }
-    const tasks = bulkUpdateTasks(db, task_ids, updates as any);
+    const tasks = bulkUpdateTasks(db, task_ids, updates as UpdateTaskInput);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
-      const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
-      for (const sid of sprintIds) recordDailyStats(db, sid);
+      const milestoneIds = new Set(tasks.filter((t) => t.milestone_id).map((t) => t.milestone_id!));
+      for (const mid of milestoneIds) recordMilestoneDailyStats(db, mid);
     }
     res.json({ updated: tasks.length, tasks });
   });
@@ -103,9 +105,9 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     res.json(searchTasks(db, {
       query: q.q,
       project_id: q.project_id,
-      sprint_id: q.sprint_id,
-      status: q.status as any,
-      priority: q.priority as any,
+      milestone_id: q.milestone_id,
+      status: q.status as TaskStatus | undefined,
+      priority: q.priority as TaskPriority | undefined,
       assigned_agent_id: q.assigned_agent_id,
       tag_id: q.tag_id,
       due_before: q.due_before,
@@ -144,8 +146,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
         payload: { ...entry, agent_name: null, task_title: updated!.title },
       });
     }
-    if (body.status && body.status !== task.status && updated?.sprint_id) {
-      recordDailyStats(db, updated.sprint_id);
+    if (body.status && body.status !== task.status && updated?.milestone_id) {
+      recordMilestoneDailyStats(db, updated.milestone_id);
     }
     res.json(updated);
   });
@@ -160,8 +162,8 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     }
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
-    if (completed?.sprint_id) {
-      recordDailyStats(db, completed.sprint_id);
+    if (completed?.milestone_id) {
+      recordMilestoneDailyStats(db, completed.milestone_id);
     }
     if (completed) {
       const nextTask = handleRecurringTaskCompletion(db, completed.id);
@@ -185,6 +187,13 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
     res.json({ time_spent_seconds: getTimeSpent(db, req.params.id) });
+  });
+
+  router.get("/api/tasks/:id/suggest-agent", (req, res) => {
+    const task = getTask(db, req.params.id);
+    if (!requireEntity(res, task, "Task")) return;
+    const suggestion = suggestAgent(db, req.params.id);
+    res.json(suggestion ?? null);
   });
 
   return router;

@@ -3,7 +3,7 @@ import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle } from "../styles/shared.js";
-import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
+import type { Task, TaskStatus, TaskPriority, Tag, TaskComment, AgentSuggestion } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
 import { ReviewPanel } from "./task/ReviewPanel";
 import { TagPicker } from "./task/TagPicker";
@@ -39,6 +39,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [saving, setSaving] = useState(false);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [suggestion, setSuggestion] = useState<AgentSuggestion | null>(null);
 
   function submitComment() {
     const text = newComment.trim();
@@ -57,6 +58,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
 
   // Keep local state fresh if task changes externally
   useEffect(() => {
+    setSuggestion(null);
     setTitle(task.title);
     setDescription(task.description ?? "");
     setStatus(task.status);
@@ -70,6 +72,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setRecurrenceRule(task.recurrence_rule ?? "");
     setNewComment("");
     api.getComments(task.id).then(setComments).catch(() => {});
+    api.getSuggestedAgent(task.id).then(setSuggestion).catch(() => setSuggestion(null));
   }, [task, api]);
 
   async function handleSave() {
@@ -148,6 +151,29 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           taskMilestones={taskMilestones}
           agents={agents}
         />
+
+        {suggestion && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              Suggested: {suggestion.agent.agent_name} ({suggestion.confidence}% match)
+            </span>
+            <button
+              type="button"
+              onClick={() => setAssignedAgentId(suggestion.agent.agent_id)}
+              style={{
+                fontSize: 11,
+                padding: "2px 8px",
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+                cursor: "pointer",
+                color: "var(--text-primary)",
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        )}
 
         <TaskDateFields
           dueDate={dueDate}

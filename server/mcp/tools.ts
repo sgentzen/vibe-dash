@@ -66,8 +66,11 @@ import {
   createReview,
   listReviewsForTask,
   updateReview,
+  suggestAgent,
 } from "../db/index.js";
 import type { ReviewStatus } from "../types.js";
+
+import { suggestAgentSchema } from "../../shared/schemas.js";
 
 import { broadcast } from "../websocket.js";
 
@@ -633,6 +636,16 @@ export async function handleTool(
       broadcast({ type: "review_updated", payload: updated });
       autoLog(db, updated.task_id, `Review updated: ${updated.status}`, agentName);
       return ok({ review: updated });
+    }
+
+    // ─── R10: Intelligent Routing ─────────────────────────────────────────
+
+    case "suggest_agent": {
+      const { task_id } = suggestAgentSchema.parse(args);
+      const taskExists = db.prepare("SELECT id FROM tasks WHERE id = ?").get(task_id);
+      if (!taskExists) return ok({ error: "Task not found" });
+      const suggestion = suggestAgent(db, task_id);
+      return ok(suggestion);
     }
 
     default:
