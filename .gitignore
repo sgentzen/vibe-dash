@@ -33,6 +33,10 @@ Thumbs.db
 .claude/worktrees/
 .superpowers/
 
+# Playwright
+test-results/
+playwright-report/
+
 # Logs
 *.log
 npm-debug.log*

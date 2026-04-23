@@ -130,3 +130,22 @@ export const logCostSchema = z.object({
   milestone_id: z.string().optional(),
   project_id: z.string().optional(),
 });
+
+// ─── Reviews ────────────────────────────────────────────────────────────
+
+export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested"]);
+
+export const createReviewSchema = z.object({
+  task_id: z.string().min(1),
+  reviewer_name: z.string().optional(),
+  reviewer_agent_id: z.string().optional(),
+  status: reviewStatusEnum.optional(),
+  comments: z.string().optional(),
+  diff_summary: z.string().optional(),
+});
+
+export const updateReviewSchema = z.object({
+  status: reviewStatusEnum.optional(),
+  comments: z.string().nullable().optional(),
+  diff_summary: z.string().nullable().optional(),
+});

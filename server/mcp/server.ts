@@ -5,9 +5,9 @@ import { handleTool } from "./tools.js";
 import { registerAgent, touchAgent, startOrGetSession, closeAgentSessions, closeStaleSession, cleanupStaleAgents } from "../db/index.js";
 import { broadcast } from "../websocket.js";
 import {
-  taskStatusEnum as STATUS_ENUM,
-  taskPrioritySchema as PRIORITY_ENUM,
-  milestoneStatusEnum as MILESTONE_STATUS_ENUM,
+  taskStatusEnum,
+  taskPrioritySchema,
+
   registerAgentSchema,
   createProjectSchema,
   updateProjectSchema,
@@ -16,6 +16,9 @@ import {
   createMilestoneSchema,
   updateMilestoneSchema,
   suggestAgentSchema,
+  reviewStatusEnum,
+  createReviewSchema,
+  updateReviewSchema,
 } from "../../shared/schemas.js";
 
 export interface McpServerHandle {
@@ -106,7 +109,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "create_task",
     "Create a new task in a project",
     // Shared schema is stricter (priority required); allow optional here for back-compat
-    { ...createTaskSchema.shape, priority: PRIORITY_ENUM.optional() },
+    { ...createTaskSchema.shape, priority: taskPrioritySchema.optional() },
     call("create_task")
   );
 
@@ -124,7 +127,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "List tasks with optional filters",
     {
       project_id: z.string().optional(),
-      status: STATUS_ENUM.optional(),
+      status: taskStatusEnum.optional(),
       parent_task_id: z.string().optional(),
       assigned_agent_id: z.string().optional(),
     },
@@ -336,8 +339,8 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       query: z.string().optional(),
       project_id: z.string().optional(),
       milestone_id: z.string().optional(),
-      status: STATUS_ENUM.optional(),
-      priority: PRIORITY_ENUM.optional(),
+      status: taskStatusEnum.optional(),
+      priority: taskPrioritySchema.optional(),
       assigned_agent_id: z.string().optional(),
       tag_id: z.string().optional(),
       due_before: z.string().optional(),
@@ -472,8 +475,8 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Update multiple tasks at once",
     {
       task_ids: z.array(z.string()),
-      status: STATUS_ENUM.optional(),
-      priority: PRIORITY_ENUM.optional(),
+      status: taskStatusEnum.optional(),
+      priority: taskPrioritySchema.optional(),
       assigned_agent_id: z.string().nullable().optional(),
     },
     call("bulk_update_tasks")
