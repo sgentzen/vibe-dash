@@ -26,8 +26,9 @@ export function GroupHeaderRow({
         alignItems: "center",
         height: GROUP_HEADER_HEIGHT,
         cursor: "pointer",
-        background: "rgba(255,255,255,0.03)",
-        borderBottom: "1px solid var(--border)",
+        background: "color-mix(in srgb, var(--accent-purple) 6%, var(--bg-primary))",
+        borderTop: "1px solid color-mix(in srgb, var(--accent-purple) 20%, var(--border))",
+        borderBottom: "1px solid color-mix(in srgb, var(--accent-purple) 20%, var(--border))",
         position: "relative",
         zIndex: 1,
       }}
@@ -46,7 +47,7 @@ export function GroupHeaderRow({
         <span
           style={{
             fontSize: "10px",
-            color: "var(--text-muted)",
+            color: "var(--accent-purple)",
             transition: "transform 0.15s",
             transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
             flexShrink: 0,
@@ -56,7 +57,9 @@ export function GroupHeaderRow({
         </span>
         <span
           style={{
-            fontSize: "12px",
+            fontFamily: "var(--font-display)",
+            fontStyle: "italic",
+            fontSize: "13px",
             fontWeight: 600,
             color: "var(--text-primary)",
             overflow: "hidden",
@@ -87,7 +90,7 @@ export function GroupHeaderRow({
             width: "80px",
             height: "6px",
             borderRadius: "3px",
-            background: "rgba(255,255,255,0.08)",
+            background: "var(--bg-tertiary)",
             overflow: "hidden",
             flexShrink: 0,
           }}

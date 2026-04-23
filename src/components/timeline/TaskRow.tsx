@@ -1,6 +1,5 @@
-import { PRIORITY_COLORS } from "../../constants/colors.js";
-import type { Task, Milestone } from "../../types";
-import { BAR_HEIGHT, ROW_HEIGHT, STATUS_DOT_COLORS, STATUS_OPACITY, DAY_MS } from "./constants";
+import type { Task, Milestone, Blocker } from "../../types";
+import { BAR_HEIGHT, ROW_HEIGHT, STATUS_DOT_COLORS, DAY_MS } from "./constants";
 import { getTaskDates } from "./utils";
 import { ResizeHandle } from "./ResizeHandle";
 
@@ -11,10 +10,69 @@ interface TaskRowProps {
   milestoneMap: Map<string, Milestone>;
   dateToX: (timeMs: number) => number;
   onResize: (delta: number) => void;
-  depIds: string[];
-  taskYMap: Map<string, number>;
-  visibleTasks: Task[];
+  blockers: Blocker[];
+  onBarClick: (task: Task) => void;
 }
+
+type Anomaly = "blocked" | "overdue" | "stale" | null;
+
+function detectAnomaly(task: Task, blockers: Blocker[]): Anomaly {
+  if (blockers.some((b) => b.task_id === task.id && !b.resolved_at)) return "blocked";
+  if (task.status === "done") return null;
+  const now = Date.now();
+  if (task.due_date && new Date(task.due_date).getTime() < now) return "overdue";
+  if (task.updated_at) {
+    const staleDays = (now - new Date(task.updated_at).getTime()) / DAY_MS;
+    if (staleDays > 7 && task.status === "in_progress") return "stale";
+  }
+  return null;
+}
+
+function barStyle(task: Task, hasDates: boolean, anomaly: Anomaly) {
+  const base: React.CSSProperties = {
+    height: BAR_HEIGHT,
+    borderRadius: "6px",
+    display: "flex",
+    alignItems: "center",
+    paddingLeft: "6px",
+    fontSize: "11px",
+    fontWeight: 500,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+  };
+
+  if (anomaly === "blocked") {
+    return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+  }
+  if (anomaly === "overdue") {
+    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+  }
+
+  switch (task.status) {
+    case "done":
+      return { ...base, background: "var(--accent-blue)", color: "var(--text-on-accent)", opacity: 0.35 };
+    case "in_progress":
+      return { ...base, background: "var(--accent-green)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6 };
+    case "blocked":
+      return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+    case "planned":
+    default:
+      return {
+        ...base,
+        background: "var(--bg-tertiary)",
+        color: "var(--text-secondary)",
+        border: hasDates ? "1px solid var(--border)" : "1px dashed var(--border)",
+        opacity: hasDates ? 0.9 : 0.6,
+      };
+  }
+}
+
+const ANOMALY_ICON: Record<NonNullable<Anomaly>, string> = {
+  blocked: "🚫",
+  overdue: "⚠",
+  stale: "⚠",
+};
 
 export function TaskRow({
   task,
@@ -23,9 +81,8 @@ export function TaskRow({
   milestoneMap,
   dateToX,
   onResize,
-  depIds,
-  taskYMap,
-  visibleTasks,
+  blockers,
+  onBarClick,
 }: TaskRowProps) {
   const dates = getTaskDates(task, milestoneMap);
   const start = dates ? dates.start : new Date(task.created_at).getTime();
@@ -33,12 +90,15 @@ export function TaskRow({
   const startX = dateToX(start);
   const endX = dateToX(end);
   const barWidth = Math.max(endX - startX, 8);
-  const color = PRIORITY_COLORS[task.priority] ?? "var(--accent-purple)";
-  const opacity = STATUS_OPACITY[task.status] ?? 1;
   const hasDates = dates !== null;
+  const anomaly = detectAnomaly(task, blockers);
+  const style = barStyle(task, hasDates, anomaly);
+  const barTop = (ROW_HEIGHT - BAR_HEIGHT) / 2;
+  const showBalloon = anomaly !== null && barWidth >= 20;
 
   return (
     <div
+      className="timeline-task-row"
       style={{
         display: "flex",
         alignItems: "center",
@@ -47,7 +107,7 @@ export function TaskRow({
         zIndex: 1,
       }}
     >
-      {/* Label with status dot + resize handle */}
+      {/* Label */}
       <div
         style={{
           width: labelWidth,
@@ -65,85 +125,46 @@ export function TaskRow({
         }}
       >
         <span
-          style={{
-            width: "8px",
-            height: "8px",
-            borderRadius: "50%",
-            flexShrink: 0,
-            background: STATUS_DOT_COLORS[task.status] ?? "var(--text-muted)",
-          }}
+          className="legend-dot"
+          style={{ background: STATUS_DOT_COLORS[task.status] ?? "var(--text-muted)" }}
         />
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{task.title}</span>
         <ResizeHandle onResize={onResize} />
       </div>
-      {/* Bar */}
+
+      {/* Timeline track */}
       <div style={{ position: "relative", width: timelineWidth }}>
-        <div
-          title={`${task.title}\n${task.start_date ?? "no start"} → ${task.due_date ?? "no due"}\nStatus: ${task.status} | Priority: ${task.priority}`}
+        {/* Balloon anomaly indicator */}
+        {showBalloon && (
+          <span
+            aria-hidden="true"
+            className={`timeline-balloon timeline-balloon--${anomaly}`}
+            style={{
+              position: "absolute",
+              left: startX + barWidth / 2 - 7,
+              top: barTop - 16,
+              fontSize: "12px",
+              lineHeight: 1,
+            }}
+          >
+            {ANOMALY_ICON[anomaly]}
+          </span>
+        )}
+
+        <button
+          className="timeline-bar"
+          aria-label={`${task.title} — ${task.status}${anomaly ? `, ${anomaly}` : ""}, ${task.start_date ?? "no start"} to ${task.due_date ?? "no due date"}`}
+          onClick={() => onBarClick(task)}
           style={{
+            ...style,
             position: "absolute",
             left: startX,
-            top: (ROW_HEIGHT - BAR_HEIGHT) / 2,
+            top: barTop,
             width: barWidth,
-            height: BAR_HEIGHT,
-            borderRadius: "4px",
-            background: color,
-            opacity: hasDates ? opacity : opacity * 0.3,
-            display: "flex",
-            alignItems: "center",
-            paddingLeft: "6px",
-            fontSize: "11px",
-            color: "var(--text-on-accent)",
-            fontWeight: 500,
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            border: hasDates ? "none" : "1px dashed rgba(255,255,255,0.3)",
           }}
         >
           {barWidth > 60 ? task.title : ""}
-        </div>
-
-        {/* Dependency arrows */}
-        {depIds.map((depId) => {
-          const depEndY = taskYMap.get(depId);
-          const thisY = taskYMap.get(task.id);
-          if (depEndY === undefined || thisY === undefined) return null;
-
-          const depTask = visibleTasks.find((t) => t.id === depId);
-          if (!depTask) return null;
-          const depDates = getTaskDates(depTask, milestoneMap);
-          const depEnd = depDates
-            ? depDates.end
-            : new Date(depTask.created_at).getTime() + 7 * DAY_MS;
-          const depEndX = dateToX(depEnd);
-          const fromY = depEndY - thisY;
-
-          return (
-            <svg
-              key={depId}
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                width: timelineWidth,
-                height: ROW_HEIGHT,
-                overflow: "visible",
-                pointerEvents: "none",
-              }}
-            >
-              <line
-                x1={depEndX}
-                y1={fromY + ROW_HEIGHT / 2}
-                x2={startX}
-                y2={ROW_HEIGHT / 2}
-                stroke="var(--accent-red)"
-                strokeWidth={1}
-                strokeDasharray="4,2"
-                markerEnd="url(#arrowhead)"
-              />
-            </svg>
-          );
-        })}
+        </button>
       </div>
     </div>
   );

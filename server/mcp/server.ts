@@ -584,6 +584,43 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("get_task_type_breakdown")
   );
 
+  // ─── 5.4: Code Review ──────────────────────────────────────────────────
+
+  const reviewStatus = z.enum(["pending", "approved", "changes_requested"]);
+
+  server.tool(
+    "create_review",
+    "Create a code review for a task (diff summary, status, comments)",
+    {
+      task_id: z.string(),
+      reviewer_name: z.string().optional(),
+      reviewer_agent_id: z.string().optional(),
+      status: reviewStatus.optional(),
+      comments: z.string().optional(),
+      diff_summary: z.string().optional(),
+    },
+    call("create_review")
+  );
+
+  server.tool(
+    "list_reviews",
+    "List reviews for a task",
+    { task_id: z.string() },
+    call("list_reviews")
+  );
+
+  server.tool(
+    "update_review",
+    "Update a review's status, comments, or diff summary",
+    {
+      review_id: z.string(),
+      status: reviewStatus.optional(),
+      comments: z.string().optional(),
+      diff_summary: z.string().optional(),
+    },
+    call("update_review")
+  );
+
   // ─── R10: Intelligent Routing ──────────────────────────────────────────
 
   server.tool(

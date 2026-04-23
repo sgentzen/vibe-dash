@@ -15,6 +15,7 @@ import {
   getActiveBlockers,
   createBlocker,
   resolveBlocker,
+  resolveBlockersForTask,
   listMilestones,
   createMilestone,
   getMilestone,
@@ -68,6 +69,10 @@ import {
   generateReport,
   addComment,
   listComments,
+  createReview,
+  getReview,
+  listReviewsForTask,
+  updateReview,
   reportWorkingOn,
   releaseFileLocks,
   getActiveFileLocks,
@@ -101,6 +106,8 @@ import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 import { validateBody } from "./routes/validate.js";
+import { integrationRoutes } from "./routes/integrations.js";
+import { openapiRoutes } from "./routes/openapi.js";
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -130,6 +137,9 @@ function makeBroadcast(db: Database.Database) {
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
+
+  router.use(integrationRoutes(db, broadcast));
+  router.use(openapiRoutes(db, broadcast));
 
   const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -330,6 +340,11 @@ export function createRouter(db: Database.Database): Router {
     const body = req.body as Parameters<typeof updateTask>[2];
     const updated = updateTask(db, id, body);
     broadcast({ type: "task_updated", payload: updated! });
+    if (body.status && body.status !== task.status && (body.status === "done" || task.status === "blocked")) {
+      for (const b of resolveBlockersForTask(db, id)) {
+        broadcast({ type: "blocker_resolved", payload: b });
+      }
+    }
     // Auto-log the change
     const changes: string[] = [];
     if (body.status && body.status !== task.status) changes.push(`status → ${body.status}`);
@@ -361,6 +376,9 @@ export function createRouter(db: Database.Database): Router {
     }
     const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
+    for (const b of resolveBlockersForTask(db, req.params.id)) {
+      broadcast({ type: "blocker_resolved", payload: b });
+    }
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     // Record daily stats if task has a milestone
@@ -658,6 +676,65 @@ export function createRouter(db: Database.Database): Router {
     for (const n of notifications) broadcast({ type: "notification_created", payload: n });
 
     res.status(201).json(comment);
+  });
+
+  // ─── 5.4: Code Review Integration ───────────────────────────────────
+
+  router.get("/api/tasks/:id/reviews", (req, res) => {
+    res.json(listReviewsForTask(db, req.params.id));
+  });
+
+  router.post("/api/tasks/:id/reviews", (req, res) => {
+    const task = getTask(db, req.params.id);
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+    const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } =
+      req.body as {
+        reviewer_name?: string;
+        reviewer_agent_id?: string | null;
+        status?: "pending" | "approved" | "changes_requested";
+        comments?: string | null;
+        diff_summary?: string | null;
+      };
+    if (!reviewer_name) {
+      res.status(400).json({ error: "reviewer_name is required" });
+      return;
+    }
+    if (reviewer_name.length > 200) {
+      res.status(400).json({ error: "reviewer_name too long" });
+      return;
+    }
+    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
+      res.status(400).json({ error: "invalid status" });
+      return;
+    }
+    const review = createReview(db, {
+      task_id: req.params.id,
+      reviewer_name,
+      reviewer_agent_id: reviewer_agent_id ?? null,
+      status,
+      comments: comments ?? null,
+      diff_summary: diff_summary ?? null,
+    });
+    broadcast({ type: "review_created", payload: review });
+    res.status(201).json(review);
+  });
+
+  router.patch("/api/reviews/:id", (req, res) => {
+    const existing = getReview(db, req.params.id);
+    if (!existing) { res.status(404).json({ error: "Review not found" }); return; }
+    const { status, comments, diff_summary } = req.body as {
+      status?: "pending" | "approved" | "changes_requested";
+      comments?: string | null;
+      diff_summary?: string | null;
+    };
+    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
+      res.status(400).json({ error: "invalid status" });
+      return;
+    }
+    const updated = updateReview(db, req.params.id, { status, comments, diff_summary });
+    if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
+    broadcast({ type: "review_updated", payload: updated });
+    res.json(updated);
   });
 
   // ─── R3: Agent File Locks ──────────────────────────────────────────

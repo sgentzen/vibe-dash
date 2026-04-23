@@ -43,6 +43,18 @@ export function resolveBlocker(
   return updated ?? null;
 }
 
+export function resolveBlockersForTask(
+  db: Database.Database,
+  taskId: string
+): Blocker[] {
+  const ts = now();
+  return db
+    .prepare(
+      "UPDATE blockers SET resolved_at = ? WHERE task_id = ? AND resolved_at IS NULL RETURNING *"
+    )
+    .all(ts, taskId) as Blocker[];
+}
+
 export function getActiveBlockers(db: Database.Database): Blocker[] {
   return db
     .prepare(

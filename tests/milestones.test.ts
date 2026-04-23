@@ -5,7 +5,6 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
-import { createTestDb } from "./setup.js";
 import {
   createProject,
   createTask,

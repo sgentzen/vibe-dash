@@ -63,7 +63,7 @@ export {
   getAgentActivityHeatmap,
 } from "./activity.js";
 export type { LogActivityInput, ActivityStreamFilter } from "./activity.js";
-export { createBlocker, resolveBlocker, getActiveBlockers } from "./blockers.js";
+export { createBlocker, resolveBlocker, resolveBlockersForTask, getActiveBlockers } from "./blockers.js";
 export type { CreateBlockerInput } from "./blockers.js";
 export { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags, getTag } from "./tags.js";
 export type { CreateTagInput } from "./tags.js";
@@ -101,6 +101,8 @@ export {
   fireWebhooks,
 } from "./webhooks.js";
 export { generateReport } from "./reports.js";
+export { createReview, getReview, listReviewsForTask, updateReview } from "./reviews.js";
+export type { CreateReviewInput, UpdateReviewInput } from "./reviews.js";
 export {
   logCost,
   getAgentCostSummary,

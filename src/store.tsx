@@ -19,7 +19,7 @@ const initialState: AppState = {
   unreadCount: 0,
   fileConflicts: [],
   searchQuery: "",
-  activeView: "board",
+  activeView: "orchestration",
   theme: getInitialTheme(),
   selectedProjectId: null,
   selectedMilestoneId: null,

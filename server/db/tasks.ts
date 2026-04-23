@@ -11,7 +11,7 @@ export interface CreateTaskInput {
   milestone_id?: string | null;
   assigned_agent_id?: string | null;
   title: string;
-  description: string | null;
+  description?: string | null;
   priority: TaskPriority;
   status?: TaskStatus;
   due_date?: string | null;

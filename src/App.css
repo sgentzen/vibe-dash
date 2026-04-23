@@ -7,12 +7,14 @@
   --text-secondary: #8b949e;
   --text-muted: #484f58;
   --text-on-accent: #ffffff;
+  --text-on-yellow: #000000;
   --accent-red: #f85149;
   --accent-green: #3fb950;
   --accent-blue: #58a6ff;
   --accent-yellow: #d29922;
   --accent-purple: #8b5cf6;
   --accent-cyan: #06b6d4;
+  --accent-cyan-rgb: 6, 182, 212;
   --green-bg: #0d1f0d;
   --green-border: #238636;
   --yellow-bg: #2a1a0a;
@@ -38,6 +40,7 @@
   --accent-yellow: #9a6700;
   --accent-purple: #7c3aed;
   --accent-cyan: #0891b2;
+  --accent-cyan-rgb: 8, 145, 178;
   --green-bg: #dafbe1;
   --green-border: #1a7f37;
   --yellow-bg: #fff8c5;
@@ -52,6 +55,57 @@
    --accent-user cascades into --accent-blue so buttons, links, stat pills pick it up. */
 :root[data-accent] {
   --accent-blue: var(--accent-user);
+}
+
+/* Display typeface — used only for timeline group header labels */
+:root {
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+}
+
+/* Timeline balloon anomaly indicator */
+@keyframes balloonPulse {
+  0%, 100% { opacity: 0.55; transform: translateY(0) scale(1); }
+  50%       { opacity: 1;    transform: translateY(-2px) scale(1.06); }
+}
+
+.timeline-balloon {
+  position: absolute;
+  pointer-events: none;
+  animation: balloonPulse 1.4s ease-in-out infinite;
+}
+.timeline-balloon--blocked  { color: var(--accent-red); }
+.timeline-balloon--overdue  { color: var(--accent-yellow); }
+.timeline-balloon--stale    { color: var(--accent-yellow); }
+
+/* Timeline bar button reset + hover */
+.timeline-bar {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+.timeline-bar:hover { transform: scale(1.02); }
+.timeline-bar:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Timeline row hover */
+.timeline-task-row:hover { background: var(--bg-secondary); }
+
+/* Legend dots */
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 *,
