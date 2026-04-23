@@ -142,6 +142,24 @@ export const logCostSchema = z.object({
   project_id: z.string().optional(),
 });
 
+// ─── Alert rules ────────────────────────────────────────────────────────
+
+export const createAlertRuleSchema = z.object({
+  event_type: z.string().min(1),
+  filter_json: z.string().optional(),
+});
+
+export const updateAlertRuleSchema = z.object({
+  enabled: z.boolean(),
+});
+
+// ─── Saved filters ───────────────────────────────────────────────────────
+
+export const createSavedFilterSchema = z.object({
+  name: z.string().min(1),
+  filter_json: z.string().min(1),
+});
+
 // ─── Blockers ───────────────────────────────────────────────────────────
 
 export const createBlockerSchema = z.object({
