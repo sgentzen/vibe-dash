@@ -39,6 +39,8 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, unreadCount: action.payload };
     case "SET_FILE_CONFLICTS":
       return { ...state, fileConflicts: action.payload };
+    case "SET_WORKTREES":
+      return { ...state, worktrees: action.payload };
     case "SET_STATS":
       return { ...state, stats: action.payload };
     case "SELECT_PROJECT":

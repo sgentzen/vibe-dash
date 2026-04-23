@@ -8,12 +8,13 @@ import type {
   Tag,
   FileConflict,
   AppNotification,
+  TaskWorktree,
   WsEvent,
 } from "../types";
 
 export type Theme = "dark" | "light";
 
-export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity";
+export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity" | "worktrees";
 
 export interface AppState {
   projects: Project[];
@@ -28,6 +29,7 @@ export interface AppState {
   notifications: AppNotification[];
   unreadCount: number;
   fileConflicts: FileConflict[];
+  worktrees: TaskWorktree[];
   searchQuery: string;
   activeView: ActiveView;
   theme: Theme;
@@ -57,6 +59,7 @@ export type AppAction =
   | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
   | { type: "SET_UNREAD_COUNT"; payload: number }
   | { type: "SET_FILE_CONFLICTS"; payload: FileConflict[] }
+  | { type: "SET_WORKTREES"; payload: TaskWorktree[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_MILESTONE"; payload: string | null }

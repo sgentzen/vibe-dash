@@ -13,6 +13,7 @@ import { DashboardView } from "./components/DashboardView";
 import { TimelineView } from "./components/TimelineView";
 import { ActivityStreamView } from "./components/ActivityStreamView";
 import { OrchestrationView } from "./components/orchestration/OrchestrationView";
+import { WorktreeView } from "./components/WorktreeView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
@@ -88,15 +89,17 @@ export function App() {
           }
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 
-          // Load notifications and file conflicts
-          const [notifs, unread, conflicts] = await Promise.all([
+          // Load notifications, file conflicts, and worktrees
+          const [notifs, unread, conflicts, worktrees] = await Promise.all([
             api.getNotifications(50),
             api.getUnreadCount(),
             api.getFileConflicts(),
+            api.getWorktrees(),
           ]);
           dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
           dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
           dispatch({ type: "SET_FILE_CONFLICTS", payload: conflicts });
+          dispatch({ type: "SET_WORKTREES", payload: worktrees });
 
           // Show onboarding wizard on first run (no projects)
           if (projects.length === 0) {
@@ -144,7 +147,7 @@ export function App() {
       <TopBar />
       <div className="main-content">
         <ProjectList />
-        {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : <ActivityStreamView />}
+        {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : <ActivityStreamView />}
         <AgentFeed />
       </div>
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}

@@ -34,16 +34,16 @@ export function worktreeRoutes(db: Database.Database, broadcast: BroadcastFn): R
   });
 
   router.get("/api/tasks/:id/worktree", (req, res) => {
-    const worktree = getTaskWorktree(db, req.params.id);
+    const worktree = getTaskWorktree(db, req.params.id as string);
     if (!requireEntity(res, worktree, "Worktree")) return;
     res.json(worktree);
   });
 
   router.patch("/api/worktrees/:id", validateBody(updateWorktreeStatusSchema), (req, res) => {
-    const existing = getWorktreeById(db, req.params.id);
+    const existing = getWorktreeById(db, req.params.id as string);
     if (!requireEntity(res, existing, "Worktree")) return;
     const { status } = req.body as { status: WorktreeStatus };
-    const updated = updateWorktreeStatus(db, req.params.id, status);
+    const updated = updateWorktreeStatus(db, req.params.id as string, status);
     if (!updated) { res.status(500).json({ error: "Update failed" }); return; }
     broadcast({ type: "worktree_updated", payload: updated });
     res.json(updated);

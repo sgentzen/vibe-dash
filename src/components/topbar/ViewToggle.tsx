@@ -9,6 +9,7 @@ const VIEWS: { key: ActiveView; label: string }[] = [
   { key: "dashboard", label: "Dash" },
   { key: "timeline", label: "Timeline" },
   { key: "activity", label: "Activity" },
+  { key: "worktrees", label: "Worktrees" },
 ];
 
 interface ViewToggleProps {

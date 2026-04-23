@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -582,6 +582,24 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
   return res.json();
 }
 
+// ─── Worktrees ────────────────────────────────────────────────────────
+
+async function getWorktrees(): Promise<TaskWorktree[]> {
+  const res = await fetch("/api/worktrees");
+  if (!res.ok) throw new Error(`getWorktrees failed: ${res.status}`);
+  return res.json();
+}
+
+async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise<TaskWorktree> {
+  const res = await fetch(`/api/worktrees/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(`updateWorktreeStatus failed: ${res.status}`);
+  return res.json();
+}
+
 async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/suggest-agent`);
   if (!res.ok) throw new Error(`getSuggestedAgent failed: ${res.status}`);
@@ -657,5 +675,7 @@ export function useApi() {
     getAgentComparison,
     getTaskTypeBreakdown,
     getSuggestedAgent,
+    getWorktrees,
+    updateWorktreeStatus,
   }), []);
 }

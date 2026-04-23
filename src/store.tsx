@@ -18,6 +18,7 @@ const initialState: AppState = {
   notifications: [],
   unreadCount: 0,
   fileConflicts: [],
+  worktrees: [],
   searchQuery: "",
   activeView: "orchestration",
   theme: getInitialTheme(),
