@@ -46,7 +46,7 @@ function barStyle(task: Task, hasDates: boolean, anomaly: Anomaly) {
     return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
   }
   if (anomaly === "overdue") {
-    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-yellow)", opacity: hasDates ? 1 : 0.5 };
   }
 
   switch (task.status) {
