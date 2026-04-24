@@ -353,7 +353,8 @@ export type WsEventType =
   | "review_created"
   | "review_updated"
   | "worktree_created"
-  | "worktree_updated";
+  | "worktree_updated"
+  | "plugins_reloaded";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 

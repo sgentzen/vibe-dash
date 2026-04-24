@@ -3,6 +3,9 @@ import FocusTrap from "focus-trap-react";
 import { useApi } from "../hooks/useApi";
 import { inputStyle, buttonPrimary } from "../styles/shared.js";
 import type { Webhook } from "../types";
+import { PluginPanel } from "./PluginWidget";
+
+type SettingsTab = "webhooks" | "plugins";
 
 const EVENT_TYPES = [
   "task_created", "task_updated", "task_completed",
@@ -12,6 +15,7 @@ const EVENT_TYPES = [
 
 export function WebhookSettings({ onClose }: { onClose: () => void }) {
   const api = useApi();
+  const [activeTab, setActiveTab] = useState<SettingsTab>("webhooks");
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [newUrl, setNewUrl] = useState("");
   const [newEvents, setNewEvents] = useState<string[]>([]);
@@ -61,7 +65,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Webhook settings"
+          aria-label="Settings"
           onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-secondary)", border: "1px solid var(--border)",
@@ -70,12 +74,38 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h3 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600 }}>Webhook Settings</h3>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "18px", cursor: "pointer" }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(["webhooks", "plugins"] as SettingsTab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: activeTab === tab ? "2px solid var(--accent-blue)" : "2px solid transparent",
+                  color: activeTab === tab ? "var(--text-primary)" : "var(--text-muted)",
+                  fontWeight: activeTab === tab ? 600 : 400,
+                  fontSize: "15px",
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  textTransform: "capitalize",
+                }}
+                aria-selected={activeTab === tab}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "18px", cursor: "pointer" }} aria-label="Close settings">
             {"\u2715"}
           </button>
         </div>
 
+        {activeTab === "plugins" && (
+          <PluginPanel style={{ marginTop: 4 }} />
+        )}
+
+        {activeTab === "webhooks" && <>
         {/* Add New */}
         <div style={{ marginBottom: "16px", padding: "12px", background: "var(--bg-tertiary)", borderRadius: "8px" }}>
           <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>Add Webhook</div>
@@ -166,6 +196,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         )}
+        </>}
         </div>
       </div>
     </FocusTrap>
