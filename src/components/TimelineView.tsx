@@ -333,7 +333,7 @@ export function TimelineView() {
             // Agent lane row
             const { agentName, tasks: agentTasks } = row;
             return (
-              <div key={`agent-${row.projectId}-${row.agentId ?? "unassigned"}`} className="timeline-task-row" style={{ display: "flex", alignItems: "center", height: ROW_HEIGHT, borderBottom: "1px solid color-mix(in srgb, var(--border) 50%, transparent)", position: "relative" }}>
+              <div key={`agent-${row.projectId}-${row.agentId ?? "unassigned"}-${i}`} className="timeline-task-row" style={{ display: "flex", alignItems: "center", height: ROW_HEIGHT, borderBottom: "1px solid color-mix(in srgb, var(--border) 50%, transparent)", position: "relative" }}>
                 {/* Label */}
                 <div style={{ width: labelWidth, flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 0 24px", overflow: "hidden", position: "relative" }}>
                   <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

@@ -14,6 +14,8 @@ import { requireEntity, handleMutation } from "./handlers.js";
 import { createReviewSchema, updateReviewSchema } from "../../shared/schemas.js";
 import { validateBody } from "./validate.js";
 
+const VALID_STATUSES: ReviewStatus[] = ["pending", "approved", "changes_requested"];
+
 export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
 
@@ -49,6 +51,10 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       comments?: string | null;
       diff_summary?: string | null;
     };
+    if (status && !VALID_STATUSES.includes(status)) {
+      badRequest(res, `status must be one of: ${VALID_STATUSES.join(", ")}`);
+      return;
+    }
     const updated = updateReview(db, req.params.id, { status, comments, diff_summary });
     if (!updated) {
       badRequest(res, "Review update failed");
