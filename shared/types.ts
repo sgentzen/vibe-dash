@@ -392,8 +392,7 @@ export type WsEvent =
   | WsEventOf<"review_created", TaskReview>
   | WsEventOf<"review_updated", TaskReview>
   | WsEventOf<"worktree_created", TaskWorktree>
-  | WsEventOf<"worktree_updated", TaskWorktree>
-  | WsEventOf<"plugins_reloaded", { count: number }>;
+  | WsEventOf<"worktree_updated", TaskWorktree>;
 
 // ─── Executive Summary ────────────────────────────────────────────────────────
 
