@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
+import type { ExecutiveSummary } from "../../shared/types.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -583,33 +584,7 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
 }
 
 // ─── Executive Summary ────────────────────────────────────────────────
-
-interface MilestoneHealth {
-  id: string;
-  name: string;
-  target_date: string | null;
-  task_count: number;
-  completed_count: number;
-  completion_pct: number;
-  health: "on_track" | "at_risk" | "behind";
-}
-
-interface TeamUtilization { total: number; active: number; idle: number; offline: number; }
-interface BlockersSummary { open_count: number; avg_resolution_seconds: number | null; }
-interface TaskVelocity { this_week: number; last_week: number; trend_pct: number | null; }
-interface CostTrendEntry { date: string; cost_usd: number; }
-interface CostOverview { total_cost_usd: number; last_7_days_cost_usd: number; daily_trend: CostTrendEntry[]; }
-
-export interface ExecutiveSummary {
-  project_id: string;
-  project_name: string;
-  milestone_health: MilestoneHealth[];
-  team_utilization: TeamUtilization;
-  blockers: BlockersSummary;
-  velocity: TaskVelocity;
-  costs: CostOverview;
-  generated_at: string;
-}
+export type { ExecutiveSummary } from "../../shared/types.js";
 
 async function getExecutiveSummary(projectId: string): Promise<ExecutiveSummary> {
   const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/executive-summary`);

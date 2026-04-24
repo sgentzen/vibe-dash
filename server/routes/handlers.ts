@@ -21,7 +21,13 @@ export function handleMutation<T>(
   eventType: WsEventType,
   status = 200
 ): void {
-  const result = fn();
+  let result: T;
+  try {
+    result = fn();
+  } catch {
+    res.status(500).json({ error: "Internal server error" });
+    return;
+  }
   // Cast required: TS cannot correlate WsEventType literals to payload shapes; call sites enforce the pairing.
   broadcast({ type: eventType, payload: result } as WsEvent);
   res.status(status).json(result);

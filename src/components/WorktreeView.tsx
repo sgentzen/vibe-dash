@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAppState, useAppDispatch } from "../store";
+import { useDataState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import type { TaskWorktree, WorktreeStatus } from "../types";
 
@@ -160,7 +160,7 @@ function WorktreeCard({
 }
 
 export function WorktreeView() {
-  const { worktrees, tasks } = useAppState();
+  const { worktrees, tasks } = useDataState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [loading, setLoading] = useState(false);

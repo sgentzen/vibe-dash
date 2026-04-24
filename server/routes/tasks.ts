@@ -2,7 +2,6 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus, TaskPriority } from "../types.js";
 import type { UpdateTaskInput } from "../db/tasks.js";
-import { BULK_UPDATE_MAX } from "../constants.js";
 import {
   listTasks,
   createTask,
@@ -20,7 +19,6 @@ import {
   suggestAgent,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
 import { requireEntity, handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { createTaskSchema, updateTaskSchema, bulkUpdateTasksSchema } from "../../shared/schemas.js";
@@ -70,7 +68,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   // PATCH /api/tasks/bulk (must be before :id param route)
   router.patch("/api/tasks/bulk", validateBody(bulkUpdateTasksSchema), (req, res) => {
     const { task_ids, updates } = req.body as { task_ids: string[]; updates: UpdateTaskInput };
-    if (task_ids.length > BULK_UPDATE_MAX) { badRequest(res, `Maximum ${BULK_UPDATE_MAX} tasks per bulk update`); return; }
     const tasks = bulkUpdateTasks(db, task_ids, updates);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
