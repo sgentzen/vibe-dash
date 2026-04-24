@@ -353,7 +353,8 @@ export type WsEventType =
   | "review_created"
   | "review_updated"
   | "worktree_created"
-  | "worktree_updated";
+  | "worktree_updated"
+  | "plugins_reloaded";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -391,7 +392,8 @@ export type WsEvent =
   | WsEventOf<"review_created", TaskReview>
   | WsEventOf<"review_updated", TaskReview>
   | WsEventOf<"worktree_created", TaskWorktree>
-  | WsEventOf<"worktree_updated", TaskWorktree>;
+  | WsEventOf<"worktree_updated", TaskWorktree>
+  | WsEventOf<"plugins_reloaded", { count: number }>;
 
 // ─── Executive Summary ────────────────────────────────────────────────────────
 
