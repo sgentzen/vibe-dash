@@ -5,7 +5,6 @@
 
 export const DEFAULT_TASK_LIST_LIMIT = 200;
 export const MAX_TASK_LIST_LIMIT = 500;
-export const BULK_UPDATE_MAX = 200;
 export const DEFAULT_NOTIFICATION_LIMIT = 50;
 export const DEFAULT_ACTIVITY_LIMIT = 100;
 

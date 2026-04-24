@@ -2,7 +2,6 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus, TaskPriority } from "../types.js";
 import type { UpdateTaskInput } from "../db/tasks.js";
-import { BULK_UPDATE_MAX } from "../constants.js";
 import {
   listTasks,
   createTask,
