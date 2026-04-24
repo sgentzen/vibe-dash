@@ -21,7 +21,7 @@ import {
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
-import { requireEntity } from "./handlers.js";
+import { requireEntity, handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { createTaskSchema, updateTaskSchema, bulkUpdateTasksSchema } from "../../shared/schemas.js";
 
@@ -51,7 +51,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
 
   router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
     const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } = req.body;
-    const task = createTask(db, {
+    handleMutation(res, broadcast, () => createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
       milestone_id: milestone_id ?? null,
@@ -64,9 +64,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       start_date: start_date ?? null,
       estimate: estimate ?? null,
       recurrence_rule: recurrence_rule ?? null,
-    });
-    broadcast({ type: "task_created", payload: task });
-    res.status(201).json(task);
+    }), "task_created", 201);
   });
 
   // PATCH /api/tasks/bulk (must be before :id param route)

@@ -25,6 +25,7 @@ import { bulkRoutes } from "./bulk.js";
 import { reviewRoutes } from "./reviews.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
+import { milestoneRoutes } from "./milestones.js";
 import type { RouteFactory } from "./types.js";
 
 function makeBroadcast(db: Database.Database) {
@@ -58,6 +59,7 @@ const routeFactories: RouteFactory[] = [
   reviewRoutes,
   worktreeRoutes,
   executiveRoutes,
+  milestoneRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {

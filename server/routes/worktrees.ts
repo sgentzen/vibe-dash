@@ -9,7 +9,7 @@ import {
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import type { WorktreeStatus } from "../types.js";
-import { requireEntity } from "./handlers.js";
+import { requireEntity, handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { createWorktreeSchema, updateWorktreeStatusSchema } from "../../shared/schemas.js";
 
@@ -28,9 +28,7 @@ export function worktreeRoutes(db: Database.Database, broadcast: BroadcastFn): R
       branch_name: string;
       worktree_path: string;
     };
-    const worktree = createWorktree(db, { task_id, repo_path, branch_name, worktree_path });
-    broadcast({ type: "worktree_created", payload: worktree });
-    res.status(201).json(worktree);
+    handleMutation(res, broadcast, () => createWorktree(db, { task_id, repo_path, branch_name, worktree_path }), "worktree_created", 201);
   });
 
   router.get("/api/tasks/:id/worktree", (req, res) => {

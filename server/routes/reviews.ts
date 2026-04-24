@@ -10,7 +10,7 @@ import {
 import type { ReviewStatus } from "../types.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest, notFound } from "./responses.js";
-import { requireEntity } from "./handlers.js";
+import { requireEntity, handleMutation } from "./handlers.js";
 import { createReviewSchema, updateReviewSchema } from "../../shared/schemas.js";
 import { validateBody } from "./validate.js";
 
@@ -31,16 +31,14 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       comments?: string | null;
       diff_summary?: string | null;
     };
-    const review = createReview(db, {
+    handleMutation(res, broadcast, () => createReview(db, {
       task_id: req.params.id,
       reviewer_name,
       reviewer_agent_id: reviewer_agent_id ?? null,
       status,
       comments: comments ?? null,
       diff_summary: diff_summary ?? null,
-    });
-    broadcast({ type: "review_created", payload: review });
-    res.status(201).json(review);
+    }), "review_created", 201);
   });
 
   router.patch("/api/reviews/:id", validateBody(updateReviewSchema), (req, res) => {

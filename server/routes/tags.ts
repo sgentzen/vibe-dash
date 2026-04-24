@@ -2,7 +2,7 @@ import { Router } from "express";
 import type Database from "better-sqlite3";
 import { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
+import { handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { createTagSchema, addTagToTaskSchema } from "../../shared/schemas.js";
 
@@ -15,9 +15,7 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
 
   router.post("/api/projects/:projectId/tags", validateBody(createTagSchema), (req, res) => {
     const { name, color } = req.body as { name: string; color?: string };
-    const tag = createTag(db, { project_id: req.params.projectId, name, color });
-    broadcast({ type: "tag_created", payload: tag });
-    res.status(201).json(tag);
+    handleMutation(res, broadcast, () => createTag(db, { project_id: req.params.projectId, name, color }), "tag_created", 201);
   });
 
   router.get("/api/tasks/:id/tags", (req, res) => {
@@ -26,9 +24,7 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
 
   router.post("/api/tasks/:id/tags", validateBody(addTagToTaskSchema), (req, res) => {
     const { tag_id } = req.body as { tag_id: string };
-    const taskTag = addTagToTask(db, req.params.id, tag_id);
-    broadcast({ type: "tag_added", payload: taskTag });
-    res.status(201).json(taskTag);
+    handleMutation(res, broadcast, () => addTagToTask(db, req.params.id, tag_id), "tag_added", 201);
   });
 
   router.delete("/api/tasks/:id/tags/:tagId", (req, res) => {

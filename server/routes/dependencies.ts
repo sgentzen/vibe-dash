@@ -4,6 +4,7 @@ import { addDependency, removeDependency, listDependencies, getBlockingTasks } f
 import type { TaskDependency } from "../types.js";
 import { dependencyDeleteLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
+import { handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { createDependencySchema } from "../../shared/schemas.js";
 
@@ -20,9 +21,7 @@ export function dependencyRoutes(db: Database.Database, broadcast: BroadcastFn):
 
   router.post("/api/tasks/:id/dependencies", validateBody(createDependencySchema), (req, res) => {
     const { depends_on_task_id } = req.body as { depends_on_task_id: string };
-    const dep = addDependency(db, req.params.id, depends_on_task_id);
-    broadcast({ type: "dependency_added", payload: dep });
-    res.status(201).json(dep);
+    handleMutation(res, broadcast, () => addDependency(db, req.params.id, depends_on_task_id), "dependency_added", 201);
   });
 
   router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
