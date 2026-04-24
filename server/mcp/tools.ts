@@ -671,10 +671,7 @@ export async function handleTool(
           stdio: "pipe",
         });
       } catch (err) {
-        const stderr = err != null && typeof err === "object" && "stderr" in err && Buffer.isBuffer((err as { stderr: unknown }).stderr)
-          ? (err as { stderr: Buffer }).stderr.toString().trim()
-          : undefined;
-        const msg = stderr || (err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
         return ok({ error: `git worktree add failed: ${msg}` });
       }
       const worktree = createWorktree(db, { task_id, repo_path, branch_name, worktree_path });
@@ -695,10 +692,7 @@ export async function handleTool(
           stdio: "pipe",
         });
       } catch (err) {
-        const stderr = err != null && typeof err === "object" && "stderr" in err && Buffer.isBuffer((err as { stderr: unknown }).stderr)
-          ? (err as { stderr: Buffer }).stderr.toString().trim()
-          : undefined;
-        const msg = stderr || (err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
         return ok({ error: `git worktree remove failed: ${msg}` });
       }
       const newStatus = ((args.status as string | undefined) ?? "removed") as import("../../shared/types.js").WorktreeStatus;

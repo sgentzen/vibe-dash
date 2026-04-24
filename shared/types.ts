@@ -381,32 +381,3 @@ export type WsEvent =
   | WsEventOf<"review_updated", TaskReview>
   | WsEventOf<"worktree_created", TaskWorktree>
   | WsEventOf<"worktree_updated", TaskWorktree>;
-
-// ─── Executive Summary ────────────────────────────────────────────────────────
-
-export interface MilestoneHealth {
-  id: string;
-  name: string;
-  target_date: string | null;
-  task_count: number;
-  completed_count: number;
-  completion_pct: number;
-  health: "on_track" | "at_risk" | "behind";
-}
-
-export interface TeamUtilization { total: number; active: number; idle: number; offline: number; }
-export interface BlockersSummary { open_count: number; avg_resolution_seconds: number | null; }
-export interface TaskVelocity { this_week: number; last_week: number; trend_pct: number | null; }
-export interface CostTrendEntry { date: string; cost_usd: number; }
-export interface CostOverview { total_cost_usd: number; last_7_days_cost_usd: number; daily_trend: CostTrendEntry[]; }
-
-export interface ExecutiveSummary {
-  project_id: string;
-  project_name: string;
-  milestone_health: MilestoneHealth[];
-  team_utilization: TeamUtilization;
-  blockers: BlockersSummary;
-  velocity: TaskVelocity;
-  costs: CostOverview;
-  generated_at: string;
-}

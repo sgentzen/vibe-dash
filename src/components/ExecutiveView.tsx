@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { useDataState, useNavigationState } from "../store";
-import { useApi } from "../hooks/useApi";
-import type { ExecutiveSummary } from "../../shared/types.js";
+import { useAppState } from "../store";
+import { useApi, type ExecutiveSummary } from "../hooks/useApi";
 
 const HEALTH_COLOR: Record<string, string> = {
   on_track: "var(--accent-green)",
@@ -99,8 +98,7 @@ function MilestoneHealthCard({ health }: { health: ExecutiveSummary["milestone_h
 }
 
 export function ExecutiveView() {
-  const { selectedProjectId } = useNavigationState();
-  const { projects } = useDataState();
+  const { selectedProjectId, projects } = useAppState();
   const api = useApi();
   const [summary, setSummary] = useState<ExecutiveSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -134,7 +132,7 @@ export function ExecutiveView() {
     a.href = url;
     a.download = `executive-summary-${summary.project_id}.json`;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+    URL.revokeObjectURL(url);
   }
 
   return (
