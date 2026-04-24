@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo, useCallback } from "react";
-import { useAppState, useAppDispatch } from "../store";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
+import { useDataState, useNavigationState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskEditDrawer } from "./TaskEditDrawer";
 import { MilestoneFilter } from "./board/MilestoneFilter";
@@ -15,10 +15,13 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
 const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 
 export function TaskBoard() {
-  const { tasks, projects, milestones, selectedProjectId, selectedMilestoneId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
+  const { tasks, projects, milestones, activity, agents, tags, taskTagMap, taskDepsMap } = useDataState();
+  const { selectedProjectId, selectedMilestoneId, searchQuery } = useNavigationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [keyboardGrab, setKeyboardGrab] = useState<{ taskId: string } | null>(null);
+  const [grabError, setGrabError] = useState<string | null>(null);
   const dragTaskId = useRef<string>("");
 
   const filteredTasks = useMemo(() => {
@@ -56,6 +59,49 @@ export function TaskBoard() {
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
     }).catch(() => {});
   }, [tasks, api, dispatch]);
+
+  const handleGrab = useCallback((taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    setKeyboardGrab({ taskId });
+  }, [tasks]);
+
+  // Keep a live ref so the keydown handler always sees current tasks
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+
+  useEffect(() => {
+    if (!keyboardGrab) return;
+    const colOrder: TaskStatus[] = ["planned", "in_progress", "done"];
+
+    function moveToStatus(taskId: string, newStatus: TaskStatus) {
+      api.updateTask(taskId, { status: newStatus }).then((updated) => {
+        dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
+      }).catch(() => {
+        setGrabError("Move failed — please try again");
+      });
+      setKeyboardGrab(null);
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (!keyboardGrab) return;
+      const target = e.target as HTMLElement;
+      const inInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+      const liveTask = tasksRef.current.find((t) => t.id === keyboardGrab.taskId);
+      const currentStatus = liveTask?.status ?? "planned";
+      const idx = colOrder.indexOf(currentStatus);
+
+      if (e.key === "Escape") { e.preventDefault(); setKeyboardGrab(null); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); moveToStatus(keyboardGrab.taskId, colOrder[Math.max(0, idx - 1)]); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); moveToStatus(keyboardGrab.taskId, colOrder[Math.min(colOrder.length - 1, idx + 1)]); }
+      else if (!inInput && e.key === "1") { e.preventDefault(); moveToStatus(keyboardGrab.taskId, "planned"); }
+      else if (!inInput && e.key === "2") { e.preventDefault(); moveToStatus(keyboardGrab.taskId, "in_progress"); }
+      else if (!inInput && e.key === "3") { e.preventDefault(); moveToStatus(keyboardGrab.taskId, "done"); }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [keyboardGrab, api, dispatch, setGrabError]);
 
   return (
     <main
@@ -101,6 +147,49 @@ export function TaskBoard() {
         )}
       </div>
 
+      {(keyboardGrab || grabError) && (
+        <div
+          id="keyboard-grab-bar"
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: "6px 16px",
+            background: grabError ? "var(--accent-red)" : "var(--accent-blue)",
+            color: "#fff",
+            fontSize: "12px",
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            flexShrink: 0,
+          }}
+        >
+          {grabError ? (
+            <>
+              <span>{grabError}</span>
+              <button
+                onClick={() => setGrabError(null)}
+                aria-label="Dismiss error"
+                style={{ marginLeft: "auto", background: "rgba(0,0,0,0.2)", border: "none", color: "#fff", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
+              >
+                Dismiss
+              </button>
+            </>
+          ) : keyboardGrab ? (
+            <>
+              <span>Moving: <strong>{tasks.find((t) => t.id === keyboardGrab.taskId)?.title}</strong></span>
+              <span style={{ opacity: 0.85 }}>← → change column · 1 Planned · 2 In Progress · 3 Done · Esc cancel</span>
+              <button
+                onClick={() => setKeyboardGrab(null)}
+                aria-label="Cancel keyboard move"
+                style={{ marginLeft: "auto", background: "rgba(0,0,0,0.2)", border: "none", color: "#fff", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : null}
+        </div>
+      )}
+
       <div
         style={{
           display: "grid",
@@ -125,8 +214,10 @@ export function TaskBoard() {
             taskDepsMap={taskDepsMap}
             selectedProjectId={selectedProjectId}
             selectedMilestoneId={selectedMilestoneId}
+            grabbedTaskId={keyboardGrab?.taskId ?? null}
             onDragStart={(id) => { dragTaskId.current = id; }}
             onDrop={() => handleDrop(key)}
+            onGrab={handleGrab}
             onClickTask={setEditingTask}
             onTaskCreated={(task) => {
               dispatch({ type: "WS_EVENT", payload: { type: "task_created", payload: task } });

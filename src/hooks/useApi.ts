@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -582,6 +582,59 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
   return res.json();
 }
 
+// ─── Executive Summary ────────────────────────────────────────────────
+
+interface MilestoneHealth {
+  id: string;
+  name: string;
+  target_date: string | null;
+  task_count: number;
+  completed_count: number;
+  completion_pct: number;
+  health: "on_track" | "at_risk" | "behind";
+}
+
+interface TeamUtilization { total: number; active: number; idle: number; offline: number; }
+interface BlockersSummary { open_count: number; avg_resolution_seconds: number | null; }
+interface TaskVelocity { this_week: number; last_week: number; trend_pct: number | null; }
+interface CostTrendEntry { date: string; cost_usd: number; }
+interface CostOverview { total_cost_usd: number; last_7_days_cost_usd: number; daily_trend: CostTrendEntry[]; }
+
+export interface ExecutiveSummary {
+  project_id: string;
+  project_name: string;
+  milestone_health: MilestoneHealth[];
+  team_utilization: TeamUtilization;
+  blockers: BlockersSummary;
+  velocity: TaskVelocity;
+  costs: CostOverview;
+  generated_at: string;
+}
+
+async function getExecutiveSummary(projectId: string): Promise<ExecutiveSummary> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/executive-summary`);
+  if (!res.ok) throw new Error(`getExecutiveSummary failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── Worktrees ────────────────────────────────────────────────────────
+
+async function getWorktrees(): Promise<TaskWorktree[]> {
+  const res = await fetch("/api/worktrees");
+  if (!res.ok) throw new Error(`getWorktrees failed: ${res.status}`);
+  return res.json();
+}
+
+async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise<TaskWorktree> {
+  const res = await fetch(`/api/worktrees/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(`updateWorktreeStatus failed: ${res.status}`);
+  return res.json();
+}
+
 async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null> {
   const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/suggest-agent`);
   if (!res.ok) throw new Error(`getSuggestedAgent failed: ${res.status}`);
@@ -657,5 +710,8 @@ export function useApi() {
     getAgentComparison,
     getTaskTypeBreakdown,
     getSuggestedAgent,
+    getWorktrees,
+    updateWorktreeStatus,
+    getExecutiveSummary,
   }), []);
 }

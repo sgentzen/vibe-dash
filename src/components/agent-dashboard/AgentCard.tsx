@@ -66,7 +66,7 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
             )}
           </div>
         </div>
-        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
+        <span role="img" aria-label={`Status: ${detail?.health_status ?? "unknown"}`} style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
         <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{detail?.health_status ?? "..."}</span>
       </div>
 

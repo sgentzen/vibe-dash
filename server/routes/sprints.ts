@@ -46,7 +46,6 @@ export function sprintRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       start_date: start_date ?? null,
       end_date: end_date ?? null,
     });
-    broadcast({ type: "sprint_created", payload: sprint });
     res.status(201).json(sprint);
   });
 
@@ -54,7 +53,6 @@ export function sprintRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
     const sprint = getSprint(db, req.params.id);
     if (!requireEntity(res, sprint, "Sprint")) return;
     const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
-    broadcast({ type: "sprint_updated", payload: updated! });
     res.json(updated);
   });
 

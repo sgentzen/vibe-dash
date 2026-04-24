@@ -21,7 +21,9 @@ import {
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
-import { requireEntity } from "./handlers.js";
+import { requireEntity, handleMutation } from "./handlers.js";
+import { validateBody } from "./validate.js";
+import { createTaskSchema, updateTaskSchema, bulkUpdateTasksSchema } from "../../shared/schemas.js";
 
 export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -47,50 +49,29 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     );
   });
 
-  router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
-      req.body as {
-        project_id: string;
-        parent_task_id?: string | null;
-        milestone_id?: string | null;
-        assigned_agent_id?: string | null;
-        title: string;
-        description?: string | null;
-        priority: string;
-        status?: string;
-        due_date?: string | null;
-        start_date?: string | null;
-        estimate?: number | null;
-        recurrence_rule?: string | null;
-      };
-    if (!project_id || !title || !priority) {
-      badRequest(res, "project_id, title, and priority are required");
-      return;
-    }
-    const task = createTask(db, {
+  router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } = req.body;
+    handleMutation(res, broadcast, () => createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
       milestone_id: milestone_id ?? null,
       assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
-      priority: priority as Parameters<typeof createTask>[1]["priority"],
-      status: status as Parameters<typeof createTask>[1]["status"],
+      priority,
+      status,
       due_date: due_date ?? null,
       start_date: start_date ?? null,
       estimate: estimate ?? null,
       recurrence_rule: recurrence_rule ?? null,
-    });
-    broadcast({ type: "task_created", payload: task });
-    res.status(201).json(task);
+    }), "task_created", 201);
   });
 
   // PATCH /api/tasks/bulk (must be before :id param route)
-  router.patch("/api/tasks/bulk", (req, res) => {
-    const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
-    if (!task_ids?.length || !updates) { badRequest(res, "task_ids and updates are required"); return; }
+  router.patch("/api/tasks/bulk", validateBody(bulkUpdateTasksSchema), (req, res) => {
+    const { task_ids, updates } = req.body as { task_ids: string[]; updates: UpdateTaskInput };
     if (task_ids.length > BULK_UPDATE_MAX) { badRequest(res, `Maximum ${BULK_UPDATE_MAX} tasks per bulk update`); return; }
-    const tasks = bulkUpdateTasks(db, task_ids, updates as UpdateTaskInput);
+    const tasks = bulkUpdateTasks(db, task_ids, updates);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
     if (updates.status) {
       const milestoneIds = new Set(tasks.filter((t) => t.milestone_id).map((t) => t.milestone_id!));
@@ -121,7 +102,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     res.json(task);
   });
 
-  router.patch("/api/tasks/:id", (req, res) => {
+  router.patch("/api/tasks/:id", validateBody(updateTaskSchema), (req, res) => {
     const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
     const body = req.body as Parameters<typeof updateTask>[2];

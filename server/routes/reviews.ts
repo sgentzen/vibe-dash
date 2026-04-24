@@ -10,7 +10,9 @@ import {
 import type { ReviewStatus } from "../types.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest, notFound } from "./responses.js";
-import { requireEntity } from "./handlers.js";
+import { requireEntity, handleMutation } from "./handlers.js";
+import { createReviewSchema, updateReviewSchema } from "../../shared/schemas.js";
+import { validateBody } from "./validate.js";
 
 const VALID_STATUSES: ReviewStatus[] = ["pending", "approved", "changes_requested"];
 
@@ -21,42 +23,27 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
     res.json(listReviewsForTask(db, req.params.id));
   });
 
-  router.post("/api/tasks/:id/reviews", (req, res) => {
+  router.post("/api/tasks/:id/reviews", validateBody(createReviewSchema), (req, res) => {
     const task = getTask(db, req.params.id);
     if (!task) { notFound(res, "Task not found"); return; }
-    const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } =
-      req.body as {
-        reviewer_name?: string;
-        reviewer_agent_id?: string | null;
-        status?: ReviewStatus;
-        comments?: string | null;
-        diff_summary?: string | null;
-      };
-    if (!reviewer_name) {
-      badRequest(res, "reviewer_name is required");
-      return;
-    }
-    if (reviewer_name.length > 200) {
-      badRequest(res, "reviewer_name too long");
-      return;
-    }
-    if (status && !VALID_STATUSES.includes(status)) {
-      badRequest(res, `status must be one of: ${VALID_STATUSES.join(", ")}`);
-      return;
-    }
-    const review = createReview(db, {
+    const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } = req.body as {
+      reviewer_name: string;
+      reviewer_agent_id?: string | null;
+      status?: ReviewStatus;
+      comments?: string | null;
+      diff_summary?: string | null;
+    };
+    handleMutation(res, broadcast, () => createReview(db, {
       task_id: req.params.id,
       reviewer_name,
       reviewer_agent_id: reviewer_agent_id ?? null,
       status,
       comments: comments ?? null,
       diff_summary: diff_summary ?? null,
-    });
-    broadcast({ type: "review_created", payload: review });
-    res.status(201).json(review);
+    }), "review_created", 201);
   });
 
-  router.patch("/api/reviews/:id", (req, res) => {
+  router.patch("/api/reviews/:id", validateBody(updateReviewSchema), (req, res) => {
     const existing = getReview(db, req.params.id);
     if (!requireEntity(res, existing, "Review")) return;
     const { status, comments, diff_summary } = req.body as {

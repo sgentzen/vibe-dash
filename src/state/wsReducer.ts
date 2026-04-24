@@ -10,6 +10,7 @@ import type {
   Task,
   FileConflict,
   AppNotification,
+  TaskWorktree,
   WsEvent,
 } from "../types";
 import type { AppState } from "./types";
@@ -143,6 +144,17 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
       return state;
     case "daily_stats_recorded":
       return state;
+    case "worktree_created": {
+      const wt = event.payload as TaskWorktree;
+      return { ...state, worktrees: [wt, ...state.worktrees] };
+    }
+    case "worktree_updated": {
+      const updated = event.payload as TaskWorktree;
+      return {
+        ...state,
+        worktrees: state.worktrees.map((w) => (w.id === updated.id ? updated : w)),
+      };
+    }
     case "dependency_removed": {
       const dep = event.payload as TaskDependency;
       const deps = state.taskDepsMap[dep.task_id] ?? [];

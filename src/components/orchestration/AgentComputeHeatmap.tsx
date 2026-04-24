@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApi } from "../../hooks/useApi";
-import { useAppState } from "../../store";
+import { usePollingState } from "../../store";
 import type { ActivityHeatmapEntry } from "../../types";
 
 interface Props {
@@ -14,7 +14,7 @@ const MAX_HOURS = 12;
 
 export function AgentComputeHeatmap({ activeProjectId }: Props) {
   const api = useApi();
-  const { pollGeneration } = useAppState();
+  const { pollGeneration } = usePollingState();
   const [data, setData] = useState<ActivityHeatmapEntry[]>([]);
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 

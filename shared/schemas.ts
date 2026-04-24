@@ -35,7 +35,7 @@ export const registerAgentSchema = z.object({
 
 export const createProjectSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
 });
 
 export const updateProjectSchema = z.object({
@@ -103,12 +103,23 @@ export const createTagSchema = z.object({
   color: hexColor.optional(),
 });
 
+export const addTagToTaskSchema = z.object({
+  tag_id: z.string().min(1),
+});
+
 // ─── Comments ───────────────────────────────────────────────────────────
 
 export const createCommentSchema = z.object({
   agent_id: z.string().nullable().optional(),
   author_name: z.string().min(1),
   message: z.string().min(1),
+});
+
+// ─── Bulk operations ────────────────────────────────────────────────────
+
+export const bulkUpdateTasksSchema = z.object({
+  task_ids: z.array(z.string().min(1)).nonempty().max(200),
+  updates: updateTaskSchema,
 });
 
 // ─── Routing ────────────────────────────────────────────────────────────
@@ -122,13 +133,105 @@ export const suggestAgentSchema = z.object({
 export const logCostSchema = z.object({
   model: z.string().min(1),
   provider: z.string().min(1),
-  input_tokens: z.number().finite().nonnegative(),
-  output_tokens: z.number().finite().nonnegative(),
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
   cost_usd: z.number().finite().nonnegative(),
   agent_id: z.string().optional(),
   task_id: z.string().optional(),
   milestone_id: z.string().optional(),
   project_id: z.string().optional(),
+});
+
+// ─── Webhooks ───────────────────────────────────────────────────────────
+
+export const createWebhookSchema = z.object({
+  url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed"),
+  event_types: z.array(z.string().min(1)).nonempty(),
+});
+
+export const updateWebhookSchema = z.object({
+  url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed").optional(),
+  event_types: z.array(z.string().min(1)).optional(),
+  active: z.boolean().optional(),
+});
+
+// ─── File locks ──────────────────────────────────────────────────────────
+
+export const reportWorkingOnSchema = z.object({
+  task_id: z.string().min(1),
+  file_paths: z.array(z.string().min(1)).nonempty(),
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");
+
+// ─── Templates ──────────────────────────────────────────────────────────
+
+export const createTemplateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().nullable().optional(),
+  template_json: validJson,
+});
+
+export const instantiateTemplateSchema = z.object({
+  project_name: z.string().min(1),
+  description: z.string().nullable().optional(),
+});
+
+export const generateReportSchema = z.object({
+  period: z.enum(["day", "week", "milestone"]).optional(),
+});
+
+// ─── Alert rules ────────────────────────────────────────────────────────
+
+export const createAlertRuleSchema = z.object({
+  event_type: z.string().min(1),
+  filter_json: validJson.optional(),
+});
+
+export const updateAlertRuleSchema = z.object({
+  enabled: z.boolean(),
+});
+
+// ─── Saved filters ───────────────────────────────────────────────────────
+
+export const createSavedFilterSchema = z.object({
+  name: z.string().min(1),
+  filter_json: validJson,
+});
+
+// ─── Blockers ───────────────────────────────────────────────────────────
+
+export const createBlockerSchema = z.object({
+  task_id: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+// ─── Dependencies ────────────────────────────────────────────────────────
+
+export const createDependencySchema = z.object({
+  depends_on_task_id: z.string().min(1),
+});
+
+// ─── Worktrees ──────────────────────────────────────────────────────────
+
+export const worktreeStatusEnum = z.enum(["active", "merged", "abandoned", "removed"]);
+
+export const safeGitBranchName = z.string().min(1).regex(
+  /^[a-zA-Z0-9._/-]+$/,
+  "branch name must contain only alphanumeric characters, dots, dashes, underscores, and slashes"
+).refine((s) => !s.startsWith("-"), "branch name must not start with a dash");
+
+export const createWorktreeSchema = z.object({
+  task_id: z.string().min(1),
+  repo_path: z.string().min(1),
+  branch_name: safeGitBranchName,
+  worktree_path: z.string().min(1),
+});
+
+export const updateWorktreeStatusSchema = z.object({
+  status: worktreeStatusEnum,
 });
 
 // ─── Reviews ────────────────────────────────────────────────────────────

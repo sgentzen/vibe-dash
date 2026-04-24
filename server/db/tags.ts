@@ -41,11 +41,11 @@ export function removeTagFromTask(
   db: Database.Database,
   taskId: string,
   tagId: string
-): boolean {
-  const result = db
-    .prepare("DELETE FROM task_tags WHERE task_id = ? AND tag_id = ?")
-    .run(taskId, tagId);
-  return result.changes > 0;
+): TaskTag | null {
+  const row = db
+    .prepare("DELETE FROM task_tags WHERE task_id = ? AND tag_id = ? RETURNING *")
+    .get(taskId, tagId) as TaskTag | undefined;
+  return row ?? null;
 }
 
 export function getTaskTags(db: Database.Database, taskId: string): Tag[] {

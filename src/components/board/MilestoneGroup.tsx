@@ -1,19 +1,21 @@
 import { TaskCard } from "../TaskCard";
 import { getBlockingCount, resolveTaskTags } from "./boardHelpers";
-import type { useAppState } from "../../store";
+import type { DataState } from "../../store";
 import type { Task, Milestone, Agent, Tag } from "../../types";
 
 interface MilestoneGroupProps {
   milestone: Milestone | null;
   tasks: Task[];
   allTasks: Task[];
-  activity: ReturnType<typeof useAppState>["activity"];
+  activity: DataState["activity"];
   agents: Agent[];
   tags: Tag[];
   taskTagMap: Record<string, string[]>;
   taskDepsMap: Record<string, string[]>;
+  grabbedTaskId: string | null;
   onClickTask: (task: Task) => void;
   onDragStart: (id: string) => void;
+  onGrab: (id: string) => void;
 }
 
 export function MilestoneGroup({
@@ -25,8 +27,10 @@ export function MilestoneGroup({
   tags,
   taskTagMap,
   taskDepsMap,
+  grabbedTaskId,
   onClickTask,
   onDragStart,
+  onGrab,
 }: MilestoneGroupProps) {
   const statusIcon = milestone?.status === "achieved" ? "\u2713" : "\u25cf";
   const statusColor =
@@ -81,8 +85,10 @@ export function MilestoneGroup({
             agents={agents}
             taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
             blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
+            grabbed={grabbedTaskId === task.id}
             onClick={() => onClickTask(task)}
             onDragStart={onDragStart}
+            onGrab={onGrab}
           />
         ))}
       </div>

@@ -8,8 +8,9 @@ import {
   evaluateAlertRules,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
 import { requireEntity } from "./handlers.js";
+import { validateBody } from "./validate.js";
+import { createBlockerSchema } from "../../shared/schemas.js";
 
 export function blockerRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -18,12 +19,8 @@ export function blockerRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
     res.json(getActiveBlockers(db));
   });
 
-  router.post("/api/blockers", (req, res) => {
+  router.post("/api/blockers", validateBody(createBlockerSchema), (req, res) => {
     const { task_id, reason } = req.body as { task_id: string; reason: string };
-    if (!task_id || !reason) {
-      badRequest(res, "task_id and reason are required");
-      return;
-    }
     const blocker = createBlocker(db, { task_id, reason });
     const task = getTask(db, task_id);
     broadcast({ type: "blocker_reported", payload: blocker });

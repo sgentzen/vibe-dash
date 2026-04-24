@@ -5,7 +5,7 @@ import { createServer } from "http";
 import type Database from "better-sqlite3";
 import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
-import { createRouter } from "./routes.js";
+import { createRouter } from "./routes/index.js";
 import { notFoundHandler, errorHandler } from "./routes/middleware.js";
 import { logger } from "./logger.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";

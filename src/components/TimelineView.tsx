@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { useAppState } from "../store";
+import { useDataState, useNavigationState } from "../store";
 import type { Milestone, Task } from "../types";
 import {
   DAY_MS,
@@ -15,6 +15,7 @@ import {
 } from "./timeline/constants";
 import { buildSwimRows, getTaskDates, type SwimRow } from "./timeline/utils";
 import { DateHeader } from "./timeline/DateHeader";
+import { ResizeHandle } from "./timeline/ResizeHandle";
 import { TaskEditDrawer } from "./TaskEditDrawer";
 
 const MAX_DAYS = 60;
@@ -80,8 +81,8 @@ function rowHeight(row: SwimRow): number {
 }
 
 export function TimelineView() {
-  const { tasks, milestones, projects, agents, selectedProjectId, selectedMilestoneId, blockers, taskDepsMap } =
-    useAppState();
+  const { tasks, milestones, projects, agents, blockers, taskDepsMap } = useDataState();
+  const { selectedProjectId, selectedMilestoneId } = useNavigationState();
   const [showUndated, setShowUndated] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(true);
   const [labelWidth, setLabelWidth] = useState(DEFAULT_LABEL_WIDTH);
@@ -230,7 +231,7 @@ export function TimelineView() {
     return map;
   }, [flatRows]);
 
-  if (filteredTasks.length === 0 && !allDone) {
+  if (filteredTasks.length === 0) {
     const emptyMsg = undatedCount > 0 && filteredTasks.length === 0
       ? "No tasks have dates set — add start_date and due_date to build a timeline."
       : "No tasks to display.";
@@ -311,7 +312,7 @@ export function TimelineView() {
               const m = row.milestone;
               if (!m.target_date) return null;
               const endMs = new Date(m.target_date).getTime();
-              const startMs = (m as any).start_date ? new Date((m as any).start_date).getTime() : endMs - 14 * DAY_MS;
+              const startMs = endMs - 14 * DAY_MS;
               const x1 = Math.max(0, dateToX(startMs));
               const x2 = Math.min(timelineWidth, dateToX(endMs));
               const bw = Math.max(x2 - x1, 20);
@@ -338,21 +339,7 @@ export function TimelineView() {
                   <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {agentName}
                   </span>
-                  {/* Resize handle */}
-                  <div
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      const startX = e.clientX;
-                      const startW = labelWidth;
-                      const onMove = (ev: MouseEvent) => handleResize(ev.clientX - startX + startW - labelWidth);
-                      const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-                      window.addEventListener("mousemove", onMove);
-                      window.addEventListener("mouseup", onUp);
-                    }}
-                    style={{ position: "absolute", right: 0, top: 0, width: "4px", height: "100%", cursor: "col-resize", background: "transparent" }}
-                    onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "var(--border)")}
-                    onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
-                  />
+                  <ResizeHandle onResize={handleResize} />
                 </div>
 
                 {/* Bars */}
@@ -407,7 +394,7 @@ export function TimelineView() {
           })}
 
           {/* Shared dep SVG overlay */}
-          <svg style={{ position: "absolute", left: labelWidth, top: HEADER_HEIGHT, width: timelineWidth, height: totalContentHeight, overflow: "visible", pointerEvents: "none", zIndex: 1 }}>
+          <svg aria-hidden="true" style={{ position: "absolute", left: labelWidth, top: HEADER_HEIGHT, width: timelineWidth, height: totalContentHeight, overflow: "visible", pointerEvents: "none", zIndex: 1 }}>
             <defs>
               <marker id="dep-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                 <path d="M0,0 L8,3 L0,6 Z" fill="var(--accent-blue)" />
@@ -462,8 +449,8 @@ function Toolbar({ hideCompleted, setHideCompleted, showUndated, setShowUndated,
         </button>
       )}
 
-      <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none" }}>
-        <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} style={{ accentColor: "var(--accent-blue)", cursor: "pointer" }} />
+      <label htmlFor="hide-completed-toggle" style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none" }}>
+        <input id="hide-completed-toggle" type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} style={{ accentColor: "var(--accent-blue)", cursor: "pointer" }} />
         Hide Completed
       </label>
 
@@ -475,12 +462,14 @@ function Toolbar({ hideCompleted, setHideCompleted, showUndated, setShowUndated,
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "14px" }}>
         <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 500 }}>Status Legend:</span>
-        {LEGEND.map(({ status, label }) => (
-          <span key={status} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-muted)" }}>
-            <span className="legend-dot" style={{ background: STATUS_DOT_COLORS[status] }} />
-            {label}
-          </span>
-        ))}
+        <ul role="list" style={{ display: "flex", gap: "14px", margin: 0, padding: 0, listStyle: "none" }}>
+          {LEGEND.map(({ status, label }) => (
+            <li key={status} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-muted)" }}>
+              <span className="legend-dot" aria-hidden="true" style={{ background: STATUS_DOT_COLORS[status] }} />
+              {label}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

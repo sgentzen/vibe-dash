@@ -19,6 +19,8 @@ import {
   reviewStatusEnum,
   createReviewSchema,
   updateReviewSchema,
+  worktreeStatusEnum,
+  safeGitBranchName,
 } from "../../shared/schemas.js";
 
 export interface McpServerHandle {
@@ -589,19 +591,10 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
 
   // ─── 5.4: Code Review ──────────────────────────────────────────────────
 
-  const reviewStatus = z.enum(["pending", "approved", "changes_requested"]);
-
   server.tool(
     "create_review",
     "Create a code review for a task (diff summary, status, comments)",
-    {
-      task_id: z.string(),
-      reviewer_name: z.string().optional(),
-      reviewer_agent_id: z.string().optional(),
-      status: reviewStatus.optional(),
-      comments: z.string().optional(),
-      diff_summary: z.string().optional(),
-    },
+    createReviewSchema.shape,
     call("create_review")
   );
 
@@ -615,12 +608,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.tool(
     "update_review",
     "Update a review's status, comments, or diff summary",
-    {
-      review_id: z.string(),
-      status: reviewStatus.optional(),
-      comments: z.string().optional(),
-      diff_summary: z.string().optional(),
-    },
+    { review_id: z.string(), ...updateReviewSchema.shape },
     call("update_review")
   );
 
@@ -631,6 +619,47 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Suggest the best agent for a task based on historical performance metrics",
     suggestAgentSchema.shape,
     call("suggest_agent")
+  );
+
+  // ─── R9a: Git Worktrees ────────────────────────────────────────────────
+
+  server.tool(
+    "create_worktree",
+    "Create a git worktree for a task (runs git worktree add)",
+    {
+      task_id: z.string(),
+      repo_path: z.string().describe("Absolute path to the git repository"),
+      branch_name: safeGitBranchName.describe("Branch name for the new worktree"),
+      worktree_path: z.string().describe("Absolute path where the worktree should be created"),
+    },
+    call("create_worktree")
+  );
+
+  server.tool(
+    "cleanup_worktree",
+    "Remove a git worktree and update its status (runs git worktree remove)",
+    {
+      worktree_id: z.string(),
+      status: worktreeStatusEnum.default("removed").describe("Final status: 'merged', 'abandoned', or 'removed'"),
+      force: z.boolean().optional().describe("Pass --force to git worktree remove"),
+    },
+    call("cleanup_worktree")
+  );
+
+  server.tool(
+    "list_worktrees",
+    "List all active git worktrees",
+    {},
+    call("list_worktrees")
+  );
+
+  server.tool(
+    "get_worktree_status",
+    "Get the worktree associated with a task",
+    {
+      task_id: z.string(),
+    },
+    call("get_worktree_status")
   );
 
   return { server, cleanup };

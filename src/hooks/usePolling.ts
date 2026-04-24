@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useAppDispatch, useAppState } from "../store";
+import { useAppDispatch, useNavigationState } from "../store";
 import { useApi } from "./useApi";
 
 const POLL_INTERVAL_MS = 3000;
@@ -15,7 +15,7 @@ const STARTUP_PROBE_MS = 1000;
  */
 export function usePolling() {
   const dispatch = useAppDispatch();
-  const { activeView } = useAppState();
+  const { activeView } = useNavigationState();
   const api = useApi();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeViewRef = useRef(activeView);
