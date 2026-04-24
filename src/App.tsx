@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
-import { useApi } from "./hooks/useApi";
+import { useApi, getStoredApiKey } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { TopBar } from "./components/TopBar";
@@ -18,18 +18,52 @@ import { ExecutiveView } from "./components/ExecutiveView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { LoginView } from "./components/LoginView";
 
 export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
-  const { theme, activeView } = useNavigationState();
+  const { theme, activeView, isAuthenticated, authEnabled } = useNavigationState();
   const { fileConflicts } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useWebSocket();
   usePolling();
+
+  // Check auth status on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const status = await api.getAuthStatus();
+        if (!status.auth_enabled) {
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+          setAuthChecked(true);
+          return;
+        }
+        // Auth is enabled — validate stored key (if any)
+        const storedKey = getStoredApiKey();
+        if (storedKey) {
+          try {
+            const user = await api.validateApiKey(storedKey);
+            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true } });
+          } catch {
+            // Key invalid or expired — prompt login
+            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+          }
+        } else {
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+        }
+      } catch {
+        // Server unreachable — treat as local-only; polling will retry data loading
+        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+      }
+      setAuthChecked(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -144,6 +178,12 @@ export function App() {
       // ignore
     }
   }
+
+  // Show nothing until auth is resolved
+  if (!authChecked) return null;
+
+  // Show login when auth is enabled but user is not authenticated
+  if (authEnabled && !isAuthenticated) return <LoginView />;
 
   return (
     <div className="app">

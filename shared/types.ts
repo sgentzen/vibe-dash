@@ -308,6 +308,17 @@ export interface AgentSuggestion {
   confidence: number;
 }
 
+export type UserRole = "admin" | "developer" | "viewer";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
 export type WsEventType =
   | "project_created"
   | "project_updated"

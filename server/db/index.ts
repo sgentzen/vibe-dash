@@ -134,3 +134,12 @@ export {
   updateWorktreeStatus,
 } from "./worktrees.js";
 export type { CreateWorktreeInput } from "./worktrees.js";
+export {
+  createUser,
+  getUserByKeyHash,
+  listUsers,
+  updateUserRole,
+  deleteUser,
+  rotateApiKey,
+  countUsers,
+} from "./users.js";

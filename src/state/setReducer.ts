@@ -52,6 +52,8 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, theme: action.payload };
     case "INCREMENT_POLL_GENERATION":
       return { ...state, pollGeneration: state.pollGeneration + 1 };
+    case "SET_AUTH":
+      return { ...state, ...action.payload };
     default:
       return null;
   }

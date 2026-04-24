@@ -26,6 +26,8 @@ import { reviewRoutes } from "./reviews.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
+import { userRoutes } from "./users.js";
+import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
 
 function makeBroadcast(db: Database.Database) {
@@ -60,11 +62,20 @@ const routeFactories: RouteFactory[] = [
   worktreeRoutes,
   executiveRoutes,
   milestoneRoutes,
+  userRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
+
+  // Auth middleware runs before all routes; no-op when no users exist.
+  // /api/auth/status is exempt — it's a public discovery endpoint.
+  const authMiddleware = makeAuthMiddleware(db);
+  router.use((req, res, next) => {
+    if (req.path === "/api/auth/status") return next();
+    authMiddleware(req, res, next);
+  });
 
   for (const factory of routeFactories) {
     router.use(factory(db, broadcast));

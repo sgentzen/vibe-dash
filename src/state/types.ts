@@ -10,6 +10,7 @@ import type {
   AppNotification,
   TaskWorktree,
   WsEvent,
+  User,
 } from "../types";
 
 export type Theme = "dark" | "light";
@@ -42,6 +43,10 @@ export interface AppState {
     alerts: number;
   };
   pollGeneration: number;
+  // Auth
+  currentUser: User | null;
+  isAuthenticated: boolean;
+  authEnabled: boolean;
 }
 
 export type AppAction =
@@ -65,4 +70,5 @@ export type AppAction =
   | { type: "SELECT_MILESTONE"; payload: string | null }
   | { type: "SET_THEME"; payload: Theme }
   | { type: "INCREMENT_POLL_GENERATION" }
-  | { type: "WS_EVENT"; payload: WsEvent };
+  | { type: "WS_EVENT"; payload: WsEvent }
+  | { type: "SET_AUTH"; payload: { currentUser: User | null; isAuthenticated: boolean; authEnabled: boolean } };
