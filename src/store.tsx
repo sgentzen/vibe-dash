@@ -15,7 +15,8 @@ export type DataState = Pick<
 
 export type NavigationState = Pick<
   AppState,
-  "selectedProjectId" | "selectedMilestoneId" | "activeView" | "searchQuery" | "theme"
+  "selectedProjectId" | "selectedMilestoneId" | "activeView" | "searchQuery" | "theme" |
+  "currentUser" | "isAuthenticated" | "authEnabled"
 >;
 
 export type NotificationState = Pick<
@@ -56,6 +57,9 @@ const initialState: AppState = {
   selectedMilestoneId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
   pollGeneration: 0,
+  currentUser: null,
+  isAuthenticated: false,
+  authEnabled: false,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -97,8 +101,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       activeView: state.activeView,
       searchQuery: state.searchQuery,
       theme: state.theme,
+      currentUser: state.currentUser,
+      isAuthenticated: state.isAuthenticated,
+      authEnabled: state.authEnabled,
     }),
-    [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.searchQuery, state.theme]
+    [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.searchQuery,
+     state.theme, state.currentUser, state.isAuthenticated, state.authEnabled]
   );
 
   const notificationValue = useMemo<NotificationState>(

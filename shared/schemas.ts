@@ -117,8 +117,10 @@ export const createCommentSchema = z.object({
 
 // ─── Bulk operations ────────────────────────────────────────────────────
 
+export const BULK_UPDATE_MAX = 200;
+
 export const bulkUpdateTasksSchema = z.object({
-  task_ids: z.array(z.string().min(1)).nonempty().max(200),
+  task_ids: z.array(z.string().min(1)).nonempty().max(BULK_UPDATE_MAX),
   updates: updateTaskSchema,
 });
 
