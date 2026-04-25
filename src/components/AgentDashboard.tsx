@@ -3,6 +3,7 @@ import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
+import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
 interface AgentDetail {
@@ -12,6 +13,11 @@ interface AgentDetail {
   current_task_title: string | null;
   activity: ActivityEntry[];
   sessions: AgentSession[];
+}
+
+interface AgentCost {
+  total_cost_usd: number;
+  total_tokens: number;
 }
 
 type StatusFilter = "active+idle" | "all" | "offline";
@@ -26,37 +32,48 @@ export function AgentDashboard() {
   const { agents } = useAppState();
   const api = useApi();
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
+  const [costMap, setCostMap] = useState<Record<string, AgentCost>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active+idle");
 
   useEffect(() => {
     async function loadDetails() {
-      const entries = await Promise.all(
-        agents.map(async (agent): Promise<[string, AgentDetail] | null> => {
-          try {
-            const [detail, activity, sessions] = await Promise.all([
-              api.getAgentDetail(agent.id),
-              api.getAgentActivity(agent.id, 10),
-              api.getAgentSessions(agent.id),
-            ]);
-            return [agent.id, {
-              agent,
-              health_status: detail.health_status,
-              completed_today: detail.completed_today,
-              current_task_title: detail.current_task_title ?? null,
-              activity,
-              sessions,
-            }];
-          } catch {
-            return null;
-          }
-        })
-      );
+      const [entries, costEntries] = await Promise.all([
+        Promise.all(
+          agents.map(async (agent): Promise<[string, AgentDetail] | null> => {
+            try {
+              const [detail, activity, sessions] = await Promise.all([
+                api.getAgentDetail(agent.id),
+                api.getAgentActivity(agent.id, 30),
+                api.getAgentSessions(agent.id),
+              ]);
+              return [agent.id, {
+                agent,
+                health_status: detail.health_status,
+                completed_today: detail.completed_today,
+                current_task_title: detail.current_task_title ?? null,
+                activity,
+                sessions,
+              }];
+            } catch {
+              return null;
+            }
+          })
+        ),
+        api.getCostByAgent().catch(() => [] as { agent_id: string; total_cost_usd: number; total_tokens: number }[]),
+      ]);
+
       const results: Record<string, AgentDetail> = {};
       for (const entry of entries) {
         if (entry) results[entry[0]] = entry[1];
       }
       setDetails(results);
+
+      const costs: Record<string, AgentCost> = {};
+      for (const c of costEntries) {
+        costs[c.agent_id] = { total_cost_usd: c.total_cost_usd, total_tokens: c.total_tokens };
+      }
+      setCostMap(costs);
     }
     if (agents.length > 0) loadDetails();
   }, [agents, api]);
@@ -138,6 +155,7 @@ export function AgentDashboard() {
                 <AgentCard
                   agent={parent}
                   detail={details[parent.id]}
+                  cost={costMap[parent.id]}
                   onClick={() => setSelectedAgentId(parent.id)}
                 />
                 {children.length > 0 && (
@@ -157,6 +175,7 @@ export function AgentDashboard() {
                         key={child.id}
                         agent={child}
                         detail={details[child.id]}
+                        cost={costMap[child.id]}
                         onClick={() => setSelectedAgentId(child.id)}
                       />
                     ))}
@@ -171,12 +190,16 @@ export function AgentDashboard() {
   );
 }
 
-function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDetail; onClick: () => void }) {
+function AgentCard({ agent, detail, cost, onClick }: { agent: Agent; detail?: AgentDetail; cost?: AgentCost; onClick: () => void }) {
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
   const healthColor = detail?.health_status === "active" ? "var(--accent-green)"
     : detail?.health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+
+  const sparkValues = detail
+    ? buildDailyActivityCounts(detail.activity.map((a) => a.timestamp), 7)
+    : null;
 
   return (
     <div
@@ -250,9 +273,35 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
         </div>
       )}
 
-      <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
-        <span>Completed today: <strong style={{ color: "var(--accent-green)" }}>{detail?.completed_today ?? 0}</strong></span>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", color: "var(--text-muted)" }}>
+        <span>Done today: <strong style={{ color: "var(--accent-green)" }}>{detail?.completed_today ?? 0}</strong></span>
         <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
+        {cost && cost.total_cost_usd > 0 && (
+          <span
+            title={`${cost.total_tokens.toLocaleString()} tokens`}
+            style={{
+              marginLeft: "auto",
+              fontSize: "10px",
+              padding: "1px 5px",
+              borderRadius: "4px",
+              background: "rgba(34,197,94,0.1)",
+              color: "var(--accent-green)",
+              border: "1px solid rgba(34,197,94,0.25)",
+              fontFamily: "monospace",
+            }}
+          >
+            ${cost.total_cost_usd < 0.01 ? cost.total_cost_usd.toFixed(4) : cost.total_cost_usd.toFixed(3)}
+          </span>
+        )}
+        {sparkValues && sparkValues.some((v) => v > 0) && (
+          <Sparkline
+            values={sparkValues}
+            width={44}
+            height={14}
+            color={healthColor}
+            style={{ marginLeft: (cost && cost.total_cost_usd > 0) ? "4px" : "auto" }}
+          />
+        )}
       </div>
 
       {agent.model && (

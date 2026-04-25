@@ -2,6 +2,7 @@ import { useState, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
+import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
 
 interface TaskCardProps {
   task: Task;
@@ -44,9 +45,12 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   const hasChildren = childTasks.length > 0;
   const childDone = childTasks.filter((t) => t.status === "done").length;
 
-  const latestActivity = activity
-    .filter((a) => a.task_id === task.id)
+  const taskActivity = activity.filter((a) => a.task_id === task.id);
+  const latestActivity = taskActivity
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+  const activitySparkValues = isActive
+    ? buildDailyActivityCounts(taskActivity.map((a) => a.timestamp), 7)
+    : null;
 
   const descSnippet = task.description
     ? task.description.slice(0, 80) + (task.description.length > 80 ? "\u2026" : "")
@@ -123,7 +127,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           </div>
         )}
 
-        {/* Active task: latest activity + progress bar */}
+        {/* Active task: latest activity + progress bar + sparkline */}
         {isActive && (
           <>
             {latestActivity && (
@@ -141,23 +145,34 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
                 {latestActivity.message}
               </div>
             )}
-            <div
-              style={{
-                height: "3px",
-                background: "var(--bg-secondary)",
-                borderRadius: "2px",
-                overflow: "hidden",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div
                 style={{
-                  height: "100%",
-                  width: `${task.progress}%`,
-                  background: "var(--accent-green)",
+                  flex: 1,
+                  height: "3px",
+                  background: "var(--bg-secondary)",
                   borderRadius: "2px",
-                  transition: "width 0.3s",
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${task.progress}%`,
+                    background: "var(--accent-green)",
+                    borderRadius: "2px",
+                    transition: "width 0.3s",
+                  }}
+                />
+              </div>
+              {activitySparkValues && activitySparkValues.some((v) => v > 0) && (
+                <Sparkline
+                  values={activitySparkValues}
+                  width={40}
+                  height={12}
+                  color="var(--accent-green)"
+                />
+              )}
             </div>
           </>
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useAppState, useAppDispatch } from "./store";
 import { useApi } from "./hooks/useApi";
@@ -15,6 +15,7 @@ import { ActivityStreamView } from "./components/ActivityStreamView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { CommandPalette } from "./components/CommandPalette";
 
 export function App() {
   const dispatch = useAppDispatch();
@@ -22,9 +23,74 @@ export function App() {
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const gKeyPending = useRef(false);
+  const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useWebSocket();
   usePolling();
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const isEditable =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+        return;
+      }
+
+      if (isEditable) return;
+
+      if (e.key === "Escape") {
+        setCommandPaletteOpen(false);
+        return;
+      }
+
+      if (e.key === "/") {
+        e.preventDefault();
+        const searchEl = document.querySelector<HTMLInputElement>(
+          'input[placeholder="Search tasks..."]'
+        );
+        searchEl?.focus();
+        return;
+      }
+
+      if (e.key === "g" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (gKeyTimer.current !== null) clearTimeout(gKeyTimer.current);
+        gKeyPending.current = true;
+        gKeyTimer.current = setTimeout(() => { gKeyPending.current = false; gKeyTimer.current = null; }, 1000);
+        return;
+      }
+
+      if (gKeyPending.current) {
+        gKeyPending.current = false;
+        const viewMap: Record<string, typeof activeView> = {
+          b: "board",
+          a: "agents",
+          l: "list",
+          d: "dashboard",
+          t: "timeline",
+          v: "activity",
+        };
+        const view = viewMap[e.key];
+        if (view) dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (gKeyTimer.current !== null) {
+        clearTimeout(gKeyTimer.current);
+        gKeyTimer.current = null;
+      }
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -147,7 +213,7 @@ export function App() {
 
   return (
     <div className="app">
-      <TopBar />
+      <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} />
       <div className="main-content">
         <ProjectList />
         {activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : <ActivityStreamView />}
@@ -156,6 +222,9 @@ export function App() {
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
       {loaded && showOnboarding && (
         <OnboardingWizard onComplete={handleOnboardingComplete} />
+      )}
+      {commandPaletteOpen && (
+        <CommandPalette onClose={() => setCommandPaletteOpen(false)} />
       )}
     </div>
   );
