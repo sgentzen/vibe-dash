@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { generateDigest, queryNaturalLanguage } from "../intelligence.js";
 import {
   registerAgent,
   createProject,
@@ -733,7 +734,7 @@ export async function handleTool(
       return ok(suggestion);
     }
 
-    // ─── R11.3: Ingestion Sources ──────────────────────────────��──────────
+    // ─── R11.3: Ingestion Sources ─────────────────────────────────────────
 
     case "list_ingestion_sources":
       return ok(listIngestionSources(db));
@@ -754,6 +755,26 @@ export async function handleTool(
       const result = rotateIngestionToken(db, source_id);
       if (!result) return ok({ error: "Ingestion source not found" });
       return ok(result);
+    }
+
+    // ─── R12.1: Intelligence ───────────────────────────────────────────────
+
+    case "query": {
+      const answer = await queryNaturalLanguage(
+        db,
+        args.question as string,
+        args.project_id as string | undefined
+      );
+      return ok({ answer });
+    }
+
+    case "generate_digest": {
+      const digest = await generateDigest(
+        db,
+        args.period as "daily" | "weekly",
+        args.project_id as string | undefined
+      );
+      return ok({ digest });
     }
 
     default:

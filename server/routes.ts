@@ -115,6 +115,7 @@ import {
   createCommentSchema,
   logCostSchema,
 } from "../shared/schemas.js";
+import { isAiConfigured, generateDigest, queryNaturalLanguage } from "./intelligence.js";
 
 const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
@@ -1036,6 +1037,52 @@ export function createRouter(db: Database.Database): Router {
     deleteMilestone(db, req.params.id);
     broadcast({ type: "milestone_deleted", payload: existing });
     res.json({ success: true });
+  });
+
+  // ─── Intelligence: NL Query & Digest ───────────────────────────────────
+
+  router.post("/api/intelligence/query", async (req, res) => {
+    const { question, project_id } = req.body as { question?: string; project_id?: string };
+    if (!question || typeof question !== "string" || question.trim() === "") {
+      res.status(400).json({ error: "question is required" });
+      return;
+    }
+    if (!isAiConfigured()) {
+      res.status(503).json({ error: "ANTHROPIC_API_KEY not configured — set it to enable AI features" });
+      return;
+    }
+    try {
+      const answer = await queryNaturalLanguage(db, question.trim(), project_id);
+      res.json({ answer, model: "claude-haiku-4-5-20251001" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  router.get("/api/intelligence/digest", async (req, res) => {
+    const period = req.query.period as string | undefined;
+    const project_id = req.query.project_id as string | undefined;
+    if (!period || (period !== "daily" && period !== "weekly")) {
+      res.status(400).json({ error: "period must be 'daily' or 'weekly'" });
+      return;
+    }
+    if (!isAiConfigured()) {
+      res.status(503).json({ error: "ANTHROPIC_API_KEY not configured — set it to enable AI features" });
+      return;
+    }
+    try {
+      const digest = await generateDigest(db, period, project_id);
+      res.json({
+        digest,
+        period,
+        model: "claude-haiku-4-5-20251001",
+        generated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(500).json({ error: message });
+    }
   });
 
 
