@@ -71,13 +71,7 @@
       "mcp__vibe-dash__search_tasks",
       "Bash(python3 -c ' *)",
       "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); tasks=[json.loads\\(t['text']\\) for t in data if t['type']=='text']; r9a=[t for t in tasks[0] if t.get\\('milestone_id'\\)=='cbf12c74-0fdb-4cf3-a414-6b935b1a92af']; print\\(json.dumps\\(r9a, indent=2\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); tasks=json.loads\\(data[0]['text']\\); r9b=[t for t in tasks if t.get\\('milestone_id'\\)=='517a8407-32cd-4c5b-9d64-8a3b79fded24']; print\\(json.dumps\\(r9b, indent=2\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); tasks=[t for t in json.loads\\(data[0]['text']\\) if t.get\\('milestone_id'\\)=='16d21b8f-48c8-47d9-81a3-96b5e73d043a']; print\\(json.dumps\\(tasks,indent=2\\)\\)\")",
-      "mcp__vibe-dash__complete_milestone",
-      "Bash(mkdir -p C:/Users/sgent/projects/vibe-dash/.claude)",
-      "Bash(touch C:/Users/sgent/projects/vibe-dash/.claude/.last-code-review)",
-      "Bash(ls -d .worktrees)",
-      "Bash(ls -d worktrees)"
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); tasks=json.loads\\(data[0]['text']\\); r9b=[t for t in tasks if t.get\\('milestone_id'\\)=='517a8407-32cd-4c5b-9d64-8a3b79fded24']; print\\(json.dumps\\(r9b, indent=2\\)\\)\")"
     ]
   }
 }

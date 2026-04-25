@@ -21,11 +21,6 @@ export function isAuthEnabled(db: Database.Database): boolean {
   return _authEnabled;
 }
 
-/** Reset the auth-enabled cache — test-only. */
-export function _resetAuthCache(): void {
-  _authEnabled = null;
-}
-
 export function generateApiKey(): string {
   return randomBytes(32).toString("hex");
 }
@@ -58,29 +53,6 @@ export function makeAuthMiddleware(db: Database.Database) {
     }
 
     req.user = user;
-    next();
-  };
-}
-
-/**
- * Like requireRole, but a no-op when auth is disabled (no users in DB).
- * Use on endpoints that should be admin/developer-only in multi-user mode
- * but must remain reachable in local-only (zero-user) mode.
- */
-export function requireRoleWhenEnabled(db: Database.Database, ...roles: UserRole[]) {
-  return function (req: Request, res: Response, next: NextFunction): void {
-    if (!isAuthEnabled(db)) {
-      next();
-      return;
-    }
-    if (!req.user) {
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
-    if (!roles.includes(req.user.role)) {
-      res.status(403).json({ error: "Insufficient permissions" });
-      return;
-    }
     next();
   };
 }

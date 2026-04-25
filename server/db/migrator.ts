@@ -308,46 +308,6 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
-  {
-    name: "006_ingestion",
-    run(db) {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS ingestion_sources (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          kind TEXT NOT NULL CHECK(kind IN ('claude_code','cursor','codex','copilot','aider','generic')),
-          token_hash TEXT NOT NULL UNIQUE,
-          project_id TEXT REFERENCES projects(id),
-          active INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL,
-          last_event_at TEXT
-        );
-        CREATE INDEX IF NOT EXISTS idx_ingestion_sources_token_hash ON ingestion_sources(token_hash);
-        CREATE TABLE IF NOT EXISTS ingestion_events (
-          id TEXT PRIMARY KEY,
-          source_id TEXT NOT NULL REFERENCES ingestion_sources(id),
-          received_at TEXT NOT NULL,
-          raw_payload TEXT NOT NULL,
-          normalized_kind TEXT NOT NULL CHECK(normalized_kind IN ('activity','cost','tool_call','file_change','session_start','session_end')),
-          task_id TEXT REFERENCES tasks(id),
-          agent_id TEXT REFERENCES agents(id),
-          processed INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE INDEX IF NOT EXISTS idx_ingestion_events_unprocessed ON ingestion_events(processed, received_at);
-      `);
-    },
-  },
-  {
-    name: "007_drop_saved_filters",
-    run(db) {
-      // saved_filters was never surfaced to users (no frontend consumer).
-      // URL-param filtering in search_tasks covers the same use case.
-      const tables = (db.pragma("table_list") as { name: string }[]).map((r) => r.name);
-      if (tables.includes("saved_filters")) {
-        db.exec("DROP TABLE saved_filters");
-      }
-    },
-  },
 ];
 
 export function runMigrations(db: Database.Database): void {
