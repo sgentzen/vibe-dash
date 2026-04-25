@@ -14,6 +14,12 @@ export function DashboardView() {
   const [contributions, setContributions] = useState<AgentContribution[]>([]);
   const [reportText, setReportText] = useState<string | null>(null);
   const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "sprint">("week");
+
+  // AI query bar state
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
@@ -85,6 +91,26 @@ export function DashboardView() {
     }
     loadCosts();
   }, [api, projectId, sprintTaskStatusKey, pollGeneration]);
+
+  async function handleAiQuery() {
+    if (!aiQuestion.trim()) return;
+    setAiLoading(true);
+    setAiAnswer(null);
+    setAiError(null);
+    try {
+      const result = await api.queryAI(aiQuestion.trim(), projectId);
+      setAiAnswer(result.answer);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      if (msg.includes("ANTHROPIC_API_KEY")) {
+        setAiError("Configure ANTHROPIC_API_KEY to enable AI features");
+      } else {
+        setAiError(msg);
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   async function handleGenerateReport() {
     if (!projectId) return;
@@ -347,6 +373,73 @@ export function DashboardView() {
           </div>
         </div>
       )}
+
+      {/* AI Query Bar */}
+      <div style={{ ...cardStyle, marginBottom: "16px" }}>
+        <div style={headerStyle}>Ask AI</div>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: aiAnswer || aiError ? "12px" : "0" }}>
+          <input
+            type="text"
+            value={aiQuestion}
+            onChange={(e) => setAiQuestion(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !aiLoading) { void handleAiQuery(); } }}
+            placeholder="Ask anything... e.g. What changed this week?"
+            disabled={aiLoading}
+            style={{
+              flex: 1,
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              borderRadius: "4px",
+              color: "var(--text-primary)",
+              padding: "6px 10px",
+              fontSize: "12px",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={() => { void handleAiQuery(); }}
+            disabled={aiLoading || !aiQuestion.trim()}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--accent-purple)",
+              color: aiLoading ? "var(--text-muted)" : "var(--accent-purple)",
+              borderRadius: "6px",
+              padding: "4px 12px",
+              fontSize: "12px",
+              cursor: aiLoading || !aiQuestion.trim() ? "not-allowed" : "pointer",
+            }}
+          >
+            {aiLoading ? "Thinking..." : "Ask"}
+          </button>
+        </div>
+        {aiError && (
+          <div style={{
+            fontSize: "12px",
+            color: "var(--accent-yellow)",
+            padding: "8px",
+            background: "var(--bg-tertiary)",
+            borderRadius: "4px",
+          }}>
+            {aiError}
+          </div>
+        )}
+        {aiAnswer && (
+          <pre style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            padding: "12px",
+            fontSize: "12px",
+            color: "var(--text-secondary)",
+            whiteSpace: "pre-wrap",
+            maxHeight: "400px",
+            overflowY: "auto",
+            margin: 0,
+          }}>
+            {aiAnswer}
+          </pre>
+        )}
+      </div>
 
       {/* Report Generation */}
       <div style={cardStyle}>

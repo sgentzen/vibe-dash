@@ -554,5 +554,27 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("get_cost_by_agent")
   );
 
+  // ─── R12.1: Intelligence ──────────────────────────────────────────────────
+
+  server.tool(
+    "query",
+    "Ask a natural-language question about your projects, tasks, agents, and costs",
+    {
+      question: z.string(),
+      project_id: z.string().optional(),
+    },
+    call("query")
+  );
+
+  server.tool(
+    "generate_digest",
+    "Generate a daily or weekly summary digest of project activity",
+    {
+      period: z.enum(["daily", "weekly"]),
+      project_id: z.string().optional(),
+    },
+    call("generate_digest")
+  );
+
   return { server, cleanup };
 }

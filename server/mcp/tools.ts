@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { Agent } from "../types.js";
+import { generateDigest, queryNaturalLanguage } from "../intelligence.js";
 import {
   registerAgent,
   createProject,
@@ -508,6 +509,26 @@ export async function handleTool(
         project_id: args.project_id as string | undefined,
         sprint_id: args.sprint_id as string | undefined,
       }));
+    }
+
+    // ─── R12.1: Intelligence ───────────────────────────────────────────────
+
+    case "query": {
+      const answer = await queryNaturalLanguage(
+        db,
+        args.question as string,
+        args.project_id as string | undefined
+      );
+      return ok({ answer });
+    }
+
+    case "generate_digest": {
+      const digest = await generateDigest(
+        db,
+        args.period as "daily" | "weekly",
+        args.project_id as string | undefined
+      );
+      return ok({ digest });
     }
 
     default:

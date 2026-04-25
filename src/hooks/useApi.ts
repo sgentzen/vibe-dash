@@ -514,6 +514,32 @@ async function getCostByAgent(params: Record<string, string | undefined> = {}): 
   return res.json();
 }
 
+// ─── R12.1: Intelligence ─────────────────────────────────────────────────
+
+async function queryAI(question: string, projectId?: string): Promise<{ answer: string; model: string }> {
+  const res = await fetch("/api/intelligence/query", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ question, project_id: projectId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error ?? `queryAI failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function getDigest(period: "daily" | "weekly", projectId?: string): Promise<{ digest: string; period: string; model: string; generated_at: string }> {
+  const params = new URLSearchParams({ period });
+  if (projectId) params.set("project_id", projectId);
+  const res = await fetch(`/api/intelligence/digest?${params}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error ?? `getDigest failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -573,5 +599,7 @@ export function useApi() {
     getProjectCostSummary,
     getCostByModel,
     getCostByAgent,
+    queryAI,
+    getDigest,
   }), []);
 }
