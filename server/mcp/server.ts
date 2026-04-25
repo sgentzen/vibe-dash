@@ -697,7 +697,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "query",
     "Ask a natural-language question about your projects, tasks, agents, and costs",
     {
-      question: z.string(),
+      question: z.string().max(2000),
       project_id: z.string().optional(),
     },
     call("query")

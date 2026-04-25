@@ -9,7 +9,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type Database from "better-sqlite3";
 
-const MODEL = "claude-haiku-4-5-20251001";
+export const MODEL = "claude-haiku-4-5-20251001";
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -28,22 +28,7 @@ export async function generateDigest(
   const systemPrompt = buildDigestSystemPrompt();
   const userMessage = `Generate a ${period} digest summary for the following project data:\n\n${JSON.stringify(ctx, null, 2)}`;
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const response = await (client.messages.create as (body: unknown) => Promise<Anthropic.Message>)({
-    model: MODEL,
-    max_tokens: 1024,
-    system: [
-      {
-        type: "text",
-        text: systemPrompt,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [{ role: "user", content: userMessage }],
-    betas: ["prompt-caching-2024-07-31"],
-  });
-
-  return extractText(response);
+  return callAnthropic(systemPrompt, userMessage);
 }
 
 export async function queryNaturalLanguage(
@@ -57,6 +42,24 @@ export async function queryNaturalLanguage(
   const systemPrompt = buildQuerySystemPrompt();
   const userMessage = `Project context:\n${JSON.stringify(ctx, null, 2)}\n\nQuestion: ${question}`;
 
+  return callAnthropic(systemPrompt, userMessage);
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+function requireApiKey(): void {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY not configured");
+  }
+}
+
+/**
+ * Shared Anthropic API call helper.
+ * The cast on `client.messages.create` is required because the SDK typings for
+ * this version do not include the `betas` field in the request body type, even
+ * though the runtime API accepts it for prompt-caching support.
+ */
+async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await (client.messages.create as (body: unknown) => Promise<Anthropic.Message>)({
     model: MODEL,
@@ -71,16 +74,7 @@ export async function queryNaturalLanguage(
     messages: [{ role: "user", content: userMessage }],
     betas: ["prompt-caching-2024-07-31"],
   });
-
   return extractText(response);
-}
-
-// ── Internal helpers ──────────────────────────────────────────────────────────
-
-function requireApiKey(): void {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY not configured");
-  }
 }
 
 function extractText(response: Anthropic.Message): string {
@@ -89,7 +83,7 @@ function extractText(response: Anthropic.Message): string {
   return block.text;
 }
 
-/** Trim a JSON-serialisable value to stay under MAX_CONTEXT_CHARS */
+/** Trim an array to at most maxItems elements to stay within context budget */
 function trimArray<T>(arr: T[], maxItems: number): T[] {
   return arr.slice(0, maxItems);
 }

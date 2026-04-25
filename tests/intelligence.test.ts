@@ -3,10 +3,11 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 
 // ── Mock @anthropic-ai/sdk before importing intelligence ────────────────────
+const mockCreate = vi.fn().mockResolvedValue({
+  content: [{ type: "text", text: "Mocked AI response" }],
+});
+
 vi.mock("@anthropic-ai/sdk", () => {
-  const mockCreate = vi.fn().mockResolvedValue({
-    content: [{ type: "text", text: "Mocked AI response" }],
-  });
   // Must use function() so `new MockAnthropic()` works
   function MockAnthropic() {
     return { messages: { create: mockCreate } };
@@ -65,6 +66,9 @@ describe("intelligence module", () => {
     const result = await generateDigest(db, "daily");
     expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+      model: "claude-haiku-4-5-20251001",
+    }));
   });
 
   it("generateDigest accepts weekly period", async () => {
