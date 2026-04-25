@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import { RequestError } from "@octokit/request-error";
 import type Database from "better-sqlite3";
 import {
   getGitIntegration,
@@ -17,6 +18,9 @@ export interface SyncResult {
   errors: string[];
 }
 
+// In-memory lock to prevent concurrent syncs for the same integration
+const activeSyncs = new Set<string>();
+
 /**
  * Pull open issues from GitHub → create/update vibe-dash tasks.
  * - New open issues: create a task (planned, medium priority) + linked_item record.
@@ -27,90 +31,117 @@ export async function syncGitHubIssues(
   db: Database.Database,
   integrationId: string
 ): Promise<SyncResult> {
-  const result: SyncResult = {
-    integration_id: integrationId,
-    issues_pulled: 0,
-    issues_updated: 0,
-    errors: [],
-  };
-
-  const integration = getGitIntegration(db, integrationId);
-  if (!integration) {
-    result.errors.push(`Integration ${integrationId} not found`);
-    return result;
+  if (activeSyncs.has(integrationId)) {
+    return {
+      integration_id: integrationId,
+      issues_pulled: 0,
+      issues_updated: 0,
+      errors: ["Sync already in progress"],
+    };
   }
 
-  const octokit = new Octokit({ auth: integration.token });
+  activeSyncs.add(integrationId);
 
   try {
-    const { data: issues } = await octokit.issues.listForRepo({
-      owner: integration.owner,
-      repo: integration.repo,
-      state: "open",
-      per_page: 100,
-    });
+    const result: SyncResult = {
+      integration_id: integrationId,
+      issues_pulled: 0,
+      issues_updated: 0,
+      errors: [],
+    };
 
-    for (const issue of issues) {
-      // Skip pull requests (GitHub API returns PRs in the issues endpoint)
-      if (issue.pull_request) continue;
-
-      try {
-        const existing = getLinkedItemByExternal(db, integrationId, "issue", issue.number);
-
-        if (existing) {
-          // Update state on existing linked item
-          upsertLinkedItem(db, {
-            integration_id: integrationId,
-            task_id: existing.task_id,
-            item_type: "issue",
-            external_number: issue.number,
-            external_id: String(issue.id),
-            external_title: issue.title,
-            external_state: issue.state,
-            external_url: issue.html_url,
-            pr_number: null,
-            pr_state: null,
-          });
-          result.issues_updated++;
-        } else {
-          // Create a new task from this issue
-          const task = createTask(db, {
-            project_id: integration.project_id,
-            title: issue.title,
-            description: issue.body ?? null,
-            status: "planned",
-            priority: "medium",
-          });
-
-          broadcast({ type: "task_created", payload: task });
-
-          upsertLinkedItem(db, {
-            integration_id: integrationId,
-            task_id: task.id,
-            item_type: "issue",
-            external_number: issue.number,
-            external_id: String(issue.id),
-            external_title: issue.title,
-            external_state: issue.state,
-            external_url: issue.html_url,
-            pr_number: null,
-            pr_state: null,
-          });
-
-          result.issues_pulled++;
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        result.errors.push(`Issue #${issue.number}: ${msg}`);
-      }
+    const integration = getGitIntegration(db, integrationId);
+    if (!integration) {
+      result.errors.push(`Integration ${integrationId} not found`);
+      return result;
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    result.errors.push(`GitHub API error: ${msg}`);
-  }
 
-  updateLastSynced(db, integrationId);
-  return result;
+    const octokit = new Octokit({ auth: integration.token });
+
+    try {
+      const issues = await octokit.paginate(octokit.issues.listForRepo, {
+        owner: integration.owner,
+        repo: integration.repo,
+        state: "open",
+        per_page: 100,
+      });
+
+      for (const issue of issues) {
+        // Skip pull requests (GitHub API returns PRs in the issues endpoint)
+        if (issue.pull_request) continue;
+
+        try {
+          const existing = getLinkedItemByExternal(db, integrationId, "issue", issue.number);
+
+          if (existing) {
+            // Update state on existing linked item
+            upsertLinkedItem(db, {
+              integration_id: integrationId,
+              task_id: existing.task_id,
+              item_type: "issue",
+              external_number: issue.number,
+              external_id: String(issue.id),
+              external_title: issue.title,
+              external_state: issue.state,
+              external_url: issue.html_url,
+              pr_number: null,
+              pr_state: null,
+            });
+            result.issues_updated++;
+          } else {
+            // Create a new task from this issue
+            const task = createTask(db, {
+              project_id: integration.project_id,
+              title: issue.title,
+              description: issue.body ?? null,
+              status: "planned",
+              priority: "medium",
+            });
+
+            broadcast({ type: "task_created", payload: task });
+
+            upsertLinkedItem(db, {
+              integration_id: integrationId,
+              task_id: task.id,
+              item_type: "issue",
+              external_number: issue.number,
+              external_id: String(issue.id),
+              external_title: issue.title,
+              external_state: issue.state,
+              external_url: issue.html_url,
+              pr_number: null,
+              pr_state: null,
+            });
+
+            result.issues_pulled++;
+          }
+        } catch (err) {
+          const msg =
+            err instanceof RequestError
+              ? `GitHub ${err.status}: ${err.message}`
+              : err instanceof Error
+              ? err.message
+              : String(err);
+          result.errors.push(`Issue #${issue.number}: ${msg}`);
+        }
+      }
+    } catch (err) {
+      const msg =
+        err instanceof RequestError
+          ? `GitHub ${err.status}: ${err.message}`
+          : err instanceof Error
+          ? err.message
+          : String(err);
+      result.errors.push(`GitHub API error: ${msg}`);
+    }
+
+    if (result.errors.length === 0) {
+      updateLastSynced(db, integrationId);
+    }
+    return result;
+  } finally {
+    activeSyncs.delete(integrationId);
+  }
 }
 
 /**
@@ -125,10 +156,20 @@ export async function closeLinkedIssue(
   if (!linked || linked.provider !== "github") return;
 
   const octokit = new Octokit({ auth: linked.token });
-  await octokit.issues.update({
-    owner: linked.owner,
-    repo: linked.repo,
-    issue_number: linked.external_number,
-    state: "closed",
-  });
+  try {
+    await octokit.issues.update({
+      owner: linked.owner,
+      repo: linked.repo,
+      issue_number: linked.external_number,
+      state: "closed",
+    });
+  } catch (err) {
+    const msg =
+      err instanceof RequestError
+        ? `GitHub ${err.status}: ${err.message}`
+        : err instanceof Error
+        ? err.message
+        : String(err);
+    throw new Error(msg);
+  }
 }
