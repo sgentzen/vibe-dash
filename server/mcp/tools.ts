@@ -84,7 +84,7 @@ function autoLog(
   });
 }
 
-type ToolResult = { content: [{ type: "text"; text: string }] };
+type ToolResult = { content: [{ type: "text"; text: string }]; isError?: boolean };
 
 function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
@@ -514,21 +514,31 @@ export async function handleTool(
     // ─── R12.1: Intelligence ───────────────────────────────────────────────
 
     case "query": {
-      const answer = await queryNaturalLanguage(
-        db,
-        args.question as string,
-        args.project_id as string | undefined
-      );
-      return ok({ answer });
+      try {
+        const answer = await queryNaturalLanguage(
+          db,
+          args.question as string,
+          args.project_id as string | undefined
+        );
+        return ok({ answer });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Query failed";
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
     }
 
     case "generate_digest": {
-      const digest = await generateDigest(
-        db,
-        args.period as "daily" | "weekly",
-        args.project_id as string | undefined
-      );
-      return ok({ digest });
+      try {
+        const digest = await generateDigest(
+          db,
+          args.period as "daily" | "weekly",
+          args.project_id as string | undefined
+        );
+        return ok({ digest });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Digest generation failed";
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
     }
 
     default:

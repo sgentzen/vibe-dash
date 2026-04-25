@@ -92,7 +92,7 @@ import {
 import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
-import { isAiConfigured, generateDigest, queryNaturalLanguage } from "./intelligence.js";
+import { isAiConfigured, generateDigest, queryNaturalLanguage, MODEL as INTELLIGENCE_MODEL } from "./intelligence.js";
 
 const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
@@ -876,13 +876,17 @@ export function createRouter(db: Database.Database): Router {
       res.status(400).json({ error: "question is required" });
       return;
     }
+    if (question.length > 2000) {
+      res.status(400).json({ error: "Question must be under 2000 characters" });
+      return;
+    }
     if (!isAiConfigured()) {
       res.status(503).json({ error: "ANTHROPIC_API_KEY not configured — set it to enable AI features" });
       return;
     }
     try {
       const answer = await queryNaturalLanguage(db, question.trim(), project_id);
-      res.json({ answer, model: "claude-haiku-4-5-20251001" });
+      res.json({ answer, model: INTELLIGENCE_MODEL });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.status(500).json({ error: message });
@@ -905,7 +909,7 @@ export function createRouter(db: Database.Database): Router {
       res.json({
         digest,
         period,
-        model: "claude-haiku-4-5-20251001",
+        model: INTELLIGENCE_MODEL,
         generated_at: new Date().toISOString(),
       });
     } catch (err) {
