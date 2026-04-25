@@ -28,6 +28,16 @@ import { milestoneRoutes } from "./milestones.js";
 import { userRoutes } from "./users.js";
 import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
+import rateLimit from "express-rate-limit";
+
+// Global rate limiter for all /api routes (CodeQL js/missing-rate-limiting)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
 
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
@@ -66,6 +76,9 @@ const routeFactories: RouteFactory[] = [
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
+
+  // Global rate limit — applies to all API routes
+  router.use(apiLimiter);
 
   // Auth middleware runs before all routes; no-op when no users exist.
   // /api/auth/status is exempt — it's a public discovery endpoint.

@@ -5,6 +5,7 @@ import type Database from "better-sqlite3";
 import type { WsEvent } from "./types.js";
 import { logger } from "./logger.js";
 import { hashApiKey, isAuthEnabled } from "./auth.js";
+import { createHash } from "crypto";
 import { getUserByKeyHash } from "./db/users.js";
 
 let wss: WebSocketServer | null = null;
@@ -40,7 +41,12 @@ export function initWebSocket(server: Server, db: Database.Database): WebSocketS
     const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
     if (!token) { reject("no token"); return; }
 
-    const user = getUserByKeyHash(db, hashApiKey(token));
+    // Try HMAC hash first; fall back to legacy SHA-256
+    let user = getUserByKeyHash(db, hashApiKey(token));
+    if (!user) {
+      const legacyHash = createHash("sha256").update(token).digest("hex");
+      user = getUserByKeyHash(db, legacyHash);
+    }
     if (!user) { reject("invalid token"); return; }
 
     accept();
