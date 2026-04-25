@@ -168,6 +168,12 @@ vibe-dash/
 | `DB_PATH` | `./vibe-dash.db` | SQLite database location (server) |
 | `VIBE_DASH_DB` | `./vibe-dash.db` | SQLite database location (stdio MCP) |
 
+## Roadmap
+
+The current strategic direction and active milestones (R11–R13) are documented in
+[docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md). This is the
+primary guiding document for all roadmap decisions until the next program review.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
