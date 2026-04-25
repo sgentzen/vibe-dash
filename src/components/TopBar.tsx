@@ -89,9 +89,33 @@ export function TopBar() {
           color: "var(--text-primary)",
           padding: "4px 10px",
           fontSize: "13px",
-          width: "200px",
+          width: "160px",
         }}
       />
+
+      {/* Command palette trigger */}
+      {onCommandPalette && (
+        <button
+          onClick={onCommandPalette}
+          title="Command palette (⌘K)"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            color: "var(--text-muted)",
+            padding: "4px 8px",
+            fontSize: "11px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ fontSize: "13px" }}>⌘</span>
+          <kbd style={{ fontFamily: "inherit", fontSize: "11px" }}>K</kbd>
+        </button>
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
