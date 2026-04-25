@@ -3,12 +3,12 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import {
   createProject,
-  createSprint,
+  createMilestone,
   createTask,
   registerAgent,
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
@@ -45,14 +45,14 @@ describe("cost tracking", () => {
     expect(summary.entry_count).toBe(1);
   });
 
-  it("aggregates costs per sprint", () => {
+  it("aggregates costs per milestone", () => {
     const project = createProject(db, { name: "P", description: null });
-    const sprint = createSprint(db, { project_id: project.id, name: "S1" });
+    const milestone = createMilestone(db, { project_id: project.id, name: "M1" });
 
-    logCost(db, { sprint_id: sprint.id, model: "gpt-4", provider: "openai", input_tokens: 200, output_tokens: 100, cost_usd: 0.01 });
-    logCost(db, { sprint_id: sprint.id, model: "gpt-4", provider: "openai", input_tokens: 300, output_tokens: 150, cost_usd: 0.02 });
+    logCost(db, { milestone_id: milestone.id, model: "gpt-4", provider: "openai", input_tokens: 200, output_tokens: 100, cost_usd: 0.01 });
+    logCost(db, { milestone_id: milestone.id, model: "gpt-4", provider: "openai", input_tokens: 300, output_tokens: 150, cost_usd: 0.02 });
 
-    const summary = getSprintCostSummary(db, sprint.id);
+    const summary = getMilestoneCostSummary(db, milestone.id);
     expect(summary.total_cost_usd).toBe(0.03);
     expect(summary.total_input_tokens).toBe(500);
     expect(summary.entry_count).toBe(2);

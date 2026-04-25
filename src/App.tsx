@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
-import { useAppState, useAppDispatch } from "./store";
-import { useApi } from "./hooks/useApi";
+import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
+import { useApi, getStoredApiKey } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { TopBar } from "./components/TopBar";
@@ -12,23 +12,58 @@ import { TaskListView } from "./components/TaskListView";
 import { DashboardView } from "./components/DashboardView";
 import { TimelineView } from "./components/TimelineView";
 import { ActivityStreamView } from "./components/ActivityStreamView";
+import { OrchestrationView } from "./components/orchestration/OrchestrationView";
+import { WorktreeView } from "./components/WorktreeView";
+import { ExecutiveView } from "./components/ExecutiveView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
-import { CommandPalette } from "./components/CommandPalette";
+import { LoginView } from "./components/LoginView";
 
 export function App() {
   const dispatch = useAppDispatch();
-  const { blockers, theme, activeView, fileConflicts } = useAppState();
+  const { blockers } = useDataState();
+  const { theme, activeView, isAuthenticated, authEnabled } = useNavigationState();
+  const { fileConflicts } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const gKeyPending = useRef(false);
-  const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useWebSocket();
   usePolling();
+
+  // Check auth status on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const status = await api.getAuthStatus();
+        if (!status.auth_enabled) {
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+          setAuthChecked(true);
+          return;
+        }
+        // Auth is enabled — validate stored key (if any)
+        const storedKey = getStoredApiKey();
+        if (storedKey) {
+          try {
+            const user = await api.validateApiKey(storedKey);
+            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true } });
+          } catch {
+            // Key invalid or expired — prompt login
+            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+          }
+        } else {
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+        }
+      } catch {
+        // Server unreachable — treat as local-only; polling will retry data loading
+        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+      }
+      setAuthChecked(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -109,11 +144,11 @@ export function App() {
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
-          const [stats, projects, sprints, tasks, agents, activity, blockerList] =
+          const [stats, projects, milestones, tasks, agents, activity, blockerList] =
             await Promise.all([
               api.getStats(),
               api.getProjects(),
-              api.getSprints(),
+              api.getMilestones(),
               api.getTasks(),
               api.getAgents(),
               api.getActivity(),
@@ -122,53 +157,48 @@ export function App() {
           if (cancelled) return;
           dispatch({ type: "SET_STATS", payload: stats });
           dispatch({ type: "SET_PROJECTS", payload: projects });
-          dispatch({ type: "SET_SPRINTS", payload: sprints });
+          dispatch({ type: "SET_MILESTONES", payload: milestones });
           dispatch({ type: "SET_TASKS", payload: tasks });
           dispatch({ type: "SET_AGENTS", payload: agents });
           dispatch({ type: "SET_ACTIVITY", payload: activity });
           dispatch({ type: "SET_BLOCKERS", payload: blockerList });
 
-          // Load tags for all projects
-          const allTags = (await Promise.all(
-            projects.map((p) => api.getTags(p.id))
-          )).flat();
+          // Load tags and milestones for all projects
+          const [allTags, allMilestones] = await Promise.all([
+            Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
+            Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
+          ]);
           dispatch({ type: "SET_TAGS", payload: allTags });
+          dispatch({ type: "SET_MILESTONES", payload: allMilestones });
 
-          // Load task tags for all tasks
-          const taskTagEntries = await Promise.all(
-            tasks.map(async (t) => {
-              const tags = await api.getTaskTags(t.id);
-              return [t.id, tags.map((tag) => tag.id)] as [string, string[]];
-            })
-          );
+          // Load task tags and dependencies in bulk (one request per project instead of N per task)
+          const [taskTagPairs, allDeps] = await Promise.all([
+            Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
+            Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
+          ]);
           const tagMap: Record<string, string[]> = {};
-          for (const [taskId, tagIds] of taskTagEntries) {
-            if (tagIds.length > 0) tagMap[taskId] = tagIds;
+          for (const { task_id, tag } of taskTagPairs) {
+            (tagMap[task_id] ??= []).push(tag.id);
           }
           dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
 
-          // Load task dependencies for all tasks
-          const depsEntries = await Promise.all(
-            tasks.map(async (t) => {
-              const deps = await api.getDependencies(t.id);
-              return [t.id, deps.map((d) => d.depends_on_task_id)] as [string, string[]];
-            })
-          );
           const depsMap: Record<string, string[]> = {};
-          for (const [taskId, depIds] of depsEntries) {
-            if (depIds.length > 0) depsMap[taskId] = depIds;
+          for (const d of allDeps) {
+            (depsMap[d.task_id] ??= []).push(d.depends_on_task_id);
           }
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 
-          // Load notifications and file conflicts
-          const [notifs, unread, conflicts] = await Promise.all([
+          // Load notifications, file conflicts, and worktrees
+          const [notifs, unread, conflicts, worktrees] = await Promise.all([
             api.getNotifications(50),
             api.getUnreadCount(),
             api.getFileConflicts(),
+            api.getWorktrees(),
           ]);
           dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
           dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
           dispatch({ type: "SET_FILE_CONFLICTS", payload: conflicts });
+          dispatch({ type: "SET_WORKTREES", payload: worktrees });
 
           // Show onboarding wizard on first run (no projects)
           if (projects.length === 0) {
@@ -193,15 +223,15 @@ export function App() {
     setShowOnboarding(false);
     // Reload data to reflect newly created project/task
     try {
-      const [stats, projects, sprints, tasks] = await Promise.all([
+      const [stats, projects, milestones, tasks] = await Promise.all([
         api.getStats(),
         api.getProjects(),
-        api.getSprints(),
+        api.getMilestones(),
         api.getTasks(),
       ]);
       dispatch({ type: "SET_STATS", payload: stats });
       dispatch({ type: "SET_PROJECTS", payload: projects });
-      dispatch({ type: "SET_SPRINTS", payload: sprints });
+      dispatch({ type: "SET_MILESTONES", payload: milestones });
       dispatch({ type: "SET_TASKS", payload: tasks });
       if (projects.length > 0) {
         dispatch({ type: "SELECT_PROJECT", payload: projects[0].id });
@@ -211,12 +241,18 @@ export function App() {
     }
   }
 
+  // Show nothing until auth is resolved
+  if (!authChecked) return null;
+
+  // Show login when auth is enabled but user is not authenticated
+  if (authEnabled && !isAuthenticated) return <LoginView />;
+
   return (
     <div className="app">
       <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} />
       <div className="main-content">
         <ProjectList />
-        {activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : <ActivityStreamView />}
+        {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : <ActivityStreamView />}
         <AgentFeed />
       </div>
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}

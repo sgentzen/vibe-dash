@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
@@ -11,8 +11,10 @@ interface TaskCardProps {
   agents: Agent[];
   taskTags?: Tag[];
   blockingCount?: number;
+  grabbed?: boolean;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
+  onGrab?: (taskId: string) => void;
 }
 
 function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week" | null {
@@ -29,7 +31,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -39,7 +41,10 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
     ? agents.find((a) => a.id === task.assigned_agent_id)
     : null;
 
-  const dueUrgency = isDone ? null : getDueUrgency(task.due_date);
+  const dueUrgency = useMemo(
+    () => (isDone ? null : getDueUrgency(task.due_date)),
+    [isDone, task.due_date]
+  );
 
   const childTasks = allTasks.filter((t) => t.parent_task_id === task.id);
   const hasChildren = childTasks.length > 0;
@@ -81,18 +86,28 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         onDragStart(task.id);
       }}
       style={{
-        border: `1px solid ${borderColor}`,
+        border: grabbed ? `2px dashed var(--accent-blue)` : `1px solid ${borderColor}`,
         borderRadius: "6px",
         padding: "10px",
-        background,
-        boxShadow,
+        background: grabbed ? "var(--bg-secondary)" : background,
+        boxShadow: grabbed ? "0 0 0 2px var(--accent-blue)" : boxShadow,
         cursor: "pointer",
         opacity: isDone ? 0.6 : 1,
         transition: "opacity 0.15s, border-color 0.15s",
         userSelect: "none",
       }}
     >
-      <div onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}>
+      <div
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        aria-describedby={grabbed ? "keyboard-grab-bar" : undefined}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter") { e.preventDefault(); onClick(); }
+          if (e.key === " ") { e.preventDefault(); onGrab ? onGrab(task.id) : onClick(); }
+        }}
+      >
         {/* Title */}
         <div
           style={{
@@ -109,7 +124,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
             <span style={{ color: "var(--accent-green)", flexShrink: 0 }}>{"\u2713"}</span>
           )}
           {isActive && (
-            <span className="pulse-dot" style={{ marginTop: "5px", flexShrink: 0 }} />
+            <span className="pulse-dot" aria-hidden="true" style={{ marginTop: "5px", flexShrink: 0 }} />
           )}
           <span>{task.title}</span>
         </div>
@@ -182,6 +197,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           {/* Priority badge */}
           {(task.priority === "urgent" || task.priority === "high") && (
             <span
+              aria-label={`Priority: ${task.priority}`}
               style={{
                 fontSize: "10px",
                 padding: "1px 6px",

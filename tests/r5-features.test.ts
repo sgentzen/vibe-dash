@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import {
-  initDb,
   createProject,
   createTask,
   registerAgent,
@@ -21,12 +20,12 @@ import {
   getActivityStream,
 } from "../server/db/index.js";
 import { getNextDueDate } from "../server/recurrence";
+import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
 beforeEach(() => {
-  db = new Database(":memory:");
-  initDb(db);
+  db = createTestDb();
 });
 
 // ─── 2.6 Recurring Tasks ────────────────────────────────────────────────────
@@ -179,10 +178,10 @@ describe("5.2 Project Templates", () => {
     expect(project!.name).toBe("New Project");
 
     // Check tasks were created
-    const tasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(project!.id) as any[];
+    const tasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(project!.id) as Array<{ title: string }>;
     expect(tasks.length).toBe(4); // 2 parents + 2 children
-    expect(tasks.some((x: any) => x.title === "Parent Task")).toBe(true);
-    expect(tasks.some((x: any) => x.title === "Subtask A")).toBe(true);
+    expect(tasks.some((x) => x.title === "Parent Task")).toBe(true);
+    expect(tasks.some((x) => x.title === "Subtask A")).toBe(true);
   });
 
   it("returns null for unknown template", () => {
