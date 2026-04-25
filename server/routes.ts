@@ -406,8 +406,8 @@ export function createRouter(db: Database.Database): Router {
       payload: { ...entry, agent_name: null, task_title: completed!.title },
     });
     // R12.2: Close linked GitHub issue (fire-and-forget)
-    closeLinkedIssue(db, completed!.id).catch((err: Error) =>
-      console.error("Failed to close linked GitHub issue:", err.message)
+    closeLinkedIssue(db, completed!.id).catch((err: unknown) =>
+      console.error("[git-sync] Failed to close linked GitHub issue:", err instanceof Error ? err.message : err)
     );
     res.json(completed);
   });

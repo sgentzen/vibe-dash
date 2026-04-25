@@ -26,7 +26,7 @@ describe("git-sync DB layer", () => {
 
   it("createGitIntegration creates and returns safe version (no token field)", () => {
     const integration = createGitIntegration(
-      db, projectId, "github", "octocat", "hello-world", "ghp_secret123", false
+      db, projectId, "github", "octocat", "hello-world", "test-token-placeholder", false
     );
 
     expect(integration.id).toBeTruthy();
