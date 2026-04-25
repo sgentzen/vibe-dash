@@ -58,6 +58,11 @@ import {
 } from "../db/index.js";
 
 import { broadcast } from "../websocket.js";
+import {
+  createGitIntegration,
+  listGitIntegrations,
+} from "../db/index.js";
+import { syncGitHubIssues } from "../git-sync-service.js";
 
 /** Auto-log activity and broadcast it for any mutation */
 function autoLog(
@@ -537,6 +542,46 @@ export async function handleTool(
         return ok({ digest });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Digest generation failed";
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
+    }
+
+    // ─── R12.2: Git Host Sync ─────────────────────────────────────────────────
+
+    case "add_git_integration": {
+      try {
+        const integration = createGitIntegration(
+          db,
+          args.project_id as string,
+          args.provider as "github" | "gitlab",
+          args.owner as string,
+          args.repo as string,
+          args.token as string,
+          Boolean(args.auto_sync)
+        );
+        return ok({ integration_id: integration.id, owner: integration.owner, repo: integration.repo });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to add integration";
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
+    }
+
+    case "sync_github_issues": {
+      try {
+        const result = await syncGitHubIssues(db, args.integration_id as string);
+        return ok({ issues_pulled: result.issues_pulled, issues_updated: result.issues_updated, errors: result.errors });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Sync failed";
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
+    }
+
+    case "list_git_integrations": {
+      try {
+        const integrations = listGitIntegrations(db, args.project_id as string | undefined);
+        return ok({ integrations });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to list integrations";
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
       }
     }

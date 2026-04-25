@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate, Webhook } from "../types";
+import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, SprintCapacity, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, SprintDailyStats, VelocityData, ActivityHeatmapEntry, ProjectTemplate, Webhook, GitIntegrationSafe, GitLinkedItem, GitSyncResult } from "../types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -514,6 +514,60 @@ async function getCostByAgent(params: Record<string, string | undefined> = {}): 
   return res.json();
 }
 
+// ─── R12.2: Git Host Sync ─────────────────────────────────────────────────
+
+async function getGitIntegrations(projectId?: string): Promise<GitIntegrationSafe[]> {
+  const url = projectId
+    ? `/api/git/integrations?project_id=${encodeURIComponent(projectId)}`
+    : "/api/git/integrations";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`getGitIntegrations failed: ${res.status}`);
+  return res.json();
+}
+
+async function addGitIntegration(data: {
+  project_id: string;
+  provider: "github" | "gitlab";
+  owner: string;
+  repo: string;
+  token: string;
+  auto_sync?: boolean;
+}): Promise<GitIntegrationSafe> {
+  const res = await fetch("/api/git/integrations", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `addGitIntegration failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function deleteGitIntegration(id: string): Promise<void> {
+  const res = await fetch(`/api/git/integrations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`deleteGitIntegration failed: ${res.status}`);
+}
+
+async function syncGitIntegration(id: string): Promise<GitSyncResult> {
+  const res = await fetch(`/api/git/integrations/${encodeURIComponent(id)}/sync`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `syncGitIntegration failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function getGitLinkedItems(integrationId: string): Promise<GitLinkedItem[]> {
+  const res = await fetch(`/api/git/integrations/${encodeURIComponent(integrationId)}/items`);
+  if (!res.ok) throw new Error(`getGitLinkedItems failed: ${res.status}`);
+  return res.json();
+}
+
 // ─── R12.1: Intelligence ─────────────────────────────────────────────────
 
 async function queryAI(question: string, projectId?: string): Promise<{ answer: string; model: string }> {
@@ -601,5 +655,10 @@ export function useApi() {
     getCostByAgent,
     queryAI,
     getDigest,
+    getGitIntegrations,
+    addGitIntegration,
+    deleteGitIntegration,
+    syncGitIntegration,
+    getGitLinkedItems,
   }), []);
 }

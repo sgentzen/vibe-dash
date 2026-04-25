@@ -107,3 +107,15 @@ export {
   getCostByAgent,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
+export {
+  createGitIntegration,
+  listGitIntegrations,
+  getGitIntegration,
+  deleteGitIntegration,
+  updateLastSynced,
+  upsertLinkedItem,
+  getLinkedItemByExternal,
+  listLinkedItems,
+  getLinkedItemByTaskId,
+} from "./git-sync.js";
+export type { GitIntegration, GitIntegrationSafe, GitLinkedItem } from "./git-sync.js";

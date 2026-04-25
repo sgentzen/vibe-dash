@@ -3,6 +3,7 @@ import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { useAppDispatch } from "../store";
 import { WebhookSettings } from "./WebhookSettings";
+import { GitSyncSettings } from "./GitSyncSettings";
 import { sectionHeader } from "../styles/shared.js";
 
 export function TopBar() {
@@ -10,7 +11,7 @@ export function TopBar() {
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState<"webhooks" | "git" | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -194,7 +195,7 @@ export function TopBar() {
 
       {/* Settings Gear */}
       <button
-        onClick={() => setShowSettings(true)}
+        onClick={() => setShowSettings(showSettings ? null : "webhooks")}
         aria-label="Settings"
         style={{
           background: "transparent",
@@ -209,7 +210,8 @@ export function TopBar() {
         {"\u2699\uFE0F"}
       </button>
 
-      {showSettings && <WebhookSettings onClose={() => setShowSettings(false)} />}
+      {showSettings === "webhooks" && <WebhookSettings onClose={() => setShowSettings(null)} />}
+      {showSettings === "git" && <GitSyncSettings onClose={() => setShowSettings(null)} />}
 
       {/* Notification Bell */}
       <div style={{ position: "relative" }}>

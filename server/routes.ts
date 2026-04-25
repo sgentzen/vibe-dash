@@ -93,6 +93,14 @@ import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 import { isAiConfigured, generateDigest, queryNaturalLanguage, MODEL as INTELLIGENCE_MODEL } from "./intelligence.js";
+import { syncGitHubIssues, closeLinkedIssue } from "./git-sync-service.js";
+import {
+  createGitIntegration,
+  listGitIntegrations,
+  getGitIntegration,
+  deleteGitIntegration,
+  listLinkedItems,
+} from "./db/index.js";
 
 const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
@@ -351,6 +359,10 @@ export function createRouter(db: Database.Database): Router {
       type: "agent_activity",
       payload: { ...entry, agent_name: null, task_title: completed!.title },
     });
+    // R12.2: Close linked GitHub issue (fire-and-forget)
+    closeLinkedIssue(db, completed!.id).catch((err: Error) =>
+      console.error("Failed to close linked GitHub issue:", err.message)
+    );
     res.json(completed);
   });
 
@@ -916,6 +928,75 @@ export function createRouter(db: Database.Database): Router {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.status(500).json({ error: message });
     }
+  });
+
+  // ─── R12.2: Git Host Sync ───────────────────────────────────────────────────
+
+  // GET /api/git/integrations?project_id=...
+  router.get("/api/git/integrations", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    const integrations = listGitIntegrations(db, project_id);
+    res.json(integrations);
+  });
+
+  // POST /api/git/integrations
+  router.post("/api/git/integrations", (req, res) => {
+    const { project_id, provider, owner, repo, token, auto_sync } = req.body as {
+      project_id?: string;
+      provider?: string;
+      owner?: string;
+      repo?: string;
+      token?: string;
+      auto_sync?: boolean;
+    };
+    if (!project_id) { res.status(400).json({ error: "project_id is required" }); return; }
+    if (!provider || !["github", "gitlab"].includes(provider)) {
+      res.status(400).json({ error: "provider must be 'github' or 'gitlab'" }); return;
+    }
+    if (!owner) { res.status(400).json({ error: "owner is required" }); return; }
+    if (!repo) { res.status(400).json({ error: "repo is required" }); return; }
+    if (!token) { res.status(400).json({ error: "token is required" }); return; }
+    try {
+      const integration = createGitIntegration(
+        db, project_id, provider as "github" | "gitlab", owner, repo, token, Boolean(auto_sync)
+      );
+      res.status(201).json(integration);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // DELETE /api/git/integrations/:id
+  router.delete("/api/git/integrations/:id", (req, res) => {
+    const existing = getGitIntegration(db, req.params.id);
+    if (!existing) { res.status(404).json({ error: "Integration not found" }); return; }
+    deleteGitIntegration(db, req.params.id);
+    res.status(204).send();
+  });
+
+  // POST /api/git/integrations/:id/sync
+  router.post("/api/git/integrations/:id/sync", async (req, res) => {
+    const integration = getGitIntegration(db, req.params.id);
+    if (!integration) { res.status(404).json({ error: "Integration not found" }); return; }
+    if (integration.provider === "gitlab") {
+      res.status(503).json({ error: "provider 'gitlab' not yet supported" }); return;
+    }
+    try {
+      const result = await syncGitHubIssues(db, req.params.id);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // GET /api/git/integrations/:id/items
+  router.get("/api/git/integrations/:id/items", (req, res) => {
+    const existing = getGitIntegration(db, req.params.id);
+    if (!existing) { res.status(404).json({ error: "Integration not found" }); return; }
+    const items = listLinkedItems(db, req.params.id);
+    res.json(items);
   });
 
   return router;
