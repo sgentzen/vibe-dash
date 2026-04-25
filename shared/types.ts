@@ -415,3 +415,40 @@ export interface ExecutiveSummary {
   costs: CostOverview;
   generated_at: string;
 }
+
+// ─── R12.2: Git Host Sync ─────────────────────────────────────────────────────
+
+export interface GitIntegrationSafe {
+  id: string;
+  project_id: string;
+  provider: "github" | "gitlab";
+  owner: string;
+  repo: string;
+  token_configured: boolean;
+  auto_sync: boolean;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitLinkedItem {
+  id: string;
+  integration_id: string;
+  task_id: string | null;
+  item_type: "issue" | "pr";
+  external_number: number;
+  external_id: string;
+  external_title: string;
+  external_state: string;
+  external_url: string;
+  pr_number: number | null;
+  pr_state: string | null;
+  synced_at: string;
+}
+
+export interface GitSyncResult {
+  integration_id: string;
+  issues_pulled: number;
+  issues_updated: number;
+  errors: string[];
+}

@@ -142,3 +142,15 @@ export {
   rotateApiKey,
   countUsers,
 } from "./users.js";
+export {
+  createGitIntegration,
+  listGitIntegrations,
+  getGitIntegration,
+  deleteGitIntegration,
+  updateLastSynced,
+  upsertLinkedItem,
+  getLinkedItemByExternal,
+  listLinkedItems,
+  getLinkedItemByTaskId,
+} from "./git-sync.js";
+export type { GitIntegration, GitIntegrationSafe, GitLinkedItem } from "./git-sync.js";

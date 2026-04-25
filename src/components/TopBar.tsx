@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { WebhookSettings } from "./WebhookSettings";
+import { GitSyncSettings } from "./GitSyncSettings";
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
@@ -13,7 +14,7 @@ export function TopBar() {
   const { unreadCount, notifications } = useNotificationState();
   const dispatch = useAppDispatch();
   const api = useApi();
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState<"webhooks" | "git" | null>(null);
 
   async function handleAddProject(name: string) {
     const project = await api.createProject({ name });
@@ -164,7 +165,7 @@ export function TopBar() {
 
       {/* Settings Gear */}
       <button
-        onClick={() => setShowSettings(true)}
+        onClick={() => setShowSettings(showSettings ? null : "webhooks")}
         aria-label="Settings"
         style={{
           background: "transparent",
@@ -179,7 +180,8 @@ export function TopBar() {
         {"\u2699\uFE0F"}
       </button>
 
-      {showSettings && <WebhookSettings onClose={() => setShowSettings(false)} />}
+      {showSettings === "webhooks" && <WebhookSettings onClose={() => setShowSettings(null)} />}
+      {showSettings === "git" && <GitSyncSettings onClose={() => setShowSettings(null)} />}
 
       {/* Notification Bell */}
       <NotificationBell

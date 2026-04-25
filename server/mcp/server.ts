@@ -713,5 +713,39 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("generate_digest")
   );
 
+  // ─── R12.2: Git Host Sync ──────────────────────────────────────────────────
+
+  server.tool(
+    "add_git_integration",
+    "Connect a GitHub repository to a project for issue sync",
+    {
+      project_id: z.string(),
+      provider: z.enum(["github", "gitlab"]),
+      owner: z.string(),
+      repo: z.string(),
+      token: z.string(),
+      auto_sync: z.boolean().optional(),
+    },
+    call("add_git_integration")
+  );
+
+  server.tool(
+    "sync_github_issues",
+    "Pull open GitHub issues and create/update vibe-dash tasks",
+    {
+      integration_id: z.string(),
+    },
+    call("sync_github_issues")
+  );
+
+  server.tool(
+    "list_git_integrations",
+    "List GitHub/GitLab integrations (tokens redacted)",
+    {
+      project_id: z.string().optional(),
+    },
+    call("list_git_integrations")
+  );
+
   return { server, cleanup };
 }

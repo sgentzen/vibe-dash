@@ -308,6 +308,44 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "006_git_sync",
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS git_integrations (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          provider TEXT NOT NULL CHECK (provider IN ('github', 'gitlab')),
+          owner TEXT NOT NULL,
+          repo TEXT NOT NULL,
+          token TEXT NOT NULL,
+          auto_sync INTEGER NOT NULL DEFAULT 0,
+          last_synced_at TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(project_id, owner, repo)
+        );
+        CREATE TABLE IF NOT EXISTS git_linked_items (
+          id TEXT PRIMARY KEY,
+          integration_id TEXT NOT NULL REFERENCES git_integrations(id) ON DELETE CASCADE,
+          task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+          item_type TEXT NOT NULL CHECK (item_type IN ('issue', 'pr')),
+          external_number INTEGER NOT NULL,
+          external_id TEXT NOT NULL,
+          external_title TEXT NOT NULL,
+          external_state TEXT NOT NULL,
+          external_url TEXT NOT NULL,
+          pr_number INTEGER,
+          pr_state TEXT,
+          synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(integration_id, item_type, external_number)
+        );
+        CREATE INDEX IF NOT EXISTS idx_git_integrations_project_id ON git_integrations(project_id);
+        CREATE INDEX IF NOT EXISTS idx_git_linked_items_integration_id ON git_linked_items(integration_id);
+        CREATE INDEX IF NOT EXISTS idx_git_linked_items_task_id ON git_linked_items(task_id);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

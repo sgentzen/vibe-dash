@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitLinkedItem, GitSyncResult } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -678,6 +678,60 @@ async function createUserApi(data: { name: string; email: string; role?: string 
   return res.json();
 }
 
+// ─── R12.2: Git Host Sync ─────────────────────────────────────────────────
+
+async function getGitIntegrations(projectId?: string): Promise<GitIntegrationSafe[]> {
+  const url = projectId
+    ? `/api/git/integrations?project_id=${encodeURIComponent(projectId)}`
+    : "/api/git/integrations";
+  const res = await apiFetch(url);
+  if (!res.ok) throw new Error(`getGitIntegrations failed: ${res.status}`);
+  return res.json();
+}
+
+async function addGitIntegration(data: {
+  project_id: string;
+  provider: "github" | "gitlab";
+  owner: string;
+  repo: string;
+  token: string;
+  auto_sync?: boolean;
+}): Promise<GitIntegrationSafe> {
+  const res = await apiFetch("/api/git/integrations", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `addGitIntegration failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function deleteGitIntegration(id: string): Promise<void> {
+  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`deleteGitIntegration failed: ${res.status}`);
+}
+
+async function syncGitIntegration(id: string): Promise<GitSyncResult> {
+  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}/sync`, {
+    method: "POST",
+    headers: jsonHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `syncGitIntegration failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function getGitLinkedItems(integrationId: string): Promise<GitLinkedItem[]> {
+  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(integrationId)}/items`);
+  if (!res.ok) throw new Error(`getGitLinkedItems failed: ${res.status}`);
+  return res.json();
+}
+
 // ─── R12.1: Intelligence ─────────────────────────────────────────────────
 
 async function queryAI(question: string, projectId?: string): Promise<{ answer: string; model: string }> {
@@ -730,8 +784,6 @@ async function getDigest(period: "daily" | "weekly", projectId?: string): Promis
     const data = await res.json().catch(() => ({}));
     throw new Error((data as { error?: string }).error ?? `getDigest failed: ${res.status}`);
   }
-  return res.json();
-}
   return res.json();
 }
 
@@ -812,5 +864,10 @@ export function useApi() {
     rotateKey: rotateKeyApi,
     queryAI,
     getDigest,
+    getGitIntegrations,
+    addGitIntegration,
+    deleteGitIntegration,
+    syncGitIntegration,
+    getGitLinkedItems,
   }), []);
 }
