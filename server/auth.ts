@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "crypto";
+import { createHmac, createHash, randomBytes, timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import type Database from "better-sqlite3";
 import { getUserByKeyHash, countUsers } from "./db/users.js";
@@ -11,6 +11,12 @@ declare global {
       user?: User;
     }
   }
+}
+
+const PEPPER = process.env.VIBE_DASH_KEY_PEPPER ?? "";
+if (!PEPPER) {
+  // Without a pepper, HMAC degrades to unkeyed SHA-256. Set VIBE_DASH_KEY_PEPPER in production.
+  console.warn("[auth] VIBE_DASH_KEY_PEPPER is not set — API key hashes have no pepper.");
 }
 
 // Cache the "auth is enabled" state — once true it never reverts
@@ -26,7 +32,29 @@ export function generateApiKey(): string {
 }
 
 export function hashApiKey(key: string): string {
-  return createHash("sha256").update(key).digest("hex");
+  // HMAC-SHA-256 keyed by pepper; "v1:" prefix enables future algorithm rotation.
+  // CodeQL js/insufficient-password-hash: generateApiKey() returns 256-bit randomBytes,
+  // so HMAC-SHA-256 is appropriate — scrypt/argon2 is for low-entropy passwords only.
+  const hash = createHmac("sha256", PEPPER).update(key).digest("hex");
+  return `v1:${hash}`;
+}
+
+export function verifyApiKey(key: string, stored: string): boolean {
+  if (stored.startsWith("v1:")) {
+    const expected = hashApiKey(key);
+    try {
+      return timingSafeEqual(Buffer.from(expected), Buffer.from(stored));
+    } catch {
+      return false;
+    }
+  }
+  // Legacy: plain SHA-256 (transition window for existing installations)
+  const legacy = createHash("sha256").update(key).digest("hex");
+  try {
+    return timingSafeEqual(Buffer.from(legacy), Buffer.from(stored));
+  } catch {
+    return false;
+  }
 }
 
 export function makeAuthMiddleware(db: Database.Database) {
