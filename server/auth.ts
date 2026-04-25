@@ -26,6 +26,10 @@ export function isAuthEnabled(db: Database.Database): boolean {
   _authEnabled = countUsers(db) > 0;
   return _authEnabled;
 }
+/** Reset auth cache — test use only */
+export function _resetAuthCache(): void {
+  _authEnabled = null;
+}
 
 export function generateApiKey(): string {
   return randomBytes(32).toString("hex");
@@ -72,8 +76,14 @@ export function makeAuthMiddleware(db: Database.Database) {
     }
 
     const key = authHeader.slice(7);
-    const hash = hashApiKey(key);
-    const user = getUserByKeyHash(db, hash);
+    // Try HMAC hash first; fall back to legacy SHA-256 so existing installations
+    // aren't locked out before they rotate their keys.
+    const hmacHash = hashApiKey(key);
+    let user = getUserByKeyHash(db, hmacHash);
+    if (!user) {
+      const legacyHash = createHash("sha256").update(key).digest("hex");
+      user = getUserByKeyHash(db, legacyHash);
+    }
 
     if (!user) {
       res.status(401).json({ error: "Invalid API key" });
@@ -96,5 +106,16 @@ export function requireRole(...roles: UserRole[]) {
       return;
     }
     next();
+  };
+}
+
+/**
+ * Like requireRole but is a no-op when auth is disabled (no users registered).
+ * Use for endpoints that should be open in local-only mode.
+ */
+export function requireRoleWhenEnabled(db: Database.Database, ...roles: UserRole[]) {
+  return function (req: Request, res: Response, next: NextFunction): void {
+    if (!isAuthEnabled(db)) { next(); return; }
+    requireRole(...roles)(req, res, next);
   };
 }
