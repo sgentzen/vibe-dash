@@ -12,7 +12,19 @@
       "Skill(update-config:*)",
       "mcp__vibe-dash__list_tasks",
       "mcp__vibe-dash__update_sprint",
-      "mcp__vibe-dash__complete_task"
+      "mcp__vibe-dash__complete_task",
+      "mcp__vibe-dash__list_milestones",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); items=[x for x in data if isinstance\\(x,dict\\) and x.get\\('text'\\)]; text=items[0]['text'] if items else data[0].get\\('text',''\\) if data else ''; milestones=json.loads\\(text\\); r12=[m for m in milestones if 'r12' in m.get\\('title',''\\).lower\\(\\) or 'r12' in m.get\\('name',''\\).lower\\(\\) or 'R12' in m.get\\('title',''\\) or 'R12' in m.get\\('name',''\\)]; print\\(json.dumps\\(r12, indent=2\\)\\)\")",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(git stash *)",
+      "Bash(mkdir -p .claude)",
+      "Bash(touch .claude/.last-code-review)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npm install *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\sgent\\\\projects\\\\vibe-dash\\\\.claude\\\\worktrees\\\\festive-williams-d4a428\\\\.claude\")",
+      "Bash(touch \"C:\\\\Users\\\\sgent\\\\projects\\\\vibe-dash\\\\.claude\\\\worktrees\\\\festive-williams-d4a428\\\\.claude\\\\.last-code-review\")"
     ]
   }
 }

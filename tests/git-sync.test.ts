@@ -120,7 +120,7 @@ describe("git-sync DB layer", () => {
   });
 
   it("token is never present in GitIntegrationSafe response", () => {
-    createGitIntegration(db, projectId, "github", "octocat", "hello-world", "super-secret-token", false);
+    createGitIntegration(db, projectId, "github", "octocat", "hello-world", "test-token-placeholder", false);
 
     const integrations = listGitIntegrations(db, projectId);
     for (const i of integrations) {
@@ -168,12 +168,12 @@ describe("git-sync DB layer", () => {
 
   it("getGitIntegration (internal) returns full record including token", () => {
     const safe = createGitIntegration(
-      db, projectId, "github", "octocat", "hello-world", "my-secret-token", false
+      db, projectId, "github", "octocat", "hello-world", "test-token-placeholder", false
     );
 
     const full = getGitIntegration(db, safe.id);
     expect(full).toBeDefined();
-    expect(full!.token).toBe("my-secret-token");
+    expect(full!.token).toBe("test-token-placeholder");
   });
 });
 
@@ -207,6 +207,7 @@ vi.mock("@octokit/rest", () => {
         listForRepo: vi.fn().mockResolvedValue({ data: mockIssues }),
         update: vi.fn().mockResolvedValue({}),
       };
+      paginate = vi.fn().mockResolvedValue(mockIssues);
     },
   };
 });

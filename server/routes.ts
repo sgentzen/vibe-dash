@@ -107,6 +107,8 @@ const dependencyDeleteLimiter = rateLimit({
   max: 30, // limit each IP to 30 delete requests per windowMs
 });
 
+const gitSyncLimiter = rateLimit({ windowMs: 60_000, max: 5 }); // 5 syncs/min per IP
+
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
@@ -976,14 +978,18 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/git/integrations/:id/sync
-  router.post("/api/git/integrations/:id/sync", async (req, res) => {
-    const integration = getGitIntegration(db, req.params.id);
+  router.post("/api/git/integrations/:id/sync", gitSyncLimiter, async (req, res) => {
+    const integrationId = req.params.id as string;
+    const integration = getGitIntegration(db, integrationId);
     if (!integration) { res.status(404).json({ error: "Integration not found" }); return; }
     if (integration.provider === "gitlab") {
       res.status(503).json({ error: "provider 'gitlab' not yet supported" }); return;
     }
     try {
-      const result = await syncGitHubIssues(db, req.params.id);
+      const result = await syncGitHubIssues(db, integrationId);
+      if (result.errors.some(e => e.includes("already in progress"))) {
+        res.status(409).json({ error: "Sync already in progress for this integration" }); return;
+      }
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
