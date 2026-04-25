@@ -196,13 +196,6 @@ export const updateAlertRuleSchema = z.object({
   enabled: z.boolean(),
 });
 
-// ─── Saved filters ───────────────────────────────────────────────────────
-
-export const createSavedFilterSchema = z.object({
-  name: z.string().min(1),
-  filter_json: validJson,
-});
-
 // ─── Blockers ───────────────────────────────────────────────────────────
 
 export const createBlockerSchema = z.object({

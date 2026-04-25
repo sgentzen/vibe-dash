@@ -13,6 +13,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
+import { startMaterializer } from "./ingestion/materializer.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 
@@ -109,6 +110,7 @@ initWebSocket(server, db);
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "Vibe Dash running");
   initPlugins(db).catch((err) => logger.warn({ err }, "plugin init failed"));
+  startMaterializer(db);
   logger.info({ port: PORT, path: "/ws" }, "WebSocket available");
   logger.info({ port: PORT, path: "/sse" }, "MCP SSE available");
   // Backfill milestone daily stats so the dashboard has data immediately

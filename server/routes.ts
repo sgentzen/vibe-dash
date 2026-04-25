@@ -43,9 +43,6 @@ import {
   getAgentById,
   getAgentActivity,
   getAgentCompletedToday,
-  createSavedFilter,
-  listSavedFilters,
-  deleteSavedFilter,
   getAgentStats,
   getMilestoneAgentContributions,
   extractMentions,
@@ -107,7 +104,6 @@ import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 import { validateBody } from "./routes/validate.js";
 import { integrationRoutes } from "./routes/integrations.js";
-import { openapiRoutes } from "./routes/openapi.js";
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -139,7 +135,6 @@ export function createRouter(db: Database.Database): Router {
   const router = Router();
 
   router.use(integrationRoutes(db, broadcast));
-  router.use(openapiRoutes(db, broadcast));
 
   const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -635,22 +630,6 @@ export function createRouter(db: Database.Database): Router {
 
   router.get("/api/agents/:id/sessions", (req, res) => {
     res.json(listAgentSessions(db, req.params.id));
-  });
-
-  // ─── R2: Saved Filters ────────────────────────────────────────────────
-
-  router.get("/api/filters", (_req, res) => {
-    res.json(listSavedFilters(db));
-  });
-
-  router.post("/api/filters", (req, res) => {
-    const { name, filter_json } = req.body as { name: string; filter_json: string };
-    if (!name || !filter_json) { res.status(400).json({ error: "name and filter_json are required" }); return; }
-    res.status(201).json(createSavedFilter(db, name, filter_json));
-  });
-
-  router.delete("/api/filters/:id", (req, res) => {
-    res.json({ success: deleteSavedFilter(db, req.params.id) });
   });
 
   // ─── R3: Task Comments ──────────────────────────────────────────────

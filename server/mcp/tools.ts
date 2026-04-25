@@ -78,6 +78,11 @@ import {
   createReviewSchema,
   updateReviewSchema,
 } from "../../shared/schemas.js";
+import {
+  createIngestionSource,
+  listIngestionSources,
+  rotateIngestionToken,
+} from "../db/ingestion.js";
 import { execFileSync } from "child_process";
 
 import { broadcast } from "../websocket.js";
@@ -726,6 +731,29 @@ export async function handleTool(
       if (!taskExists) return ok({ error: "Task not found" });
       const suggestion = suggestAgent(db, task_id);
       return ok(suggestion);
+    }
+
+    // ─── R11.3: Ingestion Sources ──────────────────────────────��──────────
+
+    case "list_ingestion_sources":
+      return ok(listIngestionSources(db));
+
+    case "create_ingestion_source": {
+      const name = args.name as string;
+      const kind = args.kind as string;
+      const project_id = (args.project_id as string | undefined) ?? null;
+      if (!name || !kind) return ok({ error: "name and kind are required" });
+      const result = createIngestionSource(db, { name, kind: kind as import("../db/ingestion.js").IngestionSourceKind, project_id });
+      // token is shown once — agent must save it
+      return ok(result);
+    }
+
+    case "rotate_ingestion_token": {
+      const source_id = args.source_id as string;
+      if (!source_id) return ok({ error: "source_id is required" });
+      const result = rotateIngestionToken(db, source_id);
+      if (!result) return ok({ error: "Ingestion source not found" });
+      return ok(result);
     }
 
     default:

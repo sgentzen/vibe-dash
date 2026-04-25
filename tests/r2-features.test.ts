@@ -17,9 +17,6 @@ import {
   closeStaleSession,
   listAgentSessions,
   searchTasks,
-  createSavedFilter,
-  listSavedFilters,
-  deleteSavedFilter,
   createMilestone,
   completeTask,
   getAgentById,
@@ -274,25 +271,6 @@ describe("3.1 Search & Filtering", () => {
 
     const results = searchTasks(db, { query: "zzzznonexistent" });
     expect(results).toHaveLength(0);
-  });
-});
-
-// ─── Saved Filters ──────────────────────────────────────────────────────────
-
-describe("Saved Filters", () => {
-  it("creates and lists saved filters", () => {
-    const f = createSavedFilter(db, "My Filter", JSON.stringify({ status: "planned" }));
-    expect(f.name).toBe("My Filter");
-
-    const filters = listSavedFilters(db);
-    expect(filters).toHaveLength(1);
-    expect(filters[0].name).toBe("My Filter");
-  });
-
-  it("deletes saved filter", () => {
-    const f = createSavedFilter(db, "Temp", JSON.stringify({}));
-    expect(deleteSavedFilter(db, f.id)).toBe(true);
-    expect(listSavedFilters(db)).toHaveLength(0);
   });
 });
 

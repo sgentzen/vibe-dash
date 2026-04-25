@@ -115,13 +115,6 @@ export interface TaskDependency {
   created_at: string;
 }
 
-export interface SavedFilter {
-  id: string;
-  name: string;
-  filter_json: string;
-  created_at: string;
-}
-
 export interface MilestoneProgress {
   task_count: number;
   completed_count: number;
@@ -319,6 +312,18 @@ export interface User {
   updated_at: string;
 }
 
+export type IngestionSourceKind = "claude_code" | "cursor" | "codex" | "copilot" | "aider" | "generic";
+
+export interface IngestionSource {
+  id: string;
+  name: string;
+  kind: IngestionSourceKind;
+  project_id: string | null;
+  active: boolean;
+  created_at: string;
+  last_event_at: string | null;
+}
+
 export type WsEventType =
   | "project_created"
   | "project_updated"
@@ -354,7 +359,9 @@ export type WsEventType =
   | "review_updated"
   | "worktree_created"
   | "worktree_updated"
-  | "plugins_reloaded";
+  | "plugins_reloaded"
+  | "ingestion_event_received"
+  | "ingestion_source_created";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -393,7 +400,9 @@ export type WsEvent =
   | WsEventOf<"review_updated", TaskReview>
   | WsEventOf<"worktree_created", TaskWorktree>
   | WsEventOf<"worktree_updated", TaskWorktree>
-  | WsEventOf<"plugins_reloaded", { count: number }>;
+  | WsEventOf<"plugins_reloaded", { count: number }>
+  | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
+  | WsEventOf<"ingestion_source_created", { id: string; name: string; kind: string }>;
 
 // ─── Executive Summary ────────────────────────────────────────────────────────
 

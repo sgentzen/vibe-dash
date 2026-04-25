@@ -16,7 +16,6 @@ import { commentRoutes } from "./comments.js";
 import { fileLockRoutes } from "./file-locks.js";
 import { alertRoutes } from "./alerts.js";
 import { notificationRoutes } from "./notifications.js";
-import { filterRoutes } from "./filters.js";
 import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
@@ -28,6 +27,7 @@ import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
 import { userRoutes } from "./users.js";
 import { pluginRoutes } from "./plugins.js";
+import { ingestionRoutes } from "../ingestion/index.js";
 import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
 
@@ -54,7 +54,6 @@ const routeFactories: RouteFactory[] = [
   fileLockRoutes,
   alertRoutes,
   notificationRoutes,
-  filterRoutes,
   templateRoutes,
   webhookRoutes,
   costRoutes,
@@ -65,6 +64,7 @@ const routeFactories: RouteFactory[] = [
   milestoneRoutes,
   userRoutes,
   pluginRoutes,
+  ingestionRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {
@@ -72,10 +72,15 @@ export function createRouter(db: Database.Database): Router {
   const router = Router();
 
   // Auth middleware runs before all routes; no-op when no users exist.
-  // /api/auth/status is exempt — it's a public discovery endpoint.
+  // /api/auth/status is exempt (public discovery). /api/ingest/:kind and
+  // /api/ingest/:kind/heartbeat are exempt (use their own source-token auth).
   const authMiddleware = makeAuthMiddleware(db);
   router.use((req, res, next) => {
     if (req.path === "/api/auth/status") return next();
+    // POST /api/ingest/<kind> and POST /api/ingest/<kind>/heartbeat use
+    // ingestion source bearer tokens, not user tokens.
+    // "sources" and "events" are admin paths that go through normal user auth.
+    if (req.method === "POST" && /^\/api\/ingest\/(?!sources|events)[^/]+(\/heartbeat)?$/.test(req.path)) return next();
     authMiddleware(req, res, next);
   });
 

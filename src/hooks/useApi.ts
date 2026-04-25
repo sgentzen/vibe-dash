@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -282,26 +282,6 @@ async function searchTasks(params: Record<string, string | undefined>): Promise<
   const res = await apiFetch(`/api/tasks/search?${qs}`);
   if (!res.ok) throw new Error(`searchTasks failed: ${res.status}`);
   return res.json();
-}
-
-async function getSavedFilters(): Promise<SavedFilter[]> {
-  const res = await apiFetch("/api/filters");
-  if (!res.ok) throw new Error(`getSavedFilters failed: ${res.status}`);
-  return res.json();
-}
-
-async function createSavedFilter(name: string, filterJson: string): Promise<SavedFilter> {
-  const res = await apiFetch("/api/filters", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ name, filter_json: filterJson }),
-  });
-  if (!res.ok) throw new Error(`createSavedFilter failed: ${res.status}`);
-  return res.json();
-}
-
-async function deleteSavedFilter(id: string): Promise<void> {
-  await apiFetch(`/api/filters/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // ─── R3: Comments ────────────────────────────────────────────────────
@@ -707,6 +687,42 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
   return res.json();
 }
 
+// ─── Ingestion Sources ─────────────────────────────────────────────────────
+
+async function listIngestionSourcesApi(): Promise<import("../types").IngestionSource[]> {
+  const res = await apiFetch("/api/ingest/sources");
+  if (!res.ok) throw new Error(`listIngestionSources failed: ${res.status}`);
+  return res.json();
+}
+
+async function createIngestionSourceApi(
+  name: string,
+  kind: import("../types").IngestionSourceKind,
+  project_id?: string | null
+): Promise<import("../types").IngestionSource & { token: string }> {
+  const res = await apiFetch("/api/ingest/sources", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ name, kind, project_id: project_id ?? null }),
+  });
+  if (!res.ok) throw new Error(`createIngestionSource failed: ${res.status}`);
+  return res.json();
+}
+
+async function deleteIngestionSourceApi(id: string): Promise<void> {
+  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`deleteIngestionSource failed: ${res.status}`);
+}
+
+async function rotateIngestionTokenApi(id: string): Promise<import("../types").IngestionSource & { token: string }> {
+  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}/rotate`, {
+    method: "POST",
+    headers: jsonHeaders(),
+  });
+  if (!res.ok) throw new Error(`rotateIngestionToken failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -738,9 +754,6 @@ export function useApi() {
     getAgentActivity,
     getAgentSessions,
     searchTasks,
-    getSavedFilters,
-    createSavedFilter,
-    deleteSavedFilter,
     getComments,
     addComment: addCommentApi,
     getReviews,
@@ -785,5 +798,9 @@ export function useApi() {
     updateUserRole: updateUserRoleApi,
     deleteUser: deleteUserApi,
     rotateKey: rotateKeyApi,
+    listIngestionSources: listIngestionSourcesApi,
+    createIngestionSource: createIngestionSourceApi,
+    deleteIngestionSource: deleteIngestionSourceApi,
+    rotateIngestionToken: rotateIngestionTokenApi,
   }), []);
 }

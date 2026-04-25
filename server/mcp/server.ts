@@ -662,5 +662,34 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("get_worktree_status")
   );
 
+  // ─── R11.3: Ingestion Sources ─────────────────────────────────────────────
+
+  server.tool(
+    "list_ingestion_sources",
+    "List all configured ingestion sources (cross-platform agent hook endpoints)",
+    {},
+    call("list_ingestion_sources")
+  );
+
+  server.tool(
+    "create_ingestion_source",
+    "Create an ingestion source and return a one-time bearer token for posting events",
+    {
+      name: z.string().describe("Human-readable label for this source"),
+      kind: z.enum(["claude_code", "cursor", "codex", "copilot", "aider", "generic"]).describe("Platform kind"),
+      project_id: z.string().optional().describe("Optional project to associate events with"),
+    },
+    call("create_ingestion_source")
+  );
+
+  server.tool(
+    "rotate_ingestion_token",
+    "Rotate the bearer token for an ingestion source (old token is immediately invalidated)",
+    {
+      source_id: z.string().describe("ID of the ingestion source to rotate"),
+    },
+    call("rotate_ingestion_token")
+  );
+
   return { server, cleanup };
 }

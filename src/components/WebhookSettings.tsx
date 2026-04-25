@@ -4,8 +4,9 @@ import { useApi } from "../hooks/useApi";
 import { inputStyle, buttonPrimary } from "../styles/shared.js";
 import type { Webhook } from "../types";
 import { PluginPanel } from "./PluginWidget";
+import { IngestionSettings } from "./IngestionSettings";
 
-type SettingsTab = "webhooks" | "plugins";
+type SettingsTab = "webhooks" | "plugins" | "ingestion";
 
 const EVENT_TYPES = [
   "task_created", "task_updated", "task_completed",
@@ -75,7 +76,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
           <div style={{ display: "flex", gap: 8 }}>
-            {(["webhooks", "plugins"] as SettingsTab[]).map((tab) => (
+            {(["webhooks", "plugins", "ingestion"] as SettingsTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -104,6 +105,8 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
         {activeTab === "plugins" && (
           <PluginPanel style={{ marginTop: 4 }} />
         )}
+
+        {activeTab === "ingestion" && <IngestionSettings />}
 
         {activeTab === "webhooks" && <>
         {/* Add New */}
