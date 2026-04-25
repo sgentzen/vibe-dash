@@ -115,13 +115,6 @@ export interface TaskDependency {
   created_at: string;
 }
 
-export interface SavedFilter {
-  id: string;
-  name: string;
-  filter_json: string;
-  created_at: string;
-}
-
 export interface MilestoneProgress {
   task_count: number;
   completed_count: number;

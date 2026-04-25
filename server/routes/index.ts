@@ -16,7 +16,6 @@ import { commentRoutes } from "./comments.js";
 import { fileLockRoutes } from "./file-locks.js";
 import { alertRoutes } from "./alerts.js";
 import { notificationRoutes } from "./notifications.js";
-import { filterRoutes } from "./filters.js";
 import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
@@ -53,7 +52,6 @@ const routeFactories: RouteFactory[] = [
   fileLockRoutes,
   alertRoutes,
   notificationRoutes,
-  filterRoutes,
   templateRoutes,
   webhookRoutes,
   costRoutes,
