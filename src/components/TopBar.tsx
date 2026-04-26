@@ -163,23 +163,55 @@ export function TopBar() {
       />
 
       {/* Settings Gear */}
-      <button
-        onClick={() => setShowSettings(true)}
-        aria-label="Settings"
-        style={{
-          background: "transparent",
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          padding: "4px 8px",
-          cursor: "pointer",
-          color: "var(--text-secondary)",
-          fontSize: "14px",
-        }}
-      >
-        {"\u2699\uFE0F"}
-      </button>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          aria-label="Settings"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            padding: "4px 8px",
+            cursor: "pointer",
+            color: "var(--text-secondary)",
+            fontSize: "14px",
+          }}
+        >
+          {"⚙️"}
+        </button>
+        {showSettingsMenu && (
+          <div style={{
+            position: "absolute", top: "100%", right: 0, marginTop: "4px",
+            background: "var(--bg-secondary)", border: "1px solid var(--border)",
+            borderRadius: "8px", zIndex: 100, boxShadow: "var(--shadow-md)",
+            minWidth: "160px", overflow: "hidden",
+          }}>
+            <button
+              onClick={() => { setShowSettings("webhooks"); setShowSettingsMenu(false); }}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                background: "transparent", border: "none", padding: "8px 14px",
+                fontSize: "13px", color: "var(--text-primary)", cursor: "pointer",
+              }}
+            >
+              Webhooks
+            </button>
+            <button
+              onClick={() => { setShowSettings("git"); setShowSettingsMenu(false); }}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                background: "transparent", border: "none", padding: "8px 14px",
+                fontSize: "13px", color: "var(--text-primary)", cursor: "pointer",
+              }}
+            >
+              GitHub Sync
+            </button>
+          </div>
+        )}
+      </div>
 
-      {showSettings && <WebhookSettings onClose={() => setShowSettings(false)} />}
+      {showSettings === "webhooks" && <WebhookSettings onClose={() => setShowSettings(null)} />}
+      {showSettings === "git" && <GitSyncSettings onClose={() => setShowSettings(null)} />}
 
       {/* Notification Bell */}
       <NotificationBell
