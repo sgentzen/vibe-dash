@@ -107,7 +107,8 @@ initWebSocket(server);
 server.listen(PORT, () => {
   console.log(`Vibe Dash running on http://localhost:${PORT}`);
   console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
-  console.log(`MCP SSE at http://localhost:${PORT}/sse`);
+  console.log(`MCP (Streamable HTTP) at http://localhost:${PORT}/mcp`);
+  console.log(`MCP (SSE legacy)      at http://localhost:${PORT}/sse`);
 });
 
 export { app, db, server };
