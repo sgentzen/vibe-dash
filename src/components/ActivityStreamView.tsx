@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useAppState } from "../store";
+import { useDataState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle } from "../styles/shared.js";
 import type { ActivityEntry } from "../types";
@@ -7,7 +7,8 @@ import type { ActivityEntry } from "../types";
 const LAST_VISIT_KEY = "vibe-dash-last-visit";
 
 export function ActivityStreamView() {
-  const { projects, agents, pollGeneration } = useAppState();
+  const { projects, agents } = useDataState();
+  const { pollGeneration } = usePollingState();
   const api = useApi();
 
   const [entries, setEntries] = useState<ActivityEntry[]>([]);

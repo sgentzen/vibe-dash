@@ -15,8 +15,8 @@ function parseWebhookRow(row: Record<string, unknown>): Webhook {
 export function createWebhook(db: Database.Database, url: string, eventTypes: string[]): Webhook {
   const id = genId();
   const ts = now();
-  db.prepare("INSERT INTO webhooks (id, url, event_types, active, created_at) VALUES (?, ?, ?, 1, ?)").run(id, url, JSON.stringify(eventTypes), ts);
-  return parseWebhookRow(db.prepare("SELECT * FROM webhooks WHERE id = ?").get(id) as Record<string, unknown>);
+  const row = db.prepare("INSERT INTO webhooks (id, url, event_types, active, created_at) VALUES (?, ?, ?, 1, ?) RETURNING *").get(id, url, JSON.stringify(eventTypes), ts) as Record<string, unknown>;
+  return parseWebhookRow(row);
 }
 
 export function listWebhooks(db: Database.Database): Webhook[] {
@@ -32,8 +32,7 @@ export function updateWebhook(db: Database.Database, id: string, updates: { url?
   if (updates.active !== undefined) { sets.push("active = ?"); params.push(updates.active ? 1 : 0); }
   if (sets.length === 0) return null;
   params.push(id);
-  db.prepare("UPDATE webhooks SET " + sets.join(", ") + " WHERE id = ?").run(...params);
-  const row = db.prepare("SELECT * FROM webhooks WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+  const row = db.prepare("UPDATE webhooks SET " + sets.join(", ") + " WHERE id = ? RETURNING *").get(...params) as Record<string, unknown> | undefined;
   return row ? parseWebhookRow(row) : null;
 }
 

@@ -9,9 +9,11 @@ type SortDir = "asc" | "desc";
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 const STATUS_ORDER: Record<TaskStatus, number> = { in_progress: 0, planned: 1, blocked: 2, done: 3 };
+const STATUS_LABELS: Record<TaskStatus, string> = { planned: "Planned", in_progress: "In Progress", blocked: "Blocked", done: "Done" };
+const PRIORITY_LABELS: Record<TaskPriority, string> = { urgent: "Urgent", high: "High", medium: "Medium", low: "Low" };
 
 export function TaskListView() {
-  const { tasks, selectedProjectId, selectedSprintId, searchQuery, agents } = useAppState();
+  const { tasks, selectedProjectId, selectedMilestoneId, searchQuery, agents } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -26,7 +28,7 @@ export function TaskListView() {
     (t) =>
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
-      (selectedSprintId === null || t.sprint_id === selectedSprintId) &&
+      (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId) &&
       (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
   );
 
@@ -164,8 +166,8 @@ export function TaskListView() {
                   <input type="checkbox" checked={selected.has(task.id)} onChange={() => toggleSelect(task.id)} />
                 </td>
                 <td style={{ ...cellStyle, color: "var(--text-primary)", fontWeight: 500, maxWidth: "300px" }}>{task.title}</td>
-                <td style={cellStyle}>{task.status}</td>
-                <td style={{ ...cellStyle, color: PRIORITY_COLORS[task.priority] }}>{task.priority}</td>
+                <td style={cellStyle} aria-label={`Status: ${STATUS_LABELS[task.status]}`}>{STATUS_LABELS[task.status]}</td>
+                <td style={{ ...cellStyle, color: PRIORITY_COLORS[task.priority] }} aria-label={`Priority: ${PRIORITY_LABELS[task.priority]}`}>{PRIORITY_LABELS[task.priority]}</td>
                 <td style={cellStyle}>{task.estimate ?? "-"}</td>
                 <td style={cellStyle}>{task.progress}%</td>
                 <td style={cellStyle}>{task.due_date ?? "-"}</td>
