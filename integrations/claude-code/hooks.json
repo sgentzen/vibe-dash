@@ -1,0 +1,47 @@
+{
+  "_comment": "Add this to your project's .claude/settings.json under 'hooks'. Replace VIBE_DASH_TOKEN with your ingestion source token (create one via Settings → Ingestion in the Vibe Dash UI, or via MCP: create_ingestion_source). Replace VIBE_DASH_URL if not running locally.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST ${VIBE_DASH_URL:-http://localhost:3001}/api/ingest/claude_code -H 'Authorization: Bearer ${VIBE_DASH_TOKEN}' -H 'Content-Type: application/json' -d \"{\\\"hook_event_name\\\":\\\"PreToolUse\\\",\\\"tool_name\\\":\\\"$CLAUDE_TOOL_NAME\\\",\\\"session_id\\\":\\\"$CLAUDE_SESSION_ID\\\"}\" > /dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST ${VIBE_DASH_URL:-http://localhost:3001}/api/ingest/claude_code -H 'Authorization: Bearer ${VIBE_DASH_TOKEN}' -H 'Content-Type: application/json' -d \"{\\\"hook_event_name\\\":\\\"PostToolUse\\\",\\\"tool_name\\\":\\\"$CLAUDE_TOOL_NAME\\\",\\\"session_id\\\":\\\"$CLAUDE_SESSION_ID\\\",\\\"cost_usd\\\":$CLAUDE_COST_USD,\\\"model\\\":\\\"$CLAUDE_MODEL\\\"}\" > /dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST ${VIBE_DASH_URL:-http://localhost:3001}/api/ingest/claude_code -H 'Authorization: Bearer ${VIBE_DASH_TOKEN}' -H 'Content-Type: application/json' -d \"{\\\"hook_event_name\\\":\\\"Stop\\\",\\\"stop_reason\\\":\\\"$CLAUDE_STOP_REASON\\\",\\\"session_id\\\":\\\"$CLAUDE_SESSION_ID\\\",\\\"cost_usd\\\":$CLAUDE_COST_USD,\\\"input_tokens\\\":$CLAUDE_INPUT_TOKENS,\\\"output_tokens\\\":$CLAUDE_OUTPUT_TOKENS,\\\"model\\\":\\\"$CLAUDE_MODEL\\\"}\" > /dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST ${VIBE_DASH_URL:-http://localhost:3001}/api/ingest/claude_code -H 'Authorization: Bearer ${VIBE_DASH_TOKEN}' -H 'Content-Type: application/json' -d \"{\\\"hook_event_name\\\":\\\"UserPromptSubmit\\\",\\\"session_id\\\":\\\"$CLAUDE_SESSION_ID\\\"}\" > /dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAppDispatch } from "../store";
 import type { WsEvent } from "../types";
+import { getStoredApiKey } from "./useApi";
 
 const RECONNECT_DELAY_MS = 2000;
 
@@ -17,7 +18,9 @@ export function useWebSocket() {
       if (unmounted.current) return;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      const apiKey = getStoredApiKey();
+      const tokenParam = apiKey ? `?token=${encodeURIComponent(apiKey)}` : "";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws${tokenParam}`);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

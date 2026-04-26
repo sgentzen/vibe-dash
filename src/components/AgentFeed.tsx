@@ -302,6 +302,8 @@ function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
         {/* Health dot overlay */}
         <span
           className={isActive ? "pulse-dot" : undefined}
+          aria-label={`Status: ${HEALTH_LABELS[health]}`}
+          role="img"
           style={{
             position: "absolute",
             bottom: "-1px",

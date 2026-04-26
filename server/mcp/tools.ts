@@ -1,9 +1,8 @@
 import type Database from "better-sqlite3";
-import type { Agent } from "../types.js";
-import { generateDigest, queryNaturalLanguage } from "../intelligence.js";
 import {
   registerAgent,
   createProject,
+  updateProject,
   listProjects,
   createTask,
   getTask,
@@ -13,10 +12,13 @@ import {
   logActivity,
   createBlocker,
   resolveBlocker,
+  resolveBlockersForTask,
   touchAgent,
-  createSprint,
-  listSprints,
-  updateSprint,
+  createMilestone,
+  listMilestones,
+  updateMilestone,
+  completeMilestone,
+  getMilestone,
   createTag,
   listTags,
   addTagToTask,
@@ -39,23 +41,49 @@ import {
   markNotificationRead,
   bulkUpdateTasks,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   generateReport,
   extractMentions,
   createNotification,
   listMentions,
   handleRecurringTaskCompletion,
+  recordMilestoneDailyStats,
   createProjectFromTemplate,
   listTemplates,
   getActivityStream,
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
+  createReview,
+  listReviewsForTask,
+  updateReview,
+  suggestAgent,
+  createWorktree,
+  getWorktreeById,
+  getTaskWorktree,
+  listActiveWorktrees,
+  updateWorktreeStatus,
 } from "../db/index.js";
+import {
+  suggestAgentSchema,
+  registerAgentSchema,
+  createReviewSchema,
+  updateReviewSchema,
+} from "../../shared/schemas.js";
+import {
+  createIngestionSource,
+  listIngestionSources,
+  rotateIngestionToken,
+} from "../db/ingestion.js";
+import { execFileSync } from "child_process";
 
 import { broadcast } from "../websocket.js";
 import {
@@ -105,12 +133,13 @@ export async function handleTool(
   const agentName = (args.agent_name as string | undefined) ?? defaultAgentName;
   switch (toolName) {
     case "register_agent": {
+      const { name, model, capabilities, role, parent_agent_name } = registerAgentSchema.parse(args);
       const agent = registerAgent(db, {
-        name: args.name as string,
-        model: (args.model as string | undefined) ?? null,
-        capabilities: (args.capabilities as string[] | undefined) ?? [],
-        role: args.role as Agent["role"] | undefined,
-        parent_agent_name: args.parent_agent_name as string | undefined,
+        name,
+        model: model ?? null,
+        capabilities: capabilities ?? [],
+        role,
+        parent_agent_name,
       });
       broadcast({ type: "agent_registered", payload: agent });
       return ok({ agent_id: agent.id });
@@ -125,6 +154,16 @@ export async function handleTool(
       return ok({ project_id: project.id });
     }
 
+    case "update_project": {
+      const project = updateProject(db, args.project_id as string, {
+        name: args.name as string | undefined,
+        description: args.description !== undefined ? (args.description as string | null) : undefined,
+      });
+      if (!project) return ok({ error: "Project not found" });
+      broadcast({ type: "project_updated", payload: project });
+      return ok({ project });
+    }
+
     case "list_projects": {
       const projects = listProjects(db);
       return ok({ projects });
@@ -134,7 +173,7 @@ export async function handleTool(
       const task = createTask(db, {
         project_id: args.project_id as string,
         parent_task_id: (args.parent_task_id as string | undefined) ?? null,
-        sprint_id: (args.sprint_id as string | undefined) ?? null,
+        milestone_id: (args.milestone_id as string | undefined) ?? null,
         title: args.title as string,
         description: (args.description as string | undefined) ?? null,
         priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
@@ -183,6 +222,7 @@ export async function handleTool(
     }
 
     case "update_task": {
+      const prior = getTask(db, args.task_id as string);
       const updated = updateTask(db, args.task_id as string, {
         title: args.title as string | undefined,
         description: args.description as string | null | undefined,
@@ -190,13 +230,23 @@ export async function handleTool(
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,
-        sprint_id: args.sprint_id as string | null | undefined,
+        milestone_id: args.milestone_id as string | null | undefined,
         assigned_agent_id: args.assigned_agent_id as string | null | undefined,
         due_date: args.due_date as string | null | undefined,
         estimate: args.estimate as number | null | undefined,
       });
       if (updated) {
+        // Auto-assign agent when status changes to in_progress or done
+        if (agentName && !updated.assigned_agent_id && args.status && (args.status === "in_progress" || args.status === "done")) {
+          const agent = touchAgent(db, agentName);
+          updateTask(db, updated.id, { assigned_agent_id: agent.id });
+        }
         broadcast({ type: "task_updated", payload: updated });
+        if (args.status && prior && args.status !== prior.status && (args.status === "done" || prior.status === "blocked")) {
+          for (const b of resolveBlockersForTask(db, updated.id)) {
+            broadcast({ type: "blocker_resolved", payload: b });
+          }
+        }
         const changes: string[] = [];
         if (args.status) changes.push(`status → ${args.status}`);
         if (args.progress !== undefined) changes.push(`progress → ${args.progress}%`);
@@ -205,15 +255,39 @@ export async function handleTool(
           ? `Updated "${updated.title}": ${changes.join(", ")}`
           : `Updated "${updated.title}"`;
         autoLog(db, updated.id, msg, agentName);
+        // Record milestone daily stats when status changes
+        if (args.status && prior && args.status !== prior.status && updated.milestone_id) {
+          recordMilestoneDailyStats(db, updated.milestone_id);
+        }
       }
       return ok({ success: true });
     }
 
     case "complete_task": {
+      // Auto-assign agent before completion if not already assigned
+      if (agentName) {
+        const task = getTask(db, args.task_id as string);
+        if (task && !task.assigned_agent_id) {
+          const agent = touchAgent(db, agentName);
+          updateTask(db, task.id, { assigned_agent_id: agent.id });
+        }
+      }
       const completed = completeTask(db, args.task_id as string);
       if (completed) {
         broadcast({ type: "task_completed", payload: completed });
+        for (const b of resolveBlockersForTask(db, completed.id)) {
+          broadcast({ type: "blocker_resolved", payload: b });
+        }
         autoLog(db, completed.id, `Completed "${completed.title}"`, agentName);
+        // Record milestone daily stats
+        if (completed.milestone_id) {
+          recordMilestoneDailyStats(db, completed.milestone_id);
+        }
+        // Handle recurring tasks
+        const nextTask = handleRecurringTaskCompletion(db, completed.id);
+        if (nextTask) {
+          broadcast({ type: "task_created", payload: nextTask });
+        }
       }
       return ok({ success: true });
     }
@@ -246,36 +320,42 @@ export async function handleTool(
       return ok({ success: true });
     }
 
-    case "create_sprint": {
-      const sprint = createSprint(db, {
+    case "create_milestone": {
+      const milestone = createMilestone(db, {
         project_id: args.project_id as string,
         name: args.name as string,
         description: (args.description as string | undefined) ?? null,
-        status: args.status as "planned" | "active" | "completed" | undefined,
-        start_date: (args.start_date as string | undefined) ?? null,
-        end_date: (args.end_date as string | undefined) ?? null,
+        acceptance_criteria: (args.acceptance_criteria as string | undefined) ?? null,
+        target_date: (args.target_date as string | undefined) ?? null,
       });
-      broadcast({ type: "sprint_created", payload: sprint });
-      return ok({ sprint_id: sprint.id });
+      broadcast({ type: "milestone_created", payload: milestone });
+      return ok({ milestone_id: milestone.id });
     }
 
-    case "list_sprints": {
-      const sprints = listSprints(db, args.project_id as string | undefined);
-      return ok({ sprints });
+    case "list_milestones": {
+      const milestones = listMilestones(db, args.project_id as string | undefined);
+      return ok({ milestones });
     }
 
-    case "update_sprint": {
-      const updated = updateSprint(db, args.sprint_id as string, {
+    case "update_milestone": {
+      const updated = updateMilestone(db, args.milestone_id as string, {
         name: args.name as string | undefined,
         description: args.description as string | null | undefined,
-        status: args.status as "planned" | "active" | "completed" | undefined,
-        start_date: args.start_date as string | null | undefined,
-        end_date: args.end_date as string | null | undefined,
+        acceptance_criteria: args.acceptance_criteria as string | null | undefined,
+        target_date: args.target_date as string | null | undefined,
       });
       if (updated) {
-        broadcast({ type: "sprint_updated", payload: updated });
+        broadcast({ type: "milestone_updated", payload: updated });
       }
       return ok({ success: true });
+    }
+
+    case "complete_milestone": {
+      const completed = completeMilestone(db, args.milestone_id as string);
+      if (completed) {
+        broadcast({ type: "milestone_achieved", payload: completed });
+      }
+      return ok({ success: completed !== null });
     }
 
     case "create_tag": {
@@ -345,7 +425,7 @@ export async function handleTool(
       const results = searchTasks(db, {
         query: args.query as string | undefined,
         project_id: args.project_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
         status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         assigned_agent_id: args.assigned_agent_id as string | undefined,
@@ -436,7 +516,7 @@ export async function handleTool(
       if (args.status !== undefined) updates.status = args.status;
       if (args.priority !== undefined) updates.priority = args.priority;
       if (args.assigned_agent_id !== undefined) updates.assigned_agent_id = args.assigned_agent_id;
-      const tasks = bulkUpdateTasks(db, ids, updates as any);
+      const tasks = bulkUpdateTasks(db, ids, updates as Parameters<typeof bulkUpdateTasks>[2]);
       for (const t of tasks) {
         broadcast({ type: "task_updated", payload: t });
       }
@@ -446,14 +526,14 @@ export async function handleTool(
     // ─── R4: Agent Stats ──────────────────────────────────────────────────
 
     case "get_agent_stats": {
-      const stats = getAgentStats(db, args.agent_id as string, args.sprint_id as string | undefined);
+      const stats = getAgentStats(db, args.agent_id as string, args.milestone_id as string | undefined);
       return ok(stats);
     }
 
     // ─── R4: Report ──────────────────────────────────────────────────────
 
     case "generate_report": {
-      const report = generateReport(db, args.project_id as string, args.period as "day" | "week" | "sprint");
+      const report = generateReport(db, args.project_id as string, args.period as "day" | "week" | "milestone");
       return ok({ report });
     }
 
@@ -475,7 +555,7 @@ export async function handleTool(
       const entry = logCost(db, {
         agent_id: (args.agent_id as string) ?? null,
         task_id: (args.task_id as string) ?? null,
-        sprint_id: (args.sprint_id as string) ?? null,
+        milestone_id: (args.milestone_id as string) ?? null,
         project_id: (args.project_id as string) ?? null,
         model: args.model as string,
         provider: args.provider as string,
@@ -488,15 +568,15 @@ export async function handleTool(
 
     case "get_cost_summary": {
       if (args.agent_id) return ok(getAgentCostSummary(db, args.agent_id as string));
-      if (args.sprint_id) return ok(getSprintCostSummary(db, args.sprint_id as string));
+      if (args.milestone_id) return ok(getMilestoneCostSummary(db, args.milestone_id as string));
       if (args.project_id) return ok(getProjectCostSummary(db, args.project_id as string));
-      return ok({ error: "Provide agent_id, sprint_id, or project_id" });
+      return ok({ error: "Provide agent_id, milestone_id, or project_id" });
     }
 
     case "get_cost_timeseries": {
       return ok(getCostTimeseries(db, {
         agent_id: args.agent_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
         project_id: args.project_id as string | undefined,
         days: args.days as number | undefined,
       }));
@@ -505,85 +585,180 @@ export async function handleTool(
     case "get_cost_by_model": {
       return ok(getCostByModel(db, {
         project_id: args.project_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
       }));
     }
 
     case "get_cost_by_agent": {
       return ok(getCostByAgent(db, {
         project_id: args.project_id as string | undefined,
-        sprint_id: args.sprint_id as string | undefined,
+        milestone_id: args.milestone_id as string | undefined,
       }));
     }
 
-    // ─── R12.1: Intelligence ───────────────────────────────────────────────
+    // ─── Agent Performance Metrics ────────────────────────────────────────
 
-    case "query": {
-      try {
-        const answer = await queryNaturalLanguage(
-          db,
-          args.question as string,
-          args.project_id as string | undefined
-        );
-        return ok({ answer });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Query failed";
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
-      }
+    case "log_completion_metrics": {
+      const entry = logCompletionMetrics(db, {
+        task_id: args.task_id as string,
+        agent_id: args.agent_id as string,
+        lines_added: args.lines_added as number | undefined,
+        lines_removed: args.lines_removed as number | undefined,
+        files_changed: args.files_changed as number | undefined,
+        tests_added: args.tests_added as number | undefined,
+        tests_passing: args.tests_passing as number | undefined,
+        duration_seconds: args.duration_seconds as number | undefined,
+      });
+      broadcast({ type: "metrics_logged", payload: entry });
+      return ok(entry);
     }
 
-    case "generate_digest": {
-      try {
-        const digest = await generateDigest(
-          db,
-          args.period as "daily" | "weekly",
-          args.project_id as string | undefined
-        );
-        return ok({ digest });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Digest generation failed";
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
-      }
+    case "get_agent_comparison": {
+      return ok(getAgentComparison(db));
     }
 
-    // ─── R12.2: Git Host Sync ─────────────────────────────────────────────────
-
-    case "add_git_integration": {
-      try {
-        const integration = createGitIntegration(
-          db,
-          args.project_id as string,
-          args.provider as "github" | "gitlab",
-          args.owner as string,
-          args.repo as string,
-          args.token as string,
-          Boolean(args.auto_sync)
-        );
-        return ok({ integration_id: integration.id, owner: integration.owner, repo: integration.repo });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to add integration";
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
-      }
+    case "get_agent_performance": {
+      const perf = getAgentPerformance(db, args.agent_id as string);
+      if (!perf) return ok({ error: "No metrics found for this agent" });
+      return ok(perf);
     }
 
-    case "sync_github_issues": {
-      try {
-        const result = await syncGitHubIssues(db, args.integration_id as string);
-        return ok({ issues_pulled: result.issues_pulled, issues_updated: result.issues_updated, errors: result.errors });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Sync failed";
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
-      }
+    case "get_task_type_breakdown": {
+      return ok(getTaskTypeBreakdown(db, args.agent_id as string));
     }
 
-    case "list_git_integrations": {
-      try {
-        const integrations = listGitIntegrations(db, args.project_id as string | undefined);
-        return ok({ integrations });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to list integrations";
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }], isError: true };
+    case "create_review": {
+      const { task_id, reviewer_name, reviewer_agent_id, status, comments, diff_summary } = createReviewSchema.parse(args);
+      const review = createReview(db, {
+        task_id,
+        reviewer_name: reviewer_name ?? agentName ?? "unknown",
+        reviewer_agent_id: reviewer_agent_id ?? null,
+        status,
+        comments: comments ?? null,
+        diff_summary: diff_summary ?? null,
+      });
+      broadcast({ type: "review_created", payload: review });
+      autoLog(db, review.task_id, `Review submitted: ${review.status}`, agentName);
+      return ok({ review_id: review.id });
+    }
+
+    case "list_reviews": {
+      return ok({ reviews: listReviewsForTask(db, args.task_id as string) });
+    }
+
+    case "update_review": {
+      const { status, comments, diff_summary } = updateReviewSchema.parse(args);
+      const updated = updateReview(db, args.review_id as string, { status, comments, diff_summary });
+      if (!updated) return ok({ error: "Review not found" });
+      broadcast({ type: "review_updated", payload: updated });
+      autoLog(db, updated.task_id, `Review updated: ${updated.status}`, agentName);
+      return ok({ review: updated });
+    }
+
+    // ─── R9a: Git Worktrees ────────────────────────────────────────────────
+
+    case "create_worktree": {
+      const task_id = args.task_id as string;
+      const repo_path = args.repo_path as string;
+      const branch_name = args.branch_name as string;
+      const worktree_path = args.worktree_path as string;
+      // Validate task exists before touching the filesystem
+      const task = getTask(db, task_id);
+      if (!task) return ok({ error: "Task not found" });
+      // Prevent path traversal — both paths must be absolute and contain no ..
+      if (!repo_path.startsWith("/") && !repo_path.match(/^[A-Za-z]:\\/)) {
+        return ok({ error: "repo_path must be an absolute path" });
       }
+      if (!worktree_path.startsWith("/") && !worktree_path.match(/^[A-Za-z]:\\/)) {
+        return ok({ error: "worktree_path must be an absolute path" });
+      }
+      if (repo_path.includes("..") || worktree_path.includes("..")) {
+        return ok({ error: "paths must not contain .." });
+      }
+      try {
+        execFileSync("git", ["-C", repo_path, "worktree", "add", "-b", branch_name, worktree_path], {
+          timeout: 30000,
+          stdio: "pipe",
+        });
+      } catch (err) {
+        const stderr = err != null && typeof err === "object" && "stderr" in err && Buffer.isBuffer((err as { stderr: unknown }).stderr)
+          ? (err as { stderr: Buffer }).stderr.toString().trim()
+          : undefined;
+        const msg = stderr || (err instanceof Error ? err.message : String(err));
+        return ok({ error: `git worktree add failed: ${msg}` });
+      }
+      const worktree = createWorktree(db, { task_id, repo_path, branch_name, worktree_path });
+      broadcast({ type: "worktree_created", payload: worktree });
+      autoLog(db, task_id, `Worktree created: ${branch_name}`, agentName);
+      return ok(worktree);
+    }
+
+    case "cleanup_worktree": {
+      const worktree = getWorktreeById(db, args.worktree_id as string);
+      if (!worktree) return ok({ error: "Worktree not found" });
+      const force = args.force as boolean | undefined;
+      const gitArgs = ["worktree", "remove", worktree.worktree_path];
+      if (force) gitArgs.push("--force");
+      try {
+        execFileSync("git", ["-C", worktree.repo_path, ...gitArgs], {
+          timeout: 30000,
+          stdio: "pipe",
+        });
+      } catch (err) {
+        const stderr = err != null && typeof err === "object" && "stderr" in err && Buffer.isBuffer((err as { stderr: unknown }).stderr)
+          ? (err as { stderr: Buffer }).stderr.toString().trim()
+          : undefined;
+        const msg = stderr || (err instanceof Error ? err.message : String(err));
+        return ok({ error: `git worktree remove failed: ${msg}` });
+      }
+      const newStatus = ((args.status as string | undefined) ?? "removed") as import("../../shared/types.js").WorktreeStatus;
+      const updated = updateWorktreeStatus(db, worktree.id, newStatus);
+      if (updated) broadcast({ type: "worktree_updated", payload: updated });
+      autoLog(db, worktree.task_id, `Worktree cleaned up: ${worktree.branch_name} (${newStatus})`, agentName);
+      return ok(updated ?? worktree);
+    }
+
+    case "list_worktrees": {
+      return ok(listActiveWorktrees(db));
+    }
+
+    case "get_worktree_status": {
+      const worktree = getTaskWorktree(db, args.task_id as string);
+      if (!worktree) return ok({ error: "No worktree found for this task" });
+      return ok(worktree);
+    }
+
+    // ─── R10: Intelligent Routing ─────────────────────────────────────────
+
+    case "suggest_agent": {
+      const { task_id } = suggestAgentSchema.parse(args);
+      const taskExists = db.prepare("SELECT id FROM tasks WHERE id = ?").get(task_id);
+      if (!taskExists) return ok({ error: "Task not found" });
+      const suggestion = suggestAgent(db, task_id);
+      return ok(suggestion);
+    }
+
+    // ─── R11.3: Ingestion Sources ──────────────────────────────��──────────
+
+    case "list_ingestion_sources":
+      return ok(listIngestionSources(db));
+
+    case "create_ingestion_source": {
+      const name = args.name as string;
+      const kind = args.kind as string;
+      const project_id = (args.project_id as string | undefined) ?? null;
+      if (!name || !kind) return ok({ error: "name and kind are required" });
+      const result = createIngestionSource(db, { name, kind: kind as import("../db/ingestion.js").IngestionSourceKind, project_id });
+      // token is shown once — agent must save it
+      return ok(result);
+    }
+
+    case "rotate_ingestion_token": {
+      const source_id = args.source_id as string;
+      if (!source_id) return ok({ error: "source_id is required" });
+      const result = rotateIngestionToken(db, source_id);
+      if (!result) return ok({ error: "Ingestion source not found" });
+      return ok(result);
     }
 
     default:

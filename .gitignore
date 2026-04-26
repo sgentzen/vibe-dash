@@ -8,6 +8,12 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+*.db.bak
+*.fkfix-backup
+
+# Editor/OS temp files
+*.bak
+.fuse_hidden*
 
 # IDE and editor files
 .vscode/
@@ -24,7 +30,12 @@ Thumbs.db
 
 # Claude Code artifacts
 .claude/.last-code-review
+.claude/worktrees/
 .superpowers/
+
+# Playwright
+test-results/
+playwright-report/
 
 # Logs
 *.log
@@ -33,4 +44,4 @@ npm-debug.log*
 # Environment
 .env
 .env.local
-.claude/.last-code-review
+.worktrees/
