@@ -114,8 +114,7 @@ Core tools your agents will use most:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Backend port |
-| `DB_PATH` | `./vibe-dash.db` | Database path (server) |
-| `VIBE_DASH_DB` | `./vibe-dash.db` | Database path (stdio MCP) |
+| `VIBE_DASH_DB` | `./vibe-dash.db` | Database path — used by both the server and stdio MCP transport |
 
 ---
 
@@ -130,6 +129,18 @@ npm run dev:client   # Frontend only
 ```
 
 ---
+
+## Team self-hosting
+
+Deploy Vibe Dash on a shared server so all your agents report to the same dashboard:
+
+```bash
+git clone https://github.com/sgent/vibe-dash.git
+cd vibe-dash
+docker compose up -d    # dashboard at http://your-server:3001
+```
+
+See [docs/self-hosting.md](docs/self-hosting.md) for reverse proxy (Nginx/Caddy), TLS, access control options, backup, and upgrade procedures.
 
 ## Contributing
 
