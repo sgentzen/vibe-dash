@@ -8,7 +8,11 @@ import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
 import { AddProjectControl } from "./topbar/AddProjectControl";
 
-export function TopBar() {
+interface TopBarProps {
+  onCommandPalette?: () => void;
+}
+
+export function TopBar({ onCommandPalette }: TopBarProps = {}) {
   const { stats } = useDataState();
   const { theme, activeView, searchQuery } = useNavigationState();
   const { unreadCount, notifications } = useNotificationState();
