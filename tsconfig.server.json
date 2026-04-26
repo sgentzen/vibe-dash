@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": [
+    "shared/**/*",
+    "server/**/*",
+    "cli/**/*",
+    "tests/setup.ts",
+    "tests/*.test.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests/components/**",
+    "server/routes/index.ts",
+    "server/routes/agents.ts",
+    "server/routes/alerts.ts",
+    "server/routes/blockers.ts",
+    "server/routes/comments.ts",
+    "server/routes/costs.ts",
+    "server/routes/dependencies.ts",
+    "server/routes/file-locks.ts",
+    "server/routes/filters.ts",
+    "server/routes/metrics.ts",
+    "server/routes/notifications.ts",
+    "server/routes/projects.ts",
+    "server/routes/sprints.ts",
+    "server/routes/tags.ts",
+    "server/routes/tasks.ts",
+    "server/routes/templates.ts",
+    "server/routes/webhooks.ts",
+    "tests/metrics.test.ts"
+  ]
+}

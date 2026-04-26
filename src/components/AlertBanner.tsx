@@ -1,7 +1,8 @@
-import { useAppState } from "../store";
+import { useDataState, useNotificationState } from "../store";
 
 export function AlertBanner() {
-  const { blockers, fileConflicts } = useAppState();
+  const { blockers } = useDataState();
+  const { fileConflicts } = useNotificationState();
   if (blockers.length === 0 && fileConflicts.length === 0) return null;
 
   const latest = blockers.length > 0 ? blockers[blockers.length - 1] : null;

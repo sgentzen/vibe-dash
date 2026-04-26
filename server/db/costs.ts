@@ -1,11 +1,12 @@
 import type Database from "better-sqlite3";
 import { now, genId } from "./helpers.js";
+import { buildWhere } from "./where.js";
 
 export interface CostEntry {
   id: string;
   agent_id: string | null;
   task_id: string | null;
-  sprint_id: string | null;
+  milestone_id: string | null;
   project_id: string | null;
   model: string;
   provider: string;
@@ -18,7 +19,7 @@ export interface CostEntry {
 export interface LogCostInput {
   agent_id?: string | null;
   task_id?: string | null;
-  sprint_id?: string | null;
+  milestone_id?: string | null;
   project_id?: string | null;
   model: string;
   provider: string;
@@ -45,14 +46,14 @@ export interface CostTimeseriesEntry {
 export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
   const id = genId();
   const ts = now();
-  db.prepare(
-    `INSERT INTO cost_entries (id, agent_id, task_id, sprint_id, project_id, model, provider, input_tokens, output_tokens, cost_usd, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
+  return db.prepare(
+    `INSERT INTO cost_entries (id, agent_id, task_id, milestone_id, project_id, model, provider, input_tokens, output_tokens, cost_usd, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+  ).get(
     id,
     input.agent_id ?? null,
     input.task_id ?? null,
-    input.sprint_id ?? null,
+    input.milestone_id ?? null,
     input.project_id ?? null,
     input.model,
     input.provider,
@@ -60,11 +61,10 @@ export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
     input.output_tokens,
     input.cost_usd,
     ts
-  );
-  return db.prepare("SELECT * FROM cost_entries WHERE id = ?").get(id) as CostEntry;
+  ) as CostEntry;
 }
 
-type CostSummaryColumn = "agent_id" | "sprint_id" | "project_id";
+type CostSummaryColumn = "agent_id" | "milestone_id" | "project_id";
 
 function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, value: string): CostSummary {
   return db.prepare(
@@ -76,12 +76,22 @@ function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, valu
   ).get(value) as CostSummary;
 }
 
+export function getGlobalCostSummary(db: Database.Database): CostSummary {
+  return db.prepare(
+    `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
+            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+            COUNT(*) AS entry_count
+     FROM cost_entries`
+  ).get() as CostSummary;
+}
+
 export function getAgentCostSummary(db: Database.Database, agentId: string): CostSummary {
   return getCostSummaryBy(db, "agent_id", agentId);
 }
 
-export function getSprintCostSummary(db: Database.Database, sprintId: string): CostSummary {
-  return getCostSummaryBy(db, "sprint_id", sprintId);
+export function getMilestoneCostSummary(db: Database.Database, milestoneId: string): CostSummary {
+  return getCostSummaryBy(db, "milestone_id", milestoneId);
 }
 
 export function getProjectCostSummary(db: Database.Database, projectId: string): CostSummary {
@@ -90,20 +100,15 @@ export function getProjectCostSummary(db: Database.Database, projectId: string):
 
 export function getCostTimeseries(
   db: Database.Database,
-  filter: { agent_id?: string; sprint_id?: string; project_id?: string; days?: number } = {}
+  filter: { agent_id?: string; milestone_id?: string; project_id?: string; days?: number } = {}
 ): CostTimeseriesEntry[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (filter.agent_id) { conditions.push("agent_id = ?"); params.push(filter.agent_id); }
-  if (filter.sprint_id) { conditions.push("sprint_id = ?"); params.push(filter.sprint_id); }
-  if (filter.project_id) { conditions.push("project_id = ?"); params.push(filter.project_id); }
-
   const days = filter.days ?? 30;
-  conditions.push("created_at >= ?");
-  params.push(new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
-
-  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  const { sql: where, params } = buildWhere([
+    filter.agent_id ? ["agent_id = ?", filter.agent_id] : null,
+    filter.milestone_id ? ["milestone_id = ?", filter.milestone_id] : null,
+    filter.project_id ? ["project_id = ?", filter.project_id] : null,
+    ["created_at >= ?", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()],
+  ]);
 
   return db.prepare(
     `SELECT DATE(created_at) AS date,
@@ -120,15 +125,12 @@ export function getCostTimeseries(
 
 export function getCostByModel(
   db: Database.Database,
-  filter: { project_id?: string; sprint_id?: string } = {}
+  filter: { project_id?: string; milestone_id?: string } = {}
 ): { model: string; provider: string; total_cost_usd: number; total_tokens: number; entry_count: number }[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (filter.project_id) { conditions.push("project_id = ?"); params.push(filter.project_id); }
-  if (filter.sprint_id) { conditions.push("sprint_id = ?"); params.push(filter.sprint_id); }
-
-  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  const { sql: where, params } = buildWhere([
+    filter.project_id ? ["project_id = ?", filter.project_id] : null,
+    filter.milestone_id ? ["milestone_id = ?", filter.milestone_id] : null,
+  ]);
 
   return db.prepare(
     `SELECT model, provider,
@@ -144,13 +146,13 @@ export function getCostByModel(
 
 export function getCostByAgent(
   db: Database.Database,
-  filter: { project_id?: string; sprint_id?: string } = {}
+  filter: { project_id?: string; milestone_id?: string } = {}
 ): { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; entry_count: number }[] {
   const conditions: string[] = ["c.agent_id IS NOT NULL"];
   const params: unknown[] = [];
 
   if (filter.project_id) { conditions.push("c.project_id = ?"); params.push(filter.project_id); }
-  if (filter.sprint_id) { conditions.push("c.sprint_id = ?"); params.push(filter.sprint_id); }
+  if (filter.milestone_id) { conditions.push("c.milestone_id = ?"); params.push(filter.milestone_id); }
 
   const where = "WHERE " + conditions.join(" AND ");
 

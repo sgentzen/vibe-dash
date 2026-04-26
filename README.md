@@ -142,6 +142,12 @@ docker compose up -d    # dashboard at http://your-server:3001
 
 See [docs/self-hosting.md](docs/self-hosting.md) for reverse proxy (Nginx/Caddy), TLS, access control options, backup, and upgrade procedures.
 
+## Roadmap
+
+The current strategic direction and active milestones (R11–R13) are documented in
+[docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md). This is the
+primary guiding document for all roadmap decisions until the next program review.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

@@ -1,9 +1,10 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import type { TaskStatus, SprintStatus } from "./types.js";
+import type { TaskStatus, TaskPriority, MilestoneStatus, TaskDependency } from "./types.js";
 import {
   listProjects,
   createProject,
+  updateProject,
   listTasks,
   createTask,
   getTask,
@@ -14,10 +15,13 @@ import {
   getActiveBlockers,
   createBlocker,
   resolveBlocker,
-  listSprints,
-  createSprint,
-  getSprint,
-  updateSprint,
+  resolveBlockersForTask,
+  listMilestones,
+  createMilestone,
+  getMilestone,
+  updateMilestone,
+  completeMilestone,
+  deleteMilestone,
   logActivity,
   getAgentCurrentTask,
   getAgentCurrentProject,
@@ -28,7 +32,7 @@ import {
   addTagToTask,
   removeTagFromTask,
   getTaskTags,
-  getSprintCapacity,
+  getMilestoneProgress,
   getTimeSpent,
   addDependency,
   removeDependency,
@@ -39,11 +43,8 @@ import {
   getAgentById,
   getAgentActivity,
   getAgentCompletedToday,
-  createSavedFilter,
-  listSavedFilters,
-  deleteSavedFilter,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   extractMentions,
   createNotification,
   listMentions,
@@ -59,13 +60,16 @@ import {
   deleteTemplate,
   createProjectFromTemplate,
   getActivityStream,
-  recordDailyStats,
-  getSprintDailyStats,
-  getVelocityTrend,
+  recordMilestoneDailyStats,
+  getMilestoneDailyStats,
   getAgentActivityHeatmap,
   generateReport,
   addComment,
   listComments,
+  createReview,
+  getReview,
+  listReviewsForTask,
+  updateReview,
   reportWorkingOn,
   releaseFileLocks,
   getActiveFileLocks,
@@ -83,31 +87,56 @@ import {
   ACTIVE_THRESHOLD_MINUTES,
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
+  getGlobalCostSummary,
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
+import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
+import { validateBody } from "./routes/validate.js";
+import { integrationRoutes } from "./routes/integrations.js";
+import {
+  createProjectSchema,
+  updateProjectSchema,
+  createTaskSchema,
+  updateTaskSchema,
+  createMilestoneSchema,
+  updateMilestoneSchema,
+  createTagSchema,
+  createCommentSchema,
+  logCostSchema,
+} from "../shared/schemas.js";
 
 const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
   max: 30, // limit each IP to 30 delete requests per windowMs
 });
 
+const gitSyncLimiter = rateLimit({ windowMs: 60_000, max: 5 }); // 5 syncs/min per IP
+
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
-    void fireWebhooks(db, event.type, event.payload);
+    fireWebhooks(db, event.type, event.payload).catch((err) => {
+      logger.warn({ err, event: event.type }, "webhook dispatch failed");
+    });
   };
 }
 
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
+
+  router.use(integrationRoutes(db, broadcast));
 
   const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -167,21 +196,35 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/projects
-  router.post("/api/projects", (req, res) => {
+  router.post("/api/projects", validateBody(createProjectSchema), (req, res) => {
     const { name, description } = req.body as {
       name: string;
       description?: string | null;
     };
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
-    }
     const project = createProject(db, {
       name,
       description: description ?? null,
     });
     broadcast({ type: "project_created", payload: project });
     res.status(201).json(project);
+  });
+
+  // PUT /api/projects/:id
+  router.put("/api/projects/:id", validateBody(updateProjectSchema), (req, res) => {
+    const { name, description } = req.body as {
+      name?: string;
+      description?: string | null;
+    };
+    const project = updateProject(db, req.params.id as string, { name, description });
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    broadcast({ type: "project_updated", payload: project });
+    fireWebhooks(db, "project_updated", project).catch((err) => {
+      logger.warn({ err, event: "project_updated" }, "webhook dispatch failed");
+    });
+    res.json(project);
   });
 
   // GET /api/projects/:projectId/tasks
@@ -208,12 +251,12 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/tasks
-  router.post("/api/tasks", (req, res) => {
-    const { project_id, parent_task_id, sprint_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
+  router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
-        sprint_id?: string | null;
+        milestone_id?: string | null;
         assigned_agent_id?: string | null;
         title: string;
         description?: string | null;
@@ -224,14 +267,10 @@ export function createRouter(db: Database.Database): Router {
         estimate?: number | null;
         recurrence_rule?: string | null;
       };
-    if (!project_id || !title || !priority) {
-      res.status(400).json({ error: "project_id, title, and priority are required" });
-      return;
-    }
     const task = createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
-      sprint_id: sprint_id ?? null,
+      milestone_id: milestone_id ?? null,
       assigned_agent_id: assigned_agent_id ?? null,
       title,
       description: description ?? null,
@@ -251,12 +290,12 @@ export function createRouter(db: Database.Database): Router {
     const { task_ids, updates } = req.body as { task_ids: string[]; updates: Record<string, unknown> };
     if (!task_ids?.length || !updates) { res.status(400).json({ error: "task_ids and updates are required" }); return; }
     if (task_ids.length > 200) { res.status(400).json({ error: "Maximum 200 tasks per bulk update" }); return; }
-    const tasks = bulkUpdateTasks(db, task_ids, updates as any);
+    const tasks = bulkUpdateTasks(db, task_ids, updates as Parameters<typeof bulkUpdateTasks>[2]);
     for (const t of tasks) broadcast({ type: "task_updated", payload: t });
-    // Record burndown stats for affected sprints when status changes
+    // Record daily stats for affected milestones when status changes
     if (updates.status) {
-      const sprintIds = new Set(tasks.filter((t) => t.sprint_id).map((t) => t.sprint_id!));
-      for (const sid of sprintIds) recordDailyStats(db, sid);
+      const milestoneIds = new Set(tasks.filter((t) => t.milestone_id).map((t) => t.milestone_id!));
+      for (const mid of milestoneIds) recordMilestoneDailyStats(db, mid);
     }
     res.json({ updated: tasks.length, tasks });
   });
@@ -267,9 +306,9 @@ export function createRouter(db: Database.Database): Router {
     res.json(searchTasks(db, {
       query: q.q,
       project_id: q.project_id,
-      sprint_id: q.sprint_id,
-      status: q.status as any,
-      priority: q.priority as any,
+      milestone_id: q.milestone_id,
+      status: q.status as TaskStatus | undefined,
+      priority: q.priority as TaskPriority | undefined,
       assigned_agent_id: q.assigned_agent_id,
       tag_id: q.tag_id,
       due_before: q.due_before,
@@ -288,15 +327,21 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // PATCH /api/tasks/:id
-  router.patch("/api/tasks/:id", (req, res) => {
-    const task = getTask(db, req.params.id);
+  router.patch("/api/tasks/:id", validateBody(updateTaskSchema), (req, res) => {
+    const id = req.params.id as string;
+    const task = getTask(db, id);
     if (!task) {
       res.status(404).json({ error: "Task not found" });
       return;
     }
     const body = req.body as Parameters<typeof updateTask>[2];
-    const updated = updateTask(db, req.params.id, body);
+    const updated = updateTask(db, id, body);
     broadcast({ type: "task_updated", payload: updated! });
+    if (body.status && body.status !== task.status && (body.status === "done" || task.status === "blocked")) {
+      for (const b of resolveBlockersForTask(db, id)) {
+        broadcast({ type: "blocker_resolved", payload: b });
+      }
+    }
     // Auto-log the change
     const changes: string[] = [];
     if (body.status && body.status !== task.status) changes.push(`status → ${body.status}`);
@@ -312,9 +357,9 @@ export function createRouter(db: Database.Database): Router {
         payload: { ...entry, agent_name: null, task_title: updated!.title },
       });
     }
-    // Record burndown stats when task status changes and task has a sprint
-    if (body.status && body.status !== task.status && updated?.sprint_id) {
-      recordDailyStats(db, updated.sprint_id);
+    // Record daily stats when task status changes and task has a milestone
+    if (body.status && body.status !== task.status && updated?.milestone_id) {
+      recordMilestoneDailyStats(db, updated.milestone_id);
     }
     res.json(updated);
   });
@@ -328,11 +373,14 @@ export function createRouter(db: Database.Database): Router {
     }
     const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
+    for (const b of resolveBlockersForTask(db, req.params.id)) {
+      broadcast({ type: "blocker_resolved", payload: b });
+    }
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
     for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
-    // Record daily stats if task has a sprint
-    if (completed?.sprint_id) {
-      recordDailyStats(db, completed.sprint_id);
+    // Record daily stats if task has a milestone
+    if (completed?.milestone_id) {
+      recordMilestoneDailyStats(db, completed.milestone_id);
     }
     // Handle recurring tasks — create next instance
     if (completed) {
@@ -350,6 +398,10 @@ export function createRouter(db: Database.Database): Router {
       type: "agent_activity",
       payload: { ...entry, agent_name: null, task_title: completed!.title },
     });
+    // R12.2: Close linked GitHub issue (fire-and-forget)
+    closeLinkedIssue(db, completed!.id).catch((err: unknown) =>
+      console.error("[git-sync] Failed to close linked GitHub issue:", err instanceof Error ? err.message : err)
+    );
     res.json(completed);
   });
 
@@ -415,49 +467,58 @@ export function createRouter(db: Database.Database): Router {
     res.json(resolved);
   });
 
-  // GET /api/sprints
-  router.get("/api/sprints", (req, res) => {
+  // GET /api/milestones
+  router.get("/api/milestones", (req, res) => {
     const { project_id } = req.query as { project_id?: string };
-    res.json(listSprints(db, project_id));
+    res.json(listMilestones(db, project_id));
   });
 
-  // POST /api/sprints
-  router.post("/api/sprints", (req, res) => {
-    const { project_id, name, description, status, start_date, end_date } =
+  // POST /api/milestones
+  router.post("/api/milestones", validateBody(createMilestoneSchema), (req, res) => {
+    const { project_id, name, description, status, acceptance_criteria, target_date } =
       req.body as {
         project_id: string;
         name: string;
         description?: string | null;
         status?: string;
-        start_date?: string | null;
-        end_date?: string | null;
+        acceptance_criteria?: string | null;
+        target_date?: string | null;
       };
-    if (!project_id || !name) {
-      res.status(400).json({ error: "project_id and name are required" });
-      return;
-    }
-    const sprint = createSprint(db, {
+    const milestone = createMilestone(db, {
       project_id,
       name,
       description: description ?? null,
-      status: status as SprintStatus | undefined,
-      start_date: start_date ?? null,
-      end_date: end_date ?? null,
+      status: status as MilestoneStatus | undefined,
+      acceptance_criteria: acceptance_criteria ?? null,
+      target_date: target_date ?? null,
     });
-    broadcast({ type: "sprint_created", payload: sprint });
-    res.status(201).json(sprint);
+    broadcast({ type: "milestone_created", payload: milestone });
+    res.status(201).json(milestone);
   });
 
-  // PATCH /api/sprints/:id
-  router.patch("/api/sprints/:id", (req, res) => {
-    const sprint = getSprint(db, req.params.id);
-    if (!sprint) {
-      res.status(404).json({ error: "Sprint not found" });
+  // PATCH /api/milestones/:id
+  router.patch("/api/milestones/:id", validateBody(updateMilestoneSchema), (req, res) => {
+    const id = req.params.id as string;
+    const milestone = getMilestone(db, id);
+    if (!milestone) {
+      res.status(404).json({ error: "Milestone not found" });
       return;
     }
-    const updated = updateSprint(db, req.params.id, req.body as Parameters<typeof updateSprint>[2]);
-    broadcast({ type: "sprint_updated", payload: updated! });
+    const updated = updateMilestone(db, id, req.body as Parameters<typeof updateMilestone>[2]);
+    broadcast({ type: "milestone_updated", payload: updated! });
     res.json(updated);
+  });
+
+  // POST /api/milestones/:id/complete
+  router.post("/api/milestones/:id/complete", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) {
+      res.status(404).json({ error: "Milestone not found" });
+      return;
+    }
+    const completed = completeMilestone(db, req.params.id);
+    broadcast({ type: "milestone_achieved", payload: completed! });
+    res.json(completed);
   });
 
   // ─── Tags ────────────────────────────────────────────────────────────────
@@ -468,17 +529,9 @@ export function createRouter(db: Database.Database): Router {
   });
 
   // POST /api/projects/:projectId/tags
-  router.post("/api/projects/:projectId/tags", (req, res) => {
+  router.post("/api/projects/:projectId/tags", validateBody(createTagSchema), (req, res) => {
     const { name, color } = req.body as { name: string; color?: string };
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
-    }
-    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
-      res.status(400).json({ error: "color must be a hex color like #ff0000" });
-      return;
-    }
-    const tag = createTag(db, { project_id: req.params.projectId, name, color });
+    const tag = createTag(db, { project_id: req.params.projectId as string, name, color });
     broadcast({ type: "tag_created", payload: tag });
     res.status(201).json(tag);
   });
@@ -509,12 +562,12 @@ export function createRouter(db: Database.Database): Router {
     res.json({ success: removed });
   });
 
-  // ─── R2: Sprint Capacity ─────────────────────────────────────────────────
+  // ─── R2: Milestone Progress ─────────────────────────────────────────────────
 
-  router.get("/api/sprints/:id/capacity", (req, res) => {
-    const sprint = getSprint(db, req.params.id);
-    if (!sprint) { res.status(404).json({ error: "Sprint not found" }); return; }
-    res.json(getSprintCapacity(db, req.params.id));
+  router.get("/api/milestones/:id/progress", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    res.json(getMilestoneProgress(db, req.params.id));
   });
 
   // ─── R2: Task time spent ────────────────────────────────────────────────
@@ -545,12 +598,19 @@ export function createRouter(db: Database.Database): Router {
 
   router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
     // Read before delete so we can broadcast
-    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as any;
+    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as TaskDependency | undefined;
     const removed = removeDependency(db, req.params.id as string);
     if (removed && dep) {
       broadcast({ type: "dependency_removed", payload: dep });
     }
     res.json({ success: removed });
+  });
+
+  // ─── Agent Performance Metrics ─────────────────────────────────────────
+
+  // Must be before /api/agents/:id to avoid "comparison" being treated as an id
+  router.get("/api/agents/comparison", (_req, res) => {
+    res.json(getAgentComparison(db));
   });
 
   // ─── R2: Agent Detail ──────────────────────────────────────────────────
@@ -578,32 +638,15 @@ export function createRouter(db: Database.Database): Router {
     res.json(listAgentSessions(db, req.params.id));
   });
 
-  // ─── R2: Saved Filters ────────────────────────────────────────────────
-
-  router.get("/api/filters", (_req, res) => {
-    res.json(listSavedFilters(db));
-  });
-
-  router.post("/api/filters", (req, res) => {
-    const { name, filter_json } = req.body as { name: string; filter_json: string };
-    if (!name || !filter_json) { res.status(400).json({ error: "name and filter_json are required" }); return; }
-    res.status(201).json(createSavedFilter(db, name, filter_json));
-  });
-
-  router.delete("/api/filters/:id", (req, res) => {
-    res.json({ success: deleteSavedFilter(db, req.params.id) });
-  });
-
   // ─── R3: Task Comments ──────────────────────────────────────────────
 
   router.get("/api/tasks/:id/comments", (req, res) => {
     res.json(listComments(db, req.params.id));
   });
 
-  router.post("/api/tasks/:id/comments", (req, res) => {
+  router.post("/api/tasks/:id/comments", validateBody(createCommentSchema), (req, res) => {
     const { message, author_name, agent_id } = req.body as { message: string; author_name: string; agent_id?: string };
-    if (!message || !author_name) { res.status(400).json({ error: "message and author_name are required" }); return; }
-    const comment = addComment(db, req.params.id, message, author_name, agent_id);
+    const comment = addComment(db, req.params.id as string, message, author_name, agent_id);
     broadcast({ type: "comment_added", payload: comment });
 
     // Process @mentions
@@ -618,6 +661,65 @@ export function createRouter(db: Database.Database): Router {
     for (const n of notifications) broadcast({ type: "notification_created", payload: n });
 
     res.status(201).json(comment);
+  });
+
+  // ─── 5.4: Code Review Integration ───────────────────────────────────
+
+  router.get("/api/tasks/:id/reviews", (req, res) => {
+    res.json(listReviewsForTask(db, req.params.id));
+  });
+
+  router.post("/api/tasks/:id/reviews", (req, res) => {
+    const task = getTask(db, req.params.id);
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+    const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } =
+      req.body as {
+        reviewer_name?: string;
+        reviewer_agent_id?: string | null;
+        status?: "pending" | "approved" | "changes_requested";
+        comments?: string | null;
+        diff_summary?: string | null;
+      };
+    if (!reviewer_name) {
+      res.status(400).json({ error: "reviewer_name is required" });
+      return;
+    }
+    if (reviewer_name.length > 200) {
+      res.status(400).json({ error: "reviewer_name too long" });
+      return;
+    }
+    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
+      res.status(400).json({ error: "invalid status" });
+      return;
+    }
+    const review = createReview(db, {
+      task_id: req.params.id,
+      reviewer_name,
+      reviewer_agent_id: reviewer_agent_id ?? null,
+      status,
+      comments: comments ?? null,
+      diff_summary: diff_summary ?? null,
+    });
+    broadcast({ type: "review_created", payload: review });
+    res.status(201).json(review);
+  });
+
+  router.patch("/api/reviews/:id", (req, res) => {
+    const existing = getReview(db, req.params.id);
+    if (!existing) { res.status(404).json({ error: "Review not found" }); return; }
+    const { status, comments, diff_summary } = req.body as {
+      status?: "pending" | "approved" | "changes_requested";
+      comments?: string | null;
+      diff_summary?: string | null;
+    };
+    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
+      res.status(400).json({ error: "invalid status" });
+      return;
+    }
+    const updated = updateReview(db, req.params.id, { status, comments, diff_summary });
+    if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
+    broadcast({ type: "review_updated", payload: updated });
+    res.json(updated);
   });
 
   // ─── R3: Agent File Locks ──────────────────────────────────────────
@@ -691,34 +793,26 @@ export function createRouter(db: Database.Database): Router {
   // ─── R4: Agent Stats ─────────────────────────────────────────────
 
   router.get("/api/agents/:id/stats", (req, res) => {
-    const sprintId = req.query.sprint_id as string | undefined;
-    res.json(getAgentStats(db, req.params.id, sprintId));
+    const milestoneId = req.query.milestone_id as string | undefined;
+    res.json(getAgentStats(db, req.params.id, milestoneId));
   });
 
-  // ─── R4: Sprint Contributions ──────────────────────────────────────
+  // ─── R4: Milestone Contributions ──────────────────────────────────────
 
-  router.get("/api/sprints/:id/contributions", (req, res) => {
-    res.json(getSprintAgentContributions(db, req.params.id));
+  router.get("/api/milestones/:id/contributions", (req, res) => {
+    res.json(getMilestoneAgentContributions(db, req.params.id));
   });
 
-  // ─── R4: Sprint Burndown ───────────────────────────────────────────
+  // ─── R4: Milestone Daily Stats ───────────────────────────────────────
 
-  router.get("/api/sprints/:id/burndown", (req, res) => {
-    res.json(getSprintDailyStats(db, req.params.id));
+  router.get("/api/milestones/:id/daily-stats", (req, res) => {
+    res.json(getMilestoneDailyStats(db, req.params.id));
   });
 
-  router.post("/api/sprints/:id/record-stats", (req, res) => {
-    const stats = recordDailyStats(db, req.params.id);
+  router.post("/api/milestones/:id/record-stats", (req, res) => {
+    const stats = recordMilestoneDailyStats(db, req.params.id);
     broadcast({ type: "daily_stats_recorded", payload: stats });
     res.json(stats);
-  });
-
-  // ─── R4: Velocity ──────────────────────────────────────────────────
-
-  router.get("/api/velocity", (req, res) => {
-    const limit = parseInt((req.query.limit as string) ?? "5", 10);
-    const projectId = req.query.project_id as string | undefined;
-    res.json(getVelocityTrend(db, isNaN(limit) ? 5 : limit, projectId));
   });
 
   // ─── R4: Activity Heatmap ──────────────────────────────────────────
@@ -731,7 +825,7 @@ export function createRouter(db: Database.Database): Router {
   // ─── R4: Reports ───────────────────────────────────────────────────
 
   router.post("/api/projects/:id/report", (req, res) => {
-    const period = (req.body.period as "day" | "week" | "sprint") ?? "week";
+    const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
     res.json({ report: generateReport(db, req.params.id, period) });
   });
 
@@ -813,21 +907,15 @@ export function createRouter(db: Database.Database): Router {
 
   // ─── Cost & Token Tracking ──────────────────────────────────────
 
-  router.post("/api/costs", statsLimiter, (req, res) => {
-    const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, sprint_id, project_id } = req.body as {
+  router.post("/api/costs", statsLimiter, validateBody(logCostSchema), (req, res) => {
+    const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body as {
       model: string; provider: string; input_tokens: number; output_tokens: number; cost_usd: number;
-      agent_id?: string; task_id?: string; sprint_id?: string; project_id?: string;
+      agent_id?: string; task_id?: string; milestone_id?: string; project_id?: string;
     };
-    if (!model || !provider || !Number.isFinite(input_tokens) || !Number.isFinite(output_tokens) || !Number.isFinite(cost_usd)) {
-      res.status(400).json({ error: "model, provider, input_tokens (number), output_tokens (number), and cost_usd (number) are required" }); return;
-    }
-    if (input_tokens < 0 || output_tokens < 0 || cost_usd < 0) {
-      res.status(400).json({ error: "input_tokens, output_tokens, and cost_usd must be non-negative" }); return;
-    }
     const entry = logCost(db, {
       agent_id: agent_id ?? null,
       task_id: task_id ?? null,
-      sprint_id: sprint_id ?? null,
+      milestone_id: milestone_id ?? null,
       project_id: project_id ?? null,
       model, provider, input_tokens, output_tokens, cost_usd,
     });
@@ -839,8 +927,17 @@ export function createRouter(db: Database.Database): Router {
     res.json(getAgentCostSummary(db, req.params.agentId));
   });
 
-  router.get("/api/costs/sprint/:sprintId", (req, res) => {
-    res.json(getSprintCostSummary(db, req.params.sprintId));
+  router.get("/api/costs/milestone/:milestoneId", (req, res) => {
+    res.json(getMilestoneCostSummary(db, req.params.milestoneId));
+  });
+
+  router.get("/api/costs/summary", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    if (project_id) {
+      res.json(getProjectCostSummary(db, project_id));
+    } else {
+      res.json(getGlobalCostSummary(db));
+    }
   });
 
   router.get("/api/costs/project/:projectId", (req, res) => {
@@ -849,23 +946,104 @@ export function createRouter(db: Database.Database): Router {
 
   router.get("/api/costs/timeseries", (req, res) => {
     const agent_id = req.query.agent_id as string | undefined;
-    const sprint_id = req.query.sprint_id as string | undefined;
+    const milestone_id = req.query.milestone_id as string | undefined;
     const project_id = req.query.project_id as string | undefined;
     const days = req.query.days ? parseInt(req.query.days as string, 10) : undefined;
-    res.json(getCostTimeseries(db, { agent_id, sprint_id, project_id, days }));
+    res.json(getCostTimeseries(db, { agent_id, milestone_id, project_id, days }));
   });
 
   router.get("/api/costs/by-model", (req, res) => {
     const project_id = req.query.project_id as string | undefined;
-    const sprint_id = req.query.sprint_id as string | undefined;
-    res.json(getCostByModel(db, { project_id, sprint_id }));
+    const milestone_id = req.query.milestone_id as string | undefined;
+    res.json(getCostByModel(db, { project_id, milestone_id }));
   });
 
   router.get("/api/costs/by-agent", (req, res) => {
     const project_id = req.query.project_id as string | undefined;
-    const sprint_id = req.query.sprint_id as string | undefined;
-    res.json(getCostByAgent(db, { project_id, sprint_id }));
+    const milestone_id = req.query.milestone_id as string | undefined;
+    res.json(getCostByAgent(db, { project_id, milestone_id }));
   });
+
+  // ─── Completion Metrics ───────────────────────────────────────────────────
+
+  router.post("/api/metrics", (req, res) => {
+    const { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds } = req.body;
+    if (!task_id || !agent_id) {
+      res.status(400).json({ error: "task_id and agent_id are required" });
+      return;
+    }
+    const entry = logCompletionMetrics(db, { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds });
+    broadcast({ type: "metrics_logged", payload: entry });
+    res.status(201).json(entry);
+  });
+
+  router.get("/api/agents/:id/performance", (req, res) => {
+    const perf = getAgentPerformance(db, req.params.id);
+    if (!perf) { res.status(404).json({ error: "No metrics found for this agent" }); return; }
+    res.json(perf);
+  });
+
+  router.get("/api/agents/:id/task-type-breakdown", (req, res) => {
+    res.json(getTaskTypeBreakdown(db, req.params.id));
+  });
+
+  // ─── Milestones ─────────────────────────────────────────────────────────────
+
+  router.get("/api/milestones", (req, res) => {
+    const project_id = req.query.project_id as string | undefined;
+    res.json(listMilestones(db, project_id));
+  });
+
+  router.post("/api/milestones", (req, res) => {
+    const { project_id, name, description, acceptance_criteria, target_date } = req.body;
+    if (!project_id || !name) {
+      res.status(400).json({ error: "project_id and name are required" });
+      return;
+    }
+    const milestone = createMilestone(db, { project_id, name, description, acceptance_criteria, target_date });
+    broadcast({ type: "milestone_created", payload: milestone });
+    res.status(201).json(milestone);
+  });
+
+  router.get("/api/milestones/:id", (req, res) => {
+    const milestone = getMilestone(db, req.params.id);
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    res.json(milestone);
+  });
+
+  const MILESTONE_STATUSES = ["open", "achieved", "cancelled"] as const;
+
+  router.patch("/api/milestones/:id", (req, res) => {
+    const { name, description, acceptance_criteria, target_date, status } = req.body;
+    if (status !== undefined && !MILESTONE_STATUSES.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${MILESTONE_STATUSES.join(", ")}` });
+      return;
+    }
+    if (acceptance_criteria !== undefined && !Array.isArray(acceptance_criteria)) {
+      res.status(400).json({ error: "acceptance_criteria must be an array of strings" });
+      return;
+    }
+    const milestone = updateMilestone(db, req.params.id, { name, description, acceptance_criteria, target_date, status });
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    broadcast({ type: "milestone_updated", payload: milestone });
+    res.json(milestone);
+  });
+
+  router.post("/api/milestones/:id/complete", (req, res) => {
+    const milestone = completeMilestone(db, req.params.id);
+    if (!milestone) { res.status(404).json({ error: "Milestone not found" }); return; }
+    broadcast({ type: "milestone_completed", payload: milestone });
+    res.json(milestone);
+  });
+
+  router.delete("/api/milestones/:id", (req, res) => {
+    const existing = getMilestone(db, req.params.id);
+    if (!existing) { res.status(404).json({ error: "Milestone not found" }); return; }
+    deleteMilestone(db, req.params.id);
+    broadcast({ type: "milestone_deleted", payload: existing });
+    res.json({ success: true });
+  });
+
 
   return router;
 }
