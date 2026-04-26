@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { TaskCard } from "./TaskCard";
@@ -15,20 +15,37 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
 
 const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 
+type SortBy = "default" | "due_soonest";
+
 export function TaskBoard() {
   const { tasks, projects, sprints, selectedProjectId, selectedSprintId, activity, agents, tags, taskTagMap, taskDepsMap, searchQuery } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("default");
+  const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const dragTaskId = useRef<string>("");
+
+  useEffect(() => {
+    setFilterTagId(null);
+  }, [selectedProjectId]);
+
+  const projectTags = useMemo(
+    () => selectedProjectId ? tags.filter((t) => t.project_id === selectedProjectId) : tags,
+    [tags, selectedProjectId]
+  );
 
   const filteredTasks = useMemo(() => {
     const nowMs = Date.now();
     const lower = searchQuery.toLowerCase();
-    return tasks.filter((t) => {
+    let result = tasks.filter((t) => {
       if (t.status === "done") {
         const completedAt = new Date(t.updated_at).getTime();
         if (nowMs - completedAt > DONE_AGE_OFF_MS) return false;
+      }
+      if (filterTagId) {
+        const taskTags = taskTagMap[t.id] ?? [];
+        if (!taskTags.includes(filterTagId)) return false;
       }
       return (
         t.parent_task_id === null &&
@@ -37,7 +54,18 @@ export function TaskBoard() {
         (!searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
       );
     });
-  }, [tasks, selectedProjectId, selectedSprintId, searchQuery]);
+
+    if (sortBy === "due_soonest") {
+      result = [...result].sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0;
+      });
+    }
+
+    return result;
+  }, [tasks, selectedProjectId, selectedSprintId, searchQuery, filterTagId, taskTagMap, sortBy]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
@@ -102,6 +130,52 @@ export function TaskBoard() {
             />
           </>
         )}
+
+        {/* Tag filter */}
+        {projectTags.length > 0 && (
+          <>
+            <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
+            <select
+              value={filterTagId ?? ""}
+              onChange={(e) => setFilterTagId(e.target.value || null)}
+              style={{
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                color: filterTagId ? "var(--accent-blue)" : "var(--text-secondary)",
+                padding: "4px 8px",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">All Tags</option>
+              {projectTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        {/* Sort */}
+        <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortBy)}
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            color: sortBy !== "default" ? "var(--accent-blue)" : "var(--text-secondary)",
+            padding: "4px 8px",
+            fontSize: "12px",
+            cursor: "pointer",
+          }}
+        >
+          <option value="default">Default Order</option>
+          <option value="due_soonest">Due Soonest</option>
+        </select>
       </div>
 
       {/* Columns */}
