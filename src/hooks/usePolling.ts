@@ -56,6 +56,14 @@ export function usePolling() {
         );
       }
 
+      // Worktrees needed for the worktrees view (stdio MCP writes bypass WebSocket,
+      // so polling is the only path that reflects create_worktree / cleanup_worktree)
+      if (view === "worktrees") {
+        promises.push(
+          api.getWorktrees().then((v) => dispatch({ type: "SET_WORKTREES", payload: v })),
+        );
+      }
+
       const results = await Promise.allSettled(promises);
       const failures = results.filter((r) => r.status === "rejected");
       if (failures.length > 0) {
