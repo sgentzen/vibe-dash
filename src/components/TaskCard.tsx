@@ -85,6 +85,15 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         e.dataTransfer.setData("text/plain", task.id);
         onDragStart(task.id);
       }}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-describedby={grabbed ? "keyboard-grab-bar" : undefined}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter") { e.preventDefault(); onClick(); }
+        if (e.key === " ") { e.preventDefault(); onGrab ? onGrab(task.id) : onClick(); }
+      }}
       style={{
         border: grabbed ? `2px dashed var(--accent-blue)` : `1px solid ${borderColor}`,
         borderRadius: "6px",
@@ -97,17 +106,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         userSelect: "none",
       }}
     >
-      <div
-        onClick={onClick}
-        role="button"
-        tabIndex={0}
-        aria-describedby={grabbed ? "keyboard-grab-bar" : undefined}
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return;
-          if (e.key === "Enter") { e.preventDefault(); onClick(); }
-          if (e.key === " ") { e.preventDefault(); onGrab ? onGrab(task.id) : onClick(); }
-        }}
-      >
+      <div>
         {/* Title */}
         <div
           style={{
