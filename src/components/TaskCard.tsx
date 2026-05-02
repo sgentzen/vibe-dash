@@ -1,9 +1,10 @@
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
 import { StatusPill } from "./StatusPill.js";
 import type { StatusToken } from "../constants/statusTokens.js";
+import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
 
 interface TaskCardProps {
   task: Task;
@@ -12,8 +13,10 @@ interface TaskCardProps {
   agents: Agent[];
   taskTags?: Tag[];
   blockingCount?: number;
+  grabbed?: boolean;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
+  onGrab?: (taskId: string) => void;
 }
 
 function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week" | null {
@@ -30,7 +33,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -40,15 +43,21 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
     ? agents.find((a) => a.id === task.assigned_agent_id)
     : null;
 
-  const dueUrgency = isDone ? null : getDueUrgency(task.due_date);
+  const dueUrgency = useMemo(
+    () => (isDone ? null : getDueUrgency(task.due_date)),
+    [isDone, task.due_date]
+  );
 
   const childTasks = allTasks.filter((t) => t.parent_task_id === task.id);
   const hasChildren = childTasks.length > 0;
   const childDone = childTasks.filter((t) => t.status === "done").length;
 
-  const latestActivity = activity
-    .filter((a) => a.task_id === task.id)
+  const taskActivity = activity.filter((a) => a.task_id === task.id);
+  const latestActivity = taskActivity
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+  const activitySparkValues = isActive
+    ? buildDailyActivityCounts(taskActivity.map((a) => a.timestamp), 7)
+    : null;
 
   const descSnippet = task.description
     ? task.description.slice(0, 80) + (task.description.length > 80 ? "\u2026" : "")
@@ -78,19 +87,28 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         e.dataTransfer.setData("text/plain", task.id);
         onDragStart(task.id);
       }}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-describedby={grabbed ? "keyboard-grab-bar" : undefined}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter") { e.preventDefault(); onClick(); }
+        if (e.key === " ") { e.preventDefault(); onGrab ? onGrab(task.id) : onClick(); }
+      }}
       style={{
-        border: `1px solid ${borderColor}`,
+        border: grabbed ? `2px dashed var(--accent-blue)` : `1px solid ${borderColor}`,
         borderRadius: "6px",
         padding: "10px",
-        background,
-        boxShadow,
+        background: grabbed ? "var(--bg-secondary)" : background,
+        boxShadow: grabbed ? "0 0 0 2px var(--accent-blue)" : boxShadow,
         cursor: "pointer",
         opacity: isDone ? 0.6 : 1,
         transition: "opacity 0.15s, border-color 0.15s",
         userSelect: "none",
       }}
     >
-      <div onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}>
+      <div>
         {/* Title */}
         <div
           style={{
@@ -107,7 +125,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
             <span style={{ color: "var(--status-info)", flexShrink: 0 }}>{"\u2713"}</span>
           )}
           {isActive && (
-            <span className="pulse-dot" style={{ marginTop: "5px", flexShrink: 0 }} />
+            <span className="pulse-dot" aria-hidden="true" style={{ marginTop: "5px", flexShrink: 0 }} />
           )}
           <span>{task.title}</span>
         </div>
@@ -125,7 +143,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           </div>
         )}
 
-        {/* Active task: latest activity + progress bar */}
+        {/* Active task: latest activity + progress bar + sparkline */}
         {isActive && (
           <>
             {latestActivity && (
@@ -143,23 +161,34 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
                 {latestActivity.message}
               </div>
             )}
-            <div
-              style={{
-                height: "3px",
-                background: "var(--bg-secondary)",
-                borderRadius: "2px",
-                overflow: "hidden",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div
                 style={{
-                  height: "100%",
-                  width: `${task.progress}%`,
-                  background: "var(--status-success)",
+                  flex: 1,
+                  height: "3px",
+                  background: "var(--bg-secondary)",
                   borderRadius: "2px",
-                  transition: "width 0.3s",
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${task.progress}%`,
+                    background: "var(--status-success)",
+                    borderRadius: "2px",
+                    transition: "width 0.3s",
+                  }}
+                />
+              </div>
+              {activitySparkValues && activitySparkValues.some((v) => v > 0) && (
+                <Sparkline
+                  values={activitySparkValues}
+                  width={40}
+                  height={12}
+                  color="var(--accent-green)"
+                />
+              )}
             </div>
           </>
         )}

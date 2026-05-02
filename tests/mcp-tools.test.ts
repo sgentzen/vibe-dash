@@ -213,6 +213,94 @@ describe("list operations", () => {
   });
 });
 
+// ─── assign_task / unassign_task ─────────────────────────────────────────────
+
+describe("assign_task", () => {
+  it("assigns an agent to a task", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "medium" }));
+    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
+
+    const result = await handleTool(db, "assign_task", { task_id, agent_id });
+    const data = parse(result);
+    expect(data.success).toBe(true);
+
+    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    expect(fetched.task.assigned_agent_id).toBe(agent_id);
+  });
+
+  it("is a no-op for unknown task_id", async () => {
+    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
+    const result = await handleTool(db, "assign_task", { task_id: "no-such-task", agent_id });
+    const data = parse(result);
+    expect(data.success).toBe(true);
+  });
+});
+
+describe("unassign_task", () => {
+  it("removes agent assignment from a task", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "medium" }));
+    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
+
+    await handleTool(db, "assign_task", { task_id, agent_id });
+    const result = await handleTool(db, "unassign_task", { task_id });
+    const data = parse(result);
+    expect(data.success).toBe(true);
+
+    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    expect(fetched.task.assigned_agent_id).toBeNull();
+  });
+});
+
+// ─── onboarding wizard flow ───────────────────────────────────────────────────
+
+describe("onboarding wizard flow", () => {
+  it("supports full wizard path: project → task", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "My First Project", description: "Onboarding test" }));
+    expect(project_id).toBeTruthy();
+
+    const { task_id } = parse(await handleTool(db, "create_task", {
+      project_id,
+      title: "My first task",
+      description: "Created during onboarding",
+      priority: "medium",
+    }));
+    expect(task_id).toBeTruthy();
+
+    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    expect(fetched.task.project_id).toBe(project_id);
+    expect(fetched.task.status).toBe("planned");
+  });
+
+  it("supports demo project seeding: multiple tasks in varied states", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "Demo Project" }));
+
+    const demoTasks = [
+      { title: "Task A", priority: "high" },
+      { title: "Task B", priority: "medium" },
+      { title: "Task C", priority: "low" },
+    ];
+
+    const taskIds: string[] = [];
+    for (const t of demoTasks) {
+      const { task_id } = parse(await handleTool(db, "create_task", { project_id, ...t }));
+      taskIds.push(task_id);
+    }
+
+    // Update statuses to simulate a realistic board
+    await handleTool(db, "update_task", { task_id: taskIds[0], status: "done", progress: 100 });
+    await handleTool(db, "update_task", { task_id: taskIds[1], status: "in_progress", progress: 50 });
+
+    const listed = parse(await handleTool(db, "list_tasks", { project_id }));
+    expect(listed.tasks).toHaveLength(3);
+    const statuses = listed.tasks.map((t: { status: string }) => t.status);
+    expect(statuses).toContain("done");
+    expect(statuses).toContain("in_progress");
+    expect(statuses).toContain("planned");
+  });
+});
+
 // ─── error handling ───────────────────────────────────────────────────────────
 
 describe("error handling", () => {

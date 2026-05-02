@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useAppDispatch, useAppState } from "../store";
+import { useAppDispatch, useNavigationState } from "../store";
 import { useApi } from "./useApi";
 
 const POLL_INTERVAL_MS = 3000;
@@ -15,7 +15,7 @@ const STARTUP_PROBE_MS = 1000;
  */
 export function usePolling() {
   const dispatch = useAppDispatch();
-  const { activeView } = useAppState();
+  const { activeView } = useNavigationState();
   const api = useApi();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeViewRef = useRef(activeView);
@@ -34,11 +34,11 @@ export function usePolling() {
         api.getBlockers().then((v) => dispatch({ type: "SET_BLOCKERS", payload: v })),
       ];
 
-      // Tasks + sprints needed for board, list, dashboard, timeline views
+      // Tasks + milestones needed for board, list, dashboard, timeline views
       if (view !== "agents") {
         promises.push(
           api.getTasks().then((v) => dispatch({ type: "SET_TASKS", payload: v })),
-          api.getSprints().then((v) => dispatch({ type: "SET_SPRINTS", payload: v })),
+          api.getMilestones().then((v) => dispatch({ type: "SET_MILESTONES", payload: v })),
         );
       }
 
@@ -53,6 +53,14 @@ export function usePolling() {
       if (view === "activity" || view === "agents" || view === "dashboard") {
         promises.push(
           api.getActivity().then((v) => dispatch({ type: "SET_ACTIVITY", payload: v })),
+        );
+      }
+
+      // Worktrees needed for the worktrees view (stdio MCP writes bypass WebSocket,
+      // so polling is the only path that reflects create_worktree / cleanup_worktree)
+      if (view === "worktrees") {
+        promises.push(
+          api.getWorktrees().then((v) => dispatch({ type: "SET_WORKTREES", payload: v })),
         );
       }
 

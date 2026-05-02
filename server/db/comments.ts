@@ -11,10 +11,9 @@ export function addComment(
 ): TaskComment {
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT INTO task_comments (id, task_id, agent_id, author_name, message, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(id, taskId, agentId ?? null, authorName, message, ts);
-  return db.prepare("SELECT * FROM task_comments WHERE id = ?").get(id) as TaskComment;
+  return db.prepare(
+    "INSERT INTO task_comments (id, task_id, agent_id, author_name, message, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *"
+  ).get(id, taskId, agentId ?? null, authorName, message, ts) as TaskComment;
 }
 
 export function listComments(db: Database.Database, taskId: string): TaskComment[] {

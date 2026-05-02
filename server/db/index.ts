@@ -2,19 +2,21 @@
 // and get the same public API as the original monolithic db.ts.
 
 export { initDb, openDb } from "./schema.js";
-export { createProject, listProjects } from "./projects.js";
+export { createProject, updateProject, listProjects } from "./projects.js";
 export {
-  createSprint,
-  updateSprint,
-  getSprint,
-  listSprints,
-  getSprintCapacity,
-  recordDailyStats,
-  getSprintDailyStats,
-  getVelocityTrend,
+  createMilestone,
+  updateMilestone,
+  completeMilestone,
+  getMilestone,
+  listMilestones,
+  deleteMilestone,
+  getMilestoneProgress,
+  recordMilestoneDailyStats,
+  getMilestoneDailyStats,
+  backfillMilestoneDailyStats,
   getTimeSpent,
-} from "./sprints.js";
-export type { CreateSprintInput, UpdateSprintInput } from "./sprints.js";
+} from "./milestones.js";
+export type { CreateMilestoneInput, UpdateMilestoneInput } from "./milestones.js";
 export {
   createTask,
   getTask,
@@ -38,7 +40,7 @@ export {
   getAgentCurrentProject,
   getAllAgentCurrentProjects,
   getAgentStats,
-  getSprintAgentContributions,
+  getMilestoneAgentContributions,
   startOrGetSession,
   closeAgentSessions,
   closeStaleSession,
@@ -61,12 +63,13 @@ export {
   getAgentActivityHeatmap,
 } from "./activity.js";
 export type { LogActivityInput, ActivityStreamFilter } from "./activity.js";
-export { createBlocker, resolveBlocker, getActiveBlockers } from "./blockers.js";
+export { createBlocker, resolveBlocker, resolveBlockersForTask, getActiveBlockers } from "./blockers.js";
 export type { CreateBlockerInput } from "./blockers.js";
 export { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags, getTag } from "./tags.js";
 export type { CreateTagInput } from "./tags.js";
 export { addDependency, removeDependency, listDependencies, getBlockingTasks } from "./dependencies.js";
-export { createSavedFilter, listSavedFilters, deleteSavedFilter } from "./filters.js";
+export { getTaskTagsForProject, getDependenciesForProject } from "./bulk.js";
+export type { TaskTagPair } from "./bulk.js";
 export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
 export {
   createAlertRule,
@@ -97,13 +100,57 @@ export {
   fireWebhooks,
 } from "./webhooks.js";
 export { generateReport } from "./reports.js";
+export { createReview, getReview, listReviewsForTask, updateReview } from "./reviews.js";
+export type { CreateReviewInput, UpdateReviewInput } from "./reviews.js";
 export {
   logCost,
   getAgentCostSummary,
-  getSprintCostSummary,
+  getMilestoneCostSummary,
   getProjectCostSummary,
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
+  getGlobalCostSummary,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
+export {
+  logCompletionMetrics,
+  getAgentPerformance,
+  getAgentComparison,
+  getTaskTypeBreakdown,
+} from "./metrics.js";
+export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
+export { scoreAgents, suggestAgent } from "./routing.js";
+export type { AgentScore, AgentSuggestion } from "./routing.js";
+export { getExecutiveSummary } from "./analytics.js";
+export type { ExecutiveSummary, MilestoneHealth, TeamUtilization, BlockersSummary, TaskVelocity, CostOverview } from "./analytics.js";
+export {
+  createWorktree,
+  getWorktreeById,
+  getTaskWorktree,
+  listActiveWorktrees,
+  listAllWorktrees,
+  updateWorktreeStatus,
+} from "./worktrees.js";
+export type { CreateWorktreeInput } from "./worktrees.js";
+export {
+  createGitIntegration,
+  listGitIntegrations,
+  getGitIntegration,
+  deleteGitIntegration,
+  updateLastSynced,
+  upsertLinkedItem,
+  getLinkedItemByExternal,
+  listLinkedItems,
+  getLinkedItemByTaskId,
+} from "./git-sync.js";
+export type { GitIntegration, GitIntegrationSafe, GitLinkedItem } from "./git-sync.js";
+export {
+  createUser,
+  getUserByKeyHash,
+  listUsers,
+  updateUserRole,
+  deleteUser,
+  rotateApiKey,
+  countUsers,
+} from "./users.js";

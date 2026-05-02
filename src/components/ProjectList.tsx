@@ -147,6 +147,8 @@ function ProjectCard({
       {/* Mini progress bar */}
       {tasks.length > 0 && (
         <div
+          role="img"
+          aria-label={`Task status: ${counts.planned} planned, ${counts.in_progress} in progress, ${counts.blocked} blocked, ${counts.done} done`}
           style={{
             display: "flex",
             height: "4px",
@@ -161,6 +163,7 @@ function ProjectCard({
               counts[s] > 0 && (
                 <div
                   key={s}
+                  aria-hidden="true"
                   style={{
                     flex: counts[s],
                     background: STATUS_COLORS[s],

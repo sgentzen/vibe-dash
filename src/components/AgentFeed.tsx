@@ -28,7 +28,7 @@ function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
 }
 
 
-export function AgentFeed() {
+export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
   const { agents, activity } = useAppState();
   const groups = groupAgents(agents);
   const [showOffline, setShowOffline] = useState(false);
@@ -76,17 +76,35 @@ export function AgentFeed() {
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            color: "var(--text-muted)",
-            fontSize: "11px",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            marginBottom: "10px",
-          }}
-        >
-          Active Agents
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+          <div
+            style={{
+              color: "var(--text-muted)",
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Active Agents
+          </div>
+          <button
+            onClick={onCollapse}
+            title="Collapse agent feed"
+            aria-label="Collapse agent feed"
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "2px 4px",
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              fontSize: "12px",
+              lineHeight: 1,
+              borderRadius: "3px",
+            }}
+          >
+            ›
+          </button>
         </div>
 
         {activeGroups.length === 0 ? (
@@ -302,6 +320,8 @@ function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
         {/* Health dot overlay */}
         <span
           className={isActive ? "pulse-dot" : undefined}
+          aria-label={`Status: ${HEALTH_LABELS[health]}`}
+          role="img"
           style={{
             position: "absolute",
             bottom: "-1px",
