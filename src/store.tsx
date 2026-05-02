@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useMemo } from "react";
 import type { AppState, AppAction, Theme, ActiveView } from "./state/types";
-import { setReducer, getInitialTheme } from "./state/setReducer";
+import { setReducer, getInitialTheme, getInitialRightRailCollapsed } from "./state/setReducer";
 import { wsReducer } from "./state/wsReducer";
 
 export type { AppState, AppAction, Theme, ActiveView };
@@ -16,7 +16,7 @@ export type DataState = Pick<
 export type NavigationState = Pick<
   AppState,
   "selectedProjectId" | "selectedMilestoneId" | "activeView" | "searchQuery" | "theme" |
-  "currentUser" | "isAuthenticated" | "authEnabled"
+  "currentUser" | "isAuthenticated" | "authEnabled" | "rightRailCollapsed"
 >;
 
 export type NotificationState = Pick<
@@ -53,6 +53,7 @@ const initialState: AppState = {
   searchQuery: "",
   activeView: "orchestration",
   theme: getInitialTheme(),
+  rightRailCollapsed: getInitialRightRailCollapsed(),
   selectedProjectId: null,
   selectedMilestoneId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
@@ -104,9 +105,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       currentUser: state.currentUser,
       isAuthenticated: state.isAuthenticated,
       authEnabled: state.authEnabled,
+      rightRailCollapsed: state.rightRailCollapsed,
     }),
     [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.searchQuery,
-     state.theme, state.currentUser, state.isAuthenticated, state.authEnabled]
+     state.theme, state.currentUser, state.isAuthenticated, state.authEnabled, state.rightRailCollapsed]
   );
 
   const notificationValue = useMemo<NotificationState>(

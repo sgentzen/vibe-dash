@@ -10,7 +10,7 @@ export function fileLockRoutes(db: Database.Database, broadcast: BroadcastFn): R
 
   router.post("/api/agents/:id/file-locks", validateBody(reportWorkingOnSchema), (req, res) => {
     const { task_id, file_paths } = req.body as { task_id: string; file_paths: string[] };
-    const locks = reportWorkingOn(db, req.params.id, task_id, file_paths);
+    const locks = reportWorkingOn(db, req.params.id as string, task_id, file_paths);
     for (const lock of locks) broadcast({ type: "file_lock_acquired", payload: lock });
     const conflicts = getFileConflicts(db);
     for (const c of conflicts) broadcast({ type: "file_conflict_detected", payload: c });
@@ -19,7 +19,7 @@ export function fileLockRoutes(db: Database.Database, broadcast: BroadcastFn): R
 
   router.delete("/api/agents/:id/file-locks", (req, res) => {
     const taskId = req.query.task_id as string | undefined;
-    const released = releaseFileLocks(db, req.params.id, taskId);
+    const released = releaseFileLocks(db, req.params.id as string, taskId);
     res.json({ released });
   });
 

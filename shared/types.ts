@@ -347,7 +347,9 @@ export type WsEventType =
   | "review_updated"
   | "worktree_created"
   | "worktree_updated"
-  | "plugins_reloaded";
+  | "plugins_reloaded"
+  | "ingestion_source_created"
+  | "ingestion_event_received";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -385,7 +387,62 @@ export type WsEvent =
   | WsEventOf<"review_created", TaskReview>
   | WsEventOf<"review_updated", TaskReview>
   | WsEventOf<"worktree_created", TaskWorktree>
-  | WsEventOf<"worktree_updated", TaskWorktree>;
+  | WsEventOf<"worktree_updated", TaskWorktree>
+  | WsEventOf<"ingestion_source_created", { id: string; name: string; kind: string }>
+  | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
+  | WsEventOf<"plugins_reloaded", { count: number }>;
+
+// ─── Saved Filters ────────────────────────────────────────────────────────────
+
+export interface SavedFilter {
+  id: string;
+  name: string;
+  filter_json: string;
+  created_at: string;
+}
+
+// ─── Git Sync ─────────────────────────────────────────────────────────────────
+
+export interface GitIntegrationSafe {
+  id: string;
+  project_id: string;
+  provider: "github" | "gitlab";
+  owner: string;
+  repo: string;
+  token_configured: boolean;
+  auto_sync: boolean;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitSyncResult {
+  integration_id: string;
+  issues_pulled: number;
+  issues_updated: number;
+  errors: string[];
+}
+
+// ─── Ingestion ────────────────────────────────────────────────────────────────
+
+export type IngestionSourceKind = "claude_code" | "cursor" | "codex" | "copilot" | "aider" | "generic";
+
+export interface IngestionSource {
+  id: string;
+  name: string;
+  kind: IngestionSourceKind;
+  project_id: string | null;
+  active: boolean;
+  created_at: string;
+  last_event_at: string | null;
+}
+
+// ─── Agent Cost ───────────────────────────────────────────────────────────────
+
+export interface AgentCost {
+  total_cost_usd: number;
+  total_tokens: number;
+}
 
 // ─── Executive Summary ────────────────────────────────────────────────────────
 

@@ -43,6 +43,7 @@ export interface AppState {
     alerts: number;
   };
   pollGeneration: number;
+  rightRailCollapsed: boolean;
   // Auth
   currentUser: User | null;
   isAuthenticated: boolean;
@@ -70,5 +71,7 @@ export type AppAction =
   | { type: "SELECT_MILESTONE"; payload: string | null }
   | { type: "SET_THEME"; payload: Theme }
   | { type: "INCREMENT_POLL_GENERATION" }
+  | { type: "TOGGLE_RIGHT_RAIL" }
+  | { type: "SET_RIGHT_RAIL_COLLAPSED"; payload: boolean }
   | { type: "WS_EVENT"; payload: WsEvent }
   | { type: "SET_AUTH"; payload: { currentUser: User | null; isAuthenticated: boolean; authEnabled: boolean } };

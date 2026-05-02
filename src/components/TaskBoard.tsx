@@ -24,6 +24,8 @@ export function TaskBoard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [keyboardGrab, setKeyboardGrab] = useState<{ taskId: string } | null>(null);
   const [grabError, setGrabError] = useState<string | null>(null);
+  const [filterTagId, setFilterTagId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("default");
   const dragTaskId = useRef<string>("");
 
   useEffect(() => {
@@ -54,7 +56,8 @@ export function TaskBoard() {
         (!searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
       );
     });
-  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery]);
+    return result;
+  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery, filterTagId, taskTagMap]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)

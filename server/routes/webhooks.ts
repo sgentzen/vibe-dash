@@ -20,13 +20,13 @@ export function webhookRoutes(db: Database.Database, _broadcast: BroadcastFn): R
 
   router.patch("/api/webhooks/:id", validateBody(updateWebhookSchema), (req, res) => {
     const updates = req.body as { url?: string; event_types?: string[]; active?: boolean };
-    const hook = updateWebhook(db, req.params.id, updates);
+    const hook = updateWebhook(db, req.params.id as string, updates);
     if (!requireEntity(res, hook, "Webhook")) return;
     res.json(hook);
   });
 
   router.delete("/api/webhooks/:id", (req, res) => {
-    res.json({ success: deleteWebhook(db, req.params.id) });
+    res.json({ success: deleteWebhook(db, req.params.id as string) });
   });
 
   return router;

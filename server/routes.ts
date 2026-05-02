@@ -99,6 +99,7 @@ import {
   getTaskTypeBreakdown,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
+import { closeLinkedIssue } from "./git-sync-service.js";
 import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";

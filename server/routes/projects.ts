@@ -20,7 +20,7 @@ export function projectRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
 
   router.post("/api/projects/:id/report", validateBody(generateReportSchema), (req, res) => {
     const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
-    res.json({ report: generateReport(db, req.params.id, period) });
+    res.json({ report: generateReport(db, req.params.id as string, period) });
   });
 
   return router;

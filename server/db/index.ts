@@ -134,6 +134,18 @@ export {
 } from "./worktrees.js";
 export type { CreateWorktreeInput } from "./worktrees.js";
 export {
+  createGitIntegration,
+  listGitIntegrations,
+  getGitIntegration,
+  deleteGitIntegration,
+  updateLastSynced,
+  upsertLinkedItem,
+  getLinkedItemByExternal,
+  listLinkedItems,
+  getLinkedItemByTaskId,
+} from "./git-sync.js";
+export type { GitIntegration, GitIntegrationSafe, GitLinkedItem } from "./git-sync.js";
+export {
   createUser,
   getUserByKeyHash,
   listUsers,

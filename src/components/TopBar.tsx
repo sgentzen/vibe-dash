@@ -2,18 +2,20 @@ import { useState } from "react";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { WebhookSettings } from "./WebhookSettings";
+import { GitSyncSettings } from "./GitSyncSettings";
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
 import { AddProjectControl } from "./topbar/AddProjectControl";
 
-export function TopBar() {
+export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } = {}) {
   const { stats } = useDataState();
   const { theme, activeView, searchQuery } = useNavigationState();
   const { unreadCount, notifications } = useNotificationState();
   const dispatch = useAppDispatch();
   const api = useApi();
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState<"webhooks" | "git" | null>(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   async function handleAddProject(name: string) {
     const project = await api.createProject({ name });
