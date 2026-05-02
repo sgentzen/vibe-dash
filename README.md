@@ -1,60 +1,91 @@
 # Vibe Dash
 
-A local-first, real-time dashboard for monitoring and managing AI-driven development projects. Gives humans at-a-glance visibility into project status, active work, and blockers — and gives AI agents a structured way to report progress via [MCP](https://modelcontextprotocol.io/).
+**The open-source project layer for AI-driven development.**
 
-![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+Connect your AI coding agents — Claude Code, Cursor, Codex, Copilot, Aider — to a shared task board, activity feed, and cost tracker. One dashboard, all your agents, no accounts required.
 
-## Why Vibe Dash?
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-When multiple AI agents work across multiple projects, you lose visibility. Vibe Dash solves this with:
+---
 
-- **A visual dashboard** — Kanban board, analytics, agent activity feed, and burndown charts
-- **An MCP server** — AI agents report task status, log activity, flag blockers, and track file conflicts through structured tool calls
-- **Real-time sync** — WebSocket-powered updates appear instantly in the browser
-- **Local-first storage** — SQLite database, no cloud dependencies, your data stays on your machine
+## What it does
+
+When multiple AI agents work across multiple projects, you lose visibility into what's happening, what's blocked, and what it's costing you. Vibe Dash gives your agents a shared workspace:
+
+- **Task board** — agents claim tasks, log progress, and flag blockers through MCP tool calls
+- **Activity feed** — every agent action appears in real time; no polling needed
+- **Cost tracker** — per-agent and per-model token spend logged automatically
+- **Conflict detection** — agents declare which files they're editing; you see collisions before they happen
+- **Local-first** — SQLite on your machine, no cloud, no subscriptions
+
+---
 
 ## Quick Start
 
 Requires **Node.js 20+**.
 
 ```bash
-# Clone and install
 git clone https://github.com/sgent/vibe-dash.git
 cd vibe-dash
 npm install
-
-# Start in development mode (hot-reload)
-npm run dev
-# Frontend: http://localhost:3000
-# Backend:  http://localhost:3001
-
-# Or start in production mode
-npm start
-# Everything at http://localhost:3001
+npm start          # http://localhost:3001
 ```
 
-## Connecting AI Agents
+For development with hot-reload:
 
-Vibe Dash exposes an MCP server that AI coding agents (Claude Code, etc.) can use to report their work. The simplest setup is the stdio transport — add the snippet from [docs/MCP-SETUP.md](docs/MCP-SETUP.md) to your project's `.mcp.json` and restart your agent.
+```bash
+npm run dev        # Frontend :3000, backend :3001
+```
 
-See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full setup guide: stdio / SSE / Streamable HTTP transports, bulk task import, ongoing reporting, and troubleshooting.
+---
 
-## Features
+## Connect your agents (60-second guides)
 
-### Dashboard Views
+| Agent | Guide |
+|-------|-------|
+| Claude Code | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) |
+| Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) |
+| OpenAI Codex | [docs/integrations/codex.md](docs/integrations/codex.md) |
+| GitHub Copilot | [docs/integrations/copilot.md](docs/integrations/copilot.md) |
+| Aider | [docs/integrations/aider.md](docs/integrations/aider.md) |
 
-- **Board** — Kanban columns (Planned, In Progress, Done) with task cards showing agent assignments, priority, tags, and progress
-- **List** — Filterable table view with sorting and saved filters
-- **Dashboard** — Project analytics, burndown charts, sprint capacity
-- **Agent Dashboard** — Per-agent metrics, session history, contribution breakdown
+All agents connect over MCP. Three transports are available:
 
-### MCP Tools for AI Agents
+| Transport | URL / Command | Best for |
+|-----------|--------------|---------|
+| **Stdio** | `npx tsx /path/to/vibe-dash/server/mcp/stdio.ts` | Single-machine, offline-first |
+| **Streamable HTTP** | `http://localhost:3001/mcp` | Multi-agent, remote, modern clients |
+| **SSE (legacy)** | `http://localhost:3001/sse` | Older MCP clients |
 
-AI agents can call 30+ tools to manage projects, tasks, sprints, blockers, dependencies, comments, and more. See the full reference in [docs/MCP-SETUP.md](docs/MCP-SETUP.md#step-4-ongoing-task-reporting).
+Full setup guide with task import, CLAUDE.md snippets, and troubleshooting: [docs/MCP-SETUP.md](docs/MCP-SETUP.md).
 
-### Real-Time Updates
+---
 
-All changes — whether from the dashboard UI or MCP tool calls — are broadcast over WebSocket and appear instantly across all connected clients.
+## Dashboard views
+
+- **Board** — Kanban (Planned / In Progress / Done) with agent assignments, priority, tags, and progress bars
+- **List** — Filterable, sortable table with saved filters
+- **Analytics** — Burndown charts, sprint capacity, velocity trends
+- **Agent Dashboard** — Per-agent metrics, session history, cost breakdown by model
+
+---
+
+## MCP tools (30+)
+
+Core tools your agents will use most:
+
+| Tool | Purpose |
+|------|---------|
+| `create_project` | Register a project |
+| `list_tasks` / `search_tasks` | Find work |
+| `create_task` / `update_task` / `complete_task` | Manage tasks |
+| `log_activity` | Post a status update (auto-registers the agent) |
+| `report_blocker` / `resolve_blocker` | Flag and clear blockers |
+| `report_working_on` | Declare files being edited (conflict detection) |
+| `log_cost` | Record token spend |
+| `create_sprint` / `generate_report` | Sprint management |
+
+---
 
 ## Architecture
 
@@ -65,39 +96,62 @@ All changes — whether from the dashboard UI or MCP tool calls — are broadcas
 │                 │  WS  │   :3001)          │     └──────────────┘
 └─────────────────┘     └──────────────────┘            ▲
                                ▲                        │
-                               │ SSE                    │ Direct
-                        ┌──────┴───────┐         ┌─────┴────────┐
-                        │  AI Agent    │         │  AI Agent     │
-                        │  (SSE MCP)   │         │  (Stdio MCP)  │
-                        └──────────────┘         └──────────────┘
+                        ┌──────┴───────────┐     ┌─────┴────────┐
+                        │  HTTP/SSE Agent  │     │  Stdio Agent  │
+                        │  (remote MCP)    │     │  (local MCP)  │
+                        └──────────────────┘     └──────────────┘
 ```
 
-- **Frontend**: React 19 + TypeScript, Context API state management, Vite dev server
-- **Backend**: Express 5 + TypeScript, REST API + WebSocket server
-- **Database**: SQLite via better-sqlite3 (local file, zero config)
-- **MCP Server**: Supports stdio (direct DB access), SSE, and Streamable HTTP transports — see [docs/MCP-SETUP.md](docs/MCP-SETUP.md)
+- **Frontend**: React 19 + TypeScript, Vite, Context API
+- **Backend**: Express 5 + TypeScript, REST + WebSocket
+- **Database**: SQLite via better-sqlite3 (zero config)
+- **MCP**: Stdio, Streamable HTTP, and SSE transports
 
-## Development
-
-```bash
-npm run dev    # Run both frontend (:3000) and backend (:3001) with hot-reload
-npm test       # Run the test suite
-```
-
-See [CLAUDE.md](CLAUDE.md) for the full module layout, additional dev commands, and architecture/code patterns (database, routes, frontend, testing, conventions).
+---
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3001` | Backend server port |
-| `DB_PATH` | `./vibe-dash.db` | SQLite database location (server) |
-| `VIBE_DASH_DB` | `./vibe-dash.db` | SQLite database location (stdio MCP) |
+| `PORT` | `3001` | Backend port |
+| `VIBE_DASH_DB` | `./vibe-dash.db` | Database path — used by both the server and stdio MCP transport |
+
+---
+
+## Development
+
+```bash
+npm test             # Vitest
+npm run test:watch   # Watch mode
+npm run build        # Production build
+npm run dev:server   # Backend only
+npm run dev:client   # Frontend only
+```
+
+---
+
+## Team self-hosting
+
+Deploy Vibe Dash on a shared server so all your agents report to the same dashboard:
+
+```bash
+git clone https://github.com/sgent/vibe-dash.git
+cd vibe-dash
+docker compose up -d    # dashboard at http://your-server:3001
+```
+
+See [docs/self-hosting.md](docs/self-hosting.md) for reverse proxy (Nginx/Caddy), TLS, access control options, backup, and upgrade procedures.
+
+## Roadmap
+
+The current strategic direction and active milestones (R11–R13) are documented in
+[docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md). This is the
+primary guiding document for all roadmap decisions until the next program review.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Apache 2.0. See [LICENSE](LICENSE).

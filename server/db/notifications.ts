@@ -9,10 +9,9 @@ export function createAlertRule(
 ): AlertRule {
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT INTO alert_rules (id, event_type, filter_json, enabled, created_at) VALUES (?, ?, ?, 1, ?)"
-  ).run(id, eventType, filterJson, ts);
-  return db.prepare("SELECT * FROM alert_rules WHERE id = ?").get(id) as AlertRule;
+  return db.prepare(
+    "INSERT INTO alert_rules (id, event_type, filter_json, enabled, created_at) VALUES (?, ?, ?, 1, ?) RETURNING *"
+  ).get(id, eventType, filterJson, ts) as AlertRule;
 }
 
 export function listAlertRules(db: Database.Database): AlertRule[] {
@@ -20,8 +19,8 @@ export function listAlertRules(db: Database.Database): AlertRule[] {
 }
 
 export function toggleAlertRule(db: Database.Database, id: string, enabled: boolean): AlertRule | null {
-  db.prepare("UPDATE alert_rules SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
-  return db.prepare("SELECT * FROM alert_rules WHERE id = ?").get(id) as AlertRule | null;
+  const row = db.prepare("UPDATE alert_rules SET enabled = ? WHERE id = ? RETURNING *").get(enabled ? 1 : 0, id) as AlertRule | undefined;
+  return row ?? null;
 }
 
 export function deleteAlertRule(db: Database.Database, id: string): boolean {
@@ -31,10 +30,9 @@ export function deleteAlertRule(db: Database.Database, id: string): boolean {
 export function createNotification(db: Database.Database, message: string, ruleId?: string | null): AppNotification {
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT INTO notifications (id, rule_id, message, read, created_at) VALUES (?, ?, ?, 0, ?)"
-  ).run(id, ruleId ?? null, message, ts);
-  return db.prepare("SELECT * FROM notifications WHERE id = ?").get(id) as AppNotification;
+  return db.prepare(
+    "INSERT INTO notifications (id, rule_id, message, read, created_at) VALUES (?, ?, ?, 0, ?) RETURNING *"
+  ).get(id, ruleId ?? null, message, ts) as AppNotification;
 }
 
 export function listNotifications(db: Database.Database, limit = 50): AppNotification[] {

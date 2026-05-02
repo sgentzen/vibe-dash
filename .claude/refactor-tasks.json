@@ -1,0 +1,126 @@
+{
+  "project_id": "f5e0c4e8-45d4-4fec-8177-46509c5f184a",
+  "milestone_id": "2fe63970-29b4-4e8a-87e6-ab905c305524",
+  "tasks": [
+    {
+      "priority": "high",
+      "title": "Add missing DB indexes on foreign-key columns",
+      "description": "server/db/schema.ts only indexes tasks(assigned_agent_id) and milestones(project_id). Hot query paths lack indexes on tasks(project_id), tasks(milestone_id), tasks(status), tasks(priority), activity_log(agent_id), activity_log(task_id), activity_log(timestamp), task_tags(task_id), blockers(task_id), agent_sessions(agent_id). activity.ts:76 subquery full-scans tasks at scale. Add CREATE INDEX IF NOT EXISTS statements; add a migration test. Effort: S."
+    },
+    {
+      "priority": "high",
+      "title": "Eliminate double-query on insert/update via RETURNING",
+      "description": "Many create/update functions run INSERT then SELECT. Use SQLite RETURNING (supported by better-sqlite3) to collapse into one round-trip. Files: server/db/tasks.ts:28-48,180-183; blockers.ts:25,43; notifications.ts:12-37,47; metrics.ts:52-70; activity.ts:27. Pure refactor, existing tests must pass unchanged. Effort: M."
+    },
+    {
+      "priority": "high",
+      "title": "Remove `as any` casts and tighten types across routes/db",
+      "description": "Unsafe casts bypass type checking: routes/tasks.ts:87,103-104; routes/dependencies.ts:27; routes/middleware.ts:57; mcp/tools.ts:484. Plus Record<string, unknown> casts without null guards in db/agents.ts:38-40,55,62,78. Replace with proper input types (UpdateTaskInput, TaskStatus) and explicit narrowing. Effort: S."
+    },
+    {
+      "priority": "high",
+      "title": "Reconcile server/types.ts vs src/types.ts drift",
+      "description": "Milestone.acceptance_criteria: server=string, src=string|null. Schema enforces NOT NULL DEFAULT '[]'. Risk: frontend can send null; server rejects. Pick server as source of truth, audit all type pairs, add a drift check. Prefer to merge into shared/types — see related task. Effort: M."
+    },
+    {
+      "priority": "high",
+      "title": "Consolidate tasks CREATE TABLE with migration-added columns",
+      "description": "server/db/schema.ts:19-29 creates tasks without assigned_agent_id, due_date, start_date, estimate, recurrence_rule, milestone_id. These are added via migrations at 196-216. Move into main CREATE TABLE; keep migration ALTERs idempotent for upgrades. Add test that fresh init has all columns. Effort: M."
+    },
+    {
+      "priority": "high",
+      "title": "Split monolithic AppState context to cut re-renders",
+      "description": "src/store.tsx:15-303: single reducer drives ~30 consumers. Any dispatch (e.g. SET_SEARCH_QUERY) re-renders all. Split into DataContext, SelectionContext, UIContext, RelationContext (lazy tag/dep maps). Measure with React DevTools profiler. Effort: L."
+    },
+    {
+      "priority": "high",
+      "title": "Lazy-load task tags and dependencies per-card",
+      "description": "src/App.tsx:74-97 fires api.getTaskTags(t.id) and api.getDependencies(t.id) for every task at boot — 2N requests (1000+ for 500 tasks). Add batch endpoints GET /api/tasks/tags?ids=... returning Record<taskId, Tag[]> and call once. Keep existing store shape so consumers do not change. Effort: M."
+    },
+    {
+      "priority": "high",
+      "title": "Fix milestone_id FK pointing at dropped sprints table (permanent migration)",
+      "description": "server/db/schema.ts:194 uses ALTER TABLE RENAME COLUMN sprint_id TO milestone_id; SQLite preserves the OLD FK target. Result: tasks.milestone_id REFERENCES sprints(id) even though sprints was dropped — every insert with milestone_id fails FK. Hot-patched the running DB surgically via writable_schema; make the fix permanent by detecting and rebuilding the tasks table in migrate() when the FK target is wrong (use PRAGMA foreign_key_list). Add integration test: init a fresh DB from legacy sprints data and confirm milestone_id inserts work. Effort: M. NOTE: this blocked task filing until fixed."
+    },
+    {
+      "priority": "medium",
+      "title": "Extract shared error-response helpers (notFound, badRequest, conflict, serverError)",
+      "description": "404 pattern copied 8+ times across routes/tasks.ts:114-116,123-125,152-154,183; sprints.ts:53-55,64; blockers.ts:36-38. Create server/routes/responses.ts with notFound/badRequest/conflict/serverError. Makes global response-shape changes trivial and ensures consistency. Effort: S."
+    },
+    {
+      "priority": "medium",
+      "title": "Extract shared WHERE-clause builder for list/search queries",
+      "description": "Dynamic-WHERE assembly duplicated in db/tasks.ts:67-99 (listTasks), 206-237 (searchTasks), activity.ts:70-95 (getActivityStream). Extract buildWhere(filters) returning {sql, params}. Keep parameterized (no user-input concatenation). Effort: S."
+    },
+    {
+      "priority": "medium",
+      "title": "Fix N+1 parent-agent lookup in logActivity",
+      "description": "db/activity.ts:20-24 issues extra SELECT+UPDATE per log entry. Replace with single UPDATE agents SET last_seen_at = ? WHERE id = (SELECT parent_agent_id FROM agents WHERE id = ?). Stateless and correct across processes. Effort: S."
+    },
+    {
+      "priority": "medium",
+      "title": "Extract shared Card / Modal / FormField UI primitives",
+      "description": "Dashboard card wrappers duplicated 8+ times in src/components/dashboard/*.tsx; modal backdrop/drawer duplicated across TaskEditDrawer.tsx:109-139 and other modals; form field+label combo repeated 15+ times in TaskEditDrawer.tsx:171-336. Create src/components/ui/: CardWrapper, ModalBackdrop, ModalDrawer, FormField, FormSelect, FormDateInput. Reduces 439 inline-style occurrences. No visual change. Effort: S-M."
+    },
+    {
+      "priority": "medium",
+      "title": "Split oversized components (TimelineView, TopBar, AgentDashboard, TaskEditDrawer)",
+      "description": "TimelineView.tsx (849 lines) — extract DateHeader, GroupHeaderRow, ResizeHandle. TopBar.tsx (388) — extract WebhookSettingsModal, NotificationsPanel, ProjectCreateForm. AgentDashboard.tsx (421) — extract AgentDetailView, move filter logic to hook. TaskEditDrawer.tsx (392) — extract TaskBasicInfo, TaskDatesEstimate, TaskMilestoneAgent sections. Pure structural refactor. Effort: M."
+    },
+    {
+      "priority": "medium",
+      "title": "Add memoization to hot-path render components",
+      "description": "Only TaskCard is memoized. Wrap getDueUrgency in useMemo (TaskCard.tsx:17-29). Memoize dashboard cards in dashboard/*.tsx. Fix KanbanColumn.tsx:83-85: isDragOver re-renders whole column on every drag event — use ref + class toggle or CSS :has(). Measure before/after with React Profiler. Effort: S."
+    },
+    {
+      "priority": "medium",
+      "title": "Dedupe test setup — use createTestDb() in all test files",
+      "description": "tests/milestones.test.ts, r2-features.test.ts, r3-features.test.ts, r4-features.test.ts, r5-features.test.ts, r6-features.test.ts all do `new Database(':memory:'); initDb(db);` manually instead of importing createTestDb from tests/setup.ts. Replace with createTestDb() in beforeEach. Export the helper if not already. Effort: S."
+    },
+    {
+      "priority": "medium",
+      "title": "Centralize magic numbers into a constants module",
+      "description": "Inconsistent limits: routes/tasks.ts:86 (200 bulk max), db/tasks.ts:232 (200 default / 500 max), routes/sprints.ts:83 (5 default), routes/notifications.ts:16-17 (50 default). Plus AGENT_ACTIVE_THRESHOLD_MS at agents.ts:142-144. Create server/constants.ts and reuse across routes. Effort: S."
+    },
+    {
+      "priority": "medium",
+      "title": "Extract route-pattern wrapper to dedupe mutation handlers",
+      "description": "CLAUDE.md documents the pattern validate → db → broadcast → fireWebhooks → res.json; nearly every mutating route in server/routes/*.ts re-implements it by hand. Extract handleMutation(handler, eventType) helper in server/routes/helpers.ts taking the db call, deriving the WebSocket payload, firing webhooks, writing JSON. Removes ~10-15 lines of boilerplate per endpoint across ~30 endpoints. Effort: M."
+    },
+    {
+      "priority": "medium",
+      "title": "Share validation between MCP tools and REST routes",
+      "description": "server/mcp/tools.ts and server/routes/*.ts call the same db/* functions but each re-implements input coercion (lots of `args.x as string` in MCP, ad-hoc validation in REST). Extract per-entity Zod schemas and reuse at both entry points. Depends on the Zod adoption task. Effort: M."
+    },
+    {
+      "priority": "medium",
+      "title": "Share types between server and client via shared/ module",
+      "description": "server/types.ts and src/types.ts must be kept in sync by hand and already drifted (see acceptance_criteria task). Move common interfaces (Task, Milestone, Agent, Activity, Blocker, Tag, Comment, etc.) to shared/types.ts imported with explicit .js extensions on both sides. Single source of truth eliminates drift entirely. Effort: M."
+    },
+    {
+      "priority": "low",
+      "title": "Clean up backup files and stale worktrees",
+      "description": "Clutter: server/db/sprints.ts.bak, vibe-dash.db.bak, vibe-dash.db.fkfix-backup (from this session), .fuse_hidden0000001e00000001, 5 abandoned .claude/worktrees/ directories (agitated-kepler, busy-williams, ecstatic-austin, ecstatic-bhabha, stoic-bartik) containing duplicate server/db and server/routes. Delete .bak/.fuse files; add *.bak, .fuse_hidden*, *.db.bak, *.fkfix-backup to .gitignore. Confirm with user before git worktree remove --force. Effort: S."
+    },
+    {
+      "priority": "low",
+      "title": "Wire up Zod for REST validation (or remove the dep)",
+      "description": "zod@^4.3.6 in package.json:55 unused outside MCP. Adopt at REST boundaries reusing MCP schemas, or remove the dep. Recommend adopt: cleaner validation, consistent errors, shrinks `as any` surface. Effort: S (remove) / M (adopt)."
+    },
+    {
+      "priority": "low",
+      "title": "Split tsconfig for server vs client",
+      "description": "tsconfig.json rootDir=. mixes cli/server/src/tests with strict+skipLibCheck. Tests can shadow source; CLI/server types may leak into client bundle. Split into tsconfig.server.json, tsconfig.client.json, tsconfig.test.json with project references. Effort: M."
+    },
+    {
+      "priority": "low",
+      "title": "Extract CLI output formatting utilities + add smoke tests",
+      "description": "cli/index.ts (~230 lines) has inline color/table formatting and no integration tests. Extract to cli/format.ts. Add tests invoking each CLI command against createTestDb()-backed state. Effort: M."
+    },
+    {
+      "priority": "low",
+      "title": "Fix fire-and-forget webhook error swallowing",
+      "description": "server/routes/index.ts:29 uses void fireWebhooks(...) — rejections vanish. Add .catch(err => log.warn({err, event}, 'webhook dispatch failed')) at minimum; audit other fire-and-forget sites. Consider a failed-deliveries retry table. Effort: S."
+    }
+  ]
+}

@@ -28,7 +28,7 @@ server/
     schema.ts       # DDL, migrations, initDb(), openDb()
     helpers.ts      # now(), genId(), parseAgent()
     projects.ts     # createProject, listProjects
-    sprints.ts      # CRUD + capacity, daily stats, velocity
+    milestones.ts   # CRUD + progress, daily stats, completion tracking
     tasks.ts        # CRUD + search, bulk update, recurring tasks
     agents.ts       # CRUD + health, sessions, stats, file locks
     activity.ts     # logActivity, activity stream, heatmap
@@ -41,7 +41,7 @@ server/
     templates.ts    # project templates + seeding
     webhooks.ts     # webhook CRUD + fireWebhooks
     reports.ts      # generateReport
-    costs.ts        # cost/token tracking per agent/sprint/project
+    costs.ts        # cost/token tracking per agent/milestone/project
   mcp/
     server.ts       # MCP server factory + tool registration
     tools.ts        # MCP tool handler implementations

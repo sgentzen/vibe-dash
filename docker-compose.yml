@@ -1,0 +1,21 @@
+services:
+  vibe-dash:
+    build: .
+    image: vibe-dash:latest
+    ports:
+      - "3001:3001"
+    volumes:
+      - vibe-dash-data:/data
+    environment:
+      - PORT=3001
+      - VIBE_DASH_DB=/data/vibe-dash.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/projects').then(r => process.exit(r.ok ? 0 : 1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  vibe-dash-data:
