@@ -15,7 +15,7 @@ When multiple AI agents work across multiple projects, you lose visibility. Vibe
 
 ## Quick Start
 
-Requires **Node.js 18+**.
+Requires **Node.js 20+**.
 
 ```bash
 # Clone and install
@@ -35,38 +35,9 @@ npm start
 
 ## Connecting AI Agents
 
-Vibe Dash exposes an MCP server that AI coding agents (Claude Code, etc.) can use to report their work.
+Vibe Dash exposes an MCP server that AI coding agents (Claude Code, etc.) can use to report their work. The simplest setup is the stdio transport — add the snippet from [docs/MCP-SETUP.md](docs/MCP-SETUP.md) to your project's `.mcp.json` and restart your agent.
 
-### Stdio Transport (recommended)
-
-Add to your project's `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
-    }
-  }
-}
-```
-
-### SSE Transport (remote/multi-agent)
-
-Start the Vibe Dash server, then add to `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "url": "http://localhost:3001/sse"
-    }
-  }
-}
-```
-
-See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full setup guide including bulk task import, ongoing reporting, and troubleshooting.
+See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full setup guide: stdio / SSE / Streamable HTTP transports, bulk task import, ongoing reporting, and troubleshooting.
 
 ## Features
 
@@ -79,25 +50,7 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full setup guide including bu
 
 ### MCP Tools for AI Agents
 
-| Tool | Purpose |
-|------|---------|
-| `list_projects` | List all projects |
-| `create_project` | Register a new project |
-| `list_tasks` | List tasks with optional filters |
-| `search_tasks` | Search tasks by query |
-| `create_task` | Create a task with status and priority |
-| `update_task` | Update task fields (status, progress, etc.) |
-| `complete_task` | Mark a task done |
-| `log_activity` | Log a status update (auto-registers agent) |
-| `report_blocker` | Flag a task as blocked with reason |
-| `resolve_blocker` | Clear a blocker |
-| `assign_task` | Assign a task to an agent |
-| `add_dependency` | Create task dependencies |
-| `report_working_on` | Declare files being edited (conflict detection) |
-| `create_sprint` | Create and manage sprints |
-| `generate_report` | Generate project/sprint reports |
-
-See the full list of 30+ tools in the [MCP setup guide](docs/MCP-SETUP.md).
+AI agents can call 30+ tools to manage projects, tasks, sprints, blockers, dependencies, comments, and more. See the full reference in [docs/MCP-SETUP.md](docs/MCP-SETUP.md#step-4-ongoing-task-reporting).
 
 ### Real-Time Updates
 
@@ -122,43 +75,16 @@ All changes — whether from the dashboard UI or MCP tool calls — are broadcas
 - **Frontend**: React 19 + TypeScript, Context API state management, Vite dev server
 - **Backend**: Express 5 + TypeScript, REST API + WebSocket server
 - **Database**: SQLite via better-sqlite3 (local file, zero config)
-- **MCP Server**: Supports stdio (direct DB access) and SSE (HTTP) transports
+- **MCP Server**: Supports stdio (direct DB access), SSE, and Streamable HTTP transports — see [docs/MCP-SETUP.md](docs/MCP-SETUP.md)
 
 ## Development
 
 ```bash
-# Run tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Build for production
-npm run build
-
-# Start individual components
-npm run dev:server   # Backend only
-npm run dev:client   # Frontend only
+npm run dev    # Run both frontend (:3000) and backend (:3001) with hot-reload
+npm test       # Run the test suite
 ```
 
-### Project Structure
-
-```
-vibe-dash/
-├── src/                  # React frontend
-│   ├── components/       # UI components (TopBar, TaskBoard, AgentDashboard, etc.)
-│   ├── hooks/            # useApi, useWebSocket, usePolling
-│   ├── store.tsx         # Global state (Context + useReducer)
-│   └── types.ts          # Shared TypeScript types
-├── server/               # Node.js backend
-│   ├── index.ts          # Express server entry
-│   ├── db.ts             # SQLite database layer
-│   ├── routes.ts         # REST API routes
-│   ├── websocket.ts      # WebSocket server
-│   └── mcp/              # MCP server (stdio + SSE)
-├── tests/                # Vitest test suite
-└── docs/                 # Documentation
-```
+See [CLAUDE.md](CLAUDE.md) for the full module layout, additional dev commands, and architecture/code patterns (database, routes, frontend, testing, conventions).
 
 ## Configuration
 
