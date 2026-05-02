@@ -9,9 +9,9 @@ function getProjectStatus(tasks: Task[]): "active" | "blocked" | "idle" {
 }
 
 function getBorderColor(status: "active" | "blocked" | "idle"): string {
-  if (status === "active") return "var(--accent-green)";
-  if (status === "blocked") return "var(--accent-yellow)";
-  return "var(--text-muted)";
+  if (status === "active") return "var(--status-success)";
+  if (status === "blocked") return "var(--status-warning)";
+  return "var(--status-neutral)";
 }
 
 
@@ -181,12 +181,12 @@ function ProjectCard({
         ) : (
           <>
             {counts.in_progress > 0 && (
-              <span style={{ color: "var(--accent-green)", fontSize: "11px" }}>
+              <span style={{ color: "var(--status-success)", fontSize: "11px" }}>
                 {counts.in_progress} in progress
               </span>
             )}
             {counts.blocked > 0 && (
-              <span style={{ color: "var(--accent-yellow)", fontSize: "11px" }}>
+              <span style={{ color: "var(--status-warning)", fontSize: "11px" }}>
                 {counts.blocked} blocked
               </span>
             )}

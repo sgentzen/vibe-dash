@@ -165,8 +165,8 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
                       style={{
                         fontSize: "10px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
                         background: "transparent",
-                        border: `1px solid ${w.active ? "var(--accent-green)" : "var(--text-muted)"}`,
-                        color: w.active ? "var(--accent-green)" : "var(--text-muted)",
+                        border: `1px solid ${w.active ? "var(--status-success)" : "var(--status-neutral)"}`,
+                        color: w.active ? "var(--status-success)" : "var(--status-neutral)",
                       }}
                     >
                       {w.active ? "Active" : "Paused"}

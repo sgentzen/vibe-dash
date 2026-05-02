@@ -5,7 +5,7 @@ export const ROLE_COLORS: Record<AgentRole, string> = {
   coder: "var(--accent-green)",
   reviewer: "var(--accent-yellow)",
   explorer: "var(--accent-red)",
-  planner: "#8b5cf6",
+  planner: "var(--accent-purple)",
   agent: "var(--text-muted)",
 };
 
