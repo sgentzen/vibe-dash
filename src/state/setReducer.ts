@@ -1,6 +1,11 @@
 import type { AppState, AppAction, Theme } from "./types";
 
 const THEME_STORAGE_KEY = "vibe-dash-theme";
+const RIGHT_RAIL_STORAGE_KEY = "vibe-dash-right-rail";
+
+export function getInitialRightRailCollapsed(): boolean {
+  return localStorage.getItem(RIGHT_RAIL_STORAGE_KEY) === "true";
+}
 
 export function getInitialTheme(): Theme {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -52,6 +57,15 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, theme: action.payload };
     case "INCREMENT_POLL_GENERATION":
       return { ...state, pollGeneration: state.pollGeneration + 1 };
+    case "TOGGLE_RIGHT_RAIL": {
+      const next = !state.rightRailCollapsed;
+      localStorage.setItem(RIGHT_RAIL_STORAGE_KEY, String(next));
+      return { ...state, rightRailCollapsed: next };
+    }
+    case "SET_RIGHT_RAIL_COLLAPSED":
+      // Does NOT persist to localStorage — used for programmatic collapse (e.g. auto-collapse on Timeline)
+      // so it doesn't override the user's stored preference.
+      return { ...state, rightRailCollapsed: action.payload };
     case "SET_AUTH":
       return { ...state, ...action.payload };
     default:

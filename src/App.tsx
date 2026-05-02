@@ -19,11 +19,12 @@ import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { LoginView } from "./components/LoginView";
+import { ProjectContextChip } from "./components/ProjectContextChip";
 
 export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
-  const { theme, activeView, isAuthenticated, authEnabled } = useNavigationState();
+  const { theme, activeView, isAuthenticated, authEnabled, rightRailCollapsed } = useNavigationState();
   const { fileConflicts } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -64,6 +65,15 @@ export function App() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-collapse right rail on views where it would obscure content.
+  // Uses SET_RIGHT_RAIL_COLLAPSED (not TOGGLE) so it doesn't write to localStorage
+  // and doesn't permanently override the user's stored preference.
+  useEffect(() => {
+    if (activeView === "timeline" || activeView === "executive") {
+      dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
+    }
+  }, [activeView, dispatch]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -188,10 +198,58 @@ export function App() {
   return (
     <div className="app">
       <TopBar />
-      <div className="main-content">
+      <div className={`main-content${rightRailCollapsed ? " rail-collapsed" : ""}`}>
         <ProjectList />
-        {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : <ActivityStreamView />}
-        <AgentFeed />
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              padding: "6px 16px",
+              borderBottom: "1px solid var(--border)",
+              flexShrink: 0,
+              gap: "8px",
+              minHeight: "32px",
+            }}
+          >
+            <ProjectContextChip />
+          </div>
+          {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : <ActivityStreamView />}
+        </div>
+        {rightRailCollapsed ? (
+          <aside
+            style={{
+              background: "var(--bg-secondary)",
+              borderLeft: "1px solid var(--border)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              paddingTop: "10px",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              onClick={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })}
+              title="Expand agent feed"
+              aria-label="Expand agent feed"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                fontSize: "14px",
+                lineHeight: 1,
+                borderRadius: "3px",
+              }}
+            >
+              ‹
+            </button>
+          </aside>
+        ) : (
+          <AgentFeed onCollapse={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })} />
+        )}
       </div>
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
       {loaded && showOnboarding && (

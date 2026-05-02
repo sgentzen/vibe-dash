@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useAppState } from "../../store";
 import { HealthScoreGauge } from "./HealthScoreGauge";
 import { ActiveBlockersPanel } from "./ActiveBlockersPanel";
-import { MilestoneProgressPanel } from "./MilestoneProgressPanel";
+import { TopAtRiskMilestonesTile } from "./TopAtRiskMilestonesTile";
 import { AgentComputeHeatmap } from "./AgentComputeHeatmap";
 import { TokenConsumptionChart } from "./TokenConsumptionChart";
 import "./orchestration.css";
@@ -51,10 +51,9 @@ export function OrchestrationView() {
 
         {/* Right column */}
         <div className="orch-right-col">
-          <MilestoneProgressPanel
+          <TopAtRiskMilestonesTile
             milestones={projectMilestones}
             tasks={projectTasks}
-            activeProjectId={activeProjectId}
           />
           <div className="orch-right-bottom">
             <AgentComputeHeatmap activeProjectId={activeProjectId} />
