@@ -201,7 +201,7 @@ describe("migration system", () => {
     const rows = db.prepare("SELECT name FROM _migrations ORDER BY id").all() as { name: string }[];
     const names = rows.map(r => r.name);
     expect(names).toContain("001_initial_schema");
-    expect(names).toContain("005_users");
+    expect(names).toContain("006_users");
   });
 
   it("users table exists after migration", () => {

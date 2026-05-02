@@ -16,12 +16,23 @@ const MCP_CONFIG_TEMPLATE = `{
   }
 }`;
 
+const DEMO_TASKS = [
+  { title: "Integrate USAC data API", description: "Connect to SODA endpoint and fetch Form 471 data", priority: "high" as const, status: "done" as const },
+  { title: "Build prospect scoring model", description: "Score districts by C2 budget utilization and filing history", priority: "high" as const, status: "in_progress" as const },
+  { title: "Add due date urgency indicators", description: "Show red/amber indicators on TaskCard based on due_date proximity", priority: "medium" as const, status: "done" as const },
+  { title: "Create agent health status API", description: "Return active/idle/offline status based on last_seen_at timestamp", priority: "medium" as const, status: "in_progress" as const },
+  { title: "Write onboarding wizard flow", description: "Multi-step first-run experience for new users", priority: "medium" as const, status: "planned" as const },
+  { title: "Set up CI pipeline", description: "GitHub Actions: lint, test, build on each PR", priority: "low" as const, status: "planned" as const },
+  { title: "Add sprint velocity chart", description: "Plot story points per sprint over time", priority: "low" as const, status: "planned" as const },
+];
+
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const api = useApi();
   const [step, setStep] = useState(0);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
   const [creating, setCreating] = useState(false);
+  const [loadingDemo, setLoadingDemo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
 
@@ -57,6 +68,49 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       // ignore
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleLoadDemo() {
+    setLoadingDemo(true);
+    try {
+      const project = await api.createProject({
+        name: "Demo Project",
+        description: "Sample project to showcase Vibe Dash features",
+      });
+      const today = new Date();
+      const fmtDate = (daysOffset: number) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() + daysOffset);
+        return d.toISOString().slice(0, 10);
+      };
+      const dueDates: (string | null)[] = [null, fmtDate(1), null, fmtDate(7), fmtDate(14), null, null];
+      try {
+        const createdTasks = await Promise.all(
+          DEMO_TASKS.map((t) =>
+            api.createTask({
+              project_id: project.id,
+              title: t.title,
+              description: t.description,
+              priority: t.priority,
+            })
+          )
+        );
+        await Promise.all(
+          createdTasks.map((task, i) => {
+            const updates: Record<string, unknown> = { status: DEMO_TASKS[i].status };
+            if (dueDates[i]) updates.due_date = dueDates[i];
+            return api.updateTask(task.id, updates as Parameters<typeof api.updateTask>[1]);
+          })
+        );
+      } catch {
+        // Task seeding failed — project still exists, proceed to board
+      }
+      onComplete();
+    } catch {
+      // Project creation failed — stay on wizard so user can try manually
+    } finally {
+      setLoadingDemo(false);
     }
   }
 
@@ -135,11 +189,23 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </div>
               <button
                 onClick={handleCreateProject}
-                disabled={creating || !projectName.trim()}
+                disabled={creating || loadingDemo || !projectName.trim()}
                 style={primaryBtnStyle}
               >
                 {creating ? "Creating..." : "Create Project"}
               </button>
+              <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border)" }}>
+                <p style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "10px" }}>
+                  Or explore with sample data:
+                </p>
+                <button
+                  onClick={handleLoadDemo}
+                  disabled={creating || loadingDemo}
+                  style={secondaryBtnStyle}
+                >
+                  {loadingDemo ? "Loading Demo..." : "Load Demo Project"}
+                </button>
+              </div>
             </>
           )}
 

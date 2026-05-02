@@ -292,7 +292,62 @@ const MIGRATIONS: Migration[] = [
     },
   },
   {
-    name: "005_users",
+    name: "005_ingestion_and_git_sync",
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ingestion_sources (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          token_hash TEXT NOT NULL UNIQUE,
+          project_id TEXT,
+          active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          last_event_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS ingestion_events (
+          id TEXT PRIMARY KEY,
+          source_id TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          raw_payload TEXT NOT NULL,
+          normalized_kind TEXT NOT NULL,
+          task_id TEXT,
+          agent_id TEXT,
+          processed INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_ingestion_events_processed ON ingestion_events(processed);
+        CREATE TABLE IF NOT EXISTS git_integrations (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          provider TEXT NOT NULL DEFAULT 'github',
+          owner TEXT NOT NULL,
+          repo TEXT NOT NULL,
+          token TEXT NOT NULL,
+          auto_sync INTEGER NOT NULL DEFAULT 1,
+          last_synced_at TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS git_linked_items (
+          id TEXT PRIMARY KEY,
+          integration_id TEXT NOT NULL,
+          task_id TEXT,
+          item_type TEXT NOT NULL,
+          external_number INTEGER NOT NULL,
+          external_id TEXT NOT NULL,
+          external_title TEXT NOT NULL,
+          external_state TEXT NOT NULL,
+          external_url TEXT,
+          pr_number INTEGER,
+          pr_state TEXT,
+          synced_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_git_linked_items_unique ON git_linked_items(integration_id, item_type, external_number);
+      `);
+    },
+  },
+  {
+    name: "006_users",
     run(db) {
       db.exec(`
         CREATE TABLE IF NOT EXISTS users (
@@ -306,46 +361,6 @@ const MIGRATIONS: Migration[] = [
         );
         CREATE INDEX IF NOT EXISTS idx_users_api_key_hash ON users(api_key_hash);
       `);
-    },
-  },
-  {
-    name: "006_ingestion",
-    run(db) {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS ingestion_sources (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          kind TEXT NOT NULL CHECK(kind IN ('claude_code','cursor','codex','copilot','aider','generic')),
-          token_hash TEXT NOT NULL UNIQUE,
-          project_id TEXT REFERENCES projects(id),
-          active INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL,
-          last_event_at TEXT
-        );
-        CREATE INDEX IF NOT EXISTS idx_ingestion_sources_token_hash ON ingestion_sources(token_hash);
-        CREATE TABLE IF NOT EXISTS ingestion_events (
-          id TEXT PRIMARY KEY,
-          source_id TEXT NOT NULL REFERENCES ingestion_sources(id),
-          received_at TEXT NOT NULL,
-          raw_payload TEXT NOT NULL,
-          normalized_kind TEXT NOT NULL CHECK(normalized_kind IN ('activity','cost','tool_call','file_change','session_start','session_end')),
-          task_id TEXT REFERENCES tasks(id),
-          agent_id TEXT REFERENCES agents(id),
-          processed INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE INDEX IF NOT EXISTS idx_ingestion_events_unprocessed ON ingestion_events(processed, received_at);
-      `);
-    },
-  },
-  {
-    name: "007_drop_saved_filters",
-    run(db) {
-      // saved_filters was never surfaced to users (no frontend consumer).
-      // URL-param filtering in search_tasks covers the same use case.
-      const tables = (db.pragma("table_list") as { name: string }[]).map((r) => r.name);
-      if (tables.includes("saved_filters")) {
-        db.exec("DROP TABLE saved_filters");
-      }
     },
   },
 ];

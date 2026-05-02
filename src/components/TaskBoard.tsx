@@ -14,6 +14,8 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
 
 const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 
+type SortBy = "default" | "due_soonest";
+
 export function TaskBoard() {
   const { tasks, projects, milestones, activity, agents, tags, taskTagMap, taskDepsMap } = useDataState();
   const { selectedProjectId, selectedMilestoneId, searchQuery } = useNavigationState();
@@ -22,15 +24,30 @@ export function TaskBoard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [keyboardGrab, setKeyboardGrab] = useState<{ taskId: string } | null>(null);
   const [grabError, setGrabError] = useState<string | null>(null);
+  const [filterTagId, setFilterTagId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("default");
   const dragTaskId = useRef<string>("");
+
+  useEffect(() => {
+    setFilterTagId(null);
+  }, [selectedProjectId]);
+
+  const projectTags = useMemo(
+    () => selectedProjectId ? tags.filter((t) => t.project_id === selectedProjectId) : tags,
+    [tags, selectedProjectId]
+  );
 
   const filteredTasks = useMemo(() => {
     const nowMs = Date.now();
     const lower = searchQuery.toLowerCase();
-    return tasks.filter((t) => {
+    let result = tasks.filter((t) => {
       if (t.status === "done") {
         const completedAt = new Date(t.updated_at).getTime();
         if (nowMs - completedAt > DONE_AGE_OFF_MS) return false;
+      }
+      if (filterTagId) {
+        const taskTags = taskTagMap[t.id] ?? [];
+        if (!taskTags.includes(filterTagId)) return false;
       }
       return (
         t.parent_task_id === null &&
@@ -39,7 +56,8 @@ export function TaskBoard() {
         (!searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
       );
     });
-  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery]);
+    return result;
+  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery, filterTagId, taskTagMap]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
@@ -145,6 +163,52 @@ export function TaskBoard() {
             />
           </>
         )}
+
+        {/* Tag filter */}
+        {projectTags.length > 0 && (
+          <>
+            <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
+            <select
+              value={filterTagId ?? ""}
+              onChange={(e) => setFilterTagId(e.target.value || null)}
+              style={{
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                color: filterTagId ? "var(--accent-blue)" : "var(--text-secondary)",
+                padding: "4px 8px",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">All Tags</option>
+              {projectTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        {/* Sort */}
+        <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortBy)}
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            color: sortBy !== "default" ? "var(--accent-blue)" : "var(--text-secondary)",
+            padding: "4px 8px",
+            fontSize: "12px",
+            cursor: "pointer",
+          }}
+        >
+          <option value="default">Default Order</option>
+          <option value="due_soonest">Due Soonest</option>
+        </select>
       </div>
 
       {(keyboardGrab || grabError) && (

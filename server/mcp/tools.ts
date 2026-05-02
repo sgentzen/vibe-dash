@@ -86,6 +86,11 @@ import {
 import { execFileSync } from "child_process";
 
 import { broadcast } from "../websocket.js";
+import {
+  createGitIntegration,
+  listGitIntegrations,
+} from "../db/index.js";
+import { syncGitHubIssues } from "../git-sync-service.js";
 
 /** Auto-log activity and broadcast it for any mutation */
 function autoLog(
@@ -112,7 +117,7 @@ function autoLog(
   });
 }
 
-type ToolResult = { content: [{ type: "text"; text: string }] };
+type ToolResult = { content: [{ type: "text"; text: string }]; isError?: boolean };
 
 function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };

@@ -13,38 +13,49 @@ export function AgentDashboard() {
   const { agents } = useAppState();
   const api = useApi();
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
+  const [costMap, setCostMap] = useState<Record<string, AgentCost>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active+idle");
   const [viewMode, setViewMode] = useState<"agents" | "performance">("agents");
 
   useEffect(() => {
     async function loadDetails() {
-      const entries = await Promise.all(
-        agents.map(async (agent): Promise<[string, AgentDetail] | null> => {
-          try {
-            const [detail, activity, sessions] = await Promise.all([
-              api.getAgentDetail(agent.id),
-              api.getAgentActivity(agent.id, 10),
-              api.getAgentSessions(agent.id),
-            ]);
-            return [agent.id, {
-              agent,
-              health_status: detail.health_status,
-              completed_today: detail.completed_today,
-              current_task_title: detail.current_task_title ?? null,
-              activity,
-              sessions,
-            }];
-          } catch {
-            return null;
-          }
-        })
-      );
+      const [entries, costEntries] = await Promise.all([
+        Promise.all(
+          agents.map(async (agent): Promise<[string, AgentDetail] | null> => {
+            try {
+              const [detail, activity, sessions] = await Promise.all([
+                api.getAgentDetail(agent.id),
+                api.getAgentActivity(agent.id, 30),
+                api.getAgentSessions(agent.id),
+              ]);
+              return [agent.id, {
+                agent,
+                health_status: detail.health_status,
+                completed_today: detail.completed_today,
+                current_task_title: detail.current_task_title ?? null,
+                activity,
+                sessions,
+              }];
+            } catch {
+              return null;
+            }
+          })
+        ),
+        api.getCostByAgent().catch(() => [] as { agent_id: string; total_cost_usd: number; total_tokens: number }[]),
+      ]);
+
       const results: Record<string, AgentDetail> = {};
       for (const entry of entries) {
         if (entry) results[entry[0]] = entry[1];
       }
       setDetails(results);
+
+      const costs: Record<string, AgentCost> = {};
+      for (const c of costEntries) {
+        costs[c.agent_id] = { total_cost_usd: c.total_cost_usd, total_tokens: c.total_tokens };
+      }
+      setCostMap(costs);
     }
     if (agents.length > 0) loadDetails();
   }, [agents, api]);
@@ -110,6 +121,7 @@ export function AgentDashboard() {
                 <AgentCard
                   agent={parent}
                   detail={details[parent.id]}
+                  cost={costMap[parent.id]}
                   onClick={() => setSelectedAgentId(parent.id)}
                 />
                 {children.length > 0 && (
@@ -129,6 +141,7 @@ export function AgentDashboard() {
                         key={child.id}
                         agent={child}
                         detail={details[child.id]}
+                        cost={costMap[child.id]}
                         onClick={() => setSelectedAgentId(child.id)}
                       />
                     ))}

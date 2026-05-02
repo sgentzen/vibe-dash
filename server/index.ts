@@ -13,12 +13,27 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
-import { startMaterializer } from "./ingestion/materializer.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
+
+// Rate limiters for MCP/SSE endpoints (CodeQL js/missing-rate-limiting)
+const mcpLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many MCP requests, please try again later." },
+});
+const messagesLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many message requests, please try again later." },
+});
 
 const PORT = parseInt(process.env.PORT ?? "3001");
 const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
@@ -38,7 +53,7 @@ const spaLimiter = rateLimit({
 const transports = new Map<string, SSEServerTransport>();
 const mcpAuth = makeAuthMiddleware(db);
 
-app.get("/sse", mcpAuth, async (req, res) => {
+app.get("/sse", mcpLimiter, mcpAuth, async (req, res) => {
   const transport = new SSEServerTransport("/messages", res);
   const handle = createMcpServer(db, transport.sessionId);
   transports.set(transport.sessionId, transport);
@@ -49,7 +64,7 @@ app.get("/sse", mcpAuth, async (req, res) => {
   await handle.server.connect(transport);
 });
 
-app.post("/messages", mcpAuth, async (req, res) => {
+app.post("/messages", messagesLimiter, mcpAuth, async (req, res) => {
   const sessionId = req.query.sessionId as string;
   const transport = transports.get(sessionId);
   if (!transport) { res.status(400).json({ error: "Unknown session" }); return; }
@@ -59,7 +74,7 @@ app.post("/messages", mcpAuth, async (req, res) => {
 // MCP Streamable HTTP transport (modern clients use this)
 const httpTransports = new Map<string, { transport: StreamableHTTPServerTransport; cleanup: () => void }>();
 
-app.all("/mcp", mcpAuth, async (req, res) => {
+app.all("/mcp", mcpLimiter, mcpAuth, async (req, res) => {
   // Handle session-based routing for existing sessions
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
   if (sessionId && httpTransports.has(sessionId)) {
@@ -110,7 +125,6 @@ initWebSocket(server, db);
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "Vibe Dash running");
   initPlugins(db).catch((err) => logger.warn({ err }, "plugin init failed"));
-  startMaterializer(db);
   logger.info({ port: PORT, path: "/ws" }, "WebSocket available");
   logger.info({ port: PORT, path: "/sse" }, "MCP SSE available");
   // Backfill milestone daily stats so the dashboard has data immediately

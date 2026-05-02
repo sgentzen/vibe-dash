@@ -2,18 +2,20 @@ import { useState } from "react";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { WebhookSettings } from "./WebhookSettings";
+import { GitSyncSettings } from "./GitSyncSettings";
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
 import { AddProjectControl } from "./topbar/AddProjectControl";
 
-export function TopBar() {
+export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } = {}) {
   const { stats } = useDataState();
   const { theme, activeView, searchQuery } = useNavigationState();
   const { unreadCount, notifications } = useNotificationState();
   const dispatch = useAppDispatch();
   const api = useApi();
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState<"webhooks" | "git" | null>(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   async function handleAddProject(name: string) {
     const project = await api.createProject({ name });
@@ -89,9 +91,33 @@ export function TopBar() {
           color: "var(--text-primary)",
           padding: "4px 10px",
           fontSize: "13px",
-          width: "200px",
+          width: "160px",
         }}
       />
+
+      {/* Command palette trigger */}
+      {onCommandPalette && (
+        <button
+          onClick={onCommandPalette}
+          title="Command palette (⌘K)"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            color: "var(--text-muted)",
+            padding: "4px 8px",
+            fontSize: "11px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ fontSize: "13px" }}>⌘</span>
+          <kbd style={{ fontFamily: "inherit", fontSize: "11px" }}>K</kbd>
+        </button>
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
@@ -139,23 +165,55 @@ export function TopBar() {
       />
 
       {/* Settings Gear */}
-      <button
-        onClick={() => setShowSettings(true)}
-        aria-label="Settings"
-        style={{
-          background: "transparent",
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          padding: "4px 8px",
-          cursor: "pointer",
-          color: "var(--text-secondary)",
-          fontSize: "14px",
-        }}
-      >
-        {"\u2699\uFE0F"}
-      </button>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          aria-label="Settings"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            padding: "4px 8px",
+            cursor: "pointer",
+            color: "var(--text-secondary)",
+            fontSize: "14px",
+          }}
+        >
+          {"⚙️"}
+        </button>
+        {showSettingsMenu && (
+          <div style={{
+            position: "absolute", top: "100%", right: 0, marginTop: "4px",
+            background: "var(--bg-secondary)", border: "1px solid var(--border)",
+            borderRadius: "8px", zIndex: 100, boxShadow: "var(--shadow-md)",
+            minWidth: "160px", overflow: "hidden",
+          }}>
+            <button
+              onClick={() => { setShowSettings("webhooks"); setShowSettingsMenu(false); }}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                background: "transparent", border: "none", padding: "8px 14px",
+                fontSize: "13px", color: "var(--text-primary)", cursor: "pointer",
+              }}
+            >
+              Webhooks
+            </button>
+            <button
+              onClick={() => { setShowSettings("git"); setShowSettingsMenu(false); }}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                background: "transparent", border: "none", padding: "8px 14px",
+                fontSize: "13px", color: "var(--text-primary)", cursor: "pointer",
+              }}
+            >
+              GitHub Sync
+            </button>
+          </div>
+        )}
+      </div>
 
-      {showSettings && <WebhookSettings onClose={() => setShowSettings(false)} />}
+      {showSettings === "webhooks" && <WebhookSettings onClose={() => setShowSettings(null)} />}
+      {showSettings === "git" && <GitSyncSettings onClose={() => setShowSettings(null)} />}
 
       {/* Notification Bell */}
       <NotificationBell

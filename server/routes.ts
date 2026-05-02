@@ -99,6 +99,7 @@ import {
   getTaskTypeBreakdown,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
+import { closeLinkedIssue } from "./git-sync-service.js";
 import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
@@ -120,6 +121,8 @@ const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
   max: 30, // limit each IP to 30 delete requests per windowMs
 });
+
+const gitSyncLimiter = rateLimit({ windowMs: 60_000, max: 5 }); // 5 syncs/min per IP
 
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
@@ -396,6 +399,10 @@ export function createRouter(db: Database.Database): Router {
       type: "agent_activity",
       payload: { ...entry, agent_name: null, task_title: completed!.title },
     });
+    // R12.2: Close linked GitHub issue (fire-and-forget)
+    closeLinkedIssue(db, completed!.id).catch((err: unknown) =>
+      console.error("[git-sync] Failed to close linked GitHub issue:", err instanceof Error ? err.message : err)
+    );
     res.json(completed);
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
 import { useApi, getStoredApiKey } from "./hooks/useApi";
@@ -74,6 +74,68 @@ export function App() {
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
     }
   }, [activeView, dispatch]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const isEditable =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+        return;
+      }
+
+      if (isEditable) return;
+
+      if (e.key === "Escape") {
+        setCommandPaletteOpen(false);
+        return;
+      }
+
+      if (e.key === "/") {
+        e.preventDefault();
+        const searchEl = document.querySelector<HTMLInputElement>(
+          'input[placeholder="Search tasks..."]'
+        );
+        searchEl?.focus();
+        return;
+      }
+
+      if (e.key === "g" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (gKeyTimer.current !== null) clearTimeout(gKeyTimer.current);
+        gKeyPending.current = true;
+        gKeyTimer.current = setTimeout(() => { gKeyPending.current = false; gKeyTimer.current = null; }, 1000);
+        return;
+      }
+
+      if (gKeyPending.current) {
+        gKeyPending.current = false;
+        const viewMap: Record<string, typeof activeView> = {
+          b: "board",
+          a: "agents",
+          l: "list",
+          d: "dashboard",
+          t: "timeline",
+          v: "activity",
+        };
+        const view = viewMap[e.key];
+        if (view) dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (gKeyTimer.current !== null) {
+        clearTimeout(gKeyTimer.current);
+        gKeyTimer.current = null;
+      }
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -197,7 +259,7 @@ export function App() {
 
   return (
     <div className="app">
-      <TopBar />
+      <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} />
       <div className={`main-content${rightRailCollapsed ? " rail-collapsed" : ""}`}>
         <ProjectList />
         <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
@@ -254,6 +316,9 @@ export function App() {
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
       {loaded && showOnboarding && (
         <OnboardingWizard onComplete={handleOnboardingComplete} />
+      )}
+      {commandPaletteOpen && (
+        <CommandPalette onClose={() => setCommandPaletteOpen(false)} />
       )}
     </div>
   );

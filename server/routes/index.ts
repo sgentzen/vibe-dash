@@ -26,10 +26,18 @@ import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
 import { userRoutes } from "./users.js";
-import { pluginRoutes } from "./plugins.js";
-import { ingestionRoutes } from "../ingestion/index.js";
 import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
+import rateLimit from "express-rate-limit";
+
+// Global rate limiter for all /api routes (CodeQL js/missing-rate-limiting)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
 
 function makeBroadcast(db: Database.Database) {
   return (event: WsEvent) => {
@@ -63,24 +71,20 @@ const routeFactories: RouteFactory[] = [
   executiveRoutes,
   milestoneRoutes,
   userRoutes,
-  pluginRoutes,
-  ingestionRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
 
+  // Global rate limit — applies to all API routes
+  router.use(apiLimiter);
+
   // Auth middleware runs before all routes; no-op when no users exist.
-  // /api/auth/status is exempt (public discovery). /api/ingest/:kind and
-  // /api/ingest/:kind/heartbeat are exempt (use their own source-token auth).
+  // /api/auth/status is exempt — it's a public discovery endpoint.
   const authMiddleware = makeAuthMiddleware(db);
   router.use((req, res, next) => {
     if (req.path === "/api/auth/status") return next();
-    // POST /api/ingest/<kind> and POST /api/ingest/<kind>/heartbeat use
-    // ingestion source bearer tokens, not user tokens.
-    // "sources" and "events" are admin paths that go through normal user auth.
-    if (req.method === "POST" && /^\/api\/ingest\/(?!sources|events)[^/]+(\/heartbeat)?$/.test(req.path)) return next();
     authMiddleware(req, res, next);
   });
 
