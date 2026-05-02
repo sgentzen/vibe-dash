@@ -1,10 +1,10 @@
 import type { Agent, AgentRole } from "../types";
 
 export const ROLE_COLORS: Record<AgentRole, string> = {
-  orchestrator: "var(--accent-blue)",
-  coder: "var(--accent-green)",
-  reviewer: "var(--accent-yellow)",
-  explorer: "var(--accent-red)",
+  orchestrator: "var(--status-info)",
+  coder: "var(--status-success)",
+  reviewer: "var(--status-warning)",
+  explorer: "var(--status-danger)",
   planner: "var(--accent-purple)",
   agent: "var(--text-muted)",
 };

@@ -202,7 +202,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             max={100}
             value={progress}
             onChange={(e) => setProgress(Number(e.target.value))}
-            style={{ width: "100%", accentColor: "var(--accent-green)" }}
+            style={{ width: "100%", accentColor: "var(--status-success)" }}
           />
         </FormField>
 

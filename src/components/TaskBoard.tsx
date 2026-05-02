@@ -218,7 +218,7 @@ export function TaskBoard() {
           aria-live="polite"
           style={{
             padding: "6px 16px",
-            background: grabError ? "var(--accent-red)" : "var(--accent-blue)",
+            background: grabError ? "var(--status-danger)" : "var(--accent-blue)",
             color: "#fff",
             fontSize: "12px",
             display: "flex",

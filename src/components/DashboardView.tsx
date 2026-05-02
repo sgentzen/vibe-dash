@@ -134,7 +134,7 @@ export function DashboardView() {
             <KpiCard
               label="Avg Cost/Task"
               value={doneTaskCount > 0 ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}` : "$0.00"}
-              color="var(--accent-green)"
+              color="var(--status-success)"
             />
           </div>
 
