@@ -20,6 +20,7 @@ import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { LoginView } from "./components/LoginView";
 import { ProjectContextChip } from "./components/ProjectContextChip";
+import { CommandPalette } from "./components/CommandPalette";
 
 export function App() {
   const dispatch = useAppDispatch();
@@ -30,6 +31,9 @@ export function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gKeyPending = useRef(false);
 
   useWebSocket();
   usePolling();

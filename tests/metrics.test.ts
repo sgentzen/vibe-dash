@@ -70,7 +70,7 @@ describe("completion_metrics DB functions", () => {
     const project = createProject(db, { name: "P1", description: null });
     const task = createTask(db, {
       project_id: project.id, title: "T1", priority: "medium",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
@@ -103,12 +103,12 @@ describe("completion_metrics DB functions", () => {
 
     const task1 = createTask(db, {
       project_id: project.id, title: "T1", priority: "high",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     const task2 = createTask(db, {
       project_id: project.id, title: "T2", priority: "medium",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
 
@@ -135,12 +135,12 @@ describe("completion_metrics DB functions", () => {
 
     const task1 = createTask(db, {
       project_id: project.id, title: "T1", priority: "high",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     const task2 = createTask(db, {
       project_id: project.id, title: "T2", priority: "medium",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
 
@@ -157,12 +157,12 @@ describe("completion_metrics DB functions", () => {
 
     const taskHigh = createTask(db, {
       project_id: project.id, title: "T1", priority: "high",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     const taskMed = createTask(db, {
       project_id: project.id, title: "T2", priority: "medium",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
 
@@ -182,7 +182,7 @@ describe("metrics REST endpoints", () => {
     const project = createProject(db, { name: "P1", description: null });
     const task = createTask(db, {
       project_id: project.id, title: "T1", priority: "medium",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
@@ -208,7 +208,7 @@ describe("metrics REST endpoints", () => {
     const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
     const task = createTask(db, {
       project_id: project.id, title: "T1", priority: "medium",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     logCompletionMetrics(db, { task_id: task.id, agent_id: agent.id, lines_added: 50 });
@@ -236,7 +236,7 @@ describe("metrics REST endpoints", () => {
     const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
     const task = createTask(db, {
       project_id: project.id, title: "T1", priority: "high",
-      parent_task_id: null, sprint_id: null, assigned_agent_id: null,
+      parent_task_id: null, assigned_agent_id: null,
       description: null, due_date: null, start_date: null, estimate: null, recurrence_rule: null,
     });
     logCompletionMetrics(db, { task_id: task.id, agent_id: agent.id, lines_added: 30 });

@@ -16,12 +16,12 @@ export function commentRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
   const router = Router();
 
   router.get("/api/tasks/:id/comments", (req, res) => {
-    res.json(listComments(db, req.params.id));
+    res.json(listComments(db, req.params.id as string));
   });
 
   router.post("/api/tasks/:id/comments", validateBody(createCommentSchema), (req, res) => {
     const { message, author_name, agent_id } = req.body as { message: string; author_name: string; agent_id?: string };
-    const comment = addComment(db, req.params.id, message, author_name, agent_id);
+    const comment = addComment(db, req.params.id as string, message, author_name, agent_id);
     broadcast({ type: "comment_added", payload: comment });
 
     const mentions = extractMentions(message);
@@ -30,7 +30,7 @@ export function commentRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
       broadcast({ type: "notification_created", payload: notif });
     }
 
-    const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id });
+    const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id as string });
     for (const n of notifications) broadcast({ type: "notification_created", payload: n });
 
     res.status(201).json(comment);

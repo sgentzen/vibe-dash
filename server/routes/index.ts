@@ -30,13 +30,21 @@ import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
 import rateLimit from "express-rate-limit";
 
-// Global rate limiter for all /api routes (CodeQL js/missing-rate-limiting)
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 1500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
+});
+
+// Tight limiter for auth operations to prevent brute-force key enumeration
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many authentication attempts, please try again later." },
 });
 
 function makeBroadcast(db: Database.Database) {
@@ -82,10 +90,11 @@ export function createRouter(db: Database.Database): Router {
 
   // Auth middleware runs before all routes; no-op when no users exist.
   // /api/auth/status is exempt — it's a public discovery endpoint.
+  // authLimiter applied before key validation to limit brute-force attempts.
   const authMiddleware = makeAuthMiddleware(db);
   router.use((req, res, next) => {
     if (req.path === "/api/auth/status") return next();
-    authMiddleware(req, res, next);
+    authLimiter(req, res, () => authMiddleware(req, res, next));
   });
 
   for (const factory of routeFactories) {

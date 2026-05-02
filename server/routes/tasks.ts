@@ -94,19 +94,19 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.get("/api/tasks/:id", (req, res) => {
-    const task = getTask(db, req.params.id);
+    const task = getTask(db, req.params.id as string);
     if (!requireEntity(res, task, "Task")) return;
     res.json(task);
   });
 
   router.patch("/api/tasks/:id", validateBody(updateTaskSchema), (req, res) => {
-    const task = getTask(db, req.params.id);
+    const task = getTask(db, req.params.id as string);
     if (!requireEntity(res, task, "Task")) return;
     const body = req.body as Parameters<typeof updateTask>[2];
-    const updated = updateTask(db, req.params.id, body);
+    const updated = updateTask(db, req.params.id as string, body);
     broadcast({ type: "task_updated", payload: updated! });
     if (body.status && body.status !== task.status && (body.status === "done" || task.status === "blocked")) {
-      for (const b of resolveBlockersForTask(db, req.params.id)) {
+      for (const b of resolveBlockersForTask(db, req.params.id as string)) {
         broadcast({ type: "blocker_resolved", payload: b });
       }
     }
@@ -131,11 +131,11 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.post("/api/tasks/:id/complete", (req, res) => {
-    const task = getTask(db, req.params.id);
+    const task = getTask(db, req.params.id as string);
     if (!requireEntity(res, task, "Task")) return;
-    const completed = completeTask(db, req.params.id);
+    const completed = completeTask(db, req.params.id as string);
     broadcast({ type: "task_completed", payload: completed! });
-    for (const b of resolveBlockersForTask(db, req.params.id)) {
+    for (const b of resolveBlockersForTask(db, req.params.id as string)) {
       broadcast({ type: "blocker_resolved", payload: b });
     }
     const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
@@ -162,15 +162,15 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.get("/api/tasks/:id/time-spent", (req, res) => {
-    const task = getTask(db, req.params.id);
+    const task = getTask(db, req.params.id as string);
     if (!requireEntity(res, task, "Task")) return;
-    res.json({ time_spent_seconds: getTimeSpent(db, req.params.id) });
+    res.json({ time_spent_seconds: getTimeSpent(db, req.params.id as string) });
   });
 
   router.get("/api/tasks/:id/suggest-agent", (req, res) => {
-    const task = getTask(db, req.params.id);
+    const task = getTask(db, req.params.id as string);
     if (!requireEntity(res, task, "Task")) return;
-    const suggestion = suggestAgent(db, req.params.id);
+    const suggestion = suggestAgent(db, req.params.id as string);
     res.json(suggestion ?? null);
   });
 

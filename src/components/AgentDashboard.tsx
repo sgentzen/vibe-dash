@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, groupAgents } from "../utils/agentColors";
-import type { Agent } from "../types";
+import type { Agent, AgentCost } from "../types";
 import AgentComparisonView from "./AgentComparisonView";
 import { AgentCard } from "./agent-dashboard/AgentCard";
 import { AgentDetailView } from "./agent-dashboard/AgentDetailView";

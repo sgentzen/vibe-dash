@@ -46,7 +46,7 @@ export function milestoneRoutes(db: Database.Database, broadcast: BroadcastFn): 
   });
 
   router.patch("/api/milestones/:id", validateBody(updateMilestoneSchema), (req, res) => {
-    const id = req.params.id;
+    const id = req.params.id as string;
     const milestone = getMilestone(db, id);
     if (!milestone) {
       res.status(404).json({ error: "Milestone not found" });
@@ -58,35 +58,35 @@ export function milestoneRoutes(db: Database.Database, broadcast: BroadcastFn): 
   });
 
   router.post("/api/milestones/:id/complete", (req, res) => {
-    const milestone = getMilestone(db, req.params.id);
+    const milestone = getMilestone(db, req.params.id as string);
     if (!milestone) {
       res.status(404).json({ error: "Milestone not found" });
       return;
     }
-    const completed = completeMilestone(db, req.params.id);
+    const completed = completeMilestone(db, req.params.id as string);
     broadcast({ type: "milestone_achieved", payload: completed! });
     res.json(completed);
   });
 
   router.get("/api/milestones/:id/progress", (req, res) => {
-    const milestone = getMilestone(db, req.params.id);
+    const milestone = getMilestone(db, req.params.id as string);
     if (!milestone) {
       res.status(404).json({ error: "Milestone not found" });
       return;
     }
-    res.json(getMilestoneProgress(db, req.params.id));
+    res.json(getMilestoneProgress(db, req.params.id as string));
   });
 
   router.get("/api/milestones/:id/contributions", (req, res) => {
-    res.json(getMilestoneAgentContributions(db, req.params.id));
+    res.json(getMilestoneAgentContributions(db, req.params.id as string));
   });
 
   router.get("/api/milestones/:id/daily-stats", (req, res) => {
-    res.json(getMilestoneDailyStats(db, req.params.id));
+    res.json(getMilestoneDailyStats(db, req.params.id as string));
   });
 
   router.post("/api/milestones/:id/record-stats", (req, res) => {
-    handleMutation(res, broadcast, () => recordMilestoneDailyStats(db, req.params.id), "daily_stats_recorded");
+    handleMutation(res, broadcast, () => recordMilestoneDailyStats(db, req.params.id as string), "daily_stats_recorded");
   });
 
   return router;

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -707,6 +707,57 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
   return res.json();
 }
 
+// ─── Git Sync ─────────────────────────────────────────────────────────────────
+
+async function getGitIntegrations(projectId?: string): Promise<GitIntegrationSafe[]> {
+  const url = projectId ? `/api/git/integrations?project_id=${encodeURIComponent(projectId)}` : "/api/git/integrations";
+  const res = await apiFetch(url);
+  if (!res.ok) throw new Error(`getGitIntegrations failed: ${res.status}`);
+  return res.json();
+}
+
+async function addGitIntegration(data: { project_id: string; provider: string; owner: string; repo: string; token: string; auto_sync?: boolean }): Promise<GitIntegrationSafe> {
+  const res = await apiFetch("/api/git/integrations", { method: "POST", headers: jsonHeaders(), body: JSON.stringify(data) });
+  if (!res.ok) throw new Error(`addGitIntegration failed: ${res.status}`);
+  return res.json();
+}
+
+async function deleteGitIntegration(id: string): Promise<void> {
+  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`deleteGitIntegration failed: ${res.status}`);
+}
+
+async function syncGitIntegration(id: string): Promise<GitSyncResult> {
+  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}/sync`, { method: "POST" });
+  if (!res.ok) throw new Error(`syncGitIntegration failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── Ingestion ────────────────────────────────────────────────────────────────
+
+async function listIngestionSources(): Promise<IngestionSource[]> {
+  const res = await apiFetch("/api/ingest/sources");
+  if (!res.ok) throw new Error(`listIngestionSources failed: ${res.status}`);
+  return res.json();
+}
+
+async function createIngestionSource(name: string, kind: IngestionSourceKind, project_id?: string | null): Promise<IngestionSource & { token: string }> {
+  const res = await apiFetch("/api/ingest/sources", { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ name, kind, project_id }) });
+  if (!res.ok) throw new Error(`createIngestionSource failed: ${res.status}`);
+  return res.json();
+}
+
+async function deleteIngestionSource(id: string): Promise<void> {
+  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`deleteIngestionSource failed: ${res.status}`);
+}
+
+async function rotateIngestionToken(id: string): Promise<{ token: string }> {
+  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}/rotate`, { method: "POST" });
+  if (!res.ok) throw new Error(`rotateIngestionToken failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -782,5 +833,13 @@ export function useApi() {
     updateUserRole: updateUserRoleApi,
     deleteUser: deleteUserApi,
     rotateKey: rotateKeyApi,
+    getGitIntegrations,
+    addGitIntegration,
+    deleteGitIntegration,
+    syncGitIntegration,
+    listIngestionSources,
+    createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
+    deleteIngestionSource,
+    rotateIngestionToken,
   }), []);
 }

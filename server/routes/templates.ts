@@ -19,18 +19,18 @@ export function templateRoutes(db: Database.Database, broadcast: BroadcastFn): R
   });
 
   router.get("/api/templates/:id", (req, res) => {
-    const t = getTemplate(db, req.params.id);
+    const t = getTemplate(db, req.params.id as string);
     if (!requireEntity(res, t, "Template")) return;
     res.json(t);
   });
 
   router.delete("/api/templates/:id", (req, res) => {
-    res.json({ success: deleteTemplate(db, req.params.id) });
+    res.json({ success: deleteTemplate(db, req.params.id as string) });
   });
 
   router.post("/api/templates/:id/instantiate", validateBody(instantiateTemplateSchema), (req, res) => {
     const { project_name } = req.body as { project_name: string };
-    const project = createProjectFromTemplate(db, req.params.id, project_name);
+    const project = createProjectFromTemplate(db, req.params.id as string, project_name);
     if (!requireEntity(res, project, "Template")) return;
     broadcast({ type: "project_created", payload: project });
     res.status(201).json(project);

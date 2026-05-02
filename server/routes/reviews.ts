@@ -20,11 +20,11 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
   const router = Router();
 
   router.get("/api/tasks/:id/reviews", (req, res) => {
-    res.json(listReviewsForTask(db, req.params.id));
+    res.json(listReviewsForTask(db, req.params.id as string));
   });
 
   router.post("/api/tasks/:id/reviews", validateBody(createReviewSchema), (req, res) => {
-    const task = getTask(db, req.params.id);
+    const task = getTask(db, req.params.id as string);
     if (!task) { notFound(res, "Task not found"); return; }
     const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } = req.body as {
       reviewer_name: string;
@@ -34,7 +34,7 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       diff_summary?: string | null;
     };
     handleMutation(res, broadcast, () => createReview(db, {
-      task_id: req.params.id,
+      task_id: req.params.id as string,
       reviewer_name,
       reviewer_agent_id: reviewer_agent_id ?? null,
       status,
@@ -44,7 +44,7 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
   });
 
   router.patch("/api/reviews/:id", validateBody(updateReviewSchema), (req, res) => {
-    const existing = getReview(db, req.params.id);
+    const existing = getReview(db, req.params.id as string);
     if (!requireEntity(res, existing, "Review")) return;
     const { status, comments, diff_summary } = req.body as {
       status?: ReviewStatus;
@@ -55,7 +55,7 @@ export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       badRequest(res, `status must be one of: ${VALID_STATUSES.join(", ")}`);
       return;
     }
-    const updated = updateReview(db, req.params.id, { status, comments, diff_summary });
+    const updated = updateReview(db, req.params.id as string, { status, comments, diff_summary });
     if (!updated) {
       badRequest(res, "Review update failed");
       return;

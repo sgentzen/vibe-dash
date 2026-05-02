@@ -1,11 +1,12 @@
 import { agentColor, ROLE_COLORS } from "../../utils/agentColors";
 import { cardStyle } from "../../styles/shared.js";
-import type { Agent } from "../../types";
+import type { Agent, AgentCost } from "../../types";
 import type { AgentDetail } from "./types";
 
 interface AgentCardProps {
   agent: Agent;
   detail?: AgentDetail;
+  cost?: AgentCost;
   onClick: () => void;
 }
 

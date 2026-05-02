@@ -20,13 +20,13 @@ export function alertRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
 
   router.patch("/api/alert-rules/:id", validateBody(updateAlertRuleSchema), (req, res) => {
     const { enabled } = req.body as { enabled: boolean };
-    const rule = toggleAlertRule(db, req.params.id, enabled);
+    const rule = toggleAlertRule(db, req.params.id as string, enabled);
     if (!requireEntity(res, rule, "Rule")) return;
     res.json(rule);
   });
 
   router.delete("/api/alert-rules/:id", (req, res) => {
-    res.json({ success: deleteAlertRule(db, req.params.id) });
+    res.json({ success: deleteAlertRule(db, req.params.id as string) });
   });
 
   return router;
