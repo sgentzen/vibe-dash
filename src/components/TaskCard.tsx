@@ -2,6 +2,8 @@ import { useState, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
+import { StatusPill } from "./StatusPill.js";
+import type { StatusToken } from "../constants/statusTokens.js";
 
 interface TaskCardProps {
   task: Task;
@@ -57,16 +59,16 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   let boxShadow = "none";
 
   if (isActive) {
-    borderColor = "var(--accent-green)";
+    borderColor = "var(--status-success)";
     background = "var(--green-bg)";
     boxShadow = "var(--shadow-glow-green)";
   } else if (isBlocked) {
-    borderColor = "var(--accent-yellow)";
+    borderColor = "var(--status-danger)";
   } else if (dueUrgency === "overdue") {
-    borderColor = "var(--accent-red)";
+    borderColor = "var(--status-danger)";
     boxShadow = "var(--shadow-glow-red)";
   } else if (dueUrgency === "today") {
-    borderColor = "var(--accent-yellow)";
+    borderColor = "var(--status-warning)";
   }
 
   return (
@@ -102,7 +104,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           }}
         >
           {isDone && (
-            <span style={{ color: "var(--accent-green)", flexShrink: 0 }}>{"\u2713"}</span>
+            <span style={{ color: "var(--status-info)", flexShrink: 0 }}>{"\u2713"}</span>
           )}
           {isActive && (
             <span className="pulse-dot" style={{ marginTop: "5px", flexShrink: 0 }} />
@@ -153,7 +155,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
                 style={{
                   height: "100%",
                   width: `${task.progress}%`,
-                  background: "var(--accent-green)",
+                  background: "var(--status-success)",
                   borderRadius: "2px",
                   transition: "width 0.3s",
                 }}
@@ -166,47 +168,20 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
           {/* Priority badge */}
           {(task.priority === "urgent" || task.priority === "high") && (
-            <span
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background:
-                  task.priority === "urgent" ? "rgba(248,81,73,0.15)" : "rgba(210,153,34,0.15)",
-                color:
-                  task.priority === "urgent" ? "var(--accent-red)" : "var(--accent-yellow)",
-                border: `1px solid ${
-                  task.priority === "urgent" ? "var(--accent-red)" : "var(--accent-yellow)"
-                }`,
-              }}
-            >
-              {task.priority}
-            </span>
+            <StatusPill
+              token={task.priority === "urgent" ? "danger" : "warning"}
+              label={task.priority}
+            />
           )}
 
           {/* Due date indicator */}
-          {dueUrgency && (
-            <span
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background: dueUrgency === "overdue" ? "rgba(248,81,73,0.15)"
-                  : dueUrgency === "today" ? "rgba(210,153,34,0.15)"
-                  : "rgba(139,148,158,0.1)",
-                color: dueUrgency === "overdue" ? "var(--accent-red)"
-                  : dueUrgency === "today" ? "var(--accent-yellow)"
-                  : "var(--text-muted)",
-                border: `1px solid ${
-                  dueUrgency === "overdue" ? "var(--accent-red)"
-                  : dueUrgency === "today" ? "var(--accent-yellow)"
-                  : "var(--border)"
-                }`,
-              }}
-            >
-              {dueUrgency === "overdue" ? "Overdue" : dueUrgency === "today" ? "Due today" : "Due soon"}
-            </span>
-          )}
+          {dueUrgency && (() => {
+            const token: StatusToken = dueUrgency === "overdue" ? "danger"
+              : dueUrgency === "today" ? "warning" : "neutral";
+            const label = dueUrgency === "overdue" ? "Overdue"
+              : dueUrgency === "today" ? "Due today" : "Due soon";
+            return <StatusPill token={token} label={label} />;
+          })()}
           {task.due_date && !dueUrgency && !isDone && (
             <span
               style={{
@@ -265,18 +240,8 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
           {/* Dependency badge */}
           {blockingCount != null && blockingCount > 0 && (
-            <span
-              title={`Blocked by ${blockingCount} task${blockingCount > 1 ? "s" : ""}`}
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background: "rgba(248,81,73,0.1)",
-                color: "var(--accent-red)",
-                border: "1px solid rgba(248,81,73,0.3)",
-              }}
-            >
-              Blocked by {blockingCount}
+            <span title={`Blocked by ${blockingCount} task${blockingCount > 1 ? "s" : ""}`}>
+              <StatusPill token="danger" label={`Blocked by ${blockingCount}`} />
             </span>
           )}
 
@@ -344,9 +309,9 @@ function SubTaskRow({ task }: { task: Task }) {
   const isBlocked = task.status === "blocked";
 
   let color = "var(--text-secondary)";
-  if (isDone) color = "var(--text-muted)";
-  if (isActive) color = "var(--accent-green)";
-  if (isBlocked) color = "var(--accent-yellow)";
+  if (isDone) color = "var(--status-neutral)";
+  if (isActive) color = "var(--status-success)";
+  if (isBlocked) color = "var(--status-danger)";
 
   const icon = isDone ? "\u2713" : isActive ? "\u25cf" : isBlocked ? "\u26a0" : "\u25cb";
 

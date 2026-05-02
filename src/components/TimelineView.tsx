@@ -1,14 +1,7 @@
 import { useMemo, useState } from "react";
 import { useAppState } from "../store";
-import { PRIORITY_COLORS } from "../constants/colors.js";
-import type { Task, Sprint, TaskStatus } from "../types";
-
-const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
-  done: "var(--accent-green)",
-  in_progress: "var(--accent-blue)",
-  blocked: "var(--accent-yellow)",
-  planned: "var(--text-muted)",
-};
+import { PRIORITY_COLORS, STATUS_COLORS } from "../constants/colors.js";
+import type { Task, Sprint } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BAR_HEIGHT = 24;
@@ -246,7 +239,7 @@ export function TimelineView() {
                   }}>
                     <span style={{
                       width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
-                      background: STATUS_DOT_COLORS[task.status] ?? "var(--text-muted)",
+                      background: STATUS_COLORS[task.status] ?? "var(--text-muted)",
                     }} />
                     {task.title}
                   </div>

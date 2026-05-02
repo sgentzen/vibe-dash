@@ -3,6 +3,8 @@ import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
+import { StatusPill } from "./StatusPill.js";
+import type { StatusToken } from "../constants/statusTokens.js";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
 interface AgentDetail {
@@ -175,8 +177,8 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = detail?.health_status === "active" ? "var(--accent-green)"
-    : detail?.health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+  const healthToken: StatusToken = detail?.health_status === "active" ? "success"
+    : detail?.health_status === "idle" ? "warning" : "neutral";
 
   return (
     <div
@@ -228,8 +230,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
             )}
           </div>
         </div>
-        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
-        <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{detail?.health_status ?? "..."}</span>
+        <StatusPill token={healthToken} label={detail?.health_status ?? "..."} />
       </div>
 
       {agent.current_project_name && (
@@ -251,7 +252,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
       )}
 
       <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
-        <span>Completed today: <strong style={{ color: "var(--accent-green)" }}>{detail?.completed_today ?? 0}</strong></span>
+        <span>Completed today: <strong style={{ color: "var(--status-success)" }}>{detail?.completed_today ?? 0}</strong></span>
         <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
       </div>
 
@@ -283,8 +284,8 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = health_status === "active" ? "var(--accent-green)"
-    : health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+  const healthToken: StatusToken = health_status === "active" ? "success"
+    : health_status === "idle" ? "warning" : "neutral";
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
@@ -319,12 +320,12 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-muted)" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: healthColor }} />
-            {health_status} {agent.model && ` | ${agent.model}`}
+            <StatusPill token={healthToken} label={health_status} />
+            {agent.model && `| ${agent.model}`}
           </div>
         </div>
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--accent-green)", fontFamily: "monospace" }}>{completed_today}</div>
+          <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--status-success)", fontFamily: "monospace" }}>{completed_today}</div>
           <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>COMPLETED TODAY</div>
         </div>
       </div>
@@ -358,7 +359,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
                     </span>
                   )}
                   {!s.ended_at && (
-                    <span style={{ fontSize: "11px", color: "var(--accent-green)", marginLeft: "8px" }}>active</span>
+                    <span style={{ fontSize: "11px", color: "var(--status-success)", marginLeft: "8px" }}>active</span>
                   )}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>

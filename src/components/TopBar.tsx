@@ -61,8 +61,8 @@ export function TopBar() {
       {/* Stats */}
       <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
         <StatPill label="PROJECTS" value={stats.projects} color="var(--accent-blue)" />
-        <StatPill label="ACTIVE AGENTS" value={stats.activeAgents} color="var(--accent-green)" />
-        <StatPill label="ALERTS" value={stats.alerts} color="var(--accent-yellow)" />
+        <StatPill label="ACTIVE AGENTS" value={stats.activeAgents} color="var(--status-success)" />
+        <StatPill label="ALERTS" value={stats.alerts} color="var(--status-warning)" />
         <StatPill label="TASKS" value={stats.tasks} color="var(--text-secondary)" />
       </div>
 
@@ -231,7 +231,7 @@ export function TopBar() {
           {unreadCount > 0 && (
             <span style={{
               position: "absolute", top: "-4px", right: "-4px",
-              background: "var(--accent-red)", color: "var(--text-on-accent)",
+              background: "var(--status-danger)", color: "var(--text-on-accent)",
               fontSize: "10px", fontWeight: 700, borderRadius: "50%",
               width: "16px", height: "16px", display: "flex",
               alignItems: "center", justifyContent: "center",

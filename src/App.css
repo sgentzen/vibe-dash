@@ -21,6 +21,14 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   --shadow-glow-green: 0 0 8px rgba(63, 185, 80, 0.2);
   --shadow-glow-red: 0 0 6px rgba(248, 81, 73, 0.15);
+  --shadow-glow-yellow: 0 0 6px rgba(210, 153, 34, 0.2);
+  --shadow-glow-blue: 0 0 6px rgba(88, 166, 255, 0.15);
+  /* Use --status-* for state; --accent-* only for branded UI */
+  --status-success: var(--accent-green);
+  --status-warning: var(--accent-yellow);
+  --status-danger: var(--accent-red);
+  --status-info: var(--accent-blue);
+  --status-neutral: var(--text-muted);
 }
 
 [data-theme="light"] {
@@ -46,6 +54,14 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.15);
   --shadow-glow-green: 0 0 8px rgba(26, 127, 55, 0.2);
   --shadow-glow-red: 0 0 6px rgba(207, 34, 46, 0.15);
+  --shadow-glow-yellow: 0 0 6px rgba(154, 103, 0, 0.2);
+  --shadow-glow-blue: 0 0 6px rgba(9, 105, 218, 0.15);
+  /* Use --status-* for state; --accent-* only for branded UI */
+  --status-success: var(--accent-green);
+  --status-warning: var(--accent-yellow);
+  --status-danger: var(--accent-red);
+  --status-info: var(--accent-blue);
+  --status-neutral: var(--text-muted);
 }
 
 /* Accent color override — applied via JS when user picks a custom color.

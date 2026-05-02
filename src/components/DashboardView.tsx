@@ -107,8 +107,8 @@ export function DashboardView() {
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
         <KpiCard label="Active Sprint" value={activeSprint?.name ?? "None"} color="var(--accent-blue)" />
-        <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--accent-red)" : "var(--accent-green)"} />
-        <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--accent-yellow)" : "var(--accent-green)"} />
+        <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"} />
+        <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"} />
         <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
       </div>
 
@@ -230,11 +230,11 @@ export function DashboardView() {
         <div style={cardStyle}>
           <div style={headerStyle}>Active Blockers ({unresolvedBlockers.length})</div>
           {unresolvedBlockers.length === 0 ? (
-            <div style={{ color: "var(--accent-green)", fontSize: "12px" }}>No active blockers</div>
+            <div style={{ color: "var(--status-success)", fontSize: "12px" }}>No active blockers</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {unresolvedBlockers.slice(0, 10).map((b) => (
-                <div key={b.id} style={{ fontSize: "12px", color: "var(--accent-yellow)" }}>
+                <div key={b.id} style={{ fontSize: "12px", color: "var(--status-warning)" }}>
                   {b.reason}
                 </div>
               ))}
@@ -245,13 +245,13 @@ export function DashboardView() {
         <div style={cardStyle}>
           <div style={headerStyle}>Overdue Tasks ({overdueTasks.length})</div>
           {overdueTasks.length === 0 ? (
-            <div style={{ color: "var(--accent-green)", fontSize: "12px" }}>No overdue tasks</div>
+            <div style={{ color: "var(--status-success)", fontSize: "12px" }}>No overdue tasks</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {overdueTasks.slice(0, 10).map((t) => (
                 <div key={t.id} style={{ fontSize: "12px", display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: "var(--text-primary)" }}>{t.title}</span>
-                  <span style={{ color: "var(--accent-red)", fontSize: "10px" }}>{t.due_date}</span>
+                  <span style={{ color: "var(--status-danger)", fontSize: "10px" }}>{t.due_date}</span>
                 </div>
               ))}
             </div>

@@ -488,10 +488,10 @@ function SprintGroup({
     sprint?.status === "completed" ? "\u2713" : sprint?.status === "active" ? "\u25cf" : "\u25cb";
   const statusColor =
     sprint?.status === "active"
-      ? "var(--accent-green)"
+      ? "var(--status-success)"
       : sprint?.status === "completed"
-        ? "var(--accent-blue)"
-        : "var(--text-muted)";
+        ? "var(--status-info)"
+        : "var(--status-neutral)";
 
   return (
     <div style={{ marginBottom: "4px" }}>
