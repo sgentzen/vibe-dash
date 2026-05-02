@@ -1,5 +1,7 @@
 # Vibe Dash MCP Setup Guide
 
+> **Source of truth** for MCP integration — transports, tool reference, and troubleshooting. README.md links here for setup details.
+
 ## Prerequisites
 
 Vibe Dash must be running for the dashboard UI and WebSocket to work. The MCP stdio transport does NOT require the server to be running (it connects directly to SQLite), but you won't see real-time updates in the browser without the server.
@@ -91,6 +93,22 @@ SSE is the older HTTP transport. Use it only if your MCP client does not support
   "mcpServers": {
     "vibe-dash": {
       "url": "http://localhost:3001/sse"
+    }
+  }
+}
+```
+
+Requires the Vibe Dash server to be running.
+
+### Option C: Streamable HTTP
+
+The server also exposes the newer Streamable HTTP transport at `/mcp` for clients that support it.
+
+```json
+{
+  "mcpServers": {
+    "vibe-dash": {
+      "url": "http://localhost:3001/mcp"
     }
   }
 }

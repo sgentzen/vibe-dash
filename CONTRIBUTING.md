@@ -62,7 +62,7 @@ Open a GitHub issue with:
 When adding or changing MCP tools:
 1. Update tool definitions in `server/mcp/tools.ts`
 2. Add tests in `tests/mcp-tools.test.ts`
-3. Update the tool table in `README.md` and `docs/MCP-SETUP.md`
+3. Update the tool reference in [`docs/MCP-SETUP.md`](docs/MCP-SETUP.md) (single source of truth — README links here)
 
 ## License
 

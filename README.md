@@ -22,7 +22,7 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 
 ## Quick Start
 
-Requires **Node.js 18+**.
+Requires **Node.js 20+**.
 
 ```bash
 git clone https://github.com/sgent/vibe-dash.git

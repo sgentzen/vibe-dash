@@ -2,9 +2,11 @@
 
 Local-first real-time dashboard for monitoring AI-driven development projects via MCP (Model Context Protocol).
 
+> **Source of truth** for architecture, project structure, and code patterns. README.md and CONTRIBUTING.md link here instead of duplicating these details. MCP integration (transports, tools, setup) lives in [docs/MCP-SETUP.md](docs/MCP-SETUP.md).
+
 ## Tech Stack
 
-- **Runtime**: Node.js >=18, ESM (`"type": "module"`)
+- **Runtime**: Node.js >=20, ESM (`"type": "module"`)
 - **Backend**: Express 5, better-sqlite3, WebSocket (ws)
 - **Frontend**: React 19, Vite 8, CSS variables (no UI library)
 - **MCP**: @modelcontextprotocol/sdk for tool registration + SSE/stdio transports
@@ -64,8 +66,11 @@ tests/
 npm run dev          # Concurrent: tsx watch server + vite client
 npm run dev:server   # Server only (port 3001)
 npm run dev:client   # Vite only (port 3000, proxies /api + /ws to 3001)
+npm start            # Production: vite build + tsx server/index.ts (serves at :3001)
 npm test             # vitest run
+npm run test:watch   # vitest in watch mode
 npm run build        # vite build + tsc --noEmit
+npm run mcp:stdio    # Run the MCP stdio transport directly (ad-hoc testing)
 ```
 
 ## Database Patterns
@@ -116,3 +121,11 @@ router.get("/api/resource", limiter, (req, res) => {
 - **CSS vars**: kebab-case (`--bg-primary`, `--accent-red`)
 - **Types**: Shared between server and client via parallel `types.ts` files
 - **IDs**: Always TEXT UUIDs, never auto-increment integers
+
+## Environment Variables
+
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `PORT` | `3001` | Express server (`server/index.ts`) |
+| `DB_PATH` | `./vibe-dash.db` | Server SQLite path |
+| `VIBE_DASH_DB` | `./vibe-dash.db` | Stdio MCP SQLite path — must match `DB_PATH` to share data with the server |

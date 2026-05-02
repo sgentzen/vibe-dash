@@ -1,5 +1,7 @@
 # Vibe Dash: Full Feature Vision
 
+> **Historical planning artifact from 2026-03-29.** Not maintained — see [CLAUDE.md](../../../CLAUDE.md) for current architecture.
+
 **Date:** 2026-03-29
 **Status:** Draft
 **Strategy:** Mission Control — balanced releases improving both agent visibility and project management in tandem
