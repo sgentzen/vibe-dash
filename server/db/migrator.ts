@@ -363,6 +363,77 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "007_agents_name_normalized",
+    run(db) {
+      const cols = db.pragma("table_info(agents)") as { name: string }[];
+      if (!cols.some((c) => c.name === "name_normalized")) {
+        db.prepare("ALTER TABLE agents ADD COLUMN name_normalized TEXT").run();
+      }
+      // Backfill: lowercase + trim + collapse _ and - to space, then collapse runs of spaces.
+      // Five nested REPLACE calls collapse up to 32 consecutive spaces — sufficient for real names.
+      db.prepare(
+        `UPDATE agents SET name_normalized =
+           REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+             LOWER(TRIM(REPLACE(REPLACE(name, '_', ' '), '-', ' '))),
+           '     ',' '),'    ',' '),'   ',' '),'  ',' '),'  ',' ')
+         WHERE name_normalized IS NULL OR name_normalized = ''`
+      ).run();
+      // Final fallback: if anything still null/empty, use the raw name
+      db.prepare(
+        "UPDATE agents SET name_normalized = name WHERE name_normalized IS NULL OR name_normalized = ''"
+      ).run();
+    },
+  },
+  {
+    name: "008_agents_dedup_normalized",
+    run(db) {
+      interface DupeRow { name_normalized: string; survivor_id: string }
+      // Use rowid (SQLite auto-increment) to pick the chronologically earliest row reliably.
+      // registered_at is a string and could collide; rowid never does.
+      const dupes = db.prepare(
+        `SELECT name_normalized, id AS survivor_id
+         FROM agents
+         WHERE rowid IN (
+           SELECT MIN(rowid) FROM agents GROUP BY name_normalized HAVING COUNT(*) > 1
+         )`
+      ).all() as DupeRow[];
+
+      for (const { name_normalized, survivor_id } of dupes) {
+        const dups = db.prepare(
+          "SELECT id FROM agents WHERE name_normalized = ? AND id != ?"
+        ).all(name_normalized, survivor_id) as { id: string }[];
+
+        for (const { id: dupId } of dups) {
+          // Remove file locks on the duplicate that would conflict with survivor's locks
+          // (UNIQUE(agent_id, file_path) constraint would fail otherwise)
+          db.prepare(
+            "DELETE FROM agent_file_locks WHERE agent_id = ? AND file_path IN (SELECT file_path FROM agent_file_locks WHERE agent_id = ?)"
+          ).run(dupId, survivor_id);
+
+          const fkUpdates = [
+            "UPDATE activity_log SET agent_id = ? WHERE agent_id = ?",
+            "UPDATE agent_sessions SET agent_id = ? WHERE agent_id = ?",
+            "UPDATE agent_file_locks SET agent_id = ? WHERE agent_id = ?",
+            "UPDATE tasks SET assigned_agent_id = ? WHERE assigned_agent_id = ?",
+            "UPDATE cost_entries SET agent_id = ? WHERE agent_id = ?",
+            "UPDATE completion_metrics SET agent_id = ? WHERE agent_id = ?",
+            "UPDATE task_reviews SET reviewer_agent_id = ? WHERE reviewer_agent_id = ?",
+            "UPDATE task_comments SET agent_id = ? WHERE agent_id = ?",
+            "UPDATE agents SET parent_agent_id = ? WHERE parent_agent_id = ?",
+          ];
+          for (const sql of fkUpdates) {
+            db.prepare(sql).run(survivor_id, dupId);
+          }
+          db.prepare("DELETE FROM agents WHERE id = ?").run(dupId);
+        }
+      }
+
+      db.prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_name_normalized ON agents(name_normalized)"
+      ).run();
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
