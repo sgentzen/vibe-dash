@@ -36,7 +36,7 @@ export function NotificationBell({
         {unreadCount > 0 && (
           <span style={{
             position: "absolute", top: "-4px", right: "-4px",
-            background: "var(--accent-red)", color: "var(--text-on-accent)",
+            background: "var(--status-danger)", color: "var(--text-on-accent)",
             fontSize: "10px", fontWeight: 700, borderRadius: "50%",
             width: "16px", height: "16px", display: "flex",
             alignItems: "center", justifyContent: "center",

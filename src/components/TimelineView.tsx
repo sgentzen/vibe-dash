@@ -56,19 +56,19 @@ function barStyle(task: Task, hasDates: boolean, anomaly: Anomaly): React.CSSPro
   };
 
   if (anomaly === "blocked") {
-    return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+    return { ...base, background: "var(--status-danger)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
   }
   if (anomaly === "overdue" || anomaly === "stale") {
-    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-yellow)", opacity: hasDates ? (anomaly === "stale" ? 0.8 : 1) : 0.5 };
+    return { ...base, background: "var(--status-warning)", color: "var(--text-on-yellow)", opacity: hasDates ? (anomaly === "stale" ? 0.8 : 1) : 0.5 };
   }
 
   switch (task.status) {
     case "done":
-      return { ...base, background: "var(--accent-blue)", color: "var(--text-on-accent)", opacity: 0.35 };
+      return { ...base, background: "var(--status-info)", color: "var(--text-on-accent)", opacity: 0.35 };
     case "in_progress":
-      return { ...base, background: "var(--accent-green)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6 };
+      return { ...base, background: "var(--status-success)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6 };
     case "blocked":
-      return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+      return { ...base, background: "var(--status-danger)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
     default:
       return { ...base, background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: hasDates ? "1px solid var(--border)" : "1px dashed var(--border)", opacity: hasDates ? 0.9 : 0.6 };
   }
@@ -275,9 +275,9 @@ export function TimelineView() {
 
           {/* Today marker */}
           {todayVisible && (
-            <div style={{ position: "absolute", left: labelWidth + todayX, top: 0, width: 2, height: HEADER_HEIGHT + totalContentHeight, background: "var(--accent-red)", zIndex: 2, pointerEvents: "none" }}>
-              <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "6px solid var(--accent-red)" }} />
-              <span style={{ position: "absolute", top: "8px", left: "4px", fontSize: "11px", color: "var(--accent-red)", fontWeight: 600, whiteSpace: "nowrap" }}>Today</span>
+            <div style={{ position: "absolute", left: labelWidth + todayX, top: 0, width: 2, height: HEADER_HEIGHT + totalContentHeight, background: "var(--status-danger)", zIndex: 2, pointerEvents: "none" }}>
+              <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "6px solid var(--status-danger)" }} />
+              <span style={{ position: "absolute", top: "8px", left: "4px", fontSize: "11px", color: "var(--status-danger)", fontWeight: 600, whiteSpace: "nowrap" }}>Today</span>
             </div>
           )}
 
@@ -356,7 +356,7 @@ export function TimelineView() {
                     const style = barStyle(task, hasDates, anomaly);
                     const barTop = (ROW_HEIGHT - 22) / 2;
                     const showHump = anomaly !== null && bw >= 20;
-                    const humpColor = anomaly === "blocked" ? "var(--accent-red)" : "var(--accent-yellow)";
+                    const humpColor = anomaly === "blocked" ? "var(--status-danger)" : "var(--status-warning)";
                     const hw = Math.min(bw, 60);
 
                     return (
@@ -455,7 +455,7 @@ function Toolbar({ hideCompleted, setHideCompleted, showUndated, setShowUndated,
       </label>
 
       {clipped && (
-        <span style={{ fontSize: "11px", color: "var(--accent-yellow)", background: "color-mix(in srgb, var(--accent-yellow) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--accent-yellow) 25%, transparent)", borderRadius: "4px", padding: "2px 8px" }}>
+        <span style={{ fontSize: "11px", color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--status-warning) 25%, transparent)", borderRadius: "4px", padding: "2px 8px" }}>
           Showing first {MAX_DAYS} days
         </span>
       )}

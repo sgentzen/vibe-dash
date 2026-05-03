@@ -43,19 +43,19 @@ function barStyle(task: Task, hasDates: boolean, anomaly: Anomaly) {
   };
 
   if (anomaly === "blocked") {
-    return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+    return { ...base, background: "var(--status-danger)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
   }
   if (anomaly === "overdue") {
-    return { ...base, background: "var(--accent-yellow)", color: "var(--text-on-yellow)", opacity: hasDates ? 1 : 0.5 };
+    return { ...base, background: "var(--status-warning)", color: "var(--text-on-yellow)", opacity: hasDates ? 1 : 0.5 };
   }
 
   switch (task.status) {
     case "done":
-      return { ...base, background: "var(--accent-blue)", color: "var(--text-on-accent)", opacity: 0.35 };
+      return { ...base, background: "var(--status-info)", color: "var(--text-on-accent)", opacity: 0.35 };
     case "in_progress":
-      return { ...base, background: "var(--accent-green)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6 };
+      return { ...base, background: "var(--status-success)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6 };
     case "blocked":
-      return { ...base, background: "var(--accent-red)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+      return { ...base, background: "var(--status-danger)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
     case "planned":
     default:
       return {

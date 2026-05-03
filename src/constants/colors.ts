@@ -1,28 +1,23 @@
 import type { TaskStatus, TaskPriority, AgentHealthStatus } from "../types.js";
-import {
-  TASK_STATUS_TOKEN,
-  AGENT_HEALTH_TOKEN,
-  tokenToColor,
-} from "./statusTokens.js";
 
 export const STATUS_COLORS: Record<TaskStatus, string> = {
-  planned: tokenToColor(TASK_STATUS_TOKEN.planned),
-  in_progress: tokenToColor(TASK_STATUS_TOKEN.in_progress),
-  blocked: tokenToColor(TASK_STATUS_TOKEN.blocked),
-  done: tokenToColor(TASK_STATUS_TOKEN.done),
+  planned: "var(--text-muted)",
+  in_progress: "var(--status-success)",
+  blocked: "var(--status-warning)",
+  done: "var(--status-info)",
 };
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  urgent: "var(--accent-red)",
-  high: "var(--accent-yellow)",
+  urgent: "var(--status-danger)",
+  high: "var(--status-warning)",
   medium: "var(--accent-purple)",
   low: "var(--text-muted)",
 };
 
 export const HEALTH_COLORS: Record<AgentHealthStatus, string> = {
-  active: tokenToColor(AGENT_HEALTH_TOKEN.active),
-  idle: tokenToColor(AGENT_HEALTH_TOKEN.idle),
-  offline: tokenToColor(AGENT_HEALTH_TOKEN.offline),
+  active: "var(--status-success)",
+  idle: "var(--status-warning)",
+  offline: "var(--text-secondary)",
 };
 
 export const HEALTH_LABELS: Record<AgentHealthStatus, string> = {

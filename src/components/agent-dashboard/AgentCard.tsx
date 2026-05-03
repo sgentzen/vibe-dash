@@ -14,8 +14,8 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = detail?.health_status === "active" ? "var(--accent-green)"
-    : detail?.health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+  const healthColor = detail?.health_status === "active" ? "var(--status-success)"
+    : detail?.health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
 
   return (
     <div
@@ -90,7 +90,7 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
       )}
 
       <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
-        <span>Completed today: <strong style={{ color: "var(--accent-green)" }}>{detail?.completed_today ?? 0}</strong></span>
+        <span>Completed today: <strong style={{ color: "var(--status-success)" }}>{detail?.completed_today ?? 0}</strong></span>
         <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
       </div>
 

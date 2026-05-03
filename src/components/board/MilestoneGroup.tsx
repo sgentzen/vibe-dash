@@ -35,7 +35,7 @@ export function MilestoneGroup({
   const statusIcon = milestone?.status === "achieved" ? "\u2713" : "\u25cf";
   const statusColor =
     milestone?.status === "open"
-      ? "var(--accent-green)"
+      ? "var(--status-success)"
       : "var(--text-muted)";
 
   return (

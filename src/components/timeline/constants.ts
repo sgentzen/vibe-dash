@@ -1,9 +1,9 @@
 import type { TaskStatus } from "../../types";
 
 export const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
-  done: "var(--accent-blue)",
-  in_progress: "var(--accent-green)",
-  blocked: "var(--accent-red)",
+  done: "var(--status-info)",
+  in_progress: "var(--status-success)",
+  blocked: "var(--status-danger)",
   planned: "var(--text-muted)",
 };
 

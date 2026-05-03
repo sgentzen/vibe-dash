@@ -12,8 +12,8 @@ export function AgentDetailView({ detail, onBack }: AgentDetailViewProps) {
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = health_status === "active" ? "var(--accent-green)"
-    : health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+  const healthColor = health_status === "active" ? "var(--status-success)"
+    : health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
@@ -53,7 +53,7 @@ export function AgentDetailView({ detail, onBack }: AgentDetailViewProps) {
           </div>
         </div>
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--accent-green)", fontFamily: "monospace" }}>{completed_today}</div>
+          <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--status-success)", fontFamily: "monospace" }}>{completed_today}</div>
           <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>COMPLETED TODAY</div>
         </div>
       </div>
@@ -87,7 +87,7 @@ export function AgentDetailView({ detail, onBack }: AgentDetailViewProps) {
                     </span>
                   )}
                   {!s.ended_at && (
-                    <span style={{ fontSize: "11px", color: "var(--accent-green)", marginLeft: "8px" }}>active</span>
+                    <span style={{ fontSize: "11px", color: "var(--status-success)", marginLeft: "8px" }}>active</span>
                   )}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
