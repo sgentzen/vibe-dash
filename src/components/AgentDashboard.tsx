@@ -23,7 +23,7 @@ const FILTER_LABELS: Record<StatusFilter, string> = {
 };
 
 export function AgentDashboard() {
-  const { agents } = useAppState();
+  const { agents, searchQuery, searchScope } = useAppState();
   const api = useApi();
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -72,7 +72,12 @@ export function AgentDashboard() {
     );
   }
 
-  const allGroups = groupAgents(agents);
+  const applyAgentSearch = searchScope === "agents" || searchScope === "all";
+  const lowerAgentSearch = searchQuery.toLowerCase();
+  const visibleAgents = applyAgentSearch && searchQuery
+    ? agents.filter((a) => a.name.toLowerCase().includes(lowerAgentSearch))
+    : agents;
+  const allGroups = groupAgents(visibleAgents);
 
   // Use health_status from the enriched API response (available on agents from /api/agents)
   function agentHealth(agent: Agent): string {

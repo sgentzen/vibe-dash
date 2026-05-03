@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus, TaskPriority, MilestoneStatus, TaskDependency } from "./types.js";
+import { validateWebhookUrl } from "./utils/validateWebhookUrl.js";
 import {
   listProjects,
   createProject,

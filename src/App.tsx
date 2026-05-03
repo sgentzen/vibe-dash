@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
 import { useApi, getStoredApiKey } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { TopBar } from "./components/TopBar";
 import { ProjectList } from "./components/ProjectList";
 import { TaskBoard } from "./components/TaskBoard";
@@ -34,7 +35,13 @@ export function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gKeyPending = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const clearSearch = useCallback(() => {
+    dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
+  }, [dispatch]);
+
+  useKeyboardShortcuts({ searchInputRef, onClearSearch: clearSearch });
   useWebSocket();
   usePolling();
 
@@ -87,7 +94,8 @@ export function App() {
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
 
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      // ⌘⇧K (or Ctrl+Shift+K) opens command palette
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "k") {
         e.preventDefault();
         setCommandPaletteOpen((open) => !open);
         return;
@@ -97,15 +105,6 @@ export function App() {
 
       if (e.key === "Escape") {
         setCommandPaletteOpen(false);
-        return;
-      }
-
-      if (e.key === "/") {
-        e.preventDefault();
-        const searchEl = document.querySelector<HTMLInputElement>(
-          'input[placeholder="Search tasks..."]'
-        );
-        searchEl?.focus();
         return;
       }
 
@@ -263,7 +262,7 @@ export function App() {
 
   return (
     <div className="app">
-      <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} />
+      <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} searchInputRef={searchInputRef} />
       <div className={`main-content${rightRailCollapsed ? " rail-collapsed" : ""}`}>
         <ProjectList />
         <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>

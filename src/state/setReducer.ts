@@ -1,7 +1,8 @@
-import type { AppState, AppAction, Theme } from "./types";
+import type { AppState, AppAction, Theme, SearchScope } from "./types";
 
 const THEME_STORAGE_KEY = "vibe-dash-theme";
 const RIGHT_RAIL_STORAGE_KEY = "vibe-dash-right-rail";
+const SEARCH_SCOPE_STORAGE_KEY = "vibe-dash-search-scope";
 
 export function getInitialRightRailCollapsed(): boolean {
   return localStorage.getItem(RIGHT_RAIL_STORAGE_KEY) === "true";
@@ -12,6 +13,12 @@ export function getInitialTheme(): Theme {
   if (stored === "light" || stored === "dark") return stored;
   if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
+}
+
+export function getInitialSearchScope(): SearchScope {
+  const stored = localStorage.getItem(SEARCH_SCOPE_STORAGE_KEY);
+  if (stored === "tasks" || stored === "projects" || stored === "agents" || stored === "all") return stored;
+  return "all";
 }
 
 export function setReducer(state: AppState, action: AppAction): AppState | null {
@@ -36,6 +43,11 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, taskDepsMap: action.payload };
     case "SET_SEARCH_QUERY":
       return { ...state, searchQuery: action.payload };
+    case "SET_SEARCH_SCOPE":
+      localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, action.payload);
+      return { ...state, searchScope: action.payload };
+    case "SET_ALERTS_OPEN":
+      return { ...state, alertsOpen: action.payload };
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
     case "SET_NOTIFICATIONS":

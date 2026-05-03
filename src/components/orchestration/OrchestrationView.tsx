@@ -34,6 +34,7 @@ export function OrchestrationView() {
   return (
     <div className="orch-wrapper">
       <div className="orch-subheader">
+        <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--text-primary)" }}>Orchestration</h1>
         <span className="orch-subheader-title">AI Agent Orchestration Overview</span>
         <span className="orch-status-pill">AI Engine: Online</span>
       </div>

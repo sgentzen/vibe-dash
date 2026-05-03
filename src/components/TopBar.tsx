@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "../store";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { useDataState, useNavigationState, useNotificationState, useAppDispatch, type SearchScope } from "../store";
 import { useApi } from "../hooks/useApi";
 import { WebhookSettings } from "./WebhookSettings";
 import { GitSyncSettings } from "./GitSyncSettings";
@@ -8,14 +8,45 @@ import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
 import { AddProjectControl } from "./topbar/AddProjectControl";
 
-export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } = {}) {
+interface TopBarProps {
+  onCommandPalette?: () => void;
+  searchInputRef?: RefObject<HTMLInputElement | null>;
+}
+
+export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   const { stats } = useDataState();
-  const { theme, activeView, searchQuery } = useNavigationState();
+  const { theme, activeView, searchQuery, searchScope, alertsOpen } = useNavigationState();
   const { unreadCount, notifications } = useNotificationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showSettings, setShowSettings] = useState<"webhooks" | "git" | null>(null);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showAppearance, setShowAppearance] = useState(false);
+  const appearanceRef = useRef<HTMLDivElement>(null);
+
+  // Initial accent color from localStorage
+  const [accentColor, setAccentColor] = useState(
+    () => localStorage.getItem("vibe-dash-accent") ?? "#58a6ff"
+  );
+
+  // Close appearance popover on outside click
+  useEffect(() => {
+    if (!showAppearance) return;
+    function handleClick(e: MouseEvent) {
+      if (appearanceRef.current && !appearanceRef.current.contains(e.target as Node)) {
+        setShowAppearance(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showAppearance]);
+
+  function handleAccentChange(color: string) {
+    setAccentColor(color);
+    localStorage.setItem("vibe-dash-accent", color);
+    document.documentElement.style.setProperty("--accent-user", color);
+    document.documentElement.setAttribute("data-accent", "true");
+  }
 
   async function handleAddProject(name: string) {
     const project = await api.createProject({ name });
@@ -36,6 +67,19 @@ export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } =
       payload: notifications.map((x) => (x.id === id ? { ...x, read: true } : x)),
     });
   }
+
+  // Determine if search scope matches the active view's domain
+  const scopeMismatch =
+    (searchScope === "tasks" && activeView !== "board" && activeView !== "list") ||
+    (searchScope === "projects" && activeView !== "dashboard" && activeView !== "orchestration") ||
+    (searchScope === "agents" && activeView !== "agents");
+
+  const scopeHintLabel: Record<SearchScope, string> = {
+    tasks: "tasks",
+    projects: "projects",
+    agents: "agents",
+    all: "everything",
+  };
 
   return (
     <header
@@ -65,11 +109,41 @@ export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } =
       </span>
 
       {/* Stats */}
-      <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-        <StatPill label="PROJECTS" value={stats.projects} color="var(--accent-blue)" />
-        <StatPill label="ACTIVE AGENTS" value={stats.activeAgents} color="var(--status-success)" />
-        <StatPill label="ALERTS" value={stats.alerts} color="var(--status-warning)" />
-        <StatPill label="TASKS" value={stats.tasks} color="var(--text-secondary)" />
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <StatPill
+          label="PROJECTS"
+          value={stats.projects}
+          color="var(--accent-blue)"
+          onClick={() => {
+            const sidebar = document.querySelector<HTMLElement>(".sidebar");
+            if (sidebar) {
+              sidebar.scrollIntoView({ behavior: "smooth", block: "start" });
+              sidebar.classList.add("highlight-pulse");
+              setTimeout(() => sidebar.classList.remove("highlight-pulse"), 800);
+            }
+          }}
+        />
+        <StatPill
+          label="ACTIVE AGENTS"
+          value={stats.activeAgents}
+          color="var(--status-success)"
+          onClick={() => {
+            dispatch({ type: "SET_ACTIVE_VIEW", payload: "agents" });
+            dispatch({ type: "SET_SEARCH_SCOPE", payload: "agents" });
+          }}
+        />
+        <StatPill
+          label="ALERTS"
+          value={stats.alerts}
+          color="var(--status-warning)"
+          onClick={() => dispatch({ type: "SET_ALERTS_OPEN", payload: true })}
+        />
+        <StatPill
+          label="TASKS"
+          value={stats.tasks}
+          color="var(--text-secondary)"
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "list" })}
+        />
       </div>
 
       {/* View Toggle */}
@@ -78,28 +152,77 @@ export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } =
         onChange={(view) => dispatch({ type: "SET_ACTIVE_VIEW", payload: view })}
       />
 
-      {/* Search */}
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => dispatch({ type: "SET_SEARCH_QUERY", payload: e.target.value })}
-        placeholder="Search tasks..."
-        style={{
-          background: "var(--bg-tertiary)",
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          color: "var(--text-primary)",
-          padding: "4px 10px",
-          fontSize: "13px",
-          width: "160px",
-        }}
-      />
+      {/* Search: scope + input + kbd hint */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0", position: "relative" }}>
+        <select
+          value={searchScope}
+          onChange={(e) => dispatch({ type: "SET_SEARCH_SCOPE", payload: e.target.value as SearchScope })}
+          aria-label="Search scope"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRight: "none",
+            borderRadius: "6px 0 0 6px",
+            color: "var(--text-secondary)",
+            padding: "4px 6px",
+            fontSize: "11px",
+            cursor: "pointer",
+            height: "28px",
+          }}
+        >
+          <option value="all">All</option>
+          <option value="tasks">Tasks</option>
+          <option value="projects">Projects</option>
+          <option value="agents">Agents</option>
+        </select>
+        <input
+          ref={searchInputRef}
+          type="text"
+          value={searchQuery}
+          onChange={(e) => dispatch({ type: "SET_SEARCH_QUERY", payload: e.target.value })}
+          placeholder={scopeMismatch ? `Searching ${scopeHintLabel[searchScope]}…` : "Search…"}
+          aria-label="Search"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderLeft: "none",
+            borderRight: "none",
+            color: "var(--text-primary)",
+            padding: "4px 8px",
+            fontSize: "13px",
+            width: "140px",
+            height: "28px",
+            opacity: scopeMismatch && searchQuery === "" ? 0.6 : 1,
+          }}
+        />
+        <kbd
+          aria-hidden
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderLeft: "none",
+            borderRadius: "0 6px 6px 0",
+            color: "var(--text-muted)",
+            padding: "0 6px",
+            fontSize: "11px",
+            fontFamily: "inherit",
+            height: "28px",
+            display: "flex",
+            alignItems: "center",
+            whiteSpace: "nowrap",
+            userSelect: "none",
+          }}
+        >
+          ⌘K
+        </kbd>
+      </div>
 
       {/* Command palette trigger */}
       {onCommandPalette && (
         <button
           onClick={onCommandPalette}
-          title="Command palette (⌘K)"
+          title="Command palette (⌘⇧K)"
+          aria-label="Open command palette"
           style={{
             background: "var(--bg-tertiary)",
             border: "1px solid var(--border)",
@@ -114,55 +237,102 @@ export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } =
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ fontSize: "13px" }}>⌘</span>
-          <kbd style={{ fontFamily: "inherit", fontSize: "11px" }}>K</kbd>
+          <span style={{ fontSize: "12px" }}>⌘⇧K</span>
         </button>
       )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Theme Toggle */}
-      <button
-        onClick={() => dispatch({ type: "SET_THEME", payload: theme === "dark" ? "light" : "dark" })}
-        aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        style={{
-          background: "transparent",
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          padding: "4px 8px",
-          cursor: "pointer",
-          color: "var(--text-secondary)",
-          fontSize: "16px",
-          lineHeight: 1,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        {theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
-      </button>
-
-      {/* Accent Color Picker */}
-      <input
-        type="color"
-        value={localStorage.getItem("vibe-dash-accent") ?? "#58a6ff"}
-        onChange={(e) => {
-          const color = e.target.value;
-          localStorage.setItem("vibe-dash-accent", color);
-          document.documentElement.style.setProperty("--accent-user", color);
-          document.documentElement.setAttribute("data-accent", "true");
-        }}
-        title="Custom accent color"
-        style={{
-          width: "28px",
-          height: "28px",
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          cursor: "pointer",
-          background: "transparent",
-          padding: "2px",
-        }}
-      />
+      {/* Appearance Popover (theme + accent) */}
+      <div ref={appearanceRef} style={{ position: "relative" }}>
+        <button
+          onClick={() => setShowAppearance((v) => !v)}
+          aria-label="Appearance settings"
+          title="Appearance"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            padding: "4px 8px",
+            cursor: "pointer",
+            color: "var(--text-secondary)",
+            fontSize: "16px",
+            lineHeight: 1,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          🎨
+        </button>
+        {showAppearance && (
+          <div
+            role="dialog"
+            aria-label="Appearance settings"
+            style={{
+              position: "absolute",
+              top: "100%",
+              right: 0,
+              marginTop: "4px",
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              zIndex: 100,
+              boxShadow: "var(--shadow-md)",
+              minWidth: "180px",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", letterSpacing: "0.05em" }}>THEME</div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                {(["light", "dark"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => dispatch({ type: "SET_THEME", payload: t })}
+                    aria-label={`Switch to ${t} mode`}
+                    aria-pressed={theme === t}
+                    style={{
+                      background: theme === t ? "var(--accent-blue)" : "var(--bg-tertiary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "4px",
+                      color: theme === t ? "#fff" : "var(--text-secondary)",
+                      padding: "3px 10px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {t === "light" ? "☀️ Light" : "🌙 Dark"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ padding: "8px 12px" }}>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", letterSpacing: "0.05em" }}>ACCENT COLOR</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <input
+                  type="color"
+                  value={accentColor}
+                  onChange={(e) => handleAccentChange(e.target.value)}
+                  title="Custom accent color"
+                  aria-label="Custom accent color"
+                  style={{
+                    width: "32px",
+                    height: "28px",
+                    border: "1px solid var(--border)",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    background: "transparent",
+                    padding: "2px",
+                  }}
+                />
+                <span style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "monospace" }}>{accentColor}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Settings Gear */}
       <div style={{ position: "relative" }}>
@@ -221,6 +391,8 @@ export function TopBar({ onCommandPalette }: { onCommandPalette?: () => void } =
         unreadCount={unreadCount}
         onMarkAllRead={handleMarkAllRead}
         onMarkRead={handleMarkRead}
+        alertsOpen={alertsOpen}
+        onAlertsOpenChange={(open) => dispatch({ type: "SET_ALERTS_OPEN", payload: open })}
       />
 
       {/* Add Project */}

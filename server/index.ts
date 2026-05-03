@@ -15,6 +15,7 @@ import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
