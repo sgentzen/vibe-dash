@@ -13,6 +13,10 @@
   --accent-yellow: #d29922;
   --accent-purple: #8b5cf6;
   --accent-cyan: #06b6d4;
+  --status-success: var(--accent-green);
+  --status-danger: var(--accent-red);
+  --status-warning: var(--accent-yellow);
+  --status-info: var(--accent-blue);
   --green-bg: #0d1f0d;
   --green-border: #238636;
   --yellow-bg: #2a1a0a;
@@ -38,6 +42,10 @@
   --accent-yellow: #9a6700;
   --accent-purple: #7c3aed;
   --accent-cyan: #0891b2;
+  --status-success: var(--accent-green);
+  --status-danger: var(--accent-red);
+  --status-warning: var(--accent-yellow);
+  --status-info: var(--accent-blue);
   --green-bg: #dafbe1;
   --green-border: #1a7f37;
   --yellow-bg: #fff8c5;
@@ -125,7 +133,7 @@ textarea:focus-visible {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent-green);
+  background: var(--status-success);
   animation: pulse 2s ease-in-out infinite;
 }
 

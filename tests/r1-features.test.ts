@@ -187,7 +187,7 @@ describe("tags", () => {
     expect(taskTags.map((t) => t.name)).toContain("feature");
 
     const removed = removeTagFromTask(db, task.id, tag1.id);
-    expect(removed).toBe(true);
+    expect(removed).not.toBeNull();
 
     const afterRemove = getTaskTags(db, task.id);
     expect(afterRemove).toHaveLength(1);
@@ -206,11 +206,11 @@ describe("tags", () => {
     expect(taskTags).toHaveLength(1);
   });
 
-  it("returns false when removing non-existent tag from task", () => {
+  it("returns null when removing non-existent tag from task", () => {
     const project = createProject(db, { name: "P1", description: null });
     const task = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
     const removed = removeTagFromTask(db, task.id, "nonexistent-id");
-    expect(removed).toBe(false);
+    expect(removed).toBeNull();
   });
 
   it("isolates tags by project", () => {

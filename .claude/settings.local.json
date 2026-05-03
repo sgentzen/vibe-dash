@@ -12,7 +12,6 @@
       "Skill(update-config:*)",
       "mcp__vibe-dash__list_tasks",
       "mcp__vibe-dash__update_sprint",
-      "mcp__vibe-dash__complete_task"
     ]
   }
 }

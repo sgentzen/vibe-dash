@@ -1,7 +1,10 @@
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
+import { StatusPill } from "./StatusPill.js";
+import type { StatusToken } from "../constants/statusTokens.js";
+import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
 
 interface TaskCardProps {
   task: Task;
@@ -10,8 +13,10 @@ interface TaskCardProps {
   agents: Agent[];
   taskTags?: Tag[];
   blockingCount?: number;
+  grabbed?: boolean;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
+  onGrab?: (taskId: string) => void;
 }
 
 function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week" | null {
@@ -28,7 +33,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, onClick, onDragStart }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -38,15 +43,21 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
     ? agents.find((a) => a.id === task.assigned_agent_id)
     : null;
 
-  const dueUrgency = isDone ? null : getDueUrgency(task.due_date);
+  const dueUrgency = useMemo(
+    () => (isDone ? null : getDueUrgency(task.due_date)),
+    [isDone, task.due_date]
+  );
 
   const childTasks = allTasks.filter((t) => t.parent_task_id === task.id);
   const hasChildren = childTasks.length > 0;
   const childDone = childTasks.filter((t) => t.status === "done").length;
 
-  const latestActivity = activity
-    .filter((a) => a.task_id === task.id)
+  const taskActivity = activity.filter((a) => a.task_id === task.id);
+  const latestActivity = taskActivity
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+  const activitySparkValues = isActive
+    ? buildDailyActivityCounts(taskActivity.map((a) => a.timestamp), 7)
+    : null;
 
   const descSnippet = task.description
     ? task.description.slice(0, 80) + (task.description.length > 80 ? "\u2026" : "")
@@ -57,16 +68,16 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   let boxShadow = "none";
 
   if (isActive) {
-    borderColor = "var(--accent-green)";
+    borderColor = "var(--status-success)";
     background = "var(--green-bg)";
     boxShadow = "var(--shadow-glow-green)";
   } else if (isBlocked) {
-    borderColor = "var(--accent-yellow)";
+    borderColor = "var(--status-danger)";
   } else if (dueUrgency === "overdue") {
-    borderColor = "var(--accent-red)";
+    borderColor = "var(--status-danger)";
     boxShadow = "var(--shadow-glow-red)";
   } else if (dueUrgency === "today") {
-    borderColor = "var(--accent-yellow)";
+    borderColor = "var(--status-warning)";
   }
 
   return (
@@ -76,19 +87,28 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         e.dataTransfer.setData("text/plain", task.id);
         onDragStart(task.id);
       }}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-describedby={grabbed ? "keyboard-grab-bar" : undefined}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter") { e.preventDefault(); onClick(); }
+        if (e.key === " ") { e.preventDefault(); onGrab ? onGrab(task.id) : onClick(); }
+      }}
       style={{
-        border: `1px solid ${borderColor}`,
+        border: grabbed ? `2px dashed var(--accent-blue)` : `1px solid ${borderColor}`,
         borderRadius: "6px",
         padding: "10px",
-        background,
-        boxShadow,
+        background: grabbed ? "var(--bg-secondary)" : background,
+        boxShadow: grabbed ? "0 0 0 2px var(--accent-blue)" : boxShadow,
         cursor: "pointer",
         opacity: isDone ? 0.6 : 1,
         transition: "opacity 0.15s, border-color 0.15s",
         userSelect: "none",
       }}
     >
-      <div onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}>
+      <div>
         {/* Title */}
         <div
           style={{
@@ -102,10 +122,10 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           }}
         >
           {isDone && (
-            <span style={{ color: "var(--accent-green)", flexShrink: 0 }}>{"\u2713"}</span>
+            <span style={{ color: "var(--status-info)", flexShrink: 0 }}>{"\u2713"}</span>
           )}
           {isActive && (
-            <span className="pulse-dot" style={{ marginTop: "5px", flexShrink: 0 }} />
+            <span className="pulse-dot" aria-hidden="true" style={{ marginTop: "5px", flexShrink: 0 }} />
           )}
           <span>{task.title}</span>
         </div>
@@ -123,7 +143,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           </div>
         )}
 
-        {/* Active task: latest activity + progress bar */}
+        {/* Active task: latest activity + progress bar + sparkline */}
         {isActive && (
           <>
             {latestActivity && (
@@ -141,23 +161,34 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
                 {latestActivity.message}
               </div>
             )}
-            <div
-              style={{
-                height: "3px",
-                background: "var(--bg-secondary)",
-                borderRadius: "2px",
-                overflow: "hidden",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div
                 style={{
-                  height: "100%",
-                  width: `${task.progress}%`,
-                  background: "var(--accent-green)",
+                  flex: 1,
+                  height: "3px",
+                  background: "var(--bg-secondary)",
                   borderRadius: "2px",
-                  transition: "width 0.3s",
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${task.progress}%`,
+                    background: "var(--status-success)",
+                    borderRadius: "2px",
+                    transition: "width 0.3s",
+                  }}
+                />
+              </div>
+              {activitySparkValues && activitySparkValues.some((v) => v > 0) && (
+                <Sparkline
+                  values={activitySparkValues}
+                  width={40}
+                  height={12}
+                  color="var(--accent-green)"
+                />
+              )}
             </div>
           </>
         )}
@@ -166,47 +197,20 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
         <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
           {/* Priority badge */}
           {(task.priority === "urgent" || task.priority === "high") && (
-            <span
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background:
-                  task.priority === "urgent" ? "rgba(248,81,73,0.15)" : "rgba(210,153,34,0.15)",
-                color:
-                  task.priority === "urgent" ? "var(--accent-red)" : "var(--accent-yellow)",
-                border: `1px solid ${
-                  task.priority === "urgent" ? "var(--accent-red)" : "var(--accent-yellow)"
-                }`,
-              }}
-            >
-              {task.priority}
-            </span>
+            <StatusPill
+              token={task.priority === "urgent" ? "danger" : "warning"}
+              label={task.priority}
+            />
           )}
 
           {/* Due date indicator */}
-          {dueUrgency && (
-            <span
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background: dueUrgency === "overdue" ? "rgba(248,81,73,0.15)"
-                  : dueUrgency === "today" ? "rgba(210,153,34,0.15)"
-                  : "rgba(139,148,158,0.1)",
-                color: dueUrgency === "overdue" ? "var(--accent-red)"
-                  : dueUrgency === "today" ? "var(--accent-yellow)"
-                  : "var(--text-muted)",
-                border: `1px solid ${
-                  dueUrgency === "overdue" ? "var(--accent-red)"
-                  : dueUrgency === "today" ? "var(--accent-yellow)"
-                  : "var(--border)"
-                }`,
-              }}
-            >
-              {dueUrgency === "overdue" ? "Overdue" : dueUrgency === "today" ? "Due today" : "Due soon"}
-            </span>
-          )}
+          {dueUrgency && (() => {
+            const token: StatusToken = dueUrgency === "overdue" ? "danger"
+              : dueUrgency === "today" ? "warning" : "neutral";
+            const label = dueUrgency === "overdue" ? "Overdue"
+              : dueUrgency === "today" ? "Due today" : "Due soon";
+            return <StatusPill token={token} label={label} />;
+          })()}
           {task.due_date && !dueUrgency && !isDone && (
             <span
               style={{
@@ -265,18 +269,8 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
           {/* Dependency badge */}
           {blockingCount != null && blockingCount > 0 && (
-            <span
-              title={`Blocked by ${blockingCount} task${blockingCount > 1 ? "s" : ""}`}
-              style={{
-                fontSize: "10px",
-                padding: "1px 6px",
-                borderRadius: "4px",
-                background: "rgba(248,81,73,0.1)",
-                color: "var(--accent-red)",
-                border: "1px solid rgba(248,81,73,0.3)",
-              }}
-            >
-              Blocked by {blockingCount}
+            <span title={`Blocked by ${blockingCount} task${blockingCount > 1 ? "s" : ""}`}>
+              <StatusPill token="danger" label={`Blocked by ${blockingCount}`} />
             </span>
           )}
 
@@ -344,9 +338,9 @@ function SubTaskRow({ task }: { task: Task }) {
   const isBlocked = task.status === "blocked";
 
   let color = "var(--text-secondary)";
-  if (isDone) color = "var(--text-muted)";
-  if (isActive) color = "var(--accent-green)";
-  if (isBlocked) color = "var(--accent-yellow)";
+  if (isDone) color = "var(--status-neutral)";
+  if (isActive) color = "var(--status-success)";
+  if (isBlocked) color = "var(--status-danger)";
 
   const icon = isDone ? "\u2713" : isActive ? "\u25cf" : isBlocked ? "\u26a0" : "\u25cb";
 

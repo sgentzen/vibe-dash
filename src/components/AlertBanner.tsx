@@ -1,7 +1,8 @@
-import { useAppState } from "../store";
+import { useDataState, useNotificationState } from "../store";
 
 export function AlertBanner() {
-  const { blockers, fileConflicts } = useAppState();
+  const { blockers } = useDataState();
+  const { fileConflicts } = useNotificationState();
   if (blockers.length === 0 && fileConflicts.length === 0) return null;
 
   const latest = blockers.length > 0 ? blockers[blockers.length - 1] : null;
@@ -12,7 +13,7 @@ export function AlertBanner() {
       role="alert"
       style={{
         background: "var(--yellow-bg)",
-        borderTop: "1px solid var(--accent-yellow)",
+        borderTop: "1px solid var(--status-warning)",
         padding: "8px 16px",
         display: "flex",
         alignItems: "center",
@@ -22,7 +23,7 @@ export function AlertBanner() {
     >
       <span
         style={{
-          color: "var(--accent-yellow)",
+          color: "var(--status-warning)",
           fontWeight: 700,
           fontSize: "12px",
           letterSpacing: "0.05em",
@@ -48,7 +49,7 @@ export function AlertBanner() {
       {extra > 0 && (
         <span
           style={{
-            color: "var(--accent-yellow)",
+            color: "var(--status-warning)",
             fontSize: "12px",
             whiteSpace: "nowrap",
             flexShrink: 0,
@@ -61,7 +62,7 @@ export function AlertBanner() {
         <span
           key={c.file_path}
           style={{
-            color: "var(--accent-red)",
+            color: "var(--status-danger)",
             fontSize: "12px",
             whiteSpace: "nowrap",
           }}

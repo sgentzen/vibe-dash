@@ -130,8 +130,8 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
                       style={{
                         fontSize: "10px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
                         background: "transparent",
-                        border: `1px solid ${w.active ? "var(--accent-green)" : "var(--text-muted)"}`,
-                        color: w.active ? "var(--accent-green)" : "var(--text-muted)",
+                        border: `1px solid ${w.active ? "var(--status-success)" : "var(--text-muted)"}`,
+                        color: w.active ? "var(--status-success)" : "var(--text-muted)",
                       }}
                     >
                       {w.active ? "Active" : "Paused"}
@@ -140,7 +140,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
                       onClick={() => handleDelete(w.id)}
                       style={{
                         fontSize: "10px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
-                        background: "transparent", border: "1px solid var(--accent-red)", color: "var(--accent-red)",
+                        background: "transparent", border: "1px solid var(--status-danger)", color: "var(--status-danger)",
                       }}
                     >
                       Delete
