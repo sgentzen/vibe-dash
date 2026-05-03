@@ -17,6 +17,8 @@
   --status-danger: var(--accent-red);
   --status-warning: var(--accent-yellow);
   --status-info: var(--accent-blue);
+  --status-neutral: var(--text-muted);
+  --text-on-yellow: #1a1a1a;
   --green-bg: #0d1f0d;
   --green-border: #238636;
   --yellow-bg: #2a1a0a;
@@ -46,6 +48,8 @@
   --status-danger: var(--accent-red);
   --status-warning: var(--accent-yellow);
   --status-info: var(--accent-blue);
+  --status-neutral: var(--text-muted);
+  --text-on-yellow: #1a1a1a;
   --green-bg: #dafbe1;
   --green-border: #1a7f37;
   --yellow-bg: #fff8c5;
