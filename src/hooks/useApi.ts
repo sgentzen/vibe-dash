@@ -4,7 +4,11 @@ import type { Project, Task, Sprint, Agent, ActivityEntry, Blocker, Tag, TaskTag
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function buildQueryString(params: Record<string, string | undefined>): string {
-  return Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join("&");
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) sp.append(k, v);
+  }
+  return sp.toString();
 }
 
 async function getStats(): Promise<{

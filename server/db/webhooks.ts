@@ -56,6 +56,7 @@ export async function fireWebhooks(db: Database.Database, eventType: string, pay
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
+        redirect: "manual",
         signal: AbortSignal.timeout(5000),
       }).catch(() => {})
     )

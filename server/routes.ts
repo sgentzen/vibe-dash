@@ -92,6 +92,7 @@ import {
 import { broadcast as wsBroadcast } from "./websocket.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
+import { validateWebhookUrl } from "./utils/validateWebhookUrl.js";
 
 const dependencyDeleteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
@@ -793,15 +794,17 @@ export function createRouter(db: Database.Database): Router {
   router.post("/api/webhooks", (req, res) => {
     const { url, event_types } = req.body as { url: string; event_types: string[] };
     if (!url || !event_types || !Array.isArray(event_types)) { res.status(400).json({ error: "url and event_types (array) are required" }); return; }
-    try {
-      const parsed = new URL(url);
-      if (!["http:", "https:"].includes(parsed.protocol)) { res.status(400).json({ error: "Only http/https URLs allowed" }); return; }
-    } catch { res.status(400).json({ error: "Invalid URL" }); return; }
+    const urlError = validateWebhookUrl(url);
+    if (urlError) { res.status(400).json({ error: urlError }); return; }
     res.status(201).json(createWebhook(db, url, event_types));
   });
 
   router.patch("/api/webhooks/:id", (req, res) => {
     const updates = req.body as { url?: string; event_types?: string[]; active?: boolean };
+    if (updates.url !== undefined) {
+      const urlError = validateWebhookUrl(updates.url);
+      if (urlError) { res.status(400).json({ error: urlError }); return; }
+    }
     const hook = updateWebhook(db, req.params.id, updates);
     if (!hook) { res.status(404).json({ error: "Webhook not found" }); return; }
     res.json(hook);

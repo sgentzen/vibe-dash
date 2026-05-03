@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
 import type Database from "better-sqlite3";
+import helmet from "helmet";
 import { openDb } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes.js";
@@ -19,7 +20,20 @@ const PORT = parseInt(process.env.PORT ?? "3001");
 const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
 
 const app = express();
-app.use(express.json());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", ...(process.env.NODE_ENV === "development" ? ["'unsafe-eval'"] : [])],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+app.use(express.json({ limit: "256kb" }));
 
 const db: Database.Database = openDb(DB_PATH);
 app.use(createRouter(db));
@@ -88,6 +102,11 @@ app.all("/mcp", async (req, res) => {
   res.status(400).json({ error: "No valid MCP session. Send an initialize request first." });
 });
 
+// Return JSON 404 for unknown /api/* routes (must be before SPA fallback)
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 // Serve built frontend in production (npm start)
 const distDir = path.join(PROJECT_ROOT, "dist");
 app.use(express.static(distDir));
@@ -104,10 +123,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const server = createServer(app);
 initWebSocket(server);
 
-server.listen(PORT, () => {
-  console.log(`Vibe Dash running on http://localhost:${PORT}`);
-  console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
-  console.log(`MCP SSE at http://localhost:${PORT}/sse`);
+const BIND = process.env.VIBE_DASH_BIND ?? "127.0.0.1";
+if (BIND !== "127.0.0.1" && BIND !== "::1" && !process.env.VIBE_DASH_ALLOW_REMOTE) {
+  console.error(`ERROR: VIBE_DASH_BIND is set to '${BIND}' (non-loopback). Set VIBE_DASH_ALLOW_REMOTE=1 to allow remote access.`);
+  process.exit(1);
+}
+
+server.listen(PORT, BIND, () => {
+  console.log(`Vibe Dash running on http://${BIND}:${PORT}`);
+  console.log(`WebSocket available at ws://${BIND}:${PORT}/ws`);
+  console.log(`MCP SSE at http://${BIND}:${PORT}/sse`);
 });
 
 export { app, db, server };
