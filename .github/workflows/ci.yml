@@ -27,6 +27,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
       - name: Type-check
         run: npx tsc -p tsconfig.json --noEmit
 
