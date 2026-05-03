@@ -15,6 +15,8 @@ import type {
 
 export type Theme = "dark" | "light";
 
+export type SearchScope = "tasks" | "projects" | "agents" | "all";
+
 export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity" | "worktrees" | "executive";
 
 export interface AppState {
@@ -32,8 +34,10 @@ export interface AppState {
   fileConflicts: FileConflict[];
   worktrees: TaskWorktree[];
   searchQuery: string;
+  searchScope: SearchScope;
   activeView: ActiveView;
   theme: Theme;
+  alertsOpen: boolean;
   selectedProjectId: string | null;
   selectedMilestoneId: string | null;
   stats: {
@@ -61,6 +65,8 @@ export type AppAction =
   | { type: "SET_TASK_TAG_MAP"; payload: Record<string, string[]> }
   | { type: "SET_TASK_DEPS_MAP"; payload: Record<string, string[]> }
   | { type: "SET_SEARCH_QUERY"; payload: string }
+  | { type: "SET_SEARCH_SCOPE"; payload: SearchScope }
+  | { type: "SET_ALERTS_OPEN"; payload: boolean }
   | { type: "SET_ACTIVE_VIEW"; payload: ActiveView }
   | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
   | { type: "SET_UNREAD_COUNT"; payload: number }

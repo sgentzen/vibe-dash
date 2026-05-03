@@ -98,6 +98,31 @@ Icons per token: `success` ✓ · `warning` ⚠ · `danger` ✗ · `info` ● ·
 
 ---
 
+## Page Title Casing
+
+**Convention:** Sentence case for page titles; uppercase tracked-out for section labels.
+
+| Element | Casing | Example |
+|---------|--------|---------|
+| Page `<h1>` / `<h2>` title | Sentence case | `Dashboard`, `Agent dashboard`, `Git worktrees` |
+| Section label (e.g., `.orch-subheader-title`) | ALL CAPS tracked-out | `AI AGENT ORCHESTRATION OVERVIEW` |
+
+**Do:**
+```tsx
+<h1>Orchestration</h1>                       {/* sentence case page title */}
+<span className="section-label">AI AGENT ORCHESTRATION OVERVIEW</span>
+```
+
+**Don't:**
+```tsx
+<h1>Orchestration Overview</h1>              {/* too descriptive — save for section labels */}
+<span className="section-label">Orchestration Overview</span>  {/* should be ALL CAPS tracked-out */}
+```
+
+Views without a visible page title (e.g., TaskBoard, TaskListView) are exempt only if the active view's name is visible in the top-bar ViewToggle — add a page title if the view ever renders standalone.
+
+---
+
 ## CSS Variable Quick Reference
 
 ```css

@@ -18,7 +18,7 @@ type SortBy = "default" | "due_soonest";
 
 export function TaskBoard() {
   const { tasks, projects, milestones, activity, agents, tags, taskTagMap, taskDepsMap } = useDataState();
-  const { selectedProjectId, selectedMilestoneId, searchQuery } = useNavigationState();
+  const { selectedProjectId, selectedMilestoneId, searchQuery, searchScope } = useNavigationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -40,6 +40,7 @@ export function TaskBoard() {
   const filteredTasks = useMemo(() => {
     const nowMs = Date.now();
     const lower = searchQuery.toLowerCase();
+    const applySearch = searchScope === "tasks" || searchScope === "all";
     let result = tasks.filter((t) => {
       if (t.status === "done") {
         const completedAt = new Date(t.updated_at).getTime();
@@ -53,11 +54,11 @@ export function TaskBoard() {
         t.parent_task_id === null &&
         (selectedProjectId === null || t.project_id === selectedProjectId) &&
         (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId) &&
-        (!searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
+        (!applySearch || !searchQuery || t.title.toLowerCase().includes(lower) || (t.description ?? "").toLowerCase().includes(lower))
       );
     });
     return result;
-  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery, filterTagId, taskTagMap]);
+  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery, searchScope, filterTagId, taskTagMap]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)

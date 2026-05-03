@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppNotification } from "../../types";
 
 interface NotificationBellProps {
@@ -6,6 +6,8 @@ interface NotificationBellProps {
   unreadCount: number;
   onMarkAllRead: () => void;
   onMarkRead: (id: string) => void;
+  alertsOpen?: boolean;
+  onAlertsOpenChange?: (open: boolean) => void;
 }
 
 export function NotificationBell({
@@ -13,13 +15,31 @@ export function NotificationBell({
   unreadCount,
   onMarkAllRead,
   onMarkRead,
+  alertsOpen,
+  onAlertsOpenChange,
 }: NotificationBellProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Sync external open state into local state
+  useEffect(() => {
+    if (alertsOpen === true) setShowNotifications(true);
+  }, [alertsOpen]);
+
+  function toggle() {
+    const next = !showNotifications;
+    setShowNotifications(next);
+    onAlertsOpenChange?.(next);
+  }
+
+  function close() {
+    setShowNotifications(false);
+    onAlertsOpenChange?.(false);
+  }
 
   return (
     <div style={{ position: "relative" }}>
       <button
-        onClick={() => setShowNotifications(!showNotifications)}
+        onClick={toggle}
         aria-label="Notifications"
         style={{
           background: "transparent",
@@ -32,7 +52,7 @@ export function NotificationBell({
           position: "relative",
         }}
       >
-        {"\uD83D\uDD14"}
+        {"🔔"}
         {unreadCount > 0 && (
           <span style={{
             position: "absolute", top: "-4px", right: "-4px",
@@ -66,6 +86,13 @@ export function NotificationBell({
                 Mark all read
               </button>
             )}
+            <button
+              onClick={close}
+              aria-label="Close notifications"
+              style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "14px", cursor: "pointer", marginLeft: "8px" }}
+            >
+              ×
+            </button>
           </div>
           {notifications.length === 0 ? (
             <div style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: "12px" }}>

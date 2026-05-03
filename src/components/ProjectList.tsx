@@ -2,6 +2,8 @@ import { useAppState, useAppDispatch } from "../store";
 import { STATUS_COLORS } from "../constants/colors.js";
 import type { Project, Task } from "../types";
 
+export const SIDEBAR_CLASS = "sidebar";
+
 function getProjectStatus(tasks: Task[]): "active" | "blocked" | "idle" {
   if (tasks.some((t) => t.status === "blocked")) return "blocked";
   if (tasks.some((t) => t.status === "in_progress")) return "active";
@@ -16,7 +18,7 @@ function getBorderColor(status: "active" | "blocked" | "idle"): string {
 
 
 export function ProjectList() {
-  const { projects, tasks, selectedProjectId } = useAppState();
+  const { projects, tasks, selectedProjectId, searchQuery, searchScope } = useAppState();
   const dispatch = useAppDispatch();
 
   function handleSelect(id: string) {
@@ -26,9 +28,15 @@ export function ProjectList() {
     });
   }
 
+  const applyProjectSearch = searchScope === "projects" || searchScope === "all";
+  const lowerProjectSearch = searchQuery.toLowerCase();
+  const visibleProjects = applyProjectSearch && searchQuery
+    ? projects.filter((p) => p.name.toLowerCase().includes(lowerProjectSearch))
+    : projects;
+
   return (
     <aside
-      className="panel-scroll"
+      className={`panel-scroll ${SIDEBAR_CLASS}`}
       style={{
         background: "var(--bg-secondary)",
         borderRight: "1px solid var(--border)",
@@ -48,7 +56,7 @@ export function ProjectList() {
         Projects
       </div>
 
-      {projects.length === 0 && (
+      {visibleProjects.length === 0 && (
         <div
           style={{
             padding: "16px 12px",
@@ -57,11 +65,11 @@ export function ProjectList() {
             fontStyle: "italic",
           }}
         >
-          No projects yet
+          {projects.length === 0 ? "No projects yet" : "No projects match search"}
         </div>
       )}
 
-      {projects.map((project) => (
+      {visibleProjects.map((project) => (
         <ProjectCard
           key={project.id}
           project={project}

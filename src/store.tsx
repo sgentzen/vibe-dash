@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useReducer, useMemo } from "react";
-import type { AppState, AppAction, Theme, ActiveView } from "./state/types";
-import { setReducer, getInitialTheme, getInitialRightRailCollapsed } from "./state/setReducer";
+import type { AppState, AppAction, Theme, ActiveView, SearchScope } from "./state/types";
+import { setReducer, getInitialTheme, getInitialRightRailCollapsed, getInitialSearchScope } from "./state/setReducer";
 import { wsReducer } from "./state/wsReducer";
 
-export type { AppState, AppAction, Theme, ActiveView };
+export type { AppState, AppAction, Theme, ActiveView, SearchScope };
 
 // ─── Domain slices ────────────────────────────────────────────────────────────
 
@@ -15,8 +15,8 @@ export type DataState = Pick<
 
 export type NavigationState = Pick<
   AppState,
-  "selectedProjectId" | "selectedMilestoneId" | "activeView" | "searchQuery" | "theme" |
-  "currentUser" | "isAuthenticated" | "authEnabled" | "rightRailCollapsed"
+  "selectedProjectId" | "selectedMilestoneId" | "activeView" | "searchQuery" | "searchScope" | "theme" |
+  "currentUser" | "isAuthenticated" | "authEnabled" | "rightRailCollapsed" | "alertsOpen"
 >;
 
 export type NotificationState = Pick<
@@ -51,8 +51,10 @@ const initialState: AppState = {
   fileConflicts: [],
   worktrees: [],
   searchQuery: "",
+  searchScope: getInitialSearchScope(),
   activeView: "orchestration",
   theme: getInitialTheme(),
+  alertsOpen: false,
   rightRailCollapsed: getInitialRightRailCollapsed(),
   selectedProjectId: null,
   selectedMilestoneId: null,
@@ -101,14 +103,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selectedMilestoneId: state.selectedMilestoneId,
       activeView: state.activeView,
       searchQuery: state.searchQuery,
+      searchScope: state.searchScope,
       theme: state.theme,
       currentUser: state.currentUser,
       isAuthenticated: state.isAuthenticated,
       authEnabled: state.authEnabled,
       rightRailCollapsed: state.rightRailCollapsed,
+      alertsOpen: state.alertsOpen,
     }),
     [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.searchQuery,
-     state.theme, state.currentUser, state.isAuthenticated, state.authEnabled, state.rightRailCollapsed]
+     state.searchScope, state.theme, state.currentUser, state.isAuthenticated, state.authEnabled,
+     state.rightRailCollapsed, state.alertsOpen]
   );
 
   const notificationValue = useMemo<NotificationState>(

@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = { planned: "Planned", in_progr
 const PRIORITY_LABELS: Record<TaskPriority, string> = { urgent: "Urgent", high: "High", medium: "Medium", low: "Low" };
 
 export function TaskListView() {
-  const { tasks, selectedProjectId, selectedMilestoneId, searchQuery, agents } = useAppState();
+  const { tasks, selectedProjectId, selectedMilestoneId, searchQuery, searchScope, agents } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -24,12 +24,13 @@ export function TaskListView() {
   const [bulkPriority, setBulkPriority] = useState<TaskPriority | "">("");
 
   const lowerSearch = searchQuery.toLowerCase();
+  const applySearch = searchScope === "tasks" || searchScope === "all";
   const filteredTasks = tasks.filter(
     (t) =>
       t.parent_task_id === null &&
       (selectedProjectId === null || t.project_id === selectedProjectId) &&
       (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId) &&
-      (!searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
+      (!applySearch || !searchQuery || t.title.toLowerCase().includes(lowerSearch) || (t.description ?? "").toLowerCase().includes(lowerSearch))
   );
 
   const sortedTasks = useMemo(() => {
