@@ -421,6 +421,7 @@ const MIGRATIONS: Migration[] = [
             "UPDATE task_reviews SET reviewer_agent_id = ? WHERE reviewer_agent_id = ?",
             "UPDATE task_comments SET agent_id = ? WHERE agent_id = ?",
             "UPDATE agents SET parent_agent_id = ? WHERE parent_agent_id = ?",
+            "UPDATE ingestion_events SET agent_id = ? WHERE agent_id = ?",
           ];
           for (const sql of fkUpdates) {
             db.prepare(sql).run(survivor_id, dupId);
