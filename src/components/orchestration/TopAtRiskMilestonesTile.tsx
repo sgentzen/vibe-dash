@@ -1,46 +1,40 @@
-import type { Milestone, Task } from "../../types";
+import { useAppDispatch } from "../../store";
+import type { MilestoneHealth } from "../../../shared/types.js";
+import { StatusPill } from "../StatusPill.js";
+import { MILESTONE_HEALTH_TOKEN, tokenToColor } from "../../constants/statusTokens.js";
 
 interface Props {
-  milestones: Milestone[];
-  tasks: Task[];
+  /** Server-authoritative milestone health from getExecutiveSummary. */
+  health: MilestoneHealth[];
+  /** Total open milestone count for the active project (for the header chip). */
+  openCount: number;
 }
 
-function barColor(pct: number): string {
-  if (pct >= 0.75) return "var(--accent-green)";
-  if (pct >= 0.4) return "var(--accent-yellow)";
-  return "var(--accent-red)";
-}
+const HEALTH_RANK: Record<MilestoneHealth["health"], number> = {
+  behind: 0,
+  at_risk: 1,
+  on_track: 2,
+};
 
-export function TopAtRiskMilestonesTile({ milestones, tasks }: Props) {
-  const open = milestones.filter((m) => m.status === "open");
+export function TopAtRiskMilestonesTile({ health, openCount }: Props) {
+  const dispatch = useAppDispatch();
 
-  const tasksByMilestone = new Map<string, Task[]>();
-  for (const t of tasks) {
-    if (t.milestone_id) {
-      const arr = tasksByMilestone.get(t.milestone_id) ?? [];
-      arr.push(t);
-      tasksByMilestone.set(t.milestone_id, arr);
-    }
-  }
-
-  // Sort open milestones by completion ascending (lowest = most at risk)
-  const ranked = open
-    .map((m) => {
-      const mTasks = tasksByMilestone.get(m.id) ?? [];
-      const done = mTasks.filter((t) => t.status === "done").length;
-      const total = mTasks.length;
-      const pct = total > 0 ? done / total : 0;
-      return { m, done, total, pct };
-    })
-    .sort((a, b) => a.pct - b.pct)
+  // Rank Behind first, then At Risk, then On Track; within a band, lowest progress first.
+  const ranked = [...health]
+    .sort((a, b) => HEALTH_RANK[a.health] - HEALTH_RANK[b.health] || a.completion_pct - b.completion_pct)
     .slice(0, 3);
+
+  const goToExecutive = (milestoneId: string) => {
+    dispatch({ type: "SELECT_MILESTONE", payload: milestoneId });
+    dispatch({ type: "SET_ACTIVE_VIEW", payload: "executive" });
+  };
 
   return (
     <div className="orch-card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
         <div className="orch-section-header" style={{ marginBottom: 0 }}>Top At-Risk Milestones</div>
         <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>
-          {open.length} open
+          {openCount} open
         </span>
       </div>
 
@@ -50,11 +44,24 @@ export function TopAtRiskMilestonesTile({ milestones, tasks }: Props) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {ranked.map(({ m, done, total, pct }) => {
-            const color = barColor(pct);
+          {ranked.map((m) => {
+            const color = tokenToColor(MILESTONE_HEALTH_TOKEN[m.health]);
             return (
-              <div key={m.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "5px" }}>
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => goToExecutive(m.id)}
+                title={`Open ${m.name} in Executive view`}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginBottom: "5px" }}>
                   <span
                     style={{
                       fontSize: "13px",
@@ -63,27 +70,33 @@ export function TopAtRiskMilestonesTile({ milestones, tasks }: Props) {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      maxWidth: "70%",
+                      flex: 1,
+                      minWidth: 0,
                     }}
-                    title={m.name}
                   >
                     {m.name}
                   </span>
-                  <span style={{ fontSize: "11px", color: "var(--text-muted)", flexShrink: 0 }}>
-                    {done}/{total}
-                  </span>
+                  <StatusPill token={MILESTONE_HEALTH_TOKEN[m.health]} label={labelFor(m.health)} size="sm" />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)", marginBottom: "5px" }}>
+                  <span>{m.completed_count}/{m.task_count} · {m.completion_pct}%</span>
+                  {m.target_date && <span>Due {new Date(m.target_date).toLocaleDateString()}</span>}
                 </div>
                 <div className="orch-progress-bar-track">
                   <div
                     className="orch-progress-bar-fill"
-                    style={{ width: `${pct * 100}%`, background: color }}
+                    style={{ width: `${m.completion_pct}%`, background: color }}
                   />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
     </div>
   );
+}
+
+function labelFor(h: MilestoneHealth["health"]): string {
+  return h === "on_track" ? "On Track" : h === "at_risk" ? "At Risk" : "Behind";
 }
