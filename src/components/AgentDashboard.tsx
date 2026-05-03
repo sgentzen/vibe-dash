@@ -175,8 +175,8 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = detail?.health_status === "active" ? "var(--accent-green)"
-    : detail?.health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+  const healthColor = detail?.health_status === "active" ? "var(--status-success)"
+    : detail?.health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
 
   return (
     <div
@@ -251,7 +251,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
       )}
 
       <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
-        <span>Completed today: <strong style={{ color: "var(--accent-green)" }}>{detail?.completed_today ?? 0}</strong></span>
+        <span>Completed today: <strong style={{ color: "var(--status-success)" }}>{detail?.completed_today ?? 0}</strong></span>
         <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
       </div>
 
@@ -283,8 +283,8 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = health_status === "active" ? "var(--accent-green)"
-    : health_status === "idle" ? "var(--accent-yellow)" : "var(--text-muted)";
+  const healthColor = health_status === "active" ? "var(--status-success)"
+    : health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
@@ -324,7 +324,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
           </div>
         </div>
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--accent-green)", fontFamily: "monospace" }}>{completed_today}</div>
+          <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--status-success)", fontFamily: "monospace" }}>{completed_today}</div>
           <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>COMPLETED TODAY</div>
         </div>
       </div>
@@ -358,7 +358,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
                     </span>
                   )}
                   {!s.ended_at && (
-                    <span style={{ fontSize: "11px", color: "var(--accent-green)", marginLeft: "8px" }}>active</span>
+                    <span style={{ fontSize: "11px", color: "var(--status-success)", marginLeft: "8px" }}>active</span>
                   )}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>

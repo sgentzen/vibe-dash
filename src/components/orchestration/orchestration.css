@@ -1,0 +1,114 @@
+.orch-wrapper {
+  flex: 1;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.orch-subheader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.orch-subheader-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+}
+
+.orch-status-pill {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-green) 15%, transparent);
+  color: var(--accent-green);
+  border: 1px solid color-mix(in srgb, var(--accent-green) 30%, transparent);
+}
+
+.orch-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.orch-center-col {
+  grid-column: 1 / 5;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.orch-right-col {
+  grid-column: 5 / 13;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.orch-right-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+}
+
+.orch-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.orch-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.orch-progress-bar-track {
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.orch-progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 400ms ease-out;
+}
+
+/* Responsive: below 900px, center and right stack vertically. */
+@media (max-width: 900px) {
+  .orch-grid {
+    grid-template-rows: auto auto;
+  }
+  .orch-center-col {
+    grid-column: 1 / 13;
+    grid-row: 1;
+  }
+  .orch-right-col {
+    grid-column: 1 / 13;
+    grid-row: 2;
+  }
+  .orch-right-bottom {
+    grid-template-columns: 1fr;
+  }
+}

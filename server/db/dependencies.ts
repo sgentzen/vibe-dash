@@ -12,9 +12,10 @@ export function addDependency(
   }
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT OR IGNORE INTO task_dependencies (id, task_id, depends_on_task_id, created_at) VALUES (?, ?, ?, ?)"
-  ).run(id, taskId, dependsOnTaskId, ts);
+  const inserted = db.prepare(
+    "INSERT OR IGNORE INTO task_dependencies (id, task_id, depends_on_task_id, created_at) VALUES (?, ?, ?, ?) RETURNING *"
+  ).get(id, taskId, dependsOnTaskId, ts) as TaskDependency | undefined;
+  if (inserted) return inserted;
   return db
     .prepare("SELECT * FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?")
     .get(taskId, dependsOnTaskId) as TaskDependency;

@@ -232,3 +232,64 @@ describe("GET /api/blockers", () => {
     expect((body as unknown[]).length).toBe(1);
   });
 });
+
+describe("GET /api/first-run", () => {
+  it("returns firstRun: true when no projects exist", async () => {
+    const { status, body } = await request("GET", "/api/first-run");
+    expect(status).toBe(200);
+    expect((body as { firstRun: boolean }).firstRun).toBe(true);
+  });
+
+  it("returns firstRun: false after a project is created", async () => {
+    createProject(db, { name: "P1", description: null });
+    const { status, body } = await request("GET", "/api/first-run");
+    expect(status).toBe(200);
+    expect((body as { firstRun: boolean }).firstRun).toBe(false);
+  });
+
+  it("remains false after multiple projects", async () => {
+    createProject(db, { name: "P1", description: null });
+    createProject(db, { name: "P2", description: null });
+    const { body } = await request("GET", "/api/first-run");
+    expect((body as { firstRun: boolean }).firstRun).toBe(false);
+  });
+});
+
+describe("agent assignment via routes", () => {
+  it("POST /api/tasks accepts assigned_agent_id", async () => {
+    const p = createProject(db, { name: "P", description: null });
+    const agent = registerAgent(db, { name: "bot-1", model: null, capabilities: [] });
+
+    const { status, body } = await request("POST", "/api/tasks", {
+      project_id: p.id,
+      title: "Assigned Task",
+      priority: "medium",
+      assigned_agent_id: agent.id,
+    });
+    expect(status).toBe(201);
+    expect((body as { assigned_agent_id: string }).assigned_agent_id).toBe(agent.id);
+  });
+
+  it("GET /api/tasks filters by assigned_agent_id", async () => {
+    const p = createProject(db, { name: "P", description: null });
+    const agent = registerAgent(db, { name: "bot-1", model: null, capabilities: [] });
+    createTask(db, { project_id: p.id, title: "Assigned", description: null, priority: "low", assigned_agent_id: agent.id });
+    createTask(db, { project_id: p.id, title: "Unassigned", description: null, priority: "low" });
+
+    const { body } = await request("GET", `/api/tasks?assigned_agent_id=${agent.id}`);
+    expect((body as unknown[]).length).toBe(1);
+    expect((body as Array<{ title: string }>)[0].title).toBe("Assigned");
+  });
+
+  it("PATCH /api/tasks/:id updates assigned_agent_id", async () => {
+    const p = createProject(db, { name: "P", description: null });
+    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "low" });
+    const agent = registerAgent(db, { name: "bot-1", model: null, capabilities: [] });
+
+    const { status, body } = await request("PATCH", `/api/tasks/${t.id}`, {
+      assigned_agent_id: agent.id,
+    });
+    expect(status).toBe(200);
+    expect((body as { assigned_agent_id: string }).assigned_agent_id).toBe(agent.id);
+  });
+});

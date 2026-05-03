@@ -2,21 +2,21 @@ import type { TaskStatus, TaskPriority, AgentHealthStatus } from "../types.js";
 
 export const STATUS_COLORS: Record<TaskStatus, string> = {
   planned: "var(--text-muted)",
-  in_progress: "var(--accent-green)",
-  blocked: "var(--accent-yellow)",
-  done: "var(--accent-blue)",
+  in_progress: "var(--status-success)",
+  blocked: "var(--status-warning)",
+  done: "var(--status-info)",
 };
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  urgent: "var(--accent-red)",
-  high: "var(--accent-yellow)",
+  urgent: "var(--status-danger)",
+  high: "var(--status-warning)",
   medium: "var(--accent-purple)",
   low: "var(--text-muted)",
 };
 
 export const HEALTH_COLORS: Record<AgentHealthStatus, string> = {
-  active: "var(--accent-green)",
-  idle: "var(--accent-yellow)",
+  active: "var(--status-success)",
+  idle: "var(--status-warning)",
   offline: "var(--text-secondary)",
 };
 

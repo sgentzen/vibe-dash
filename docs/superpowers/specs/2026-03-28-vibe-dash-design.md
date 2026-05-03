@@ -1,5 +1,7 @@
 # Vibe Dash — Design Specification
 
+> **Historical planning artifact from 2026-03-28.** Not maintained — see [CLAUDE.md](../../../CLAUDE.md) for current architecture.
+
 **Date:** 2026-03-28
 **Status:** Draft
 

@@ -4,17 +4,37 @@ import { fileURLToPath } from "url";
 import { createServer } from "http";
 import type Database from "better-sqlite3";
 import helmet from "helmet";
-import { openDb } from "./db/index.js";
+import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
-import { createRouter } from "./routes.js";
+import { createRouter } from "./routes/index.js";
+import { notFoundHandler, errorHandler } from "./routes/middleware.js";
+import { makeAuthMiddleware } from "./auth.js";
+import { logger } from "./logger.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
+import { initPlugins } from "./routes/plugins.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
+
+// Rate limiters for MCP/SSE endpoints (CodeQL js/missing-rate-limiting)
+const mcpLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many MCP requests, please try again later." },
+});
+const messagesLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many message requests, please try again later." },
+});
 
 const PORT = parseInt(process.env.PORT ?? "3001");
 const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
@@ -45,8 +65,9 @@ const spaLimiter = rateLimit({
 
 // MCP SSE transport
 const transports = new Map<string, SSEServerTransport>();
+const mcpAuth = makeAuthMiddleware(db);
 
-app.get("/sse", async (req, res) => {
+app.get("/sse", mcpLimiter, mcpAuth, async (req, res) => {
   const transport = new SSEServerTransport("/messages", res);
   const handle = createMcpServer(db, transport.sessionId);
   transports.set(transport.sessionId, transport);
@@ -57,7 +78,7 @@ app.get("/sse", async (req, res) => {
   await handle.server.connect(transport);
 });
 
-app.post("/messages", async (req, res) => {
+app.post("/messages", messagesLimiter, mcpAuth, async (req, res) => {
   const sessionId = req.query.sessionId as string;
   const transport = transports.get(sessionId);
   if (!transport) { res.status(400).json({ error: "Unknown session" }); return; }
@@ -67,7 +88,7 @@ app.post("/messages", async (req, res) => {
 // MCP Streamable HTTP transport (modern clients use this)
 const httpTransports = new Map<string, { transport: StreamableHTTPServerTransport; cleanup: () => void }>();
 
-app.all("/mcp", async (req, res) => {
+app.all("/mcp", mcpLimiter, mcpAuth, async (req, res) => {
   // Handle session-based routing for existing sessions
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
   if (sessionId && httpTransports.has(sessionId)) {
@@ -114,25 +135,26 @@ app.get("/{*splat}", spaLimiter, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
-// Global error handler — catches thrown errors in route handlers
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("Unhandled route error:", err.message);
-  res.status(500).json({ error: "Internal server error" });
-});
+// Centralized error handler — must be last middleware
+app.use(errorHandler);
 
 const server = createServer(app);
-initWebSocket(server);
+initWebSocket(server, db);
 
 const BIND = process.env.VIBE_DASH_BIND ?? "127.0.0.1";
 if (BIND !== "127.0.0.1" && BIND !== "::1" && !process.env.VIBE_DASH_ALLOW_REMOTE) {
-  console.error(`ERROR: VIBE_DASH_BIND is set to '${BIND}' (non-loopback). Set VIBE_DASH_ALLOW_REMOTE=1 to allow remote access.`);
+  logger.error({ bind: BIND }, "Non-loopback bind requires VIBE_DASH_ALLOW_REMOTE=1");
   process.exit(1);
 }
 
 server.listen(PORT, BIND, () => {
-  console.log(`Vibe Dash running on http://${BIND}:${PORT}`);
-  console.log(`WebSocket available at ws://${BIND}:${PORT}/ws`);
-  console.log(`MCP SSE at http://${BIND}:${PORT}/sse`);
+  logger.info({ port: PORT, bind: BIND }, "Vibe Dash running");
+  initPlugins(db).catch((err) => logger.warn({ err }, "plugin init failed"));
+  logger.info({ port: PORT, path: "/ws" }, "WebSocket available");
+  logger.info({ port: PORT, path: "/sse" }, "MCP SSE available");
+  // Backfill milestone daily stats so the dashboard has data immediately
+  const backfilled = backfillMilestoneDailyStats(db);
+  if (backfilled > 0) logger.info({ count: backfilled }, "Backfilled daily stats for milestones");
 });
 
 export { app, db, server };

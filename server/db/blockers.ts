@@ -14,15 +14,15 @@ export function createBlocker(
 ): Blocker {
   const id = genId();
   const ts = now();
-  db.prepare(
-    "INSERT INTO blockers (id, task_id, reason, reported_at, resolved_at) VALUES (?, ?, ?, ?, NULL)"
-  ).run(id, input.task_id, input.reason, ts);
+  const blocker = db.prepare(
+    "INSERT INTO blockers (id, task_id, reason, reported_at, resolved_at) VALUES (?, ?, ?, ?, NULL) RETURNING *"
+  ).get(id, input.task_id, input.reason, ts) as Blocker;
   // Only change status if task isn't already done
   const task = db.prepare("SELECT status FROM tasks WHERE id = ?").get(input.task_id) as { status: string } | undefined;
   if (task && task.status !== "done") {
     updateTask(db, input.task_id, { status: "blocked" });
   }
-  return db.prepare("SELECT * FROM blockers WHERE id = ?").get(id) as Blocker;
+  return blocker;
 }
 
 export function resolveBlocker(
@@ -34,13 +34,25 @@ export function resolveBlocker(
     .get(id) as Blocker | undefined;
   if (!blocker) return null;
   const ts = now();
-  db.prepare("UPDATE blockers SET resolved_at = ? WHERE id = ?").run(ts, id);
+  const updated = db.prepare("UPDATE blockers SET resolved_at = ? WHERE id = ? RETURNING *").get(ts, id) as Blocker | undefined;
   // Only change status if task is currently blocked (don't overwrite "done")
   const task = db.prepare("SELECT status FROM tasks WHERE id = ?").get(blocker.task_id) as { status: string } | undefined;
   if (task && task.status === "blocked") {
     updateTask(db, blocker.task_id, { status: "in_progress" });
   }
-  return db.prepare("SELECT * FROM blockers WHERE id = ?").get(id) as Blocker;
+  return updated ?? null;
+}
+
+export function resolveBlockersForTask(
+  db: Database.Database,
+  taskId: string
+): Blocker[] {
+  const ts = now();
+  return db
+    .prepare(
+      "UPDATE blockers SET resolved_at = ? WHERE task_id = ? AND resolved_at IS NULL RETURNING *"
+    )
+    .all(ts, taskId) as Blocker[];
 }
 
 export function getActiveBlockers(db: Database.Database): Blocker[] {
