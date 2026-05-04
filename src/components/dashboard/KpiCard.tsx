@@ -1,5 +1,4 @@
 import { memo } from "react";
-import type { CSSProperties } from "react";
 import { Sparkline } from "../Sparkline.js";
 import { typeScale } from "../../styles/shared.js";
 
@@ -29,7 +28,7 @@ export const KpiCard = memo(function KpiCard({
       <div style={{ ...typeScale.h1, color, fontFamily: "monospace" }}>{value}</div>
       <div style={{ ...typeScale.micro, color: "var(--text-muted)" }}>{label}</div>
       {sparkline && sparkline.length >= 2 && (
-        <Sparkline values={sparkline} width={60} height={16} color={color} style={{ opacity: 0.7 }} />
+        <Sparkline values={sparkline} width={60} height={16} color={color} />
       )}
     </div>
   );
