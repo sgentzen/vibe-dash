@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
-import { cardStyle, sectionHeader } from "../styles/shared.js";
+import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
 import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
@@ -98,7 +98,7 @@ export function DashboardView() {
 
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-      <h2 style={{ color: "var(--text-primary)", fontSize: "16px", marginBottom: "16px", fontWeight: 600 }}>
+      <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
         Dashboard
       </h2>
 

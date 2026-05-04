@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
-import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
+import { cardStyle, badgeStyle, sectionHeader, typeScale } from "../styles/shared.js";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
 interface AgentDetail {
@@ -108,7 +108,7 @@ export function AgentDashboard() {
   return (
     <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-        <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
+        <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
           Agent Dashboard
         </h2>
         <div style={{ display: "flex", gap: "4px" }}>
