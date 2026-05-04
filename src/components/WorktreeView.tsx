@@ -190,8 +190,8 @@ export function WorktreeView() {
   const inactive = worktrees.filter((w) => w.status !== "active");
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+    <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-5)" }}>
         <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>
           Git Worktrees
         </h2>
