@@ -27,7 +27,7 @@
   --shadow-glow-red: 0 0 6px rgba(248, 81, 73, 0.15);
 
   /* === Font + type scale === */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --type-display: 600 32px/1.2 var(--font-sans);
   --type-h1: 600 24px/1.3 var(--font-sans);
   --type-h2: 600 18px/1.4 var(--font-sans);

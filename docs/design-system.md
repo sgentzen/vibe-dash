@@ -164,6 +164,8 @@ Defined in `src/App.css` (`:root`). Use `typeScale.*` spread in React inline sty
 
 ### React inline style usage
 
+`typeScale` is exported from `src/styles/shared.ts`.
+
 ```tsx
 import { typeScale } from "../styles/shared.js";
 <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>Git Worktrees</h2>
