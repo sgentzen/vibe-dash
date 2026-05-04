@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useDataState, useNavigationState } from "../store";
 import { useApi } from "../hooks/useApi";
+import { typeScale } from "../styles/shared.js";
 import type { ExecutiveSummary } from "../../shared/types.js";
 import { StatusPill } from "./StatusPill.js";
 import {
@@ -26,7 +27,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       borderRadius: "10px",
       padding: "18px 20px",
     }}>
-      <h3 style={{ margin: "0 0 14px 0", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
+      <h3 style={{ ...typeScale.micro, color: "var(--text-muted)", margin: "0 0 var(--space-3) 0" }}>
         {title}
       </h3>
       {children}
@@ -38,7 +39,7 @@ function BigStat({ value, label, color }: { value: string | number; label: strin
   return (
     <div style={{ textAlign: "center" }}>
       <div style={{ fontSize: "28px", fontWeight: 700, color: color ?? "var(--text-primary)", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>{label}</div>
+      <div style={{ ...typeScale.caption, color: "var(--text-muted)", marginTop: "var(--space-1)" }}>{label}</div>
     </div>
   );
 }
@@ -310,7 +311,7 @@ export function ExecutiveView() {
     <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: "var(--text-primary)" }}>
+          <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>
             Executive Summary
           </h2>
           {projects.length > 1 && (

@@ -45,3 +45,4 @@ npm-debug.log*
 .env
 .env.local
 .worktrees/
+.claude/.last-code-review

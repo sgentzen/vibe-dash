@@ -25,7 +25,7 @@ export const ReportGeneratorCard = memo(function ReportGeneratorCard({ projectId
 
   return (
     <CardWrapper title="Generate Status Report">
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-3)" }}>
         <select
           value={reportPeriod}
           onChange={(e) => setReportPeriod(e.target.value as ReportPeriod)}

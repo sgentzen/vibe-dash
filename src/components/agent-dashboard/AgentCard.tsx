@@ -48,7 +48,7 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px" }}>{agent.name}</span>
+            <span style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)" }} title={agent.name}>{agent.name}</span>
             {role !== "agent" && (
               <span
                 style={{
@@ -98,7 +98,7 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
       </div>
 
       {agent.model && (
-        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "8px" }}>
+        <div style={{ ...typeScale.caption, color: "var(--text-muted)", marginTop: "var(--space-2)" }}>
           Model: {agent.model}
         </div>
       )}

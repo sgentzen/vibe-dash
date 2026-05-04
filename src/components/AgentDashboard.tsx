@@ -142,9 +142,9 @@ export function AgentDashboard() {
   }
 
   return (
-    <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-        <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
+    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+        <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
           Agent Dashboard
         </h2>
         <div style={{ display: "flex", gap: "4px" }}>
@@ -346,7 +346,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
     : health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
 
   return (
-    <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
+    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <button onClick={onBack} style={{
         background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
         borderRadius: "6px", padding: "4px 12px", fontSize: "12px", cursor: "pointer", marginBottom: "16px",
