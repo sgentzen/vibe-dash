@@ -55,6 +55,7 @@ export const OverdueTasksCard = memo(function OverdueTasksCard({ tasks }: Overdu
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                   maxWidth: "70%",
+                  minWidth: 0,
                 }}
                 title={t.title}
               >

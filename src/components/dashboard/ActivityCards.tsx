@@ -19,7 +19,7 @@ export const AgentContributionsCard = memo(function AgentContributionsCard({ con
           {contributions.map((c) => (
             <div key={c.agent_id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
               <span
-                style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%" }}
+                style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%", minWidth: 0 }}
                 title={c.agent_name}
               >
                 {c.agent_name}
