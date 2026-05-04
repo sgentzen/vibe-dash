@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
-
-export type MilestoneHealthStatus = "on_track" | "at_risk" | "behind";
+import { computeMilestoneHealth, type MilestoneHealthStatus } from "./milestone-health.js";
+export type { MilestoneHealthStatus };
 
 export interface MilestoneHealth {
   id: string;
@@ -54,8 +54,8 @@ export interface ExecutiveSummary {
 
 function getMilestoneHealth(db: Database.Database, projectId: string): MilestoneHealth[] {
   const milestones = db.prepare(
-    "SELECT id, name, target_date FROM milestones WHERE project_id = ? AND status = 'open' ORDER BY target_date ASC NULLS LAST"
-  ).all(projectId) as { id: string; name: string; target_date: string | null }[];
+    "SELECT id, name, target_date, created_at FROM milestones WHERE project_id = ? AND status = 'open' ORDER BY target_date ASC NULLS LAST"
+  ).all(projectId) as { id: string; name: string; target_date: string | null; created_at: string }[];
 
   const now = new Date();
 
@@ -67,17 +67,14 @@ function getMilestoneHealth(db: Database.Database, projectId: string): Milestone
     const total = counts.total || 0;
     const done = counts.done || 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const progress = total > 0 ? done / total : 0;
 
-    let health: MilestoneHealthStatus = "on_track";
-    if (m.target_date) {
-      const daysLeft = (new Date(m.target_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-      const remaining = total - done;
-      if (daysLeft < 0) {
-        health = remaining > 0 ? "behind" : "on_track";
-      } else if (remaining > 0 && daysLeft < remaining * 0.5) {
-        health = "at_risk";
-      }
-    }
+    const health: MilestoneHealthStatus = computeMilestoneHealth({
+      progress,
+      created_at: m.created_at,
+      target_date: m.target_date,
+      now,
+    });
 
     return {
       id: m.id,

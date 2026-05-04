@@ -9,6 +9,10 @@ export function genId(): string {
   return randomUUID();
 }
 
+export function normalizeAgentName(name: string): string {
+  return name.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+}
+
 export function parseAgent(row: Record<string, unknown>): Agent {
   return {
     ...(row as Omit<Agent, "capabilities" | "role">),

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
-import { cardStyle, badgeStyle, sectionHeader, typeScale } from "../styles/shared.js";
+import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
+import AgentComparisonView from "./AgentComparisonView";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
 interface AgentDetail {
@@ -14,6 +15,7 @@ interface AgentDetail {
   sessions: AgentSession[];
 }
 
+type DashboardView = "agents" | "performance";
 type StatusFilter = "active+idle" | "all" | "offline";
 
 const FILTER_LABELS: Record<StatusFilter, string> = {
@@ -28,6 +30,7 @@ export function AgentDashboard() {
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active+idle");
+  const [dashboardView, setDashboardView] = useState<DashboardView>("agents");
 
   useEffect(() => {
     async function loadDetails() {
@@ -105,6 +108,39 @@ export function AgentDashboard() {
     return (statusOrder[aStatus] ?? 2) - (statusOrder[bStatus] ?? 2);
   });
 
+  if (dashboardView === "performance") {
+    return (
+      <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+          <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
+            Agent Dashboard
+          </h2>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {(["agents", "performance"] as DashboardView[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setDashboardView(v)}
+                style={{
+                  background: dashboardView === v ? "var(--accent-blue)" : "transparent",
+                  border: `1px solid ${dashboardView === v ? "var(--accent-blue)" : "var(--border)"}`,
+                  color: dashboardView === v ? "var(--text-on-accent)" : "var(--text-muted)",
+                  borderRadius: "4px",
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  textTransform: "capitalize",
+                }}
+              >
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <AgentComparisonView />
+      </div>
+    );
+  }
+
   return (
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
@@ -112,6 +148,24 @@ export function AgentDashboard() {
           Agent Dashboard
         </h2>
         <div style={{ display: "flex", gap: "4px" }}>
+          {(["agents", "performance"] as DashboardView[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => setDashboardView(v)}
+              style={{
+                background: dashboardView === v ? "var(--accent-blue)" : "transparent",
+                border: `1px solid ${dashboardView === v ? "var(--accent-blue)" : "var(--border)"}`,
+                color: dashboardView === v ? "var(--text-on-accent)" : "var(--text-muted)",
+                borderRadius: "4px",
+                padding: "2px 8px",
+                fontSize: "11px",
+                cursor: "pointer",
+                textTransform: "capitalize",
+              }}
+            >
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
           {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((f) => (
             <button
               key={f}
