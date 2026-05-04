@@ -41,6 +41,24 @@ export function DashboardView() {
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
+  // Last-7-days activity sparkline derived from heatmap (ActivityHeatmapEntry.hour is Unix hour number)
+  const activityLast7: number[] = (() => {
+    const todayDay = Math.floor(Date.now() / 86_400_000);
+    const buckets: Record<number, number> = {};
+    for (const e of heatmap) {
+      const day = Math.floor((e.hour * 3_600_000) / 86_400_000);
+      if (day >= todayDay - 6) buckets[day] = (buckets[day] ?? 0) + e.count;
+    }
+    return Array.from({ length: 7 }, (_, i) => buckets[todayDay - 6 + i] ?? 0);
+  })();
+
+  // Compact tile layout when ≥2 of the 4 KPI values are zero
+  const activeTasks = projectTasks.filter((t) => t.status !== "done").length;
+  const isCompact =
+    [openMilestones.length, overdueTasks.length, unresolvedBlockers.length, activeTasks].filter(
+      (v) => v === 0
+    ).length >= 2;
+
   const milestoneTaskStatusKey = openMilestones.length > 0
     ? openMilestones.map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";")).join("|")
     : "";
@@ -102,12 +120,36 @@ export function DashboardView() {
         Dashboard
       </h2>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <KpiCard label="Open Milestones" value={String(openMilestones.length)} color="var(--accent-blue)" />
-        <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"} />
-        <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"} />
-        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
-        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "var(--space-3)",
+        marginBottom: "var(--space-4)",
+      }}>
+        <KpiCard
+          label="Open Milestones"
+          value={String(openMilestones.length)}
+          color="var(--accent-blue)"
+          sparkline={isCompact ? undefined : activityLast7}
+        />
+        <KpiCard
+          label="Overdue Tasks"
+          value={String(overdueTasks.length)}
+          color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"}
+          sparkline={isCompact ? undefined : activityLast7}
+        />
+        <KpiCard
+          label="Active Blockers"
+          value={String(unresolvedBlockers.length)}
+          color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"}
+          sparkline={isCompact ? undefined : activityLast7}
+        />
+        <KpiCard
+          label="Active Tasks"
+          value={String(activeTasks)}
+          color="var(--text-secondary)"
+          sparkline={isCompact ? undefined : activityLast7}
+        />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
