@@ -177,6 +177,7 @@ export function DashboardView() {
               label="Avg Cost/Task"
               value={doneTaskCount > 0 ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}` : "$0.00"}
               color="var(--status-success)"
+              tooltip="Total spend divided by number of done tasks. Reflects all-time data, not just the current period."
             />
           </div>
 

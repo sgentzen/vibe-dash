@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { MetricInfoTip } from "../ui/MetricInfoTip";
 
 interface Props {
   done: number;
@@ -57,7 +58,10 @@ export function HealthScoreGauge({ done, total, unresolvedBlockers }: Props) {
 
   return (
     <div className="orch-card" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div className="orch-section-header" style={{ marginBottom: "8px" }}>Project Health Score</div>
+      <div className="orch-section-header" style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "4px" }}>
+        Project Health Score
+        <MetricInfoTip text={"Score = (done / total) − blocker penalty, scaled 0–100.\nBlocker penalty: 5% per unresolved blocker, capped at 30%.\nUpdates in real time as tasks complete."} />
+      </div>
       <svg viewBox="0 0 200 130" width="180" height="117" style={{ overflow: "visible" }}>
         {/* Background track */}
         <path
