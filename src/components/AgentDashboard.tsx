@@ -110,8 +110,8 @@ export function AgentDashboard() {
 
   if (dashboardView === "performance") {
     return (
-      <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+      <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
           <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
             Agent Dashboard
           </h2>
@@ -190,7 +190,7 @@ export function AgentDashboard() {
           No agents registered yet
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           {groups.map(({ parent, children }) => {
             return (
               <div key={parent.id}>
@@ -246,7 +246,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
         borderLeft: `3px solid ${color}`,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
         {/* Avatar */}
         <div
           style={{
@@ -349,12 +349,12 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <button onClick={onBack} style={{
         background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
-        borderRadius: "6px", padding: "4px 12px", fontSize: "12px", cursor: "pointer", marginBottom: "16px",
+        borderRadius: "6px", padding: "4px 12px", fontSize: "12px", cursor: "pointer", marginBottom: "var(--space-4)",
       }}>
         Back to Dashboard
       </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-5)" }}>
         <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-on-accent)", fontWeight: 700, fontSize: "16px" }}>
           {agent.name.charAt(0).toUpperCase()}
         </div>
@@ -389,14 +389,14 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
       </div>
 
       {current_task_title && (
-        <div style={{ ...cardStyle, padding: "12px", marginBottom: "16px" }}>
+        <div style={{ ...cardStyle, padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>Currently working on</div>
           <div style={{ color: "var(--text-primary)", fontSize: "14px" }}>{current_task_title}</div>
         </div>
       )}
 
       {/* Sessions timeline */}
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "var(--space-5)" }}>
         <h3 style={{ color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>Sessions ({sessions.length})</h3>
         {sessions.length === 0 ? (
           <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No sessions recorded</div>
@@ -405,7 +405,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
             {sessions.slice(0, 10).map((s) => (
               <div key={s.id} style={{
                 background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px",
-                padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "var(--space-2) var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
                 <div>
                   <span style={{ fontSize: "12px", color: "var(--text-primary)" }}>

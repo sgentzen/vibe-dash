@@ -120,7 +120,11 @@ export function DashboardView() {
         Dashboard
       </h2>
 
-      <div style={{
+      <div style={isCompact ? {
+        display: "flex",
+        gap: "var(--space-3)",
+        marginBottom: "var(--space-4)",
+      } : {
         display: "grid",
         gridTemplateColumns: "repeat(4, 1fr)",
         gap: "var(--space-3)",
@@ -131,24 +135,28 @@ export function DashboardView() {
           value={String(openMilestones.length)}
           color="var(--accent-blue)"
           sparkline={isCompact ? undefined : activityLast7}
+          compact={isCompact}
         />
         <KpiCard
           label="Overdue Tasks"
           value={String(overdueTasks.length)}
           color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"}
           sparkline={isCompact ? undefined : activityLast7}
+          compact={isCompact}
         />
         <KpiCard
           label="Active Blockers"
           value={String(unresolvedBlockers.length)}
           color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"}
           sparkline={isCompact ? undefined : activityLast7}
+          compact={isCompact}
         />
         <KpiCard
           label="Active Tasks"
           value={String(activeTasks)}
           color="var(--text-secondary)"
           sparkline={isCompact ? undefined : activityLast7}
+          compact={isCompact}
         />
       </div>
 

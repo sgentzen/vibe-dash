@@ -71,12 +71,12 @@ export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
       {/* Active Agents section */}
       <div
         style={{
-          padding: "12px",
+          padding: "var(--space-3)",
           borderBottom: "1px solid var(--border)",
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
           <div
             style={{
               color: "var(--text-muted)",
@@ -147,7 +147,7 @@ export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
 
         {/* Offline Agents — collapsed by default */}
         {offlineAgentCount > 0 && (
-          <div style={{ marginTop: "10px" }}>
+          <div style={{ marginTop: "var(--space-2)" }}>
             <button
               onClick={() => setShowOffline(!showOffline)}
               style={{
@@ -199,7 +199,7 @@ export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
       <div
         style={{
           flex: 1,
-          padding: "12px",
+          padding: "var(--space-3)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -212,7 +212,7 @@ export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
             fontWeight: 600,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            marginBottom: "10px",
+            marginBottom: "var(--space-2)",
             flexShrink: 0,
           }}
         >
@@ -231,7 +231,7 @@ export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
               No recent events
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               {recentActivity.map((entry) => {
                 const entryColor = entry.agent_name ? agentColor(entry.agent_name) : null;
                 return (
