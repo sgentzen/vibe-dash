@@ -1,3 +1,4 @@
+import { EmptyState } from "../EmptyState.js";
 import { useAppDispatch } from "../../store";
 import type { MilestoneHealth } from "../../../shared/types.js";
 import { StatusPill } from "../StatusPill.js";
@@ -39,9 +40,7 @@ export function TopAtRiskMilestonesTile({ health, openCount }: Props) {
       </div>
 
       {ranked.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px", textAlign: "center", padding: "12px 0" }}>
-          No open milestones
-        </div>
+        <EmptyState message="No open milestones" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {ranked.map((m) => {

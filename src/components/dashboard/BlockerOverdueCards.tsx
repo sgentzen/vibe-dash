@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
+import { EmptyState } from "../EmptyState.js";
 import { typeScale } from "../../styles/shared.js";
 import type { Blocker, Task } from "../../types";
 
@@ -11,7 +12,7 @@ export const BlockersCard = memo(function BlockersCard({ blockers }: BlockersCar
   return (
     <CardWrapper title={`Active Blockers (${blockers.length})`}>
       {blockers.length === 0 ? (
-        <div style={{ color: "var(--status-success)", fontSize: "12px" }}>No active blockers</div>
+        <EmptyState compact icon="✓" message="No active blockers" color="var(--status-success)" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {blockers.slice(0, 10).map((b) => (
@@ -43,7 +44,7 @@ export const OverdueTasksCard = memo(function OverdueTasksCard({ tasks }: Overdu
   return (
     <CardWrapper title={`Overdue Tasks (${tasks.length})`}>
       {tasks.length === 0 ? (
-        <div style={{ color: "var(--status-success)", fontSize: "12px" }}>No overdue tasks</div>
+        <EmptyState compact icon="✓" message="No overdue tasks" color="var(--status-success)" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {tasks.slice(0, 10).map((t) => (
