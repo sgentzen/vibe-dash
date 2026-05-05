@@ -39,6 +39,7 @@ export function TaskMetadataFields({
           <option value="in_progress">In Progress</option>
           <option value="blocked">Blocked</option>
           <option value="done">Done</option>
+          <option value="cancelled">Cancelled</option>
         </FormSelect>
       </FormField>
 

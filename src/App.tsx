@@ -81,7 +81,7 @@ export function App() {
   // Uses SET_RIGHT_RAIL_COLLAPSED (not TOGGLE) so it doesn't write to localStorage
   // and doesn't permanently override the user's stored preference.
   useEffect(() => {
-    if (activeView === "timeline" || activeView === "executive") {
+    if (activeView === "timeline" || activeView === "executive" || activeView === "agents") {
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
     }
   }, [activeView, dispatch]);
