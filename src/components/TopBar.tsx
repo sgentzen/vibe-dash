@@ -103,6 +103,7 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           letterSpacing: "0.1em",
           fontFamily: "monospace",
           whiteSpace: "nowrap",
+          lineHeight: 1.5,
         }}
       >
         VIBE DASH

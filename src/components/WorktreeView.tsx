@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDataState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
+import { typeScale } from "../styles/shared.js";
 import type { TaskWorktree, WorktreeStatus } from "../types";
 
 const STATUS_COLORS: Record<WorktreeStatus, string> = {
@@ -189,9 +190,9 @@ export function WorktreeView() {
   const inactive = worktrees.filter((w) => w.status !== "active");
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-        <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: "var(--text-primary)" }}>
+    <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-5)" }}>
+        <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>
           Git Worktrees
         </h2>
         <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
@@ -215,7 +216,7 @@ export function WorktreeView() {
 
       {active.length > 0 && (
         <section style={{ marginBottom: "24px" }}>
-          <h3 style={{ margin: "0 0 10px 0", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
+          <h3 style={{ ...typeScale.micro, color: "var(--text-muted)", margin: "0 0 var(--space-2) 0" }}>
             Active ({active.length})
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -233,7 +234,7 @@ export function WorktreeView() {
 
       {inactive.length > 0 && (
         <section>
-          <h3 style={{ margin: "0 0 10px 0", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
+          <h3 style={{ ...typeScale.micro, color: "var(--text-muted)", margin: "0 0 var(--space-2) 0" }}>
             Closed ({inactive.length})
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

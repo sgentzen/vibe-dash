@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
+import { typeScale } from "../../styles/shared.js";
 import type { Blocker, Task } from "../../types";
 
 interface BlockersCardProps {
@@ -14,7 +15,17 @@ export const BlockersCard = memo(function BlockersCard({ blockers }: BlockersCar
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {blockers.slice(0, 10).map((b) => (
-            <div key={b.id} style={{ fontSize: "12px", color: "var(--status-warning)" }}>
+            <div
+              key={b.id}
+              style={{
+                ...typeScale.caption,
+                color: "var(--status-warning)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={b.reason}
+            >
               {b.reason}
             </div>
           ))}
@@ -37,7 +48,19 @@ export const OverdueTasksCard = memo(function OverdueTasksCard({ tasks }: Overdu
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {tasks.slice(0, 10).map((t) => (
             <div key={t.id} style={{ fontSize: "12px", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--text-primary)" }}>{t.title}</span>
+              <span
+                style={{
+                  color: "var(--text-primary)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  maxWidth: "70%",
+                  minWidth: 0,
+                }}
+                title={t.title}
+              >
+                {t.title}
+              </span>
               <span style={{ color: "var(--status-danger)", fontSize: "10px" }}>{t.due_date}</span>
             </div>
           ))}
