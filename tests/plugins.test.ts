@@ -29,13 +29,20 @@ describe("5.3 Plugin/Extension System — sandbox", () => {
 
   it("proxied db.prepare rewrites plugin_ table references", () => {
     const ctx = createPluginContext(db, "demo");
-    // Create a plugin-namespaced table
-    ctx.db.exec("CREATE TABLE IF NOT EXISTS demo_data (id TEXT PRIMARY KEY, value TEXT)");
+    // Set up the table via the raw db (exec is forbidden through the sandbox by design)
+    db.exec("CREATE TABLE IF NOT EXISTS demo_data (id TEXT PRIMARY KEY, value TEXT)");
 
     // prepare() through the proxy should rewrite plugin_data -> demo_data
     const stmt = ctx.db.prepare("SELECT * FROM plugin_data");
     // If rewriting works, the statement executes without 'no such table' error
     expect(() => stmt.all()).not.toThrow();
+  });
+
+  it("blocks forbidden Database methods like exec and transaction", () => {
+    const ctx = createPluginContext(db, "evil");
+    expect(() => (ctx.db as unknown as Record<string, unknown>).exec).toThrow(/forbidden Database property/);
+    expect(() => (ctx.db as unknown as Record<string, unknown>).transaction).toThrow(/forbidden Database property/);
+    expect(() => (ctx.db as unknown as Record<string, unknown>).pragma).toThrow(/forbidden Database property/);
   });
 
   it("namespaced tables are isolated from core tables", () => {
