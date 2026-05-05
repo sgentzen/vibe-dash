@@ -1,5 +1,6 @@
 import { useAppState, useAppDispatch } from "../store";
 import { STATUS_COLORS } from "../constants/colors.js";
+import { typeScale } from "../styles/shared.js";
 import type { Project, Task } from "../types";
 
 export const SIDEBAR_CLASS = "sidebar";
@@ -45,12 +46,9 @@ export function ProjectList() {
     >
       <div
         style={{
-          padding: "0 12px 8px",
+          ...typeScale.micro,
+          padding: "0 var(--space-3) var(--space-2)",
           color: "var(--text-muted)",
-          fontSize: "11px",
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
         }}
       >
         Projects
@@ -140,13 +138,14 @@ function ProjectCard({
         />
         <span
           style={{
+            ...typeScale.body,
             color: "var(--text-primary)",
-            fontSize: "13px",
             fontWeight: selected ? 600 : 400,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
+          title={project.name}
         >
           {project.name}
         </span>
@@ -182,26 +181,26 @@ function ProjectCard({
       {/* Task count summary */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         {tasks.length === 0 ? (
-          <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>no tasks</span>
+          <span style={{ ...typeScale.caption, color: "var(--text-muted)" }}>no tasks</span>
         ) : (
           <>
             {counts.in_progress > 0 && (
-              <span style={{ color: "var(--status-success)", fontSize: "11px" }}>
+              <span style={{ ...typeScale.caption, color: "var(--status-success)" }}>
                 {counts.in_progress} in progress
               </span>
             )}
             {counts.blocked > 0 && (
-              <span style={{ color: "var(--status-warning)", fontSize: "11px" }}>
+              <span style={{ ...typeScale.caption, color: "var(--status-warning)" }}>
                 {counts.blocked} blocked
               </span>
             )}
             {counts.done > 0 && (
-              <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+              <span style={{ ...typeScale.caption, color: "var(--text-muted)" }}>
                 {counts.done}/{tasks.length} done
               </span>
             )}
             {counts.in_progress === 0 && counts.blocked === 0 && counts.done === 0 && (
-              <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+              <span style={{ ...typeScale.caption, color: "var(--text-muted)" }}>
                 {tasks.length} planned
               </span>
             )}

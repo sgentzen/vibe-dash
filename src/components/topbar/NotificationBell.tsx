@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppNotification } from "../../types";
 
 interface NotificationBellProps {
@@ -23,15 +23,10 @@ export function NotificationBell({
   const panelRef = useRef<HTMLDivElement>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Sync external open state into local state
   useEffect(() => {
     if (alertsOpen === true) setShowNotifications(true);
   }, [alertsOpen]);
-
-  const close = useCallback(() => {
-    setShowNotifications(false);
-    onAlertsOpenChange?.(false);
-    triggerRef.current?.focus();
-  }, [onAlertsOpenChange]);
 
   function toggle() {
     const next = !showNotifications;
@@ -39,39 +34,16 @@ export function NotificationBell({
     onAlertsOpenChange?.(next);
   }
 
-  useEffect(() => {
-    if (!showNotifications) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") close();
-    }
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        panelRef.current && !panelRef.current.contains(e.target as Node) &&
-        !triggerRef.current?.contains(e.target as Node)
-      ) {
-        close();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showNotifications, close]);
-
-  const triggerLabel = unreadCount > 0
-    ? `Notifications — ${unreadCount > 9 ? "9+" : unreadCount} unread`
-    : "Notifications";
+  function close() {
+    setShowNotifications(false);
+    onAlertsOpenChange?.(false);
+  }
 
   return (
     <div style={{ position: "relative" }}>
       <button
-        ref={triggerRef}
         onClick={toggle}
-        aria-label={triggerLabel}
-        aria-expanded={showNotifications}
-        aria-haspopup="listbox"
+        aria-label="Notifications"
         style={{
           background: "transparent",
           border: "1px solid var(--border)",
@@ -83,7 +55,7 @@ export function NotificationBell({
           position: "relative",
         }}
       >
-        <span aria-hidden="true">{"🔔"}</span>
+        {"🔔"}
         {unreadCount > 0 && (
           <span
             aria-hidden="true"
