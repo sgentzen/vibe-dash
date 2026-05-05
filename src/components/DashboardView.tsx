@@ -103,11 +103,10 @@ export function DashboardView() {
       </h2>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-        <KpiCard label="Open Milestones" value={String(openMilestones.length)} color="var(--accent-blue)" />
-        <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"} />
-        <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"} />
-        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
-        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
+        <KpiCard label="Open Milestones" value={String(openMilestones.length)} color="var(--accent-blue)" tooltip="Milestones with status 'open' in the selected project scope." />
+        <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"} tooltip="Tasks with a due date in the past that are not yet done." />
+        <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"} tooltip="Blockers reported via log_blocker that have not been resolved." />
+        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" tooltip="Tasks in any non-done status (planned, in_progress, blocked)." />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
@@ -128,13 +127,14 @@ export function DashboardView() {
       {costSummary && costSummary.entry_count > 0 ? (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-            <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" />
-            <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
-            <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
+            <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" tooltip="Sum of all costs reported by agents via log_cost in the selected project scope." />
+            <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" tooltip="Total input (prompt) tokens reported by agents via log_cost." />
+            <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" tooltip="Total output (completion) tokens reported by agents via log_cost." />
             <KpiCard
               label="Avg Cost/Task"
               value={doneTaskCount > 0 ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}` : "$0.00"}
               color="var(--status-success)"
+              tooltip="Total spend divided by number of done tasks. Reflects all-time data, not just the current period."
             />
           </div>
 

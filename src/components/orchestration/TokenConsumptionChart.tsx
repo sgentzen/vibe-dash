@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { usePollingState } from "../../store";
+import { MetricInfoTip } from "../ui/MetricInfoTip";
 import type { CostTimeseriesEntry } from "../../hooks/useApi.js";
 
 interface Props {
@@ -13,20 +14,15 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-function linearRegression(ys: number[]): number[] {
-  const n = ys.length;
-  if (n < 2) return ys.slice();
-  const xs = ys.map((_, i) => i);
-  const sumX = xs.reduce((a, b) => a + b, 0);
-  const sumY = ys.reduce((a, b) => a + b, 0);
-  const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0);
-  const sumX2 = xs.reduce((a, x) => a + x * x, 0);
-  const denom = n * sumX2 - sumX * sumX;
-  if (denom === 0) return ys.map(() => sumY / n);
-  const m = (n * sumXY - sumX * sumY) / denom;
-  const b = (sumY - m * sumX) / n;
-  return xs.map((x) => m * x + b);
+function rollingAverage(ys: number[], window: number): number[] {
+  return ys.map((_, i) => {
+    const slice = ys.slice(Math.max(0, i - window + 1), i + 1);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  });
 }
+
+const TREND_TOOLTIP =
+  "Trend (7d vs prior 7d): compares the average daily tokens\nover the last 7 days vs the 7 days before that.\nFormula: (avg(last 7d) − avg(prior 7d)) / avg(prior 7d)";
 
 export function TokenConsumptionChart({ activeProjectId }: Props) {
   const api = useApi();
@@ -42,23 +38,26 @@ export function TokenConsumptionChart({ activeProjectId }: Props) {
       .catch(() => {});
   }, [api, activeProjectId, pollGeneration]);
 
-  const { dailyTotals, trendPct, trendLine, maxTokens } = useMemo(() => {
-    if (data.length === 0) return { dailyTotals: [], trendPct: 0, trendLine: [], maxTokens: 0 };
+  const { dailyTotals, trendPct, rollingAvgLine, maxTokens } = useMemo(() => {
+    if (data.length === 0) return { dailyTotals: [], trendPct: 0, rollingAvgLine: [], maxTokens: 0 };
 
     const dailyTotals = data.map((d) => d.total_input_tokens + d.total_output_tokens);
-    const trendLine = linearRegression(dailyTotals);
+    const rollingAvgLine = rollingAverage(dailyTotals, 7);
 
-    const firstNonZero = dailyTotals.find((v) => v > 0) ?? 0;
-    const last = dailyTotals[dailyTotals.length - 1] ?? 0;
-    const trendPct = firstNonZero > 0 ? Math.round(((last - firstNonZero) / firstNonZero) * 100) : 0;
+    const last7 = dailyTotals.slice(-7);
+    const prior7 = dailyTotals.slice(-14, -7);
+    const avg7 = last7.reduce((a, b) => a + b, 0) / (last7.length || 1);
+    const avgPrior7 = prior7.length > 0 ? prior7.reduce((a, b) => a + b, 0) / prior7.length : avg7;
+    const trendPct = avgPrior7 > 0 ? Math.round(((avg7 - avgPrior7) / avgPrior7) * 100) : 0;
 
     const maxTokens = Math.max(...dailyTotals, 1);
 
-    return { dailyTotals, trendPct, trendLine, maxTokens };
+    return { dailyTotals, trendPct, rollingAvgLine, maxTokens };
   }, [data]);
 
   const latest = dailyTotals[dailyTotals.length - 1] ?? 0;
-  const trendPositive = trendPct >= 0;
+  const trendPositive = trendPct > 0;
+  const trendNeutral = trendPct === 0;
 
   const PAD = 16;
   const W = 280;
@@ -70,7 +69,7 @@ export function TokenConsumptionChart({ activeProjectId }: Props) {
   const toY = (v: number) => PAD + chartH - (v / (maxTokens || 1)) * chartH;
 
   const mainPoints = dailyTotals.map((v, i) => `${toX(i)},${toY(v)}`).join(" ");
-  const trendPoints = trendLine.map((v, i) => `${toX(i)},${toY(Math.max(0, v))}`).join(" ");
+  const rollingAvgPoints = rollingAvgLine.map((v, i) => `${toX(i)},${toY(Math.max(0, v))}`).join(" ");
 
   // Y-axis labels
   const yStep = maxTokens / 3;
@@ -109,8 +108,9 @@ export function TokenConsumptionChart({ activeProjectId }: Props) {
         <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
           Daily: <strong style={{ color: "var(--text-primary)" }}>{formatTokens(latest)}</strong>
         </span>
-        <span style={{ fontSize: "11px", color: trendPositive ? "var(--accent-green)" : "var(--accent-red)" }}>
-          Trend: {trendPositive ? "+" : ""}{trendPct}%
+        <span style={{ fontSize: "11px", color: trendNeutral ? "var(--text-muted)" : trendPositive ? "var(--accent-green)" : "var(--accent-red)", display: "inline-flex", alignItems: "center", gap: "2px" }}>
+          Trend (7d vs prior 7d): {trendPositive ? "+" : ""}{trendPct}%
+          <MetricInfoTip text={TREND_TOOLTIP} />
         </span>
       </div>
 
@@ -133,10 +133,10 @@ export function TokenConsumptionChart({ activeProjectId }: Props) {
           </text>
         ))}
 
-        {/* Trend line (dashed, yellow) */}
+        {/* 7d rolling average (dashed, yellow) */}
         {dailyTotals.length > 1 && (
           <polyline
-            points={trendPoints}
+            points={rollingAvgPoints}
             fill="none"
             stroke="var(--accent-yellow)"
             strokeWidth="1.5"
@@ -170,7 +170,7 @@ export function TokenConsumptionChart({ activeProjectId }: Props) {
         </span>
         <span>
           <span style={{ color: "var(--accent-yellow)", marginRight: "4px" }}>- -</span>
-          Trend
+          7d Rolling Avg
         </span>
       </div>
     </div>
