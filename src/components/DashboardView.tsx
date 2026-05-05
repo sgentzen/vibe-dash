@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
-import { cardStyle, sectionHeader } from "../styles/shared.js";
+import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
 import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
@@ -40,6 +40,24 @@ export function DashboardView() {
   );
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
+
+  // Last-7-days activity sparkline derived from heatmap (ActivityHeatmapEntry.hour is Unix hour number)
+  const activityLast7: number[] = (() => {
+    const todayDay = Math.floor(Date.now() / 86_400_000);
+    const buckets: Record<number, number> = {};
+    for (const e of heatmap) {
+      const day = Math.floor((e.hour * 3_600_000) / 86_400_000);
+      if (day >= todayDay - 6) buckets[day] = (buckets[day] ?? 0) + e.count;
+    }
+    return Array.from({ length: 7 }, (_, i) => buckets[todayDay - 6 + i] ?? 0);
+  })();
+
+  // Compact tile layout when ≥2 of the 4 KPI values are zero
+  const activeTasks = projectTasks.filter((t) => t.status !== "done").length;
+  const isCompact =
+    [openMilestones.length, overdueTasks.length, unresolvedBlockers.length, activeTasks].filter(
+      (v) => v === 0
+    ).length >= 2;
 
   const milestoneTaskStatusKey = openMilestones.length > 0
     ? openMilestones.map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";")).join("|")
@@ -97,37 +115,61 @@ export function DashboardView() {
   const reportProjectId = projectId ?? projects[0]?.id ?? null;
 
   return (
-    <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-      <h2 style={{ color: "var(--text-primary)", fontSize: "16px", marginBottom: "16px", fontWeight: 600 }}>
+    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+      <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
         Dashboard
       </h2>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-        <KpiCard label="Open Milestones" value={String(openMilestones.length)} color="var(--accent-blue)" />
-        <KpiCard label="Overdue Tasks" value={String(overdueTasks.length)} color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"} />
-        <KpiCard label="Active Blockers" value={String(unresolvedBlockers.length)} color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"} />
-        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
-        <KpiCard label="Active Tasks" value={String(projectTasks.filter((t) => t.status !== "done").length)} color="var(--text-secondary)" />
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "var(--space-3)",
+        marginBottom: "var(--space-4)",
+      }}>
+        <KpiCard
+          label="Open Milestones"
+          value={String(openMilestones.length)}
+          color="var(--accent-blue)"
+          sparkline={isCompact ? undefined : activityLast7}
+        />
+        <KpiCard
+          label="Overdue Tasks"
+          value={String(overdueTasks.length)}
+          color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"}
+          sparkline={isCompact ? undefined : activityLast7}
+        />
+        <KpiCard
+          label="Active Blockers"
+          value={String(unresolvedBlockers.length)}
+          color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"}
+          sparkline={isCompact ? undefined : activityLast7}
+        />
+        <KpiCard
+          label="Active Tasks"
+          value={String(activeTasks)}
+          color="var(--text-secondary)"
+          sparkline={isCompact ? undefined : activityLast7}
+        />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <MilestoneProgressCard dailyStats={dailyStats} openMilestones={openMilestones} />
         <MilestoneOverviewCard openMilestones={openMilestones} projectTasks={projectTasks} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <AgentContributionsCard contributions={contributions} openMilestones={openMilestones} />
         <ActivityHeatmapCard heatmap={heatmap} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <BlockersCard blockers={unresolvedBlockers} />
         <OverdueTasksCard tasks={overdueTasks} />
       </div>
 
       {costSummary && costSummary.entry_count > 0 ? (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
             <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" />
             <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
             <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
@@ -138,7 +180,7 @@ export function DashboardView() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
             <CostTimeseriesCard data={costTimeseries} />
             <CostByModelCard data={costByModel} />
           </div>
@@ -146,7 +188,7 @@ export function DashboardView() {
           <CostByAgentCard data={costByAgent} />
         </>
       ) : (
-        <div style={{ ...cardStyle, marginBottom: "16px" }}>
+        <div style={{ ...cardStyle, marginBottom: "var(--space-4)" }}>
           <div style={headerStyle}>Cost & Token Tracking</div>
           <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
             No cost data recorded yet. Agents report costs via the <code style={{ color: "var(--accent-blue)" }}>log_cost</code> MCP tool after completing work. Cost cards will appear here once data is available.

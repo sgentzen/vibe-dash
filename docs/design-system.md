@@ -144,3 +144,47 @@ Views without a visible page title (e.g., TaskBoard, TaskListView) are exempt on
 --accent-blue --accent-green --accent-yellow
 --accent-red  --accent-purple --accent-cyan
 ```
+
+---
+
+## Type Scale
+
+Defined in `src/App.css` (`:root`). Use `typeScale.*` spread in React inline styles.
+
+| Token            | Value          | Use                               |
+|------------------|----------------|-----------------------------------|
+| `--type-display` | `600 32px/1.2` | Hero numbers, large KPI values    |
+| `--type-h1`      | `600 24px/1.3` | Page titles (reserved)            |
+| `--type-h2`      | `600 18px/1.4` | View headings (WorktreeView, ExecutiveView) |
+| `--type-body`    | `400 14px/1.5` | Default body copy, sub-headings   |
+| `--type-caption` | `400 12px/1.4` | Card metadata, secondary labels   |
+| `--type-micro`   | `500 11px/1.3` | Section headers, stat labels, badges |
+
+> `--type-micro` also requires `letterSpacing: "0.05em"` and `textTransform: "uppercase"` — these are included in `typeScale.micro` (defined in `src/styles/shared.ts`).
+
+### React inline style usage
+
+`typeScale` is exported from `src/styles/shared.ts`.
+
+```tsx
+import { typeScale } from "../styles/shared.js";
+<h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>Git Worktrees</h2>
+<span style={{ ...typeScale.micro, color: "var(--text-muted)" }}>PROJECTS</span>
+```
+
+---
+
+## Spacing Scale
+
+Defined in `src/App.css` (`:root`). Use as string literals in inline style properties.
+
+| Token       | Value | Common use                            |
+|-------------|-------|---------------------------------------|
+| `--space-1` | 4px   | Icon gap, tight badge padding         |
+| `--space-2` | 8px   | Button padding-block, list item gap   |
+| `--space-3` | 12px  | Card inner gap, list item padding     |
+| `--space-4` | 16px  | Card padding, section margin          |
+| `--space-5` | 24px  | View padding (generous), section gap  |
+| `--space-6` | 32px  | Large section separation              |
+| `--space-7` | 48px  | Empty state padding                   |
+| `--space-8` | 64px  | Page-level top padding                |
