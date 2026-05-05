@@ -1,4 +1,4 @@
-import { agentColor, ROLE_COLORS } from "../../utils/agentColors";
+import { agentColor, agentGlyph, ROLE_COLORS } from "../../utils/agentColors";
 import { cardStyle } from "../../styles/shared.js";
 import type { Agent, AgentCost } from "../../types";
 import type { AgentDetail } from "./types";
@@ -22,6 +22,7 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
       onClick={onClick}
       style={{
         ...cardStyle,
+        padding: "12px",
         cursor: "pointer",
         borderLeft: `3px solid ${color}`,
       }}
@@ -43,11 +44,11 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
             flexShrink: 0,
           }}
         >
-          {agent.name.charAt(0).toUpperCase()}
+          {agentGlyph(agent)}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px" }}>{agent.name}</span>
+            <span style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)" }} title={agent.name}>{agent.name}</span>
             {role !== "agent" && (
               <span
                 style={{
@@ -71,6 +72,12 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
         <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{detail?.health_status ?? "..."}</span>
       </div>
 
+      {detail?.current_task_title && (
+        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+          ↳ <span style={{ color: "var(--text-primary)" }}>{detail.current_task_title}</span>
+        </div>
+      )}
+
       {agent.current_project_name && (
         <div style={{ marginBottom: "8px" }}>
           <span style={{
@@ -83,19 +90,15 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
         </div>
       )}
 
-      {detail?.current_task_title && (
-        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
-          Working on: <span style={{ color: "var(--text-primary)" }}>{detail.current_task_title}</span>
-        </div>
-      )}
-
       <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
         <span>Completed today: <strong style={{ color: "var(--status-success)" }}>{detail?.completed_today ?? 0}</strong></span>
-        <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
+        {((detail?.sessions.length ?? 0) > 0 || (detail?.completed_today ?? 0) === 0) && (
+          <span>Sessions: <strong>{detail?.sessions.length ?? 0}</strong></span>
+        )}
       </div>
 
       {agent.model && (
-        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "8px" }}>
+        <div style={{ ...typeScale.caption, color: "var(--text-muted)", marginTop: "var(--space-2)" }}>
           Model: {agent.model}
         </div>
       )}

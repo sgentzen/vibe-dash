@@ -23,7 +23,7 @@ export const MilestoneProgressCard = memo(function MilestoneProgressCard({ daily
                 width: "100%", background: "var(--accent-blue)", borderRadius: "2px",
                 height: `${d.completion_pct}%`, minHeight: "2px",
               }} />
-              <span style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "4px" }}>
+              <span style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "var(--space-1)" }}>
                 {d.date.slice(5)}
               </span>
             </div>
@@ -45,7 +45,7 @@ export const MilestoneOverviewCard = memo(function MilestoneOverviewCard({ openM
       {openMilestones.length === 0 ? (
         <EmptyState message="No open milestones. Create a milestone to track progress." />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {openMilestones.map((m) => {
             const milestoneTasks = projectTasks.filter((t) => t.milestone_id === m.id);
             const completedCount = milestoneTasks.filter((t) => t.status === "done").length;

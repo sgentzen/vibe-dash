@@ -55,3 +55,11 @@ export function agentColor(name: string): string {
   }
   return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length];
 }
+
+export function agentGlyph(agent: { name: string; model?: string | null }): string {
+  const m = (agent.model ?? "").toLowerCase();
+  if (m.includes("opus")) return "◆";
+  if (m.includes("sonnet")) return "◇";
+  if (m.includes("haiku")) return "○";
+  return agent.name.charAt(0).toUpperCase();
+}
