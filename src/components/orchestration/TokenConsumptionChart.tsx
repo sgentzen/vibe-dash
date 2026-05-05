@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { EmptyState } from "../EmptyState.js";
 import { useApi } from "../../hooks/useApi";
 import { usePollingState } from "../../store";
 import type { CostTimeseriesEntry } from "../../hooks/useApi.js";
@@ -93,9 +94,7 @@ export function TokenConsumptionChart({ activeProjectId }: Props) {
     return (
       <div className="orch-card" style={{ display: "flex", flexDirection: "column" }}>
         <div className="orch-section-header">Token Consumption</div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "12px", minHeight: "80px" }}>
-          No token data yet
-        </div>
+        <EmptyState message="No token data yet" />
       </div>
     );
   }

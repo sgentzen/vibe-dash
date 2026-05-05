@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { EmptyState } from "../EmptyState.js";
 import { useApi } from "../../hooks/useApi";
 import { usePollingState } from "../../store";
 import type { ActivityHeatmapEntry } from "../../types";
@@ -72,9 +73,7 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
     return (
       <div className="orch-card" style={{ display: "flex", flexDirection: "column" }}>
         <div className="orch-section-header">Agent Compute Usage</div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "12px", minHeight: "80px" }}>
-          No agent activity yet
-        </div>
+        <EmptyState message="No agent activity yet" />
       </div>
     );
   }

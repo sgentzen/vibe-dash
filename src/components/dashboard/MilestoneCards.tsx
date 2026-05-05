@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
+import { EmptyState } from "../EmptyState.js";
 import type { MilestoneDailyStats, Milestone, Task } from "../../types";
 
 interface MilestoneProgressCardProps {
@@ -11,9 +12,9 @@ export const MilestoneProgressCard = memo(function MilestoneProgressCard({ daily
   return (
     <CardWrapper title={`Milestone Progress ${openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}`}>
       {dailyStats.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-          {openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
-        </div>
+        <EmptyState
+          message={openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
+        />
       ) : (
         <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
           {dailyStats.map((d) => (
@@ -42,7 +43,7 @@ export const MilestoneOverviewCard = memo(function MilestoneOverviewCard({ openM
   return (
     <CardWrapper title="Open Milestones Overview">
       {openMilestones.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No open milestones. Create a milestone to track progress.</div>
+        <EmptyState message="No open milestones. Create a milestone to track progress." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {openMilestones.map((m) => {

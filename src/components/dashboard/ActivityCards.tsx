@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
+import { EmptyState } from "../EmptyState.js";
 import type { AgentContribution, ActivityHeatmapEntry, Milestone } from "../../types";
 
 interface AgentContributionsCardProps {
@@ -11,9 +12,9 @@ export const AgentContributionsCard = memo(function AgentContributionsCard({ con
   return (
     <CardWrapper title={`Agent Contributions ${openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}`}>
       {contributions.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-          {openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}
-        </div>
+        <EmptyState
+          message={openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {contributions.map((c) => (
@@ -41,7 +42,7 @@ export const ActivityHeatmapCard = memo(function ActivityHeatmapCard({ heatmap }
   return (
     <CardWrapper title="Activity Heatmap (by hour)">
       {heatmap.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No activity data yet.</div>
+        <EmptyState message="No activity data yet." />
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "2px" }}>
           {Array.from({ length: 24 }, (_, h) => {

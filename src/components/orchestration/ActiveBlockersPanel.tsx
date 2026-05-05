@@ -1,3 +1,4 @@
+import { EmptyState } from "../EmptyState.js";
 import type { Blocker, Task } from "../../types";
 
 interface Props {
@@ -43,15 +44,23 @@ export function ActiveBlockersPanel({ blockers, tasks }: Props) {
     return sa - sb;
   });
 
+  if (sorted.length === 0) {
+    return (
+      <div style={{
+        padding: "0 12px",
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+      }}>
+        <EmptyState compact icon="✓" message="No active blockers" color="var(--status-success)" />
+      </div>
+    );
+  }
+
   return (
     <div className="orch-card" style={{ display: "flex", flexDirection: "column", maxHeight: 260, minHeight: 0 }}>
       <div className="orch-section-header">Active Blockers</div>
-      {sorted.length === 0 ? (
-        <div style={{ padding: "16px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "12px" }}>
-          No active blockers
-        </div>
-      ) : (
-        <ul role="list" style={{ overflowY: "auto", flex: 1, listStyle: "none", padding: 0, margin: 0 }} className="orch-blocker-list">
+      <ul role="list" style={{ overflowY: "auto", flex: 1, listStyle: "none", padding: 0, margin: 0 }} className="orch-blocker-list">
           {sorted.map((b) => {
             const severity = getSeverity(taskMap.get(b.task_id));
             const color = SEVERITY_COLOR[severity];
@@ -102,8 +111,7 @@ export function ActiveBlockersPanel({ blockers, tasks }: Props) {
               </li>
             );
           })}
-        </ul>
-      )}
+      </ul>
     </div>
   );
 }

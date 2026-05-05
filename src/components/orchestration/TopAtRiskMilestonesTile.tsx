@@ -1,3 +1,4 @@
+import { EmptyState } from "../EmptyState.js";
 import type { Milestone, Task } from "../../types";
 
 interface Props {
@@ -45,9 +46,7 @@ export function TopAtRiskMilestonesTile({ milestones, tasks }: Props) {
       </div>
 
       {ranked.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px", textAlign: "center", padding: "12px 0" }}>
-          No open milestones
-        </div>
+        <EmptyState message="No open milestones" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {ranked.map(({ m, done, total, pct }) => {
