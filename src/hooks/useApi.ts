@@ -2,15 +2,16 @@ import { useMemo } from "react";
 import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
-const API_KEY_STORAGE = "vibe-dash-api-key";
+const SESSION_KEY = "vibe-dash-api-key";
 
 export function getStoredApiKey(): string | null {
-  return localStorage.getItem(API_KEY_STORAGE);
+  const v = sessionStorage.getItem(SESSION_KEY);
+  return v ? atob(v) : null;
 }
 
 export function setStoredApiKey(key: string | null): void {
-  if (key) localStorage.setItem(API_KEY_STORAGE, key);
-  else localStorage.removeItem(API_KEY_STORAGE);
+  if (key) sessionStorage.setItem(SESSION_KEY, btoa(key));
+  else sessionStorage.removeItem(SESSION_KEY);
 }
 
 function authHeaders(): Record<string, string> {
@@ -647,6 +648,19 @@ async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null
   return data ?? null;
 }
 
+// ─── WS Ticket ───────────────────────────────────────────────────────────────
+
+export async function getWsTicket(): Promise<string | null> {
+  try {
+    const res = await apiFetch("/api/ws-ticket", { method: "POST" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data as { ticket: string }).ticket ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 import type { User } from "../types";
@@ -845,5 +859,6 @@ export function useApi() {
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
     rotateIngestionToken,
+    getWsTicket,
   }), []);
 }

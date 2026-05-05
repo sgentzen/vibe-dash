@@ -153,6 +153,12 @@ export function PluginPanel({ style }: PluginPanelProps) {
         </button>
       </div>
 
+      <p style={{ fontSize: 11, color: "var(--status-warning, #f59e0b)", margin: "0 0 4px", lineHeight: 1.4 }}>
+        <strong>Security notice:</strong> Plugins in{" "}
+        <code style={{ fontFamily: "monospace" }}>~/.vibe-dash/plugins/</code> run as
+        arbitrary code with server-level access. Only install plugins you trust completely.
+      </p>
+
       {loading ? (
         <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading plugins…</p>
       ) : plugins.length === 0 ? (

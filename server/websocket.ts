@@ -4,9 +4,8 @@ import { parse as parseUrl } from "url";
 import type Database from "better-sqlite3";
 import type { WsEvent } from "./types.js";
 import { logger } from "./logger.js";
-import { hashApiKey, isAuthEnabled } from "./auth.js";
-import { createHash } from "crypto";
-import { getUserByKeyHash } from "./db/users.js";
+import { isAuthEnabled } from "./auth.js";
+import { consumeTicket } from "./ws-tickets.js";
 
 let wss: WebSocketServer | null = null;
 
@@ -37,17 +36,11 @@ export function initWebSocket(server: Server, db: Database.Database): WebSocketS
       return;
     }
 
-    const rawToken = query.token;
-    const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
-    if (!token) { reject("no token"); return; }
+    const rawTicket = query.ticket;
+    const ticket = Array.isArray(rawTicket) ? rawTicket[0] : rawTicket;
+    if (!ticket) { reject("no ticket"); return; }
 
-    // Try HMAC hash first; fall back to legacy SHA-256
-    let user = getUserByKeyHash(db, hashApiKey(token));
-    if (!user) {
-      const legacyHash = createHash("sha256").update(token).digest("hex");
-      user = getUserByKeyHash(db, legacyHash);
-    }
-    if (!user) { reject("invalid token"); return; }
+    if (!consumeTicket(ticket)) { reject("invalid or expired ticket"); return; }
 
     accept();
   });
