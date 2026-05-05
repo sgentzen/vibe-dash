@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // ─── Enums ──────────────────────────────────────────────────────────────
 
-export const taskStatusEnum = z.enum(["planned", "in_progress", "blocked", "done"]);
+export const taskStatusEnum = z.enum(["planned", "in_progress", "blocked", "done", "cancelled"]);
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 export const milestoneStatusEnum = z.enum(["open", "achieved"]);
 export const agentRoleEnum = z.enum([

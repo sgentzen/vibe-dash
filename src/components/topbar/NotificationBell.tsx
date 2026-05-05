@@ -23,6 +23,7 @@ export function NotificationBell({
   const panelRef = useRef<HTMLDivElement>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Sync external open state into local state
   useEffect(() => {
     if (alertsOpen === true) setShowNotifications(true);
   }, [alertsOpen]);

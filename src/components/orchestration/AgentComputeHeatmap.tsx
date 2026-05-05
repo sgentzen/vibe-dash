@@ -119,6 +119,7 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
                   fontFamily="system-ui, sans-serif"
                   fontWeight="500"
                 >
+                  <title>{agent}</title>
                   {agent.length > 10 ? agent.slice(0, 10) + "…" : agent}
                 </text>
 
