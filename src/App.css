@@ -5,7 +5,8 @@
   --border: #30363d;
   --text-primary: #c9d1d9;
   --text-secondary: #8b949e;
-  --text-muted: #484f58;
+  --text-muted: #9ca4ad; /* bumped from #484f58 — dark bg needs ≥7:1 for micro text (M8-T2) */
+  --accent-cyan-rgb: 6, 182, 212; /* rgba() triplet matching --accent-cyan #06b6d4 */
   --text-on-accent: #ffffff;
   --text-on-yellow: #1a1a1a;
   --accent-red: #f85149;
@@ -56,7 +57,7 @@
   --border: #d0d7de;
   --text-primary: #1f2328;
   --text-secondary: #656d76;
-  --text-muted: #8b949e;
+  --text-muted: #4f5960; /* bumped from #8b949e — light bg needs ≥7:1 for micro text (M8-T2) */
   --text-on-accent: #ffffff;
   --text-on-yellow: #1a1a1a;
   --accent-red: #cf222e;
@@ -65,6 +66,7 @@
   --accent-yellow: #9a6700;
   --accent-purple: #7c3aed;
   --accent-cyan: #0891b2;
+  --accent-cyan-rgb: 8, 145, 178; /* rgba() triplet matching --accent-cyan #0891b2 */
   --status-success: var(--accent-green);
   --status-danger: var(--accent-red);
   --status-warning: var(--accent-yellow);
@@ -104,8 +106,9 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--status-info);
   outline-offset: 2px;
+  border-radius: inherit;
 }
 
 input:focus-visible,

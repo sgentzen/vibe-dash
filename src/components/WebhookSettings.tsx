@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useApi } from "../hooks/useApi";
+import { useFocusTrap } from "../hooks/useFocusTrap.js";
 import { inputStyle, buttonPrimary } from "../styles/shared.js";
 import type { Webhook } from "../types";
 
@@ -11,9 +12,11 @@ const EVENT_TYPES = [
 
 export function WebhookSettings({ onClose }: { onClose: () => void }) {
   const api = useApi();
+  const titleId = useId();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [newUrl, setNewUrl] = useState("");
   const [newEvents, setNewEvents] = useState<string[]>([]);
+  const trapRef = useFocusTrap<HTMLDivElement>({ onEscape: onClose });
 
   useEffect(() => {
     api.getWebhooks().then(setWebhooks).catch(() => {});
@@ -52,11 +55,18 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
   const localInputStyle: React.CSSProperties = { ...inputStyle, padding: "6px 10px", fontSize: "12px" };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }} onClick={onClose}>
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+      onClick={onClose}
+    >
       <div
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-secondary)", border: "1px solid var(--border)",
@@ -65,9 +75,13 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h3 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600 }}>Webhook Settings</h3>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "18px", cursor: "pointer" }}>
-            {"\u2715"}
+          <h3 id={titleId} style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600 }}>Webhook Settings</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close webhook settings"
+            style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "18px", cursor: "pointer" }}
+          >
+            {"✕"}
           </button>
         </div>
 
@@ -86,6 +100,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
               <button
                 key={evt}
                 onClick={() => toggleEvent(evt)}
+                aria-pressed={newEvents.includes(evt)}
                 style={{
                   fontSize: "10px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
                   background: newEvents.includes(evt) ? "rgba(99,102,241,0.2)" : "var(--bg-secondary)",
@@ -138,6 +153,7 @@ export function WebhookSettings({ onClose }: { onClose: () => void }) {
                     </button>
                     <button
                       onClick={() => handleDelete(w.id)}
+                      aria-label={`Delete webhook ${w.url}`}
                       style={{
                         fontSize: "10px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
                         background: "transparent", border: "1px solid var(--status-danger)", color: "var(--status-danger)",
