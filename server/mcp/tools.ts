@@ -84,13 +84,45 @@ import {
   rotateIngestionToken,
 } from "../db/ingestion.js";
 import { execFileSync } from "child_process";
-
+import { realpathSync } from "fs";
+import path from "path";
 import { broadcast } from "../websocket.js";
 import {
   createGitIntegration,
   listGitIntegrations,
 } from "../db/index.js";
 import { syncGitHubIssues } from "../git-sync-service.js";
+
+// Allowlisted workspace roots — symlink escapes are caught by realpathSync resolution.
+const WORKSPACE_ROOTS: string[] = (process.env.WORKSPACE_ROOTS ?? process.cwd())
+  .split(",")
+  .map((r) => r.trim())
+  .filter(Boolean)
+  .map((r) => {
+    try {
+      return realpathSync(r);
+    } catch {
+      return path.resolve(r);
+    }
+  });
+
+/**
+ * Resolves `p` to its real path and verifies it starts with an allowed root.
+ * Throws with a descriptive message if the check fails.
+ */
+function assertAllowedPath(p: string): void {
+  let real: string;
+  try {
+    real = realpathSync(p);
+  } catch {
+    // Path does not yet exist (e.g. new worktree target) — resolve without following symlinks.
+    real = path.resolve(p);
+  }
+  const allowed = WORKSPACE_ROOTS.some((root) => real === root || real.startsWith(root + path.sep));
+  if (!allowed) {
+    throw new Error(`Path not in allowed workspace roots: ${real}`);
+  }
+}
 
 /** Auto-log activity and broadcast it for any mutation */
 function autoLog(
@@ -665,15 +697,14 @@ export async function handleTool(
       // Validate task exists before touching the filesystem
       const task = getTask(db, task_id);
       if (!task) return ok({ error: "Task not found" });
-      // Prevent path traversal — both paths must be absolute and contain no ..
-      if (!repo_path.startsWith("/") && !repo_path.match(/^[A-Za-z]:\\/)) {
-        return ok({ error: "repo_path must be an absolute path" });
-      }
-      if (!worktree_path.startsWith("/") && !worktree_path.match(/^[A-Za-z]:\\/)) {
-        return ok({ error: "worktree_path must be an absolute path" });
-      }
-      if (repo_path.includes("..") || worktree_path.includes("..")) {
-        return ok({ error: "paths must not contain .." });
+      // Constrain both paths to allowlisted workspace roots to prevent symlink escapes and traversal.
+      try {
+        assertAllowedPath(repo_path);
+        assertAllowedPath(worktree_path);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        autoLog(db, task_id, `Worktree create DENIED for branch ${branch_name}: ${msg} (caller: ${agentName ?? "unknown"})`, agentName);
+        return ok({ error: msg });
       }
       try {
         execFileSync("git", ["-C", repo_path, "worktree", "add", "-b", branch_name, worktree_path], {
@@ -685,17 +716,27 @@ export async function handleTool(
           ? (err as { stderr: Buffer }).stderr.toString().trim()
           : undefined;
         const msg = stderr || (err instanceof Error ? err.message : String(err));
+        autoLog(db, task_id, `Worktree create FAILED for branch ${branch_name} at ${worktree_path}: ${msg} (caller: ${agentName ?? "unknown"})`, agentName);
         return ok({ error: `git worktree add failed: ${msg}` });
       }
       const worktree = createWorktree(db, { task_id, repo_path, branch_name, worktree_path });
       broadcast({ type: "worktree_created", payload: worktree });
-      autoLog(db, task_id, `Worktree created: ${branch_name}`, agentName);
+      autoLog(db, task_id, `Worktree created: ${branch_name} at ${worktree_path} (caller: ${agentName ?? "unknown"})`, agentName);
       return ok(worktree);
     }
 
     case "cleanup_worktree": {
       const worktree = getWorktreeById(db, args.worktree_id as string);
       if (!worktree) return ok({ error: "Worktree not found" });
+      // Constrain paths to allowlisted roots even for removals — prevents post-creation tampering via DB.
+      try {
+        assertAllowedPath(worktree.repo_path);
+        assertAllowedPath(worktree.worktree_path);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        autoLog(db, worktree.task_id, `Worktree cleanup DENIED for ${worktree.branch_name}: ${msg} (caller: ${agentName ?? "unknown"})`, agentName);
+        return ok({ error: msg });
+      }
       const force = args.force as boolean | undefined;
       const gitArgs = ["worktree", "remove", worktree.worktree_path];
       if (force) gitArgs.push("--force");
@@ -709,12 +750,13 @@ export async function handleTool(
           ? (err as { stderr: Buffer }).stderr.toString().trim()
           : undefined;
         const msg = stderr || (err instanceof Error ? err.message : String(err));
+        autoLog(db, worktree.task_id, `Worktree cleanup FAILED for ${worktree.branch_name} at ${worktree.worktree_path}: ${msg} (caller: ${agentName ?? "unknown"})`, agentName);
         return ok({ error: `git worktree remove failed: ${msg}` });
       }
       const newStatus = ((args.status as string | undefined) ?? "removed") as import("../../shared/types.js").WorktreeStatus;
       const updated = updateWorktreeStatus(db, worktree.id, newStatus);
       if (updated) broadcast({ type: "worktree_updated", payload: updated });
-      autoLog(db, worktree.task_id, `Worktree cleaned up: ${worktree.branch_name} (${newStatus})`, agentName);
+      autoLog(db, worktree.task_id, `Worktree cleaned up: ${worktree.branch_name} at ${worktree.worktree_path} (${newStatus}) (caller: ${agentName ?? "unknown"})`, agentName);
       return ok(updated ?? worktree);
     }
 
