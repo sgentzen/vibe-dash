@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAppState } from "../store";
-import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
+import { agentColor, agentGlyph, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import { HEALTH_COLORS, HEALTH_LABELS } from "../constants/colors.js";
 import type { Agent, AgentHealthStatus } from "../types";
 
@@ -316,7 +316,7 @@ function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
           position: "relative",
         }}
       >
-        {agent.name.charAt(0).toUpperCase()}
+        {agentGlyph(agent)}
         {/* Health dot overlay */}
         <span
           className={isActive ? "pulse-dot" : undefined}

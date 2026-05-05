@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
+import { EmptyState } from "../EmptyState.js";
 import { formatTokens } from "./KpiCard";
 
 interface CostTimeseriesEntry {
@@ -25,7 +26,7 @@ export const CostTimeseriesCard = memo(function CostTimeseriesCard({ data }: { d
   return (
     <CardWrapper title="Daily Spend (Last 30 Days)">
       {data.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No cost data yet. Agents will log costs as they work.</div>
+        <EmptyState message="No cost data yet. Agents will log costs as they work." />
       ) : (
         <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "120px" }}>
           {(() => { const maxCost = Math.max(...data.map((x) => x.total_cost_usd), 0.01); return data.map((d) => {
@@ -52,7 +53,7 @@ export const CostByModelCard = memo(function CostByModelCard({ data }: { data: C
   return (
     <CardWrapper title="Cost by Model">
       {data.length === 0 ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>No model cost data yet.</div>
+        <EmptyState message="No model cost data yet." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {(() => { const maxCost = Math.max(...data.map((x) => x.total_cost_usd), 0.01); return data.map((m) => {
