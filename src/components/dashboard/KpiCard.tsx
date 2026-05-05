@@ -7,14 +7,16 @@ export const KpiCard = memo(function KpiCard({
   value,
   color,
   sparkline,
+  tooltip,
 }: {
   label: string;
   value: string;
   color: string;
   sparkline?: number[];
+  tooltip?: string;
 }) {
   return (
-    <div style={{
+    <div title={tooltip} style={{
       background: "var(--bg-secondary)",
       border: "1px solid var(--border)",
       borderRadius: "8px",

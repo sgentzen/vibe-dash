@@ -1,5 +1,5 @@
 import { agentColor, agentGlyph, ROLE_COLORS } from "../../utils/agentColors";
-import { cardStyle } from "../../styles/shared.js";
+import { cardStyle, typeScale } from "../../styles/shared.js";
 import type { Agent, AgentCost } from "../../types";
 import type { AgentDetail } from "./types";
 

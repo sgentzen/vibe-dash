@@ -5,11 +5,12 @@ import type { ExecutiveSummary } from "../../shared/types.js";
 const SESSION_KEY = "vibe-dash-api-key";
 
 export function getStoredApiKey(): string | null {
-  return sessionStorage.getItem(SESSION_KEY);
+  const v = sessionStorage.getItem(SESSION_KEY);
+  return v ? atob(v) : null;
 }
 
 export function setStoredApiKey(key: string | null): void {
-  if (key) sessionStorage.setItem(SESSION_KEY, key);
+  if (key) sessionStorage.setItem(SESSION_KEY, btoa(key));
   else sessionStorage.removeItem(SESSION_KEY);
 }
 
