@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
-import { cardStyle, badgeStyle, sectionHeader } from "../styles/shared.js";
+import { cardStyle, badgeStyle, sectionHeader, typeScale } from "../styles/shared.js";
 import AgentComparisonView from "./AgentComparisonView";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
