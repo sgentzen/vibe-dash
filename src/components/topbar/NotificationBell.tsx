@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { AppNotification } from "../../types";
 
 interface NotificationBellProps {
@@ -18,12 +18,20 @@ export function NotificationBell({
   alertsOpen,
   onAlertsOpenChange,
 }: NotificationBellProps) {
+  const panelLabelId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Sync external open state into local state
   useEffect(() => {
     if (alertsOpen === true) setShowNotifications(true);
   }, [alertsOpen]);
+
+  const close = useCallback(() => {
+    setShowNotifications(false);
+    onAlertsOpenChange?.(false);
+    triggerRef.current?.focus();
+  }, [onAlertsOpenChange]);
 
   function toggle() {
     const next = !showNotifications;
@@ -31,16 +39,39 @@ export function NotificationBell({
     onAlertsOpenChange?.(next);
   }
 
-  function close() {
-    setShowNotifications(false);
-    onAlertsOpenChange?.(false);
-  }
+  useEffect(() => {
+    if (!showNotifications) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") close();
+    }
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target as Node) &&
+        !triggerRef.current?.contains(e.target as Node)
+      ) {
+        close();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showNotifications, close]);
+
+  const triggerLabel = unreadCount > 0
+    ? `Notifications — ${unreadCount > 9 ? "9+" : unreadCount} unread`
+    : "Notifications";
 
   return (
     <div style={{ position: "relative" }}>
       <button
+        ref={triggerRef}
         onClick={toggle}
-        aria-label="Notifications"
+        aria-label={triggerLabel}
+        aria-expanded={showNotifications}
+        aria-haspopup="listbox"
         style={{
           background: "transparent",
           border: "1px solid var(--border)",
@@ -52,32 +83,42 @@ export function NotificationBell({
           position: "relative",
         }}
       >
-        {"🔔"}
+        <span aria-hidden="true">{"🔔"}</span>
         {unreadCount > 0 && (
-          <span style={{
-            position: "absolute", top: "-4px", right: "-4px",
-            background: "var(--status-danger)", color: "var(--text-on-accent)",
-            fontSize: "10px", fontWeight: 700, borderRadius: "50%",
-            width: "16px", height: "16px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}>
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute", top: "-4px", right: "-4px",
+              background: "var(--status-danger)", color: "var(--text-on-accent)",
+              fontSize: "10px", fontWeight: 700, borderRadius: "50%",
+              width: "16px", height: "16px", display: "flex",
+              alignItems: "center", justifyContent: "center",
+            }}
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {showNotifications && (
-        <div style={{
-          position: "absolute", top: "100%", right: 0, marginTop: "4px",
-          background: "var(--bg-secondary)", border: "1px solid var(--border)",
-          borderRadius: "8px", width: "320px", maxHeight: "400px",
-          overflowY: "auto", zIndex: 100, boxShadow: "var(--shadow-md)",
-        }}>
+        <div
+          ref={panelRef}
+          role="region"
+          aria-labelledby={panelLabelId}
+          style={{
+            position: "absolute", top: "100%", right: 0, marginTop: "4px",
+            background: "var(--bg-secondary)", border: "1px solid var(--border)",
+            borderRadius: "8px", width: "320px", maxHeight: "400px",
+            overflowY: "auto", zIndex: 100, boxShadow: "var(--shadow-md)",
+          }}
+        >
           <div style={{
             padding: "8px 12px", borderBottom: "1px solid var(--border)",
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Notifications</span>
+            <span id={panelLabelId} style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+              Notifications
+            </span>
             {unreadCount > 0 && (
               <button
                 onClick={onMarkAllRead}
@@ -100,14 +141,16 @@ export function NotificationBell({
             </div>
           ) : (
             notifications.slice(0, 20).map((n) => (
-              <div
+              <button
                 key={n.id}
-                onClick={() => {
-                  if (!n.read) onMarkRead(n.id);
-                }}
+                onClick={() => { if (!n.read) onMarkRead(n.id); }}
+                aria-disabled={n.read}
                 style={{
+                  display: "block", width: "100%", textAlign: "left",
                   padding: "8px 12px", borderBottom: "1px solid var(--border)",
-                  cursor: "pointer", background: n.read ? "transparent" : "rgba(99,102,241,0.05)",
+                  cursor: n.read ? "default" : "pointer",
+                  background: n.read ? "transparent" : "rgba(99,102,241,0.05)",
+                  border: "none", borderBottomColor: "var(--border)", borderBottomWidth: "1px", borderBottomStyle: "solid",
                 }}
               >
                 <div style={{ fontSize: "12px", color: n.read ? "var(--text-muted)" : "var(--text-primary)" }}>
@@ -116,7 +159,7 @@ export function NotificationBell({
                 <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
                   {new Date(n.created_at).toLocaleString()}
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
