@@ -25,7 +25,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       background: "var(--bg-secondary)",
       border: "1px solid var(--border)",
       borderRadius: "10px",
-      padding: "18px 20px",
+      padding: "var(--space-4) var(--space-5)",
     }}>
       <h3 style={{ ...typeScale.micro, color: "var(--text-muted)", margin: "0 0 var(--space-3) 0" }}>
         {title}
@@ -79,10 +79,10 @@ function MilestoneRow({ m }: { m: MilestoneHealthRow }) {
       style={{
         display: "grid",
         gridTemplateColumns: "1fr auto 200px",
-        columnGap: "16px",
+        columnGap: "var(--space-4)",
         rowGap: "4px",
         alignItems: "center",
-        padding: "8px 0",
+        padding: "var(--space-2) 0",
       }}
     >
       <span
@@ -136,11 +136,11 @@ function HealthSummaryTile({
           : "var(--bg-secondary)",
         border: `1px solid ${active ? color : "var(--border)"}`,
         borderRadius: "10px",
-        padding: "14px 16px",
+        padding: "14px var(--space-4)",
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
-        gap: "8px",
+        gap: "var(--space-2)",
         transition: "background 0.15s ease, border-color 0.15s ease",
       }}
     >
@@ -178,8 +178,8 @@ function MilestoneHealthCard({
   for (const m of health) partition[m.health].push(m);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-3)" }}>
         {HEALTH_SECTION_ORDER.map((h) => (
           <HealthSummaryTile
             key={h}
@@ -308,9 +308,9 @@ export function ExecutiveView() {
   const atRiskCount = summary?.milestone_health.filter((m) => m.health !== "on_track").length ?? 0;
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+    <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-5)", flexWrap: "wrap", gap: "var(--space-3)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
           <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>
             Executive Summary
           </h2>
@@ -371,7 +371,7 @@ export function ExecutiveView() {
       )}
 
       {summary && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "var(--space-4)" }}>
 
           {/* Milestone Health */}
           <div style={{ gridColumn: "1 / -1" }}>
@@ -387,7 +387,7 @@ export function ExecutiveView() {
 
           {/* Team Utilization */}
           <Card title="Team Utilization">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-3)" }}>
               <BigStat value={summary.team_utilization.active} label="Active" color="var(--accent-green)" />
               <BigStat value={summary.team_utilization.idle} label="Idle" color="var(--accent-yellow)" />
               <BigStat value={summary.team_utilization.offline} label="Offline" color="var(--text-muted)" />
@@ -405,7 +405,7 @@ export function ExecutiveView() {
 
           {/* Blockers */}
           <Card title="Blockers">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
               <BigStat
                 value={summary.blockers.open_count}
                 label="Open blockers"
@@ -422,7 +422,7 @@ export function ExecutiveView() {
 
           {/* Velocity */}
           <Card title="Task Velocity">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
               <BigStat value={summary.velocity.this_week} label="This week" color="var(--accent-green)" />
               <BigStat value={summary.velocity.last_week} label="Last week" />
               <BigStat
@@ -435,7 +435,7 @@ export function ExecutiveView() {
 
           {/* Cost Overview */}
           <Card title="Cost Overview">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
               <BigStat value={`$${summary.costs.total_cost_usd.toFixed(2)}`} label="Total spend" />
               <BigStat value={`$${summary.costs.last_7_days_cost_usd.toFixed(2)}`} label="Last 7 days" />
             </div>

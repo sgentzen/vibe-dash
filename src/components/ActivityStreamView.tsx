@@ -82,7 +82,7 @@ export function ActivityStreamView() {
       </h2>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "16px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
         <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} style={selectStyle}>
           <option value="">All agents</option>
           {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

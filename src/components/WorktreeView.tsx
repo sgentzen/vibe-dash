@@ -215,7 +215,7 @@ export function WorktreeView() {
       )}
 
       {active.length > 0 && (
-        <section style={{ marginBottom: "24px" }}>
+        <section style={{ marginBottom: "var(--space-5)" }}>
           <h3 style={{ ...typeScale.micro, color: "var(--text-muted)", margin: "0 0 var(--space-2) 0" }}>
             Active ({active.length})
           </h3>

@@ -8,13 +8,36 @@ export const KpiCard = memo(function KpiCard({
   color,
   sparkline,
   tooltip,
+  compact = false,
 }: {
   label: string;
   value: string;
   color: string;
   sparkline?: number[];
   tooltip?: string;
+  compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div title={tooltip} style={{
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "var(--space-2) var(--space-3)",
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-2)",
+        height: "80px",
+        flex: 1,
+      }}>
+        <div style={{ ...typeScale.micro, color: "var(--text-muted)", textAlign: "left" }}>{label}</div>
+        <div style={{ ...typeScale.h2, color, fontFamily: "monospace", flexShrink: 0 }}>{value}</div>
+      </div>
+    );
+  }
+
   return (
     <div title={tooltip} style={{
       background: "var(--bg-secondary)",

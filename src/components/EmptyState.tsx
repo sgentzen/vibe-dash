@@ -25,8 +25,8 @@ export function EmptyState({ message, compact = false, icon, color = "var(--text
       alignItems: "center",
       justifyContent: "center",
       textAlign: "center",
-      padding: "24px 16px",
-      gap: "8px",
+      padding: "var(--space-5) var(--space-4)",
+      gap: "var(--space-2)",
     }}>
       {icon && <span style={{ fontSize: "20px", lineHeight: 1 }}>{icon}</span>}
       <span style={{ fontSize: "13px", color }}>{message}</span>

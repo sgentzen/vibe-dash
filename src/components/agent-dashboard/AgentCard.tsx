@@ -22,12 +22,12 @@ export function AgentCard({ agent, detail, onClick }: AgentCardProps) {
       onClick={onClick}
       style={{
         ...cardStyle,
-        padding: "12px",
+        padding: "var(--space-3)",
         cursor: "pointer",
         borderLeft: `3px solid ${color}`,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
         {/* Avatar */}
         <div
           style={{

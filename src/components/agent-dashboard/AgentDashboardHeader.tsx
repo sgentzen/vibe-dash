@@ -14,7 +14,7 @@ export function AgentDashboardHeader({
   onStatusFilterChange,
 }: AgentDashboardHeaderProps) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
       <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
         Agent Dashboard
       </h2>

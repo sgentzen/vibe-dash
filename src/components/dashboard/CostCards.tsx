@@ -55,7 +55,7 @@ export const CostByModelCard = memo(function CostByModelCard({ data }: { data: C
       {data.length === 0 ? (
         <EmptyState message="No model cost data yet." />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
           {(() => { const maxCost = Math.max(...data.map((x) => x.total_cost_usd), 0.01); return data.map((m) => {
             const pct = (m.total_cost_usd / maxCost) * 100;
             return (
@@ -79,8 +79,8 @@ export const CostByModelCard = memo(function CostByModelCard({ data }: { data: C
 export const CostByAgentCard = memo(function CostByAgentCard({ data }: { data: CostByAgentEntry[] }) {
   if (data.length === 0) return null;
   return (
-    <CardWrapper title="Cost by Agent" style={{ marginBottom: "16px" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+    <CardWrapper title="Cost by Agent" style={{ marginBottom: "var(--space-4)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
         {(() => { const maxCost = Math.max(...data.map((x) => x.total_cost_usd), 0.01); return data.map((a) => {
           const pct = (a.total_cost_usd / maxCost) * 100;
           return (

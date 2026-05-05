@@ -272,7 +272,7 @@ export function TimelineView() {
       ? "No tasks have dates set — add start_date and due_date to build a timeline."
       : "No tasks to display.";
     return (
-      <div style={{ flex: 1, padding: "16px" }}>
+      <div style={{ flex: 1, padding: "var(--space-4)" }}>
         <Toolbar
           hideCompleted={hideCompleted} setHideCompleted={setHideCompleted}
           hideCancelled={hideCancelled} setHideCancelled={setHideCancelled}
@@ -294,7 +294,7 @@ export function TimelineView() {
   }
 
   return (
-    <div style={{ flex: 1, padding: "16px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       <Toolbar
         hideCompleted={hideCompleted} setHideCompleted={setHideCompleted}
         hideCancelled={hideCancelled} setHideCancelled={setHideCancelled}
