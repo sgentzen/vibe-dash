@@ -11,6 +11,7 @@ const CELL = 22;
 const GAP = 4;
 const MAX_AGENTS = 8;
 const MAX_HOURS = 12;
+const LEGEND_STEPS = 5;
 
 export function AgentComputeHeatmap({ activeProjectId }: Props) {
   const api = useApi();
@@ -28,23 +29,19 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
   const { agents, hours, matrix, maxCount } = useMemo(() => {
     if (data.length === 0) return { agents: [], hours: [], matrix: new Map(), maxCount: 0 };
 
-    // Aggregate by agent
     const agentTotals = new Map<string, number>();
     for (const e of data) {
       agentTotals.set(e.agent_name, (agentTotals.get(e.agent_name) ?? 0) + e.count);
     }
 
-    // Top MAX_AGENTS agents by total activity
     const topAgents = [...agentTotals.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, MAX_AGENTS)
       .map(([name]) => name);
 
-    // Latest MAX_HOURS unique hour buckets
     const allHours = [...new Set(data.map((e) => e.hour))].sort((a, b) => a - b);
     const latestHours = allHours.slice(-MAX_HOURS);
 
-    // Build matrix: agent_name -> hour -> count
     const matrix = new Map<string, Map<number, number>>();
     for (const e of data) {
       if (!topAgents.includes(e.agent_name)) continue;
@@ -88,7 +85,9 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
           width={labelWidth + gridWidth}
           height={20 + gridHeight}
           style={{ display: "block", fontSize: "10px" }}
+          aria-label={`Agent compute heatmap: ${agents.length} agents over ${hours.length} hours, max ${maxCount} events per cell`}
         >
+          <title>{`Agent compute heatmap — ${agents.length} agents, ${hours.length} hour buckets, max ${maxCount} events`}</title>
           {/* Hour labels along top */}
           {hours.map((h, ci) => (
             <text
@@ -120,6 +119,7 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
                   fontFamily="system-ui, sans-serif"
                   fontWeight="500"
                 >
+                  <title>{agent}</title>
                   {agent.length > 10 ? agent.slice(0, 10) + "…" : agent}
                 </text>
 
@@ -135,8 +135,8 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
                       width={CELL}
                       height={CELL}
                       rx="3"
-                      fill={`rgba(var(--accent-cyan-rgb), ${opacity})`}
-                      style={{ cursor: count > 0 ? "pointer" : "default" }}
+                      style={{ fill: `rgba(var(--accent-cyan-rgb), ${opacity})`, cursor: count > 0 ? "pointer" : "default" }}
+                      aria-label={`${agent} — hour ${h} — ${count} events`}
                       onMouseEnter={(e) => {
                         const rect = (e.target as SVGRectElement).getBoundingClientRect();
                         setTooltip({ text: `${agent} · ${h}:00 · ${count} events`, x: rect.left, y: rect.top });
@@ -149,6 +149,27 @@ export function AgentComputeHeatmap({ activeProjectId }: Props) {
             );
           })}
         </svg>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", fontSize: "9px", color: "var(--text-muted)" }}>
+        <span>0</span>
+        <div
+          style={{
+            flex: 1,
+            height: "8px",
+            borderRadius: "4px",
+            background: `linear-gradient(to right, ${
+              Array.from({ length: LEGEND_STEPS }, (_, i) => {
+                const opacity = 0.08 + (i / (LEGEND_STEPS - 1)) * 0.92;
+                return `rgba(var(--accent-cyan-rgb), ${opacity.toFixed(2)})`;
+              }).join(", ")
+            })`,
+          }}
+          role="img"
+          aria-label={`Color scale: 0 events (faint) to ${maxCount} events (solid)`}
+        />
+        <span>{maxCount}</span>
       </div>
 
       {tooltip && (

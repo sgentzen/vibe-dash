@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDataState, useNavigationState } from "../store";
-import type { Milestone, Task } from "../types";
+import type { Milestone, Task, TaskStatus } from "../types";
 import {
   DAY_MS,
   DEFAULT_LABEL_WIDTH,
@@ -11,27 +11,29 @@ import {
   MONTH_HEADER_HEIGHT,
   PROJECT_HEADER_HEIGHT,
   ROW_HEIGHT,
-  STATUS_DOT_COLORS,
 } from "./timeline/constants";
 import { buildSwimRows, getTaskDates, type SwimRow } from "./timeline/utils";
 import { DateHeader } from "./timeline/DateHeader";
 import { ResizeHandle } from "./timeline/ResizeHandle";
 import { TaskEditDrawer } from "./TaskEditDrawer";
+import { StatusPill } from "./StatusPill";
+import { TASK_STATUS_TOKEN } from "../constants/statusTokens";
 
 const MAX_DAYS = 60;
 
-const LEGEND: { status: keyof typeof STATUS_DOT_COLORS; label: string }[] = [
+const LEGEND: { status: TaskStatus; label: string }[] = [
   { status: "in_progress", label: "Running" },
   { status: "blocked", label: "Failed" },
   { status: "planned", label: "Planned" },
   { status: "done", label: "Completed" },
+  { status: "cancelled", label: "Cancelled" },
 ];
 
 type Anomaly = "blocked" | "overdue" | "stale" | null;
 
 function detectAnomaly(task: Task, blockers: import("../types").Blocker[]): Anomaly {
   if (blockers.some((b) => b.task_id === task.id && !b.resolved_at)) return "blocked";
-  if (task.status === "done") return null;
+  if (task.status === "done" || task.status === "cancelled") return null;
   const now = Date.now();
   if (task.due_date && new Date(task.due_date).getTime() < now) return "overdue";
   if (task.updated_at) {
@@ -56,21 +58,29 @@ function barStyle(task: Task, hasDates: boolean, anomaly: Anomaly): React.CSSPro
   };
 
   if (anomaly === "blocked") {
-    return { ...base, background: "var(--status-danger)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
+    return {
+      ...base,
+      backgroundImage: "repeating-linear-gradient(45deg, var(--status-danger) 0 6px, transparent 6px 12px)",
+      border: "1px solid var(--status-danger)",
+      color: "var(--text-on-accent)",
+      opacity: hasDates ? 1 : 0.5,
+    };
   }
   if (anomaly === "overdue" || anomaly === "stale") {
     return { ...base, background: "var(--status-warning)", color: "var(--text-on-yellow)", opacity: hasDates ? (anomaly === "stale" ? 0.8 : 1) : 0.5 };
   }
 
   switch (task.status) {
+    case "cancelled":
+      return { ...base, background: "var(--status-neutral)", color: "var(--text-secondary)", opacity: 0.4, textDecoration: "line-through" };
     case "done":
       return { ...base, background: "var(--status-info)", color: "var(--text-on-accent)", opacity: 0.35 };
     case "in_progress":
-      return { ...base, background: "var(--status-success)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6 };
+      return { ...base, background: "var(--status-success)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.6, boxShadow: "var(--shadow-glow-green)" };
     case "blocked":
       return { ...base, background: "var(--status-danger)", color: "var(--text-on-accent)", opacity: hasDates ? 1 : 0.5 };
-    default:
-      return { ...base, background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: hasDates ? "1px solid var(--border)" : "1px dashed var(--border)", opacity: hasDates ? 0.9 : 0.6 };
+    default: // planned
+      return { ...base, background: "transparent", color: "var(--text-secondary)", border: "1px dashed var(--status-neutral)", opacity: hasDates ? 0.9 : 0.6 };
   }
 }
 
@@ -85,6 +95,8 @@ export function TimelineView() {
   const { selectedProjectId, selectedMilestoneId } = useNavigationState();
   const [showUndated, setShowUndated] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(true);
+  const [hideCancelled, setHideCancelled] = useState(true);
+  const [fitToData, setFitToData] = useState(false);
   const [labelWidth, setLabelWidth] = useState(DEFAULT_LABEL_WIDTH);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -103,9 +115,10 @@ export function TimelineView() {
         (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId),
     );
     if (hideCompleted) result = result.filter((t) => t.status !== "done");
+    if (hideCancelled) result = result.filter((t) => t.status !== "cancelled");
     if (!showUndated) result = result.filter((t) => getTaskDates(t, milestoneMap) !== null);
     return result;
-  }, [tasks, selectedProjectId, selectedMilestoneId, hideCompleted, showUndated, milestoneMap]);
+  }, [tasks, selectedProjectId, selectedMilestoneId, hideCompleted, hideCancelled, showUndated, milestoneMap]);
 
   const allMatchingTasks = useMemo(
     () =>
@@ -119,7 +132,8 @@ export function TimelineView() {
   );
   const undatedCount = allMatchingTasks.filter((t) => getTaskDates(t, milestoneMap) === null).length;
   const completedCount = allMatchingTasks.filter((t) => t.status === "done").length;
-  const allDone = allMatchingTasks.length > 0 && completedCount === allMatchingTasks.length;
+  const cancelledCount = allMatchingTasks.filter((t) => t.status === "cancelled").length;
+  const allDone = allMatchingTasks.length > 0 && completedCount > 0 && completedCount + cancelledCount === allMatchingTasks.length;
 
   const filteredMilestones = milestones.filter(
     (m) => selectedProjectId === null || m.project_id === selectedProjectId,
@@ -153,6 +167,26 @@ export function TimelineView() {
     [flatRows],
   );
 
+  const cancelledTasks = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          t.parent_task_id === null &&
+          t.status === "cancelled" &&
+          (selectedProjectId === null || t.project_id === selectedProjectId) &&
+          (selectedMilestoneId === null || t.milestone_id === selectedMilestoneId),
+      ),
+    [tasks, selectedProjectId, selectedMilestoneId],
+  );
+
+  const cancelledFlatRows = useMemo(
+    () =>
+      buildSwimRows(cancelledTasks, filteredMilestones, filteredProjects, agents).filter(
+        (r): r is Extract<SwimRow, { kind: "agent" }> => r.kind === "agent",
+      ),
+    [cancelledTasks, filteredMilestones, filteredProjects, agents],
+  );
+
   const { minDate, maxDate, totalDays, clipped } = useMemo(() => {
     if (visibleTasks.length === 0) {
       const now = Date.now();
@@ -170,10 +204,12 @@ export function TimelineView() {
     min -= 2 * DAY_MS;
     max += 2 * DAY_MS;
     const days = Math.ceil((max - min) / DAY_MS);
-    const clipped = days > MAX_DAYS;
+    const clipped = !fitToData && days > MAX_DAYS;
     const clampedMax = clipped ? min + MAX_DAYS * DAY_MS : max;
     return { minDate: new Date(min), maxDate: new Date(clampedMax), totalDays: clipped ? MAX_DAYS : days, clipped };
-  }, [visibleTasks, milestoneMap]);
+  }, [visibleTasks, milestoneMap, fitToData]);
+
+  useEffect(() => { setFitToData(false); }, [selectedProjectId, selectedMilestoneId]);
 
   const timelineWidth = Math.max(totalDays * 30, 600);
 
@@ -239,8 +275,9 @@ export function TimelineView() {
       <div style={{ flex: 1, padding: "16px" }}>
         <Toolbar
           hideCompleted={hideCompleted} setHideCompleted={setHideCompleted}
+          hideCancelled={hideCancelled} setHideCancelled={setHideCancelled}
           showUndated={showUndated} setShowUndated={setShowUndated}
-          undatedCount={undatedCount} clipped={false}
+          undatedCount={undatedCount} cancelledCount={cancelledCount} clipped={false}
         />
         <div style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "60px 40px" }}>
           {allDone && hideCompleted ? (
@@ -260,8 +297,10 @@ export function TimelineView() {
     <div style={{ flex: 1, padding: "16px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
       <Toolbar
         hideCompleted={hideCompleted} setHideCompleted={setHideCompleted}
+        hideCancelled={hideCancelled} setHideCancelled={setHideCancelled}
         showUndated={showUndated} setShowUndated={setShowUndated}
-        undatedCount={undatedCount} clipped={clipped}
+        undatedCount={undatedCount} cancelledCount={cancelledCount} clipped={clipped}
+        onFitToData={() => setFitToData(true)}
       />
 
       <div style={{ overflowX: "auto" }}>
@@ -379,6 +418,7 @@ export function TimelineView() {
                         )}
                         <button
                           className="timeline-bar"
+                          title={task.title}
                           aria-label={`${task.title} — ${task.status}${anomaly ? `, ${anomaly}` : ""}, agent: ${agentName}, ${task.start_date ?? "no start"} to ${task.due_date ?? "no due date"}`}
                           onClick={() => setEditingTask(task)}
                           style={{ ...style, position: "absolute", left: sx, top: barTop, width: bw }}
@@ -392,6 +432,51 @@ export function TimelineView() {
               </div>
             );
           })}
+
+          {/* Cancelled tasks — collapsible section */}
+          {!hideCancelled && cancelledFlatRows.length > 0 && (
+            <details style={{ borderTop: "1px solid var(--border)" }}>
+              <summary style={{ padding: "4px 12px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none", display: "flex", alignItems: "center", gap: "6px", listStyle: "none" }}>
+                {cancelledCount} cancelled task{cancelledCount !== 1 ? "s" : ""}
+              </summary>
+              {cancelledFlatRows.map((row, i) => {
+                const { agentName, tasks: agentTasks } = row;
+                return (
+                  <div key={`cancelled-agent-${row.projectId}-${row.agentId ?? "unassigned"}-${i}`} className="timeline-task-row" style={{ display: "flex", alignItems: "center", height: ROW_HEIGHT, borderBottom: "1px solid color-mix(in srgb, var(--border) 50%, transparent)", position: "relative", opacity: 0.7 }}>
+                    <div style={{ width: labelWidth, flexShrink: 0, display: "flex", alignItems: "center", padding: "0 12px 0 24px", overflow: "hidden" }}>
+                      <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {agentName}
+                      </span>
+                    </div>
+                    <div style={{ position: "relative", width: timelineWidth, height: ROW_HEIGHT }}>
+                      {agentTasks.map((task) => {
+                        const dates = getTaskDates(task, milestoneMap);
+                        const startMs = dates ? dates.start : new Date(task.created_at).getTime();
+                        const endMs = dates ? dates.end : startMs + 7 * DAY_MS;
+                        const sx = dateToX(startMs);
+                        const ex = dateToX(endMs);
+                        const bw = Math.max(ex - sx, 8);
+                        const style = barStyle(task, dates !== null, null);
+                        const barTop = (ROW_HEIGHT - 22) / 2;
+                        return (
+                          <button
+                            key={task.id}
+                            className="timeline-bar"
+                            title={task.title}
+                            aria-label={`${task.title} — cancelled, agent: ${agentName}, ${task.start_date ?? "no start"} to ${task.due_date ?? "no due date"}`}
+                            onClick={() => setEditingTask(task)}
+                            style={{ ...style, position: "absolute", left: sx, top: barTop, width: bw }}
+                          >
+                            {bw > 60 ? task.title : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </details>
+          )}
 
           {/* Shared dep SVG overlay */}
           <svg aria-hidden="true" style={{ position: "absolute", left: labelWidth, top: HEADER_HEIGHT, width: timelineWidth, height: totalContentHeight, overflow: "visible", pointerEvents: "none", zIndex: 1 }}>
@@ -432,11 +517,13 @@ export function TimelineView() {
 
 interface ToolbarProps {
   hideCompleted: boolean; setHideCompleted: (v: boolean) => void;
+  hideCancelled: boolean; setHideCancelled: (v: boolean) => void;
   showUndated: boolean; setShowUndated: (v: boolean) => void;
-  undatedCount: number; clipped: boolean;
+  undatedCount: number; cancelledCount: number; clipped: boolean;
+  onFitToData?: () => void;
 }
 
-function Toolbar({ hideCompleted, setHideCompleted, showUndated, setShowUndated, undatedCount, clipped }: ToolbarProps) {
+function Toolbar({ hideCompleted, setHideCompleted, hideCancelled, setHideCancelled, showUndated, setShowUndated, undatedCount, cancelledCount, clipped, onFitToData }: ToolbarProps) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
       <h2 style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", margin: 0, marginRight: "4px" }}>
@@ -454,19 +541,30 @@ function Toolbar({ hideCompleted, setHideCompleted, showUndated, setShowUndated,
         Hide Completed
       </label>
 
+      <label htmlFor="hide-cancelled-toggle" style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none" }}>
+        <input id="hide-cancelled-toggle" type="checkbox" checked={hideCancelled} onChange={(e) => setHideCancelled(e.target.checked)} style={{ accentColor: "var(--accent-blue)", cursor: "pointer" }} />
+        Hide Cancelled{cancelledCount > 0 ? ` (${cancelledCount})` : ""}
+      </label>
+
       {clipped && (
-        <span style={{ fontSize: "11px", color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--status-warning) 25%, transparent)", borderRadius: "4px", padding: "2px 8px" }}>
-          Showing first {MAX_DAYS} days
-        </span>
+        <>
+          <span style={{ fontSize: "11px", color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--status-warning) 25%, transparent)", borderRadius: "4px", padding: "2px 8px" }}>
+            Showing first {MAX_DAYS} days
+          </span>
+          {onFitToData && (
+            <button onClick={onFitToData} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px 9px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer" }}>
+              Fit to data
+            </button>
+          )}
+        </>
       )}
 
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "14px" }}>
-        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 500 }}>Status Legend:</span>
-        <ul role="list" style={{ display: "flex", gap: "14px", margin: 0, padding: 0, listStyle: "none" }}>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px" }}>
+        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 500 }}>Status:</span>
+        <ul role="list" style={{ display: "flex", gap: "6px", margin: 0, padding: 0, listStyle: "none" }}>
           {LEGEND.map(({ status, label }) => (
-            <li key={status} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-muted)" }}>
-              <span className="legend-dot" aria-hidden="true" style={{ background: STATUS_DOT_COLORS[status] }} />
-              {label}
+            <li key={status}>
+              <StatusPill token={TASK_STATUS_TOKEN[status]} label={label} />
             </li>
           ))}
         </ul>

@@ -1,7 +1,7 @@
 // Single source of truth for types shared between server and client.
 // Both server/types.ts and src/types.ts re-export from this module.
 
-export type TaskStatus = "planned" | "in_progress" | "blocked" | "done";
+export type TaskStatus = "planned" | "in_progress" | "blocked" | "done" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type MilestoneStatus = "open" | "achieved";
 

@@ -209,7 +209,7 @@ export async function handleTool(
         title: args.title as string,
         description: (args.description as string | undefined) ?? null,
         priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
-        status: (args.status as "planned" | "in_progress" | "blocked" | "done" | undefined) ?? "planned",
+        status: (args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined) ?? "planned",
       });
       broadcast({ type: "task_created", payload: task });
       autoLog(db, task.id, `Created task: ${task.title}`, agentName);
@@ -224,7 +224,7 @@ export async function handleTool(
     case "list_tasks": {
       const tasks = listTasks(db, {
         project_id: args.project_id as string | undefined,
-        status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
+        status: args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined,
         parent_task_id: args.parent_task_id as string | undefined,
         assigned_agent_id: args.assigned_agent_id as string | undefined,
       });
@@ -258,7 +258,7 @@ export async function handleTool(
       const updated = updateTask(db, args.task_id as string, {
         title: args.title as string | undefined,
         description: args.description as string | null | undefined,
-        status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
+        status: args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined,
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,
@@ -458,7 +458,7 @@ export async function handleTool(
         query: args.query as string | undefined,
         project_id: args.project_id as string | undefined,
         milestone_id: args.milestone_id as string | undefined,
-        status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
+        status: args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined,
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         assigned_agent_id: args.assigned_agent_id as string | undefined,
         tag_id: args.tag_id as string | undefined,
