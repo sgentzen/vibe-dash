@@ -9,6 +9,7 @@ export const TASK_STATUS_TOKEN: Record<TaskStatus, StatusToken> = {
   in_progress: "success",
   blocked: "danger",
   done: "info",
+  cancelled: "neutral",
 };
 
 export const MILESTONE_HEALTH_TOKEN: Record<MilestoneHealthStatus, StatusToken> = {

@@ -6,8 +6,8 @@ import type { AgentComparison } from "../../types";
 export const AgentEfficiencyCard = memo(function AgentEfficiencyCard({ agentComparison }: { agentComparison: AgentComparison }) {
   if (agentComparison.agents.length === 0) return null;
   return (
-    <CardWrapper title="Agent Efficiency" style={{ marginBottom: "16px" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <CardWrapper title="Agent Efficiency" style={{ marginBottom: "var(--space-4)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
         {agentComparison.agents.slice(0, 5).map((agent) => {
           const color = agentColor(agent.agent_name);
           const maxTasks = Math.max(...agentComparison.agents.map((a) => a.tasks_completed), 1);
