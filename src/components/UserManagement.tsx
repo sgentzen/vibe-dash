@@ -47,6 +47,9 @@ export function UserManagement() {
 
   async function handleRotateKey(id: string) {
     const { api_key } = await api.rotateKey(id);
+    if (id === currentUser?.id) {
+      setStoredApiKey(api_key);
+    }
     setNewKey({ userId: id, key: api_key });
   }
 
