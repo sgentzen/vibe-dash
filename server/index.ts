@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
 import type Database from "better-sqlite3";
-import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
+import { openDb, backfillMilestoneDailyStats, resolveDbPath } from "./db/index.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
 import { notFoundHandler, errorHandler } from "./routes/middleware.js";
@@ -37,7 +37,8 @@ const messagesLimiter = rateLimit({
 });
 
 const PORT = parseInt(process.env.PORT ?? "3001");
-const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
+const DB_PATH = resolveDbPath();
+logger.info({ DB_PATH }, "Opening database");
 
 const app = express();
 app.use(helmet({
@@ -55,7 +56,13 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: "256kb" }));
 
-const db: Database.Database = openDb(DB_PATH);
+let db: Database.Database;
+try {
+  db = openDb(DB_PATH);
+} catch (err) {
+  logger.error({ err, DB_PATH }, "Failed to open database — aborting startup");
+  process.exit(1);
+}
 app.use(createRouter(db));
 
 const spaLimiter = rateLimit({
@@ -142,8 +149,12 @@ server.listen(PORT, () => {
   logger.info({ port: PORT, path: "/ws" }, "WebSocket available");
   logger.info({ port: PORT, path: "/sse" }, "MCP SSE available");
   // Backfill milestone daily stats so the dashboard has data immediately
-  const backfilled = backfillMilestoneDailyStats(db);
-  if (backfilled > 0) logger.info({ count: backfilled }, "Backfilled daily stats for milestones");
+  try {
+    const backfilled = backfillMilestoneDailyStats(db);
+    if (backfilled > 0) logger.info({ count: backfilled }, "Backfilled daily stats for milestones");
+  } catch (err) {
+    logger.error({ err }, "backfillMilestoneDailyStats failed — continuing without backfill");
+  }
 });
 
 export { app, db, server };

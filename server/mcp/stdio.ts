@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-import path from "path";
-import { fileURLToPath } from "url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { openDb } from "../db/index.js";
+import { openDb, resolveDbPath } from "../db/index.js";
 import { createMcpServer } from "./server.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
-const DB_PATH = process.env.VIBE_DASH_DB ?? path.join(PROJECT_ROOT, "vibe-dash.db");
+const DB_PATH = resolveDbPath();
+// stdio transport: server logs go to stderr to avoid corrupting the JSON-RPC stream.
+process.stderr.write(`[mcp/stdio] Opening database: ${DB_PATH}\n`);
 const db = openDb(DB_PATH);
 const handle = createMcpServer(db);
 

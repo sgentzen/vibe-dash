@@ -80,6 +80,8 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, rightRailCollapsed: action.payload };
     case "SET_AUTH":
       return { ...state, ...action.payload };
+    case "SET_LOAD_ERROR":
+      return { ...state, loadError: action.payload };
     default:
       return null;
   }
