@@ -2,10 +2,11 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { openDb, resolveDbPath } from "../db/index.js";
 import { createMcpServer } from "./server.js";
+import { resolveDbPath } from "../utils/resolveDbPath.js";
 
-const DB_PATH = resolveDbPath();
-// stdio transport: server logs go to stderr to avoid corrupting the JSON-RPC stream.
-process.stderr.write(`[mcp/stdio] Opening database: ${DB_PATH}\n`);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, "../..");
+const DB_PATH = resolveDbPath(PROJECT_ROOT);
 const db = openDb(DB_PATH);
 const handle = createMcpServer(db);
 

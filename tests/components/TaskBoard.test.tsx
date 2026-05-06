@@ -17,6 +17,7 @@ vi.mock("../../src/hooks/useApi", () => ({
     completeTask: vi.fn().mockResolvedValue(null),
     addComment: vi.fn().mockResolvedValue(null),
     getComments: vi.fn().mockResolvedValue([]),
+    getSuggestedAgent: vi.fn().mockResolvedValue(null),
   }),
 }));
 
@@ -145,4 +146,5 @@ describe("TaskBoard", () => {
     renderWithProviders(<TaskBoard />);
     expect(screen.queryByLabelText("Add task to PLANNED")).not.toBeInTheDocument();
   });
+
 });

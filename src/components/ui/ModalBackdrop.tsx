@@ -14,6 +14,7 @@ export function ModalBackdrop({ onClick, zIndex = 10, style }: ModalBackdropProp
   return (
     <div
       onClick={onClick}
+      aria-hidden="true"
       style={{
         position: "fixed",
         inset: 0,

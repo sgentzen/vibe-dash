@@ -16,6 +16,7 @@ import { initPlugins } from "./routes/plugins.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { resolveDbPath } from "./utils/resolveDbPath.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -37,8 +38,7 @@ const messagesLimiter = rateLimit({
 });
 
 const PORT = parseInt(process.env.PORT ?? "3001");
-const DB_PATH = resolveDbPath();
-logger.info({ DB_PATH }, "Opening database");
+const DB_PATH = resolveDbPath(PROJECT_ROOT);
 
 const app = express();
 app.use(helmet({

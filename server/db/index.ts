@@ -2,7 +2,7 @@
 // and get the same public API as the original monolithic db.ts.
 
 export { initDb, openDb } from "./schema.js";
-export { resolveDbPath } from "./path.js";
+export { normalizeAgentName } from "./helpers.js";
 export { createProject, updateProject, listProjects } from "./projects.js";
 export {
   createMilestone,
