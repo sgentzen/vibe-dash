@@ -10,9 +10,8 @@
  *   npx ts-node cli/index.ts agents
  */
 
-import { resolve } from "path";
 import Database from "better-sqlite3";
-import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
+import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers, resolveDbPath } from "../server/db/index.js";
 import {
   RESET,
   DIM,
@@ -46,7 +45,7 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-const dbPath = resolve(flags.db ?? "./vibe-dash.db");
+const dbPath = resolveDbPath(flags.db);
 const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 
