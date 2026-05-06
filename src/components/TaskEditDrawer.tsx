@@ -114,7 +114,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   }
 
   return (
-    <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: true, escapeDeactivates: true, onDeactivate: onClose }}>
+    <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: false, allowOutsideClick: true, escapeDeactivates: true, onDeactivate: onClose }}>
       <div>
       <ModalBackdrop onClick={onClose} />
       <ModalDrawer ariaLabel="Edit task">
