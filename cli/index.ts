@@ -55,8 +55,6 @@ const dbPath = resolve(flags.db ?? "./vibe-dash.db");
 const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 
-// ─── install-hooks runs before DB open (no DB needed) ────────────────────────
-
 // ─── Open DB (skipped for install-hooks which talks to the server via HTTP) ──
 
 let db!: Database.Database;
@@ -302,27 +300,27 @@ async function installHooks(): Promise<void> {
     throw new Error(`Cannot reach vibe-dash server at ${serverUrl}. Is it running?\n  ${(e as Error).message}`);
   }
 
-  // 2. Create (or reuse) a claude_code ingestion source
+  // 2. Find or create a claude_code ingestion source, then rotate to get a fresh token
   const sourceName = "claude-code-hooks";
-  const createRes = await fetch(`${serverUrl}/api/ingest/sources`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: sourceName, kind: "claude_code" }),
-  });
-  if (!createRes.ok && createRes.status !== 409) {
-    throw new Error(`Failed to create ingestion source: ${createRes.status} ${await createRes.text()}`);
-  }
-  if (createRes.ok) {
-    const source = (await createRes.json()) as { token: string };
-    token = source.token;
+  const listRes = await fetch(`${serverUrl}/api/ingest/sources`);
+  if (!listRes.ok) throw new Error(`Failed to list ingestion sources: ${listRes.status}`);
+  const sources = (await listRes.json()) as { id: string; name: string }[];
+  const existing = sources.find((s) => s.name === sourceName);
+
+  if (existing) {
+    const rotateRes = await fetch(`${serverUrl}/api/ingest/sources/${existing.id}/rotate`, { method: "POST" });
+    if (!rotateRes.ok) throw new Error(`Failed to rotate token: ${rotateRes.status} ${await rotateRes.text()}`);
+    const rotated = (await rotateRes.json()) as { token: string };
+    token = rotated.token;
   } else {
-    // 409 means it exists — list sources and find it
-    const listRes = await fetch(`${serverUrl}/api/ingest/sources`);
-    if (!listRes.ok) throw new Error(`Failed to list ingestion sources: ${listRes.status}`);
-    const sources = (await listRes.json()) as { name: string; token?: string }[];
-    const existing = sources.find((s) => s.name === sourceName);
-    if (!existing?.token) throw new Error(`Source "${sourceName}" exists but token is not exposed. Rotate it via the dashboard.`);
-    token = existing.token;
+    const createRes = await fetch(`${serverUrl}/api/ingest/sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: sourceName, kind: "claude_code" }),
+    });
+    if (!createRes.ok) throw new Error(`Failed to create ingestion source: ${createRes.status} ${await createRes.text()}`);
+    const created = (await createRes.json()) as { token: string };
+    token = created.token;
   }
 
   // 3. Build hook command (inline node, works cross-platform, requires Node >=18)
@@ -367,7 +365,7 @@ async function installHooks(): Promise<void> {
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
 
   console.log(`${GREEN}✓ Hooks installed${RESET} → ${settingsPath}`);
-  console.log(`  Ingestion source: ${sourceName}`);
+  console.log(`  Ingestion source: ${sourceName} ${existing ? DIM + "(token rotated)" + RESET : ""}`);
   console.log(`  Endpoint: ${endpoint}`);
   console.log(`  Every PostToolUse + Stop event will POST to vibe-dash.`);
 }
