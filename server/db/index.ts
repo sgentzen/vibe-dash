@@ -75,14 +75,6 @@ export {
   getUnreadNotificationCount,
 } from "./notifications.js";
 export {
-  createTemplate,
-  listTemplates,
-  getTemplate,
-  deleteTemplate,
-  createProjectFromTemplate,
-  seedBuiltInTemplates,
-} from "./templates.js";
-export {
   createWebhook,
   listWebhooks,
   updateWebhook,

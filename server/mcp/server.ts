@@ -372,25 +372,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("list_mentions")
   );
 
-  // ─── R5: Templates ────────────────────────────────────────────────
-
-  server.tool(
-    "create_project_from_template",
-    "Create a project from a template",
-    {
-      template_id: z.string(),
-      project_name: z.string(),
-    },
-    call("create_project_from_template")
-  );
-
-  server.tool(
-    "list_templates",
-    "List available project templates",
-    {},
-    call("list_templates")
-  );
-
   // ─── R4: Agent Stats ─────────────────────────────────────────────────
 
   server.tool(

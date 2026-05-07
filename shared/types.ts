@@ -45,14 +45,6 @@ export interface Task {
   updated_at: string;
 }
 
-export interface ProjectTemplate {
-  id: string;
-  name: string;
-  description: string | null;
-  template_json: string;
-  created_at: string;
-}
-
 export type AgentRole = "orchestrator" | "coder" | "reviewer" | "explorer" | "planner" | "agent";
 
 export interface Agent {

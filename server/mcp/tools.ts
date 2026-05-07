@@ -46,8 +46,6 @@ import {
   listMentions,
   handleRecurringTaskCompletion,
   recordMilestoneDailyStats,
-  createProjectFromTemplate,
-  listTemplates,
   getActivityStream,
   logCost,
   getAgentCostSummary,
@@ -436,19 +434,6 @@ export async function handleTool(
 
     case "list_mentions": {
       return ok({ mentions: listMentions(db, args.agent_name as string) });
-    }
-
-    // ─── R5: Templates ──────────────────────────────────────────────────
-
-    case "create_project_from_template": {
-      const project = createProjectFromTemplate(db, args.template_id as string, args.project_name as string);
-      if (!project) return ok({ error: "Template not found" });
-      broadcast({ type: "project_created", payload: project });
-      return ok({ project });
-    }
-
-    case "list_templates": {
-      return ok({ templates: listTemplates(db) });
     }
 
     // ─── R3: Comments ──────────────────────────────────────────────────────

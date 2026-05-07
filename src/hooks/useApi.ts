@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -421,24 +421,6 @@ async function generateReportApi(projectId: string, period: "day" | "week" | "mi
   return data.report;
 }
 
-// ─── R5: Templates ───────────────────────────────────────────────────
-
-async function getTemplates(): Promise<ProjectTemplate[]> {
-  const res = await apiFetch("/api/templates");
-  if (!res.ok) throw new Error(`getTemplates failed: ${res.status}`);
-  return res.json();
-}
-
-async function instantiateTemplate(templateId: string, projectName: string): Promise<Project> {
-  const res = await apiFetch(`/api/templates/${encodeURIComponent(templateId)}/instantiate`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ project_name: projectName }),
-  });
-  if (!res.ok) throw new Error(`instantiateTemplate failed: ${res.status}`);
-  return res.json();
-}
-
 // ─── R5: Activity Stream ─────────────────────────────────────────────
 
 async function getActivityStreamApi(params: Record<string, string | undefined> = {}): Promise<ActivityEntry[]> {
@@ -763,8 +745,6 @@ export function useApi() {
     getMilestoneDailyStats,
     getActivityHeatmap,
     generateReport: generateReportApi,
-    getTemplates,
-    instantiateTemplate,
     getActivityStream: getActivityStreamApi,
     getWebhooks,
     createWebhook: createWebhookApi,

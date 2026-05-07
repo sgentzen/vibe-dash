@@ -382,6 +382,15 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "009_drop_project_templates",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "project_templates")) {
+        db.prepare("DROP TABLE project_templates").run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

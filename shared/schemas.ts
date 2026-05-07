@@ -155,19 +155,6 @@ export const updateWebhookSchema = z.object({
 
 const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");
 
-// ─── Templates ──────────────────────────────────────────────────────────
-
-export const createTemplateSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().nullable().optional(),
-  template_json: validJson,
-});
-
-export const instantiateTemplateSchema = z.object({
-  project_name: z.string().min(1),
-  description: z.string().nullable().optional(),
-});
-
 export const generateReportSchema = z.object({
   period: z.enum(["day", "week", "milestone"]).optional(),
 });

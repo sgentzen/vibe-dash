@@ -14,7 +14,6 @@ import { tagRoutes } from "./tags.js";
 import { dependencyRoutes } from "./dependencies.js";
 import { commentRoutes } from "./comments.js";
 import { notificationRoutes } from "./notifications.js";
-import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
@@ -66,7 +65,6 @@ const routeFactories: RouteFactory[] = [
   dependencyRoutes,
   commentRoutes,
   notificationRoutes,
-  templateRoutes,
   webhookRoutes,
   costRoutes,
   bulkRoutes,
