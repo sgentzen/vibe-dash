@@ -76,6 +76,7 @@ export async function handleTool(
       return ok({ agent_id: agent.id });
     }
 
+    // Not registered in server.ts (humans create projects via UI), kept here as test scaffolding
     case "create_project": {
       const project = createProject(db, {
         name: args.name as string,
@@ -160,7 +161,9 @@ export async function handleTool(
         milestone_id: args.milestone_id as string | null | undefined,
         assigned_agent_id: args.assigned_agent_id as string | null | undefined,
         due_date: args.due_date as string | null | undefined,
+        start_date: args.start_date as string | null | undefined,
         estimate: args.estimate as number | null | undefined,
+        recurrence_rule: args.recurrence_rule as string | null | undefined,
       });
       if (updated) {
         // Auto-assign agent when status changes to in_progress or done

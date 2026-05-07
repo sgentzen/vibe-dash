@@ -202,6 +202,38 @@ describe("list operations", () => {
   });
 });
 
+// ─── search_tasks ─────────────────────────────────────────────────────────────
+
+describe("search_tasks", () => {
+  it("returns tasks matching query", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    await handleTool(db, "create_task", { project_id, title: "Implement auth", priority: "high" });
+    await handleTool(db, "create_task", { project_id, title: "Write tests", priority: "low" });
+
+    const result = await handleTool(db, "search_tasks", { query: "auth" });
+    const data = parse(result);
+    expect(data.tasks.length).toBeGreaterThanOrEqual(1);
+    expect(data.tasks.some((t: { title: string }) => t.title.includes("auth"))).toBe(true);
+  });
+});
+
+// ─── list_milestones / complete_milestone ─────────────────────────────────────
+
+describe("milestones", () => {
+  it("list_milestones returns empty when none exist", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    const result = await handleTool(db, "list_milestones", { project_id });
+    const data = parse(result);
+    expect(data.milestones).toEqual([]);
+  });
+
+  it("complete_milestone returns success=false for unknown id", async () => {
+    const result = await handleTool(db, "complete_milestone", { milestone_id: "no-such-id" });
+    const data = parse(result);
+    expect(data.success).toBe(false);
+  });
+});
+
 // ─── onboarding wizard flow ───────────────────────────────────────────────────
 
 describe("onboarding wizard flow", () => {
