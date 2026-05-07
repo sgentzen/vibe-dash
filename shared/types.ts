@@ -431,3 +431,20 @@ export interface ExecutiveSummary {
   costs: CostOverview;
   generated_at: string;
 }
+
+// ─── Detector Framework ───────────────────────────────────────────────────────
+
+export type DetectorEntityType = "task" | "agent" | "blocker" | "review";
+
+export interface DetectorMatch {
+  entityId: string;
+  entityType: DetectorEntityType;
+  label: string;
+  detail?: string;
+}
+
+export interface ScoredMatch extends DetectorMatch {
+  detectorId: string;
+  category: string;
+  score: number; // 0–100
+}
