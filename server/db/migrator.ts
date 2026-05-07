@@ -391,6 +391,15 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "010_drop_agent_file_locks",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "agent_file_locks")) {
+        db.prepare("DROP TABLE agent_file_locks").run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
