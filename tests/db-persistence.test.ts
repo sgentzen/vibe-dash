@@ -3,7 +3,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import Database from "better-sqlite3";
-import { initDb, createProject, listProjects, createTask, listTasks, resolveDbPath } from "../server/db/index.js";
+import { initDb, createProject, listProjects, createTask, listTasks } from "../server/db/index.js";
+import { resolveDbPath } from "../server/db/path.js";
 
 describe("DB persistence across restarts", () => {
   let dbDir: string;
