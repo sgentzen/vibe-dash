@@ -403,16 +403,27 @@ const MIGRATIONS: Migration[] = [
   {
     name: "011_drop_alert_rules",
     run(db) {
-      // Notifications table stays; alert_rules FK column becomes nullable-safe
-      // because notifications.rule_id is already nullable (inserted as NULL).
       const tables = db.pragma("table_list") as { name: string }[];
+      const hasAlertRules = tables.some((t) => t.name === "alert_rules");
+      if (!hasAlertRules) return;
+
+      // Recreate notifications without the FK reference to alert_rules,
+      // then drop alert_rules. SQLite requires table recreation to drop FKs.
       if (tables.some((t) => t.name === "notifications")) {
-        // Detach the FK reference before dropping parent
-        db.prepare("UPDATE notifications SET rule_id = NULL WHERE rule_id IS NOT NULL").run();
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS notifications_new (
+            id TEXT PRIMARY KEY,
+            rule_id TEXT,
+            message TEXT NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+          );
+          INSERT INTO notifications_new SELECT id, rule_id, message, read, created_at FROM notifications;
+          DROP TABLE notifications;
+          ALTER TABLE notifications_new RENAME TO notifications;
+        `);
       }
-      if (tables.some((t) => t.name === "alert_rules")) {
-        db.prepare("DROP TABLE alert_rules").run();
-      }
+      db.prepare("DROP TABLE alert_rules").run();
     },
   },
 ];

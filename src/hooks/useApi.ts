@@ -496,35 +496,35 @@ interface CostByAgentEntry {
 }
 
 async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/timeseries${qs ? `?${qs}` : ""}`);
+  const qs = buildQueryString({ ...params, groupBy: "day" });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) throw new Error(`getCostTimeseries failed: ${res.status}`);
   return res.json();
 }
 
 async function getCostSummary(projectId?: string): Promise<CostSummary> {
-  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
-  const res = await apiFetch(`/api/costs/summary${qs}`);
+  const qs = buildQueryString({ groupBy: "project", ...(projectId ? { id: projectId } : {}) });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) throw new Error(`getCostSummary failed: ${res.status}`);
   return res.json();
 }
 
 async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
-  const res = await apiFetch(`/api/costs/project/${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/costs?groupBy=project&id=${encodeURIComponent(projectId)}`);
   if (!res.ok) throw new Error(`getProjectCostSummary failed: ${res.status}`);
   return res.json();
 }
 
 async function getCostByModel(params: Record<string, string | undefined> = {}): Promise<CostByModelEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/by-model${qs ? `?${qs}` : ""}`);
+  const qs = buildQueryString({ ...params, groupBy: "model" });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) throw new Error(`getCostByModel failed: ${res.status}`);
   return res.json();
 }
 
 async function getCostByAgent(params: Record<string, string | undefined> = {}): Promise<CostByAgentEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/by-agent${qs ? `?${qs}` : ""}`);
+  const qs = buildQueryString({ ...params, groupBy: "agent" });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) throw new Error(`getCostByAgent failed: ${res.status}`);
   return res.json();
 }
