@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -576,12 +576,6 @@ async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise
   return res.json();
 }
 
-async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/suggest-agent`);
-  if (!res.ok) throw new Error(`getSuggestedAgent failed: ${res.status}`);
-  const data = await res.json();
-  return data ?? null;
-}
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -768,7 +762,6 @@ export function useApi() {
     getAgentPerformance,
     getAgentComparison,
     getTaskTypeBreakdown,
-    getSuggestedAgent,
     getWorktrees,
     updateWorktreeStatus,
     getExecutiveSummary,
