@@ -368,15 +368,6 @@ export type WsEvent =
   | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
   | WsEventOf<"plugins_reloaded", { count: number }>;
 
-// ─── Saved Filters ────────────────────────────────────────────────────────────
-
-export interface SavedFilter {
-  id: string;
-  name: string;
-  filter_json: string;
-  created_at: string;
-}
-
 // ─── Git Sync ─────────────────────────────────────────────────────────────────
 
 export interface GitIntegrationSafe {

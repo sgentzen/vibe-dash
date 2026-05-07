@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -286,26 +286,6 @@ async function searchTasks(params: Record<string, string | undefined>): Promise<
   const res = await apiFetch(`/api/tasks/search?${qs}`);
   if (!res.ok) throw new Error(`searchTasks failed: ${res.status}`);
   return res.json();
-}
-
-async function getSavedFilters(): Promise<SavedFilter[]> {
-  const res = await apiFetch("/api/filters");
-  if (!res.ok) throw new Error(`getSavedFilters failed: ${res.status}`);
-  return res.json();
-}
-
-async function createSavedFilter(name: string, filterJson: string): Promise<SavedFilter> {
-  const res = await apiFetch("/api/filters", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ name, filter_json: filterJson }),
-  });
-  if (!res.ok) throw new Error(`createSavedFilter failed: ${res.status}`);
-  return res.json();
-}
-
-async function deleteSavedFilter(id: string): Promise<void> {
-  await apiFetch(`/api/filters/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // ─── R3: Comments ────────────────────────────────────────────────────
