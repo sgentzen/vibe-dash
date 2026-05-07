@@ -179,7 +179,7 @@ export interface Blocker {
   resolved_at: string | null;
 }
 
-export type ReviewStatus = "pending" | "approved" | "changes_requested";
+export type ReviewStatus = "pending" | "approved" | "changes_requested" | "failed";
 
 export type WorktreeStatus = "active" | "merged" | "abandoned" | "removed";
 

@@ -31,11 +31,10 @@ function hoursAgo(h: number): string {
   return new Date(Date.now() - h * 3_600_000).toISOString();
 }
 
-function runWith(nowOverride?: string) {
-  // runDetectors uses new Date().toISOString() internally — we use a small
-  // workaround: set the db row timestamps relative to a controlled "now".
-  // Since runDetectors doesn't accept a clock override, tests control the
-  // row timestamps (reported_at / last_seen_at / updated_at) instead.
+// Tests control timestamps by back-dating the DB rows (reported_at / last_seen_at /
+// updated_at) rather than overriding the runner clock.  runDetectors uses
+// new Date().toISOString() as its "now", so rows dated N hours ago appear as N hours old.
+function runWith() {
   return runDetectors(db, { minScore: 0 });
 }
 
@@ -163,6 +162,18 @@ describe("agent-silence detector", () => {
 
     const match = runWith().find((m) => m.entityId === agent.id);
     expect(match?.score).toBe(60);
+  });
+
+  it("scores 80 for 4-7 h silence", () => {
+    const agent = registerAgent(db, { name: "bot-4h", model: null, capabilities: [] });
+    db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(hoursAgo(5), agent.id);
+    const p = createProject(db, { name: "P", description: null });
+    db.prepare(
+      "INSERT INTO tasks (id, project_id, title, status, priority, progress, created_at, updated_at, assigned_agent_id) VALUES (?, ?, ?, 'in_progress', 'medium', 0, ?, ?, ?)"
+    ).run("t-4h", p.id, "Task 4h", hoursAgo(6), hoursAgo(6), agent.id);
+
+    const match = runWith().find((m) => m.entityId === agent.id);
+    expect(match?.score).toBe(80);
   });
 
   it("scores 95 for 8 h+ silence", () => {

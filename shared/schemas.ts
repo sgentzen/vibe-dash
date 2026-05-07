@@ -194,7 +194,7 @@ export const updateWorktreeStatusSchema = z.object({
 
 // ─── Reviews ────────────────────────────────────────────────────────────
 
-export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested"]);
+export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested", "failed"]);
 
 export const createReviewSchema = z.object({
   task_id: z.string().min(1),

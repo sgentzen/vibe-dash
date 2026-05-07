@@ -125,7 +125,9 @@ export function registerTier1Detectors(): void {
 
       // Agents with last_seen_at < cutoff that have at least one in_progress task.
       const rows = db.prepare(`
-        SELECT a.id, a.name, a.last_seen_at, t.id AS task_id, t.title AS task_title
+        SELECT a.id, a.name, a.last_seen_at,
+               MIN(t.id)    AS task_id,
+               MIN(t.title) AS task_title
         FROM agents a
         JOIN tasks t ON t.assigned_agent_id = a.id AND t.status = 'in_progress'
         WHERE a.last_seen_at < ?
