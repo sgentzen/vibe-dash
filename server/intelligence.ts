@@ -121,7 +121,7 @@ function extractText(response: Anthropic.Message): string {
 
 /** Trim an array to at most maxItems elements to stay within context budget */
 function trimArray<T>(arr: T[], maxItems: number): T[] {
-  return arr.slice(0, maxItems);
+  return arr.slice(0, Math.max(0, Math.round(maxItems)));
 }
 
 // ── Digest context ─────────────────────────────────────────────────────────────
