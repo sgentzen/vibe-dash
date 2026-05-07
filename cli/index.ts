@@ -345,18 +345,22 @@ async function installHooks(): Promise<void> {
   const hookEntry = { type: "command", command: hookCmd };
   const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
 
-  // PostToolUse: capture every tool call
+  // PostToolUse: capture every tool call — replace existing vibe-dash entry to refresh token
   const postToolUse = (hooks.PostToolUse ?? []) as { matcher?: string; hooks: unknown[] }[];
-  const vibeEntry = postToolUse.find((e) => e.matcher === ".*" && JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
-  if (!vibeEntry) {
+  const vibeIdx = postToolUse.findIndex((e) => e.matcher === ".*" && JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
+  if (vibeIdx >= 0) {
+    postToolUse[vibeIdx] = { matcher: ".*", hooks: [hookEntry] };
+  } else {
     postToolUse.push({ matcher: ".*", hooks: [hookEntry] });
   }
   hooks.PostToolUse = postToolUse;
 
-  // Stop: capture session end
+  // Stop: capture session end — replace existing vibe-dash entry to refresh token
   const stop = (hooks.Stop ?? []) as { hooks: unknown[] }[];
-  const vibeStop = stop.find((e) => JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
-  if (!vibeStop) {
+  const stopIdx = stop.findIndex((e) => JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
+  if (stopIdx >= 0) {
+    stop[stopIdx] = { hooks: [hookEntry] };
+  } else {
     stop.push({ hooks: [hookEntry] });
   }
   hooks.Stop = stop;
