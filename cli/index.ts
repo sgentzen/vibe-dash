@@ -10,9 +10,11 @@
  *   npx ts-node cli/index.ts agents
  */
 
-import { resolve } from "path";
+import { resolve, join } from "path";
+import { mkdirSync, writeFileSync } from "fs";
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
+import { generateDigest, isAiConfigured } from "../server/intelligence.js";
 import {
   RESET,
   DIM,
@@ -213,12 +215,88 @@ function cmdHelp() {
   console.log(formatHelp());
 }
 
+async function cmdDigest() {
+  const outputDir = resolve(flags["output-dir"] ?? "./digests");
+  const date = new Date().toISOString().slice(0, 10);
+  const outPath = join(outputDir, `${date}.md`);
+
+  mkdirSync(outputDir, { recursive: true });
+
+  let content: string;
+  if (isAiConfigured()) {
+    const projectName = flags.project;
+    const projectId = projectName
+      ? listProjects(db).find((p) => p.name.toLowerCase() === projectName.toLowerCase())?.id
+      : undefined;
+    process.stdout.write("Generating AI digest…");
+    content = await generateDigest(db, "daily", projectId);
+    process.stdout.write(" done.\n");
+  } else {
+    content = buildStaticDigest(db, date);
+  }
+  writeFileSync(outPath, content, "utf8");
+  console.log(`${GREEN}Digest written:${RESET} ${outPath}`);
+}
+
+function buildStaticDigest(db: Database.Database, date: string): string {
+  const projects = listProjects(db);
+  const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const lines: string[] = [`# Daily Digest — ${date}`, ""];
+
+  for (const p of projects) {
+    const tasks = listTasks(db, { project_id: p.id }).filter((t) => !t.parent_task_id);
+    const inProgress = tasks.filter((t) => t.status === "in_progress");
+    const done24h = tasks.filter((t) => t.status === "done" && t.updated_at >= since);
+    const blocked = tasks.filter((t) => t.status === "blocked");
+    const openMilestone = listMilestones(db, p.id).find((m) => m.status === "open");
+    const pct = openMilestone ? getMilestoneProgress(db, openMilestone.id).completion_pct : null;
+
+    lines.push(`## ${p.name}`);
+    if (openMilestone) lines.push(`**Milestone:** ${openMilestone.name}${pct !== null ? ` (${pct}%)` : ""}`);
+    lines.push(`**In progress:** ${inProgress.length}  **Completed today:** ${done24h.length}  **Blocked:** ${blocked.length}`);
+    if (done24h.length > 0) {
+      lines.push("", "### Completed today");
+      for (const t of done24h.slice(0, 10)) lines.push(`- ${t.title}`);
+    }
+    if (inProgress.length > 0) {
+      lines.push("", "### In progress");
+      for (const t of inProgress.slice(0, 10)) lines.push(`- ${t.title}`);
+    }
+    if (blocked.length > 0) {
+      lines.push("", "### Blocked");
+      for (const t of blocked.slice(0, 5)) lines.push(`- ${t.title}`);
+    }
+    lines.push("");
+  }
+
+  const activeBlockers = getActiveBlockers(db);
+  if (activeBlockers.length > 0) {
+    lines.push("## Active Blockers", "");
+    for (const b of activeBlockers.slice(0, 10)) lines.push(`- ${b.reason}`);
+    lines.push("");
+  }
+
+  const agents = listAgents(db);
+  const activeAgents = agents.filter((a) => getAgentHealthStatus(a.last_seen_at) === "active");
+  lines.push(`## Agents`, `${activeAgents.length} active / ${agents.length} total`, "");
+
+  return lines.join("\n");
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
-switch (command) {
-  case "list": cmdList(); break;
-  case "add-task": cmdAddTask(); break;
-  case "status": cmdStatus(); break;
-  case "agents": cmdAgents(); break;
-  default: cmdHelp(); break;
+async function main() {
+  switch (command) {
+    case "list": cmdList(); break;
+    case "add-task": cmdAddTask(); break;
+    case "status": cmdStatus(); break;
+    case "agents": cmdAgents(); break;
+    case "digest": await cmdDigest(); break;
+    default: cmdHelp(); break;
+  }
 }
+
+main().catch((err: Error) => {
+  console.error(`${RED}Error:${RESET} ${err.message}`);
+  process.exit(1);
+});
