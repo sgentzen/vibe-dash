@@ -1,7 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus, TaskPriority, MilestoneStatus, TaskDependency } from "./types.js";
-import { runDetectors, listDetectors } from "./detectors/index.js";
 import { validateWebhookUrl } from "./utils/validateWebhookUrl.js";
 import {
   listProjects,
@@ -947,27 +946,6 @@ export function createRouter(db: Database.Database): Router {
     deleteMilestone(db, req.params.id);
     broadcast({ type: "milestone_deleted", payload: existing });
     res.json({ success: true });
-  });
-
-  // ─── Detectors ────────────────────────────────────────────────────────────────
-
-  router.get("/api/detectors", (_req, res) => {
-    const detectors = listDetectors().map((d) => ({
-      id: d.id,
-      category: d.category,
-      defaultThreshold: d.defaultThreshold,
-    }));
-    res.json(detectors);
-  });
-
-  router.get("/api/detectors/matches", (req, res) => {
-    const minScore = req.query.minScore !== undefined ? Number(req.query.minScore) : undefined;
-    if (minScore !== undefined && (isNaN(minScore) || minScore < 0 || minScore > 100)) {
-      res.status(400).json({ error: "minScore must be a number between 0 and 100" });
-      return;
-    }
-    const detectorId = typeof req.query.detectorId === "string" ? req.query.detectorId : undefined;
-    res.json(runDetectors(db, { minScore, detectorId }));
   });
 
   return router;

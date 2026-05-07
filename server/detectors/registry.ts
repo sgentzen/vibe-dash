@@ -7,6 +7,9 @@ export function registerDetector(d: Detector): void {
   if (REGISTRY.some((r) => r.id === d.id)) {
     throw new Error(`Detector '${d.id}' is already registered`);
   }
+  if (d.defaultThreshold < 0 || d.defaultThreshold > 100) {
+    throw new Error(`Detector '${d.id}': defaultThreshold must be 0–100, got ${d.defaultThreshold}`);
+  }
   REGISTRY.push(d);
 }
 
@@ -16,6 +19,9 @@ export function listDetectors(): readonly Detector[] {
 
 // Comma-separated detector IDs that are suppressed at runtime.
 // Set VIBE_SUPPRESS_DETECTORS=blocker-aging,agent-silence to silence specific detectors.
+// Re-reads env on every call so that test code can toggle suppression between runs
+// without restarting the process.  In production the env never changes, so the
+// overhead is one string split per request — acceptable.
 function suppressedIds(): Set<string> {
   const raw = process.env.VIBE_SUPPRESS_DETECTORS ?? "";
   return new Set(raw.split(",").filter(Boolean));

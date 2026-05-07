@@ -5,8 +5,8 @@ import {
   registerDetector,
   runDetectors,
   listDetectors,
-  _resetRegistry,
 } from "../server/detectors/index.js";
+import { _resetRegistry } from "../server/detectors/registry.js";
 import type { Detector, Match, DetectorContext } from "../server/detectors/index.js";
 
 let db: Database.Database;
@@ -47,6 +47,14 @@ describe("registerDetector", () => {
   it("throws on duplicate id", () => {
     registerDetector(makeDetector());
     expect(() => registerDetector(makeDetector())).toThrow("already registered");
+  });
+
+  it("throws on defaultThreshold < 0", () => {
+    expect(() => registerDetector(makeDetector({ defaultThreshold: -1 }))).toThrow("defaultThreshold must be 0");
+  });
+
+  it("throws on defaultThreshold > 100", () => {
+    expect(() => registerDetector(makeDetector({ defaultThreshold: 101 }))).toThrow("defaultThreshold must be 0");
   });
 
   it("allows different ids", () => {
