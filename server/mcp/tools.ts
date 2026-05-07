@@ -65,7 +65,6 @@ import {
   createReview,
   listReviewsForTask,
   updateReview,
-  suggestAgent,
   createWorktree,
   getWorktreeById,
   getTaskWorktree,
@@ -73,7 +72,6 @@ import {
   updateWorktreeStatus,
 } from "../db/index.js";
 import {
-  suggestAgentSchema,
   registerAgentSchema,
   createReviewSchema,
   updateReviewSchema,
@@ -726,16 +724,6 @@ export async function handleTool(
       const worktree = getTaskWorktree(db, args.task_id as string);
       if (!worktree) return ok({ error: "No worktree found for this task" });
       return ok(worktree);
-    }
-
-    // ─── R10: Intelligent Routing ─────────────────────────────────────────
-
-    case "suggest_agent": {
-      const { task_id } = suggestAgentSchema.parse(args);
-      const taskExists = db.prepare("SELECT id FROM tasks WHERE id = ?").get(task_id);
-      if (!taskExists) return ok({ error: "Task not found" });
-      const suggestion = suggestAgent(db, task_id);
-      return ok(suggestion);
     }
 
     // ─── R11.3: Ingestion Sources ──────────────────────────────��──────────

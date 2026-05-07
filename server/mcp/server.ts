@@ -15,7 +15,6 @@ import {
   updateTaskSchema,
   createMilestoneSchema,
   updateMilestoneSchema,
-  suggestAgentSchema,
   reviewStatusEnum,
   createReviewSchema,
   updateReviewSchema,
@@ -610,15 +609,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Update a review's status, comments, or diff summary",
     { review_id: z.string(), ...updateReviewSchema.shape },
     call("update_review")
-  );
-
-  // ─── R10: Intelligent Routing ──────────────────────────────────────────
-
-  server.tool(
-    "suggest_agent",
-    "Suggest the best agent for a task based on historical performance metrics",
-    suggestAgentSchema.shape,
-    call("suggest_agent")
   );
 
   // ─── R9a: Git Worktrees ────────────────────────────────────────────────
