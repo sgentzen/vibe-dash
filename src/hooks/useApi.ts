@@ -699,6 +699,16 @@ async function rotateIngestionToken(id: string): Promise<{ token: string }> {
   return res.json();
 }
 
+async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<import("../../shared/types.js").ScoredMatch[]> {
+  const params = new URLSearchParams();
+  if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
+  if (opts?.detectorId) params.set("detectorId", opts.detectorId);
+  const qs = params.size > 0 ? `?${params}` : "";
+  const res = await apiFetch(`/api/detectors/matches${qs}`);
+  if (!res.ok) throw new Error(`getDetectorMatches failed: ${res.status}`);
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -777,5 +787,6 @@ export function useApi() {
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
     rotateIngestionToken,
+    getDetectorMatches,
   }), []);
 }

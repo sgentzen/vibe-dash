@@ -16,7 +16,7 @@ export type Theme = "dark" | "light";
 
 export type SearchScope = "tasks" | "projects" | "agents" | "all";
 
-export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity" | "worktrees" | "executive";
+export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity" | "worktrees" | "executive" | "hotspots";
 
 export interface AppState {
   projects: Project[];

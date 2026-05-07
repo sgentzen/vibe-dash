@@ -16,6 +16,7 @@ import { ActivityStreamView } from "./components/ActivityStreamView";
 import { OrchestrationView } from "./components/orchestration/OrchestrationView";
 import { WorktreeView } from "./components/WorktreeView";
 import { ExecutiveView } from "./components/ExecutiveView";
+import { HotSpotsView } from "./components/HotSpotsView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
@@ -278,7 +279,7 @@ export function App() {
           >
             <ProjectContextChip />
           </div>
-          {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : <ActivityStreamView />}
+          {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : activeView === "hotspots" ? <HotSpotsView /> : <ActivityStreamView />}
         </div>
         {rightRailCollapsed ? (
           <aside
