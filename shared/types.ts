@@ -257,7 +257,6 @@ export interface TaskTypeBreakdown {
   avg_lines_added: number;
 }
 
-
 export type UserRole = "admin" | "developer" | "viewer";
 
 export interface User {

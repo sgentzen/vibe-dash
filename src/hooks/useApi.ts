@@ -576,7 +576,6 @@ async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise
   return res.json();
 }
 
-
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 import type { User } from "../types";
