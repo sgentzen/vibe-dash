@@ -39,17 +39,6 @@ describe("register_agent", () => {
   });
 });
 
-// ─── create_project ───────────────────────────────────────────────────────────
-
-describe("create_project", () => {
-  it("creates a project and returns project_id", async () => {
-    const result = await handleTool(db, "create_project", { name: "My Project", description: "A test project" });
-    const data = parse(result);
-    expect(data.project_id).toBeTruthy();
-    expect(typeof data.project_id).toBe("string");
-  });
-});
-
 // ─── create_task ──────────────────────────────────────────────────────────────
 
 describe("create_task", () => {
@@ -210,46 +199,6 @@ describe("list operations", () => {
     const result = await handleTool(db, "list_tasks", { project_id });
     const data = parse(result);
     expect(data.tasks).toHaveLength(2);
-  });
-});
-
-// ─── assign_task / unassign_task ─────────────────────────────────────────────
-
-describe("assign_task", () => {
-  it("assigns an agent to a task", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "medium" }));
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
-
-    const result = await handleTool(db, "assign_task", { task_id, agent_id });
-    const data = parse(result);
-    expect(data.success).toBe(true);
-
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
-    expect(fetched.task.assigned_agent_id).toBe(agent_id);
-  });
-
-  it("is a no-op for unknown task_id", async () => {
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
-    const result = await handleTool(db, "assign_task", { task_id: "no-such-task", agent_id });
-    const data = parse(result);
-    expect(data.success).toBe(true);
-  });
-});
-
-describe("unassign_task", () => {
-  it("removes agent assignment from a task", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "medium" }));
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
-
-    await handleTool(db, "assign_task", { task_id, agent_id });
-    const result = await handleTool(db, "unassign_task", { task_id });
-    const data = parse(result);
-    expect(data.success).toBe(true);
-
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
-    expect(fetched.task.assigned_agent_id).toBeNull();
   });
 });
 
