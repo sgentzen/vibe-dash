@@ -118,6 +118,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
         task_id: updated!.id,
         agent_id: null,
         message: `${changes.join(", ")} on "${updated!.title}"`,
+        source: "api",
       });
       broadcast({
         type: "agent_activity",
@@ -153,6 +154,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       task_id: completed!.id,
       agent_id: null,
       message: `Completed "${completed!.title}"`,
+      source: "api",
     });
     broadcast({
       type: "agent_activity",

@@ -353,6 +353,7 @@ export function createRouter(db: Database.Database): Router {
         task_id: updated!.id,
         agent_id: null,
         message: `${changes.join(", ")} on "${updated!.title}"`,
+        source: "api",
       });
       broadcast({
         type: "agent_activity",
@@ -395,6 +396,7 @@ export function createRouter(db: Database.Database): Router {
       task_id: completed!.id,
       agent_id: null,
       message: `Completed "${completed!.title}"`,
+      source: "api",
     });
     broadcast({
       type: "agent_activity",

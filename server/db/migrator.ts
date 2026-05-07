@@ -363,6 +363,16 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "007_activity_source",
+    run(db) {
+      const cols = db.pragma("table_info(activity_log)") as { name: string }[];
+      if (!cols.some((c) => c.name === "source")) {
+        db.prepare("ALTER TABLE activity_log ADD COLUMN source TEXT NOT NULL DEFAULT 'internal'").run();
+        db.prepare("CREATE INDEX IF NOT EXISTS idx_activity_log_source ON activity_log(source)").run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

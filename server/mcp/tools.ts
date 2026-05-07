@@ -105,7 +105,7 @@ function autoLog(
     broadcast({ type: "agent_registered", payload: agent });
     agentId = agent.id;
   }
-  const entry = logActivity(db, { task_id: taskId, agent_id: agentId, message });
+  const entry = logActivity(db, { task_id: taskId, agent_id: agentId, message, source: "mcp" });
   const task = getTask(db, taskId);
   broadcast({
     type: "agent_activity",

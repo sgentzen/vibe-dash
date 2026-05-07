@@ -75,6 +75,7 @@ export interface ActivityEntry {
   agent_id: string | null;
   message: string;
   timestamp: string;
+  source: string;
   agent_name?: string | null;
   task_title?: string | null;
   project_name?: string | null;
