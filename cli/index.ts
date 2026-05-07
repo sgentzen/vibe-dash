@@ -27,8 +27,10 @@ import {
   formatAgentHeaderRow,
   formatAgentRow,
   formatStatusSummary,
+  formatCompactStatus,
   formatHelp,
 } from "./format.js";
+import type { ProjectSnapshot } from "./format.js";
 
 // ─── Parse args ──────────────────────────────────────────────────────────────
 
@@ -141,43 +143,57 @@ function cmdAddTask() {
 
 function cmdStatus() {
   const projectName = subcommand || undefined;
-  const projects = listProjects(db);
-  const project = projectName ? projects.find((p) => p.name.toLowerCase() === projectName.toLowerCase()) : projects[0];
+  const allProjects = listProjects(db);
 
-  if (!project) {
+  if (!allProjects.length) {
     console.error(`${RED}Error:${RESET} No projects found.`);
     process.exit(1);
   }
 
-  const tasks = listTasks(db, { project_id: project.id }).filter((t) => !t.parent_task_id);
-  const byStatus: Record<string, number> = { planned: 0, in_progress: 0, blocked: 0, done: 0 };
-  for (const t of tasks) byStatus[t.status] = (byStatus[t.status] ?? 0) + 1;
+  // Named project → detailed single-project view (existing behavior)
+  if (projectName) {
+    const project = allProjects.find((p) => p.name.toLowerCase() === projectName.toLowerCase());
+    if (!project) {
+      console.error(`${RED}Error:${RESET} Project "${projectName}" not found.`);
+      process.exit(1);
+    }
+    const tasks = listTasks(db, { project_id: project.id }).filter((t) => !t.parent_task_id);
+    const byStatus: Record<string, number> = { planned: 0, in_progress: 0, blocked: 0, done: 0 };
+    for (const t of tasks) byStatus[t.status] = (byStatus[t.status] ?? 0) + 1;
+    const milestones = listMilestones(db, project.id);
+    const openMilestone = milestones.find((m) => m.status === "open");
+    const blockers = getActiveBlockers(db);
+    const openMilestoneSummary = openMilestone
+      ? (() => {
+          const progress = getMilestoneProgress(db, openMilestone.id);
+          return { name: openMilestone.name, completed_count: progress.completed_count, task_count: progress.task_count, completion_pct: progress.completion_pct };
+        })()
+      : undefined;
+    console.log(formatStatusSummary({ projectName: project.name, byStatus, total: tasks.length, openMilestone: openMilestoneSummary, blockers }));
+    return;
+  }
 
-  const milestones = listMilestones(db, project.id);
-  const openMilestone = milestones.find((m) => m.status === "open");
-  const blockers = getActiveBlockers(db);
+  // No arg → compact all-projects view (≤10 lines)
+  const snapshots: ProjectSnapshot[] = allProjects.map((p) => {
+    const tasks = listTasks(db, { project_id: p.id }).filter((t) => !t.parent_task_id);
+    const counts = { planned: 0, in_progress: 0, blocked: 0, done: 0 };
+    for (const t of tasks) counts[t.status as keyof typeof counts] = (counts[t.status as keyof typeof counts] ?? 0) + 1;
+    const openMilestone = listMilestones(db, p.id).find((m) => m.status === "open");
+    const milestone = openMilestone
+      ? { name: openMilestone.name, completion_pct: getMilestoneProgress(db, openMilestone.id).completion_pct }
+      : undefined;
+    return { name: p.name, ...counts, openMilestone: milestone };
+  });
 
-  const openMilestoneSummary = openMilestone
-    ? (() => {
-        const progress = getMilestoneProgress(db, openMilestone.id);
-        return {
-          name: openMilestone.name,
-          completed_count: progress.completed_count,
-          task_count: progress.task_count,
-          completion_pct: progress.completion_pct,
-        };
-      })()
-    : undefined;
+  const agents = listAgents(db);
+  const agentCounts = { active: 0, idle: 0, offline: 0 };
+  for (const a of agents) {
+    const h = getAgentHealthStatus(a.last_seen_at);
+    agentCounts[h]++;
+  }
+  const openBlockers = getActiveBlockers(db).length;
 
-  console.log(
-    formatStatusSummary({
-      projectName: project.name,
-      byStatus,
-      total: tasks.length,
-      openMilestone: openMilestoneSummary,
-      blockers,
-    }),
-  );
+  console.log(formatCompactStatus({ projects: snapshots, activeAgents: agentCounts.active, idleAgents: agentCounts.idle, offlineAgents: agentCounts.offline, openBlockers }));
 }
 
 function cmdAgents() {
