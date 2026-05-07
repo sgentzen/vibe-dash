@@ -436,19 +436,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("list_comments")
   );
 
-  // ─── R3: File Locks ────────────────────────────────────────────────────
-
-  server.tool(
-    "report_working_on",
-    "Declare files an agent is working on for conflict detection",
-    {
-      agent_id: z.string(),
-      task_id: z.string(),
-      file_paths: z.array(z.string()),
-    },
-    call("report_working_on")
-  );
-
   // ─── R3: Notifications ─────────────────────────────────────────────────
 
   server.tool(

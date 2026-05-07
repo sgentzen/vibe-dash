@@ -71,10 +71,6 @@ import {
   getReview,
   listReviewsForTask,
   updateReview,
-  reportWorkingOn,
-  releaseFileLocks,
-  getActiveFileLocks,
-  getFileConflicts,
   createAlertRule,
   listAlertRules,
   toggleAlertRule,
@@ -724,32 +720,6 @@ export function createRouter(db: Database.Database): Router {
     if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
     broadcast({ type: "review_updated", payload: updated });
     res.json(updated);
-  });
-
-  // ─── R3: Agent File Locks ──────────────────────────────────────────
-
-  router.post("/api/agents/:id/file-locks", (req, res) => {
-    const { task_id, file_paths } = req.body as { task_id: string; file_paths: string[] };
-    if (!task_id || !file_paths?.length) { res.status(400).json({ error: "task_id and file_paths are required" }); return; }
-    const locks = reportWorkingOn(db, req.params.id, task_id, file_paths);
-    for (const lock of locks) broadcast({ type: "file_lock_acquired", payload: lock });
-    const conflicts = getFileConflicts(db);
-    for (const c of conflicts) broadcast({ type: "file_conflict_detected", payload: c });
-    res.status(201).json({ locks, conflicts });
-  });
-
-  router.delete("/api/agents/:id/file-locks", (req, res) => {
-    const taskId = req.query.task_id as string | undefined;
-    const released = releaseFileLocks(db, req.params.id, taskId);
-    res.json({ released });
-  });
-
-  router.get("/api/file-locks", (_req, res) => {
-    res.json(getActiveFileLocks(db));
-  });
-
-  router.get("/api/file-locks/conflicts", (_req, res) => {
-    res.json(getFileConflicts(db));
   });
 
   // ─── R3: Alert Rules ───────────────────────────────────────────────

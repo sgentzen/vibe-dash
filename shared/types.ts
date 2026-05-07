@@ -131,19 +131,6 @@ export interface TaskComment {
   created_at: string;
 }
 
-export interface AgentFileLock {
-  id: string;
-  agent_id: string;
-  task_id: string;
-  file_path: string;
-  started_at: string;
-}
-
-export interface FileConflict {
-  file_path: string;
-  agents: { agent_id: string; agent_name: string; task_id: string }[];
-}
-
 export interface AlertRule {
   id: string;
   event_type: string;
@@ -338,8 +325,6 @@ export type WsEventType =
   | "session_started"
   | "session_ended"
   | "comment_added"
-  | "file_lock_acquired"
-  | "file_conflict_detected"
   | "notification_created"
   | "daily_stats_recorded"
   | "cost_logged"
@@ -379,8 +364,6 @@ export type WsEvent =
   | WsEventOf<"session_started", AgentSession>
   | WsEventOf<"session_ended", AgentSession>
   | WsEventOf<"comment_added", TaskComment>
-  | WsEventOf<"file_lock_acquired", AgentFileLock>
-  | WsEventOf<"file_conflict_detected", FileConflict>
   | WsEventOf<"notification_created", AppNotification>
   | WsEventOf<"daily_stats_recorded", MilestoneDailyStats>
   | WsEventOf<"cost_logged", CostEntry>

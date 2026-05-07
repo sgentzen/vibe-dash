@@ -21,7 +21,7 @@ export type NavigationState = Pick<
 
 export type NotificationState = Pick<
   AppState,
-  "notifications" | "unreadCount" | "fileConflicts"
+  "notifications" | "unreadCount"
 >;
 
 export type PollingState = Pick<AppState, "pollGeneration">;
@@ -48,7 +48,6 @@ const initialState: AppState = {
   taskDepsMap: {},
   notifications: [],
   unreadCount: 0,
-  fileConflicts: [],
   worktrees: [],
   searchQuery: "",
   searchScope: getInitialSearchScope(),
@@ -122,9 +121,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       notifications: state.notifications,
       unreadCount: state.unreadCount,
-      fileConflicts: state.fileConflicts,
     }),
-    [state.notifications, state.unreadCount, state.fileConflicts]
+    [state.notifications, state.unreadCount]
   );
 
   const pollingValue = useMemo<PollingState>(

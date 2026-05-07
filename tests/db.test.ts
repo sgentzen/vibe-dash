@@ -379,7 +379,6 @@ describe("schema indexes", () => {
     "idx_tags_project_id",
     "idx_milestones_project_id",
     "idx_task_comments_task_id",
-    "idx_agent_file_locks_agent_id",
     "idx_cost_entries_agent_id",
     "idx_cost_entries_project_id",
     "idx_cost_entries_milestone_id",

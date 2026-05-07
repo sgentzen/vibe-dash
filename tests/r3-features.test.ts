@@ -8,10 +8,6 @@ import {
   updateTask,
   addComment,
   listComments,
-  reportWorkingOn,
-  releaseFileLocks,
-  getActiveFileLocks,
-  getFileConflicts,
   createAlertRule,
   listAlertRules,
   toggleAlertRule,
@@ -62,75 +58,6 @@ describe("4.1 Task Comments", () => {
     const project = createProject(db, { name: "P", description: null });
     const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
     expect(listComments(db, task.id)).toHaveLength(0);
-  });
-});
-
-// ─── 1.4 Agent Conflict Detection ───────────────────────────────────────────
-
-describe("1.4 Agent Conflict Detection", () => {
-  it("reports working on files and creates locks", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
-    const agent = registerAgent(db, { name: "bot", model: null, capabilities: [] });
-
-    const locks = reportWorkingOn(db, agent.id, task.id, ["src/a.ts", "src/b.ts"]);
-    expect(locks).toHaveLength(2);
-    expect(locks[0].file_path).toBe("src/a.ts");
-  });
-
-  it("detects conflicts when two agents work on same file", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const t1 = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
-    const t2 = createTask(db, { project_id: project.id, title: "T2", description: null, priority: "medium" });
-    const a1 = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
-    const a2 = registerAgent(db, { name: "agent-2", model: null, capabilities: [] });
-
-    reportWorkingOn(db, a1.id, t1.id, ["src/shared.ts"]);
-    reportWorkingOn(db, a2.id, t2.id, ["src/shared.ts"]);
-
-    const conflicts = getFileConflicts(db);
-    expect(conflicts).toHaveLength(1);
-    expect(conflicts[0].file_path).toBe("src/shared.ts");
-    expect(conflicts[0].agents).toHaveLength(2);
-  });
-
-  it("no conflicts when agents work on different files", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const t1 = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
-    const t2 = createTask(db, { project_id: project.id, title: "T2", description: null, priority: "medium" });
-    const a1 = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
-    const a2 = registerAgent(db, { name: "agent-2", model: null, capabilities: [] });
-
-    reportWorkingOn(db, a1.id, t1.id, ["src/a.ts"]);
-    reportWorkingOn(db, a2.id, t2.id, ["src/b.ts"]);
-
-    expect(getFileConflicts(db)).toHaveLength(0);
-  });
-
-  it("releases file locks", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
-    const agent = registerAgent(db, { name: "bot", model: null, capabilities: [] });
-
-    reportWorkingOn(db, agent.id, task.id, ["src/a.ts", "src/b.ts"]);
-    expect(getActiveFileLocks(db)).toHaveLength(2);
-
-    releaseFileLocks(db, agent.id, task.id);
-    expect(getActiveFileLocks(db)).toHaveLength(0);
-  });
-
-  it("releases all locks for an agent", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const t1 = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
-    const t2 = createTask(db, { project_id: project.id, title: "T2", description: null, priority: "medium" });
-    const agent = registerAgent(db, { name: "bot", model: null, capabilities: [] });
-
-    reportWorkingOn(db, agent.id, t1.id, ["src/a.ts"]);
-    reportWorkingOn(db, agent.id, t2.id, ["src/b.ts"]);
-    expect(getActiveFileLocks(db)).toHaveLength(2);
-
-    releaseFileLocks(db, agent.id);
-    expect(getActiveFileLocks(db)).toHaveLength(0);
   });
 });
 

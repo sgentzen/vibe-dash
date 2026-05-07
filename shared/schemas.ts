@@ -151,13 +151,6 @@ export const updateWebhookSchema = z.object({
   active: z.boolean().optional(),
 });
 
-// ─── File locks ──────────────────────────────────────────────────────────
-
-export const reportWorkingOnSchema = z.object({
-  task_id: z.string().min(1),
-  file_paths: z.array(z.string().min(1)).nonempty(),
-});
-
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");

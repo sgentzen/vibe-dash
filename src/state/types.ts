@@ -6,7 +6,6 @@ import type {
   ActivityEntry,
   Blocker,
   Tag,
-  FileConflict,
   AppNotification,
   TaskWorktree,
   WsEvent,
@@ -31,7 +30,6 @@ export interface AppState {
   taskDepsMap: Record<string, string[]>;
   notifications: AppNotification[];
   unreadCount: number;
-  fileConflicts: FileConflict[];
   worktrees: TaskWorktree[];
   searchQuery: string;
   searchScope: SearchScope;
@@ -71,7 +69,6 @@ export type AppAction =
   | { type: "SET_ACTIVE_VIEW"; payload: ActiveView }
   | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
   | { type: "SET_UNREAD_COUNT"; payload: number }
-  | { type: "SET_FILE_CONFLICTS"; payload: FileConflict[] }
   | { type: "SET_WORKTREES"; payload: TaskWorktree[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }

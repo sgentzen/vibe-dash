@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
+import { useDataState, useNavigationState, useAppDispatch } from "./store";
 import { useApi, getStoredApiKey } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
@@ -27,7 +27,6 @@ export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
   const { theme, activeView, isAuthenticated, authEnabled, rightRailCollapsed } = useNavigationState();
-  const { fileConflicts } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -202,16 +201,14 @@ export function App() {
           }
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 
-          // Load notifications, file conflicts, and worktrees
-          const [notifs, unread, conflicts, worktrees] = await Promise.all([
+          // Load notifications and worktrees
+          const [notifs, unread, worktrees] = await Promise.all([
             api.getNotifications(50),
             api.getUnreadCount(),
-            api.getFileConflicts(),
             api.getWorktrees(),
           ]);
           dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
           dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
-          dispatch({ type: "SET_FILE_CONFLICTS", payload: conflicts });
           dispatch({ type: "SET_WORKTREES", payload: worktrees });
 
           // Show onboarding wizard on first run (no projects)
@@ -317,7 +314,7 @@ export function App() {
           <AgentFeed onCollapse={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })} />
         )}
       </div>
-      {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
+      {blockers.length > 0 && <AlertBanner />}
       {loaded && showOnboarding && (
         <OnboardingWizard onComplete={handleOnboardingComplete} />
       )}

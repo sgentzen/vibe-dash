@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -360,14 +360,6 @@ async function updateReviewApi(reviewId: string, patch: {
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error(`updateReview failed: ${res.status}`);
-  return res.json();
-}
-
-// ─── R3: File Locks ──────────────────────────────────────────────────
-
-async function getFileConflicts(): Promise<FileConflict[]> {
-  const res = await apiFetch("/api/file-locks/conflicts");
-  if (!res.ok) throw new Error(`getFileConflicts failed: ${res.status}`);
   return res.json();
 }
 
@@ -799,7 +791,6 @@ export function useApi() {
     getReviews,
     createReview: createReviewApi,
     updateReview: updateReviewApi,
-    getFileConflicts,
     getNotifications,
     getUnreadCount,
     markNotificationRead: markNotificationReadApi,

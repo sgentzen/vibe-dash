@@ -6,7 +6,7 @@ import type { Webhook } from "../types";
 const EVENT_TYPES = [
   "task_created", "task_updated", "task_completed",
   "blocker_reported", "comment_added", "notification_created",
-  "project_created", "file_conflict_detected",
+  "project_created",
 ];
 
 export function WebhookSettings({ onClose }: { onClose: () => void }) {

@@ -35,8 +35,6 @@ import {
   getAgentHealthStatus,
   addComment,
   listComments,
-  reportWorkingOn,
-  getFileConflicts,
   listNotifications,
   markNotificationRead,
   bulkUpdateTasks,
@@ -475,25 +473,6 @@ export async function handleTool(
 
     case "list_comments": {
       return ok({ comments: listComments(db, args.task_id as string) });
-    }
-
-    // ─── R3: File Locks ──────────────────────────────────────────────────────
-
-    case "report_working_on": {
-      const locks = reportWorkingOn(
-        db,
-        args.agent_id as string,
-        args.task_id as string,
-        args.file_paths as string[]
-      );
-      for (const lock of locks) {
-        broadcast({ type: "file_lock_acquired", payload: lock });
-      }
-      const conflicts = getFileConflicts(db);
-      for (const c of conflicts) {
-        broadcast({ type: "file_conflict_detected", payload: c });
-      }
-      return ok({ locks, conflicts });
     }
 
     // ─── R3: Notifications ───────────────────────────────────────────────────
