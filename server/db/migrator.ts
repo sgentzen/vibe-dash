@@ -373,6 +373,15 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "008_drop_saved_filters",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "saved_filters")) {
+        db.prepare("DROP TABLE saved_filters").run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
