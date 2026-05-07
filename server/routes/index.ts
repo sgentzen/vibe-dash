@@ -23,6 +23,7 @@ import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
 import { detectorRoutes } from "./detectors.js";
+import { intelligenceRoutes } from "./intelligence.js";
 import { userRoutes } from "./users.js";
 import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
@@ -75,6 +76,7 @@ const routeFactories: RouteFactory[] = [
   milestoneRoutes,
   userRoutes,
   detectorRoutes,
+  intelligenceRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {

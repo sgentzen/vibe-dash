@@ -19,6 +19,8 @@ import {
   isAiConfigured,
   generateDigest,
   queryNaturalLanguage,
+  getDigestAnomalies,
+  shouldSendDigest,
 } from "../server/intelligence.js";
 
 describe("intelligence module", () => {
@@ -107,6 +109,45 @@ describe("intelligence module", () => {
       "some-project-id"
     );
     expect(typeof result).toBe("string");
+  });
+
+  // ── getDigestAnomalies ──────────────────────────────────────────────────
+  // Runs detectors against the DB — empty DB means no anomalies
+
+  it("getDigestAnomalies returns an array", () => {
+    const result = getDigestAnomalies(db);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("getDigestAnomalies returns empty array for empty DB", () => {
+    const result = getDigestAnomalies(db);
+    expect(result).toHaveLength(0);
+  });
+
+  it("getDigestAnomalies respects limit parameter", () => {
+    const result = getDigestAnomalies(db, 5);
+    expect(result.length).toBeLessThanOrEqual(5);
+  });
+
+  it("getDigestAnomalies result items have required fields", () => {
+    const result = getDigestAnomalies(db);
+    for (const item of result) {
+      expect(typeof item.detectorId).toBe("string");
+      expect(typeof item.category).toBe("string");
+      expect(typeof item.label).toBe("string");
+      expect(typeof item.score).toBe("number");
+    }
+  });
+
+  // ── shouldSendDigest ────────────────────────────────────────────────────
+
+  it("shouldSendDigest returns false for empty DB (no anomalies)", () => {
+    expect(shouldSendDigest(db)).toBe(false);
+  });
+
+  it("shouldSendDigest returns boolean", () => {
+    const result = shouldSendDigest(db, 50);
+    expect(typeof result).toBe("boolean");
   });
 });
 
