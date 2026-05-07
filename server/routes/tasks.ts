@@ -12,7 +12,6 @@ import {
   bulkUpdateTasks,
   logActivity,
   recordMilestoneDailyStats,
-  evaluateAlertRules,
   handleRecurringTaskCompletion,
   getTimeSpent,
   resolveBlockersForTask,
@@ -139,8 +138,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     for (const b of resolveBlockersForTask(db, req.params.id as string)) {
       broadcast({ type: "blocker_resolved", payload: b });
     }
-    const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
     }

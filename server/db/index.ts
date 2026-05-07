@@ -68,16 +68,11 @@ export { getTaskTagsForProject, getDependenciesForProject } from "./bulk.js";
 export type { TaskTagPair } from "./bulk.js";
 export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
 export {
-  createAlertRule,
-  listAlertRules,
-  toggleAlertRule,
-  deleteAlertRule,
   createNotification,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   getUnreadNotificationCount,
-  evaluateAlertRules,
 } from "./notifications.js";
 export {
   createTemplate,

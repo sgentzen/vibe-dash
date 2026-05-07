@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
@@ -384,24 +384,6 @@ async function markNotificationReadApi(id: string): Promise<void> {
 
 async function markAllRead(): Promise<void> {
   await apiFetch("/api/notifications/mark-all-read", { method: "POST" });
-}
-
-// ─── R3: Alert Rules ────────────────────────────────────────────────
-
-async function getAlertRules(): Promise<AlertRule[]> {
-  const res = await apiFetch("/api/alert-rules");
-  if (!res.ok) throw new Error(`getAlertRules failed: ${res.status}`);
-  return res.json();
-}
-
-async function createAlertRule(eventType: string, filterJson?: string): Promise<AlertRule> {
-  const res = await apiFetch("/api/alert-rules", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ event_type: eventType, filter_json: filterJson }),
-  });
-  if (!res.ok) throw new Error(`createAlertRule failed: ${res.status}`);
-  return res.json();
 }
 
 // ─── R3: Bulk Update ────────────────────────────────────────────────
@@ -795,8 +777,6 @@ export function useApi() {
     getUnreadCount,
     markNotificationRead: markNotificationReadApi,
     markAllRead,
-    getAlertRules,
-    createAlertRule,
     bulkUpdateTasks,
     getAgentStats,
     getMilestoneContributions,

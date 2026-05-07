@@ -8,16 +8,11 @@ import {
   updateTask,
   addComment,
   listComments,
-  createAlertRule,
-  listAlertRules,
-  toggleAlertRule,
-  deleteAlertRule,
   createNotification,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   getUnreadNotificationCount,
-  evaluateAlertRules,
   bulkUpdateTasks,
 } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
@@ -61,30 +56,9 @@ describe("4.1 Task Comments", () => {
   });
 });
 
-// ─── 4.2 Notifications & Alerts ─────────────────────────────────────────────
+// ─── 4.2 Notifications ──────────────────────────────────────────────────────
 
-describe("4.2 Notifications & Alerts", () => {
-  it("creates and lists alert rules", () => {
-    const rule = createAlertRule(db, "task_blocked", JSON.stringify({ priority: "high" }));
-    expect(rule.event_type).toBe("task_blocked");
-    expect(rule.enabled).toBeTruthy();
-
-    const rules = listAlertRules(db);
-    expect(rules).toHaveLength(1);
-  });
-
-  it("toggles alert rule", () => {
-    const rule = createAlertRule(db, "task_completed");
-    const toggled = toggleAlertRule(db, rule.id, false);
-    expect(toggled!.enabled).toBeFalsy();
-  });
-
-  it("deletes alert rule", () => {
-    const rule = createAlertRule(db, "blocker_reported");
-    expect(deleteAlertRule(db, rule.id)).toBe(true);
-    expect(listAlertRules(db)).toHaveLength(0);
-  });
-
+describe("4.2 Notifications", () => {
   it("creates and lists notifications", () => {
     createNotification(db, "Task blocked!");
     createNotification(db, "Task completed!");
@@ -112,22 +86,6 @@ describe("4.2 Notifications & Alerts", () => {
     expect(getUnreadNotificationCount(db)).toBe(0);
   });
 
-  it("evaluates alert rules and creates notifications", () => {
-    createAlertRule(db, "task_blocked", JSON.stringify({ priority: "high" }));
-    createAlertRule(db, "task_blocked", JSON.stringify({ priority: "low" }));
-
-    const notifs = evaluateAlertRules(db, "task_blocked", { priority: "high" });
-    expect(notifs).toHaveLength(1);
-    expect(listNotifications(db)).toHaveLength(1);
-  });
-
-  it("skips disabled rules", () => {
-    const rule = createAlertRule(db, "task_completed");
-    toggleAlertRule(db, rule.id, false);
-
-    const notifs = evaluateAlertRules(db, "task_completed", {});
-    expect(notifs).toHaveLength(0);
-  });
 });
 
 // ─── 3.2 Bulk Update ────────────────────────────────────────────────────────

@@ -71,15 +71,10 @@ import {
   getReview,
   listReviewsForTask,
   updateReview,
-  createAlertRule,
-  listAlertRules,
-  toggleAlertRule,
-  deleteAlertRule,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   getUnreadNotificationCount,
-  evaluateAlertRules,
   bulkUpdateTasks,
   ACTIVE_THRESHOLD_MINUTES,
   logCost,
@@ -375,8 +370,6 @@ export function createRouter(db: Database.Database): Router {
     for (const b of resolveBlockersForTask(db, req.params.id)) {
       broadcast({ type: "blocker_resolved", payload: b });
     }
-    const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     // Record daily stats if task has a milestone
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
@@ -449,8 +442,6 @@ export function createRouter(db: Database.Database): Router {
     const task = getTask(db, task_id);
     broadcast({ type: "blocker_reported", payload: blocker });
     if (task) broadcast({ type: "task_updated", payload: task });
-    const alertNotifs = evaluateAlertRules(db, "blocker_reported", { task_id, priority: task?.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     res.status(201).json(blocker);
   });
 
@@ -656,10 +647,6 @@ export function createRouter(db: Database.Database): Router {
       broadcast({ type: "notification_created", payload: notif });
     }
 
-    // Evaluate alert rules for comment events
-    const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id });
-    for (const n of notifications) broadcast({ type: "notification_created", payload: n });
-
     res.status(201).json(comment);
   });
 
@@ -720,29 +707,6 @@ export function createRouter(db: Database.Database): Router {
     if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
     broadcast({ type: "review_updated", payload: updated });
     res.json(updated);
-  });
-
-  // ─── R3: Alert Rules ───────────────────────────────────────────────
-
-  router.get("/api/alert-rules", (_req, res) => {
-    res.json(listAlertRules(db));
-  });
-
-  router.post("/api/alert-rules", (req, res) => {
-    const { event_type, filter_json } = req.body as { event_type: string; filter_json?: string };
-    if (!event_type) { res.status(400).json({ error: "event_type is required" }); return; }
-    res.status(201).json(createAlertRule(db, event_type, filter_json));
-  });
-
-  router.patch("/api/alert-rules/:id", (req, res) => {
-    const { enabled } = req.body as { enabled: boolean };
-    const rule = toggleAlertRule(db, req.params.id, enabled);
-    if (!rule) { res.status(404).json({ error: "Rule not found" }); return; }
-    res.json(rule);
-  });
-
-  router.delete("/api/alert-rules/:id", (req, res) => {
-    res.json({ success: deleteAlertRule(db, req.params.id) });
   });
 
   // ─── R3: Notifications ─────────────────────────────────────────────

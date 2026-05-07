@@ -172,17 +172,6 @@ export const generateReportSchema = z.object({
   period: z.enum(["day", "week", "milestone"]).optional(),
 });
 
-// ─── Alert rules ────────────────────────────────────────────────────────
-
-export const createAlertRuleSchema = z.object({
-  event_type: z.string().min(1),
-  filter_json: validJson.optional(),
-});
-
-export const updateAlertRuleSchema = z.object({
-  enabled: z.boolean(),
-});
-
 // ─── Blockers ───────────────────────────────────────────────────────────
 
 export const createBlockerSchema = z.object({

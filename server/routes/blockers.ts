@@ -5,7 +5,6 @@ import {
   createBlocker,
   resolveBlocker,
   getTask,
-  evaluateAlertRules,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { requireEntity } from "./handlers.js";
@@ -25,8 +24,6 @@ export function blockerRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
     const task = getTask(db, task_id);
     broadcast({ type: "blocker_reported", payload: blocker });
     if (task) broadcast({ type: "task_updated", payload: task });
-    const alertNotifs = evaluateAlertRules(db, "blocker_reported", { task_id, priority: task?.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     res.status(201).json(blocker);
   });
 

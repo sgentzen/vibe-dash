@@ -13,7 +13,6 @@ import { blockerRoutes } from "./blockers.js";
 import { tagRoutes } from "./tags.js";
 import { dependencyRoutes } from "./dependencies.js";
 import { commentRoutes } from "./comments.js";
-import { alertRoutes } from "./alerts.js";
 import { notificationRoutes } from "./notifications.js";
 import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
@@ -66,7 +65,6 @@ const routeFactories: RouteFactory[] = [
   tagRoutes,
   dependencyRoutes,
   commentRoutes,
-  alertRoutes,
   notificationRoutes,
   templateRoutes,
   webhookRoutes,

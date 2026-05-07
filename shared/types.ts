@@ -131,14 +131,6 @@ export interface TaskComment {
   created_at: string;
 }
 
-export interface AlertRule {
-  id: string;
-  event_type: string;
-  filter_json: string;
-  enabled: boolean;
-  created_at: string;
-}
-
 export interface AppNotification {
   id: string;
   rule_id: string | null;
