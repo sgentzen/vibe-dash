@@ -653,6 +653,7 @@ import type { User } from "../types";
 
 interface AuthStatus {
   auth_enabled: boolean;
+  team_mode: boolean;
 }
 
 async function getAuthStatus(): Promise<AuthStatus> {

@@ -50,8 +50,9 @@ export function App() {
     (async () => {
       try {
         const status = await api.getAuthStatus();
+        const teamMode = status.team_mode ?? false;
         if (!status.auth_enabled) {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode } });
           setAuthChecked(true);
           return;
         }
@@ -60,17 +61,17 @@ export function App() {
         if (storedKey) {
           try {
             const user = await api.validateApiKey(storedKey);
-            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true } });
+            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true, teamMode } });
           } catch {
             // Key invalid or expired — prompt login
-            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
           }
         } else {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
         }
       } catch {
         // Server unreachable — treat as local-only; polling will retry data loading
-        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode: false } });
       }
       setAuthChecked(true);
     })();
