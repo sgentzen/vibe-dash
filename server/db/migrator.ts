@@ -400,6 +400,21 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "011_drop_alert_rules",
+    run(db) {
+      // Notifications table stays; alert_rules FK column becomes nullable-safe
+      // because notifications.rule_id is already nullable (inserted as NULL).
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "notifications")) {
+        // Detach the FK reference before dropping parent
+        db.prepare("UPDATE notifications SET rule_id = NULL WHERE rule_id IS NOT NULL").run();
+      }
+      if (tables.some((t) => t.name === "alert_rules")) {
+        db.prepare("DROP TABLE alert_rules").run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
