@@ -13,6 +13,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
+import { registerTier1Detectors } from "./detectors/tier1.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -56,6 +57,7 @@ app.use(helmet({
 app.use(express.json({ limit: "256kb" }));
 
 const db: Database.Database = openDb(DB_PATH);
+registerTier1Detectors();
 app.use(createRouter(db));
 
 const spaLimiter = rateLimit({
