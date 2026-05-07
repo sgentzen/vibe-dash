@@ -143,6 +143,7 @@ export const integrationRoutes: RouteFactory = (db: Database.Database, broadcast
         task_id: task.id,
         agent_id: null,
         message: `Auto-created from ${source} alert${alert.external_id ? ` (${alert.external_id})` : ""}`,
+        source: "webhook",
       });
       broadcast({ type: "task_created", payload: task });
       res.status(201).json({ task, alert });

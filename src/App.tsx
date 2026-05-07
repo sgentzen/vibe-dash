@@ -16,6 +16,7 @@ import { ActivityStreamView } from "./components/ActivityStreamView";
 import { OrchestrationView } from "./components/orchestration/OrchestrationView";
 import { WorktreeView } from "./components/WorktreeView";
 import { ExecutiveView } from "./components/ExecutiveView";
+import { HotSpotsView } from "./components/HotSpotsView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
@@ -50,8 +51,9 @@ export function App() {
     (async () => {
       try {
         const status = await api.getAuthStatus();
+        const teamMode = status.team_mode ?? false;
         if (!status.auth_enabled) {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode } });
           setAuthChecked(true);
           return;
         }
@@ -60,17 +62,17 @@ export function App() {
         if (storedKey) {
           try {
             const user = await api.validateApiKey(storedKey);
-            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true } });
+            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true, teamMode } });
           } catch {
             // Key invalid or expired — prompt login
-            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
           }
         } else {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
         }
       } catch {
         // Server unreachable — treat as local-only; polling will retry data loading
-        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode: false } });
       }
       setAuthChecked(true);
     })();
@@ -124,6 +126,7 @@ export function App() {
           d: "dashboard",
           t: "timeline",
           v: "activity",
+          h: "hotspots",
         };
         const view = viewMap[e.key];
         if (view) dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
@@ -181,7 +184,6 @@ export function App() {
             allDeps,
             notifs,
             unread,
-            conflicts,
             worktrees,
           ] = await Promise.all([
             Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
@@ -190,7 +192,6 @@ export function App() {
             Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
             api.getNotifications(50),
             api.getUnreadCount(),
-            api.getFileConflicts(),
             api.getWorktrees(),
           ]);
           if (cancelled) return;
@@ -217,7 +218,6 @@ export function App() {
           dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
           dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
           dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
-          dispatch({ type: "SET_FILE_CONFLICTS", payload: conflicts });
           dispatch({ type: "SET_WORKTREES", payload: worktrees });
           dispatch({ type: "SET_LOAD_ERROR", payload: null });
 
@@ -296,7 +296,7 @@ export function App() {
           >
             <ProjectContextChip />
           </div>
-          {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : <ActivityStreamView />}
+          {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : activeView === "hotspots" ? <HotSpotsView /> : <ActivityStreamView />}
         </div>
         {rightRailCollapsed ? (
           <aside

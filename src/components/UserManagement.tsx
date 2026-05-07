@@ -6,7 +6,7 @@ import type { User } from "../types";
 export function UserManagement() {
   const api = useApi();
   const dispatch = useAppDispatch();
-  const { currentUser } = useNavigationState();
+  const { currentUser, teamMode } = useNavigationState();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -204,7 +204,7 @@ export function UserManagement() {
       <button
         onClick={() => {
           setStoredApiKey(null);
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
         }}
         style={{ ...btnStyle, alignSelf: "flex-start", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
       >

@@ -370,8 +370,6 @@ const MIGRATIONS: Migration[] = [
       if (!cols.some((c) => c.name === "name_normalized")) {
         db.prepare("ALTER TABLE agents ADD COLUMN name_normalized TEXT").run();
       }
-      // Backfill: lowercase + trim + collapse _ and - to space, then collapse runs of spaces.
-      // Five nested REPLACE calls collapse up to 32 consecutive spaces — sufficient for real names.
       db.prepare(
         `UPDATE agents SET name_normalized =
            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
@@ -379,7 +377,6 @@ const MIGRATIONS: Migration[] = [
            '     ',' '),'    ',' '),'   ',' '),'  ',' '),'  ',' ')
          WHERE name_normalized IS NULL OR name_normalized = ''`
       ).run();
-      // Final fallback: if anything still null/empty, use the raw name
       db.prepare(
         "UPDATE agents SET name_normalized = name WHERE name_normalized IS NULL OR name_normalized = ''"
       ).run();
@@ -389,8 +386,6 @@ const MIGRATIONS: Migration[] = [
     name: "008_agents_dedup_normalized",
     run(db) {
       interface DupeRow { name_normalized: string; survivor_id: string }
-      // Use rowid (SQLite auto-increment) to pick the chronologically earliest row reliably.
-      // registered_at is a string and could collide; rowid never does.
       const dupes = db.prepare(
         `SELECT name_normalized, id AS survivor_id
          FROM agents
@@ -405,16 +400,16 @@ const MIGRATIONS: Migration[] = [
         ).all(name_normalized, survivor_id) as { id: string }[];
 
         for (const { id: dupId } of dups) {
-          // Remove file locks on the duplicate that would conflict with survivor's locks
-          // (UNIQUE(agent_id, file_path) constraint would fail otherwise)
-          db.prepare(
-            "DELETE FROM agent_file_locks WHERE agent_id = ? AND file_path IN (SELECT file_path FROM agent_file_locks WHERE agent_id = ?)"
-          ).run(dupId, survivor_id);
+          const tables = db.pragma("table_list") as { name: string }[];
+          if (tables.some((t) => t.name === "agent_file_locks")) {
+            db.prepare(
+              "DELETE FROM agent_file_locks WHERE agent_id = ? AND file_path IN (SELECT file_path FROM agent_file_locks WHERE agent_id = ?)"
+            ).run(dupId, survivor_id);
+          }
 
           const fkUpdates = [
             "UPDATE activity_log SET agent_id = ? WHERE agent_id = ?",
             "UPDATE agent_sessions SET agent_id = ? WHERE agent_id = ?",
-            "UPDATE agent_file_locks SET agent_id = ? WHERE agent_id = ?",
             "UPDATE tasks SET assigned_agent_id = ? WHERE assigned_agent_id = ?",
             "UPDATE cost_entries SET agent_id = ? WHERE agent_id = ?",
             "UPDATE completion_metrics SET agent_id = ? WHERE agent_id = ?",
@@ -433,6 +428,67 @@ const MIGRATIONS: Migration[] = [
       db.prepare(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_name_normalized ON agents(name_normalized)"
       ).run();
+    },
+  },
+  {
+    name: "009_activity_source",
+    run(db) {
+      const cols = db.pragma("table_info(activity_log)") as { name: string }[];
+      if (!cols.some((c) => c.name === "source")) {
+        db.prepare("ALTER TABLE activity_log ADD COLUMN source TEXT NOT NULL DEFAULT 'internal'").run();
+        db.prepare("CREATE INDEX IF NOT EXISTS idx_activity_log_source ON activity_log(source)").run();
+      }
+    },
+  },
+  {
+    name: "010_drop_saved_filters",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "saved_filters")) {
+        db.prepare("DROP TABLE saved_filters").run();
+      }
+    },
+  },
+  {
+    name: "011_drop_project_templates",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "project_templates")) {
+        db.prepare("DROP TABLE project_templates").run();
+      }
+    },
+  },
+  {
+    name: "012_drop_agent_file_locks",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      if (tables.some((t) => t.name === "agent_file_locks")) {
+        db.prepare("DROP TABLE agent_file_locks").run();
+      }
+    },
+  },
+  {
+    name: "013_drop_alert_rules",
+    run(db) {
+      const tables = db.pragma("table_list") as { name: string }[];
+      const hasAlertRules = tables.some((t) => t.name === "alert_rules");
+      if (!hasAlertRules) return;
+
+      if (tables.some((t) => t.name === "notifications")) {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS notifications_new (
+            id TEXT PRIMARY KEY,
+            rule_id TEXT,
+            message TEXT NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+          );
+          INSERT INTO notifications_new SELECT id, rule_id, message, read, created_at FROM notifications;
+          DROP TABLE notifications;
+          ALTER TABLE notifications_new RENAME TO notifications;
+        `);
+      }
+      db.prepare("DROP TABLE alert_rules").run();
     },
   },
 ];

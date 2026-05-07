@@ -47,10 +47,6 @@ export {
   closeStaleSession,
   cleanupStaleAgents,
   listAgentSessions,
-  reportWorkingOn,
-  releaseFileLocks,
-  getActiveFileLocks,
-  getFileConflicts,
   ACTIVE_THRESHOLD_MS,
   IDLE_THRESHOLD_MS,
   ACTIVE_THRESHOLD_MINUTES,
@@ -73,25 +69,12 @@ export { getTaskTagsForProject, getDependenciesForProject } from "./bulk.js";
 export type { TaskTagPair } from "./bulk.js";
 export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
 export {
-  createAlertRule,
-  listAlertRules,
-  toggleAlertRule,
-  deleteAlertRule,
   createNotification,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   getUnreadNotificationCount,
-  evaluateAlertRules,
 } from "./notifications.js";
-export {
-  createTemplate,
-  listTemplates,
-  getTemplate,
-  deleteTemplate,
-  createProjectFromTemplate,
-  seedBuiltInTemplates,
-} from "./templates.js";
 export {
   createWebhook,
   listWebhooks,
@@ -121,8 +104,7 @@ export {
   getTaskTypeBreakdown,
 } from "./metrics.js";
 export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
-export { scoreAgents, suggestAgent } from "./routing.js";
-export type { AgentScore, AgentSuggestion } from "./routing.js";
+
 export { getExecutiveSummary } from "./analytics.js";
 export type { ExecutiveSummary, MilestoneHealth, TeamUtilization, BlockersSummary, TaskVelocity, CostOverview } from "./analytics.js";
 export {

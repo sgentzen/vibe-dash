@@ -1,9 +1,8 @@
-import { useDataState, useNotificationState } from "../store";
+import { useDataState } from "../store";
 
 export function AlertBanner() {
   const { blockers } = useDataState();
-  const { fileConflicts } = useNotificationState();
-  if (blockers.length === 0 && fileConflicts.length === 0) return null;
+  if (blockers.length === 0) return null;
 
   const latest = blockers.length > 0 ? blockers[blockers.length - 1] : null;
   const extra = blockers.length - 1;
@@ -58,18 +57,6 @@ export function AlertBanner() {
           +{extra} more
         </span>
       )}
-      {fileConflicts.map((c) => (
-        <span
-          key={c.file_path}
-          style={{
-            color: "var(--status-danger)",
-            fontSize: "12px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {c.agents.map((a) => a.agent_name).join(" & ")} both editing {c.file_path}
-        </span>
-      ))}
     </div>
   );
 }
