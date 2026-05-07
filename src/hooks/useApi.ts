@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
-import type { ExecutiveSummary } from "../../shared/types.js";
+import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
 
 const API_KEY_STORAGE = "vibe-dash-api-key";
 
@@ -699,7 +699,7 @@ async function rotateIngestionToken(id: string): Promise<{ token: string }> {
   return res.json();
 }
 
-async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<import("../../shared/types.js").ScoredMatch[]> {
+async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<ScoredMatch[]> {
   const params = new URLSearchParams();
   if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
   if (opts?.detectorId) params.set("detectorId", opts.detectorId);

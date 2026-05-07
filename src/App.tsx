@@ -125,6 +125,7 @@ export function App() {
           d: "dashboard",
           t: "timeline",
           v: "activity",
+          h: "hotspots",
         };
         const view = viewMap[e.key];
         if (view) dispatch({ type: "SET_ACTIVE_VIEW", payload: view });

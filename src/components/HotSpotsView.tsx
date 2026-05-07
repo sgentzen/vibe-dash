@@ -1,14 +1,21 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApi } from "../hooks/useApi";
-import type { ScoredMatch } from "../../shared/types";
+import type { ScoredMatch } from "../../shared/types.js";
 
-// ─── Score → severity color ────────────────────────────────────────────────────
+// ─── Score → severity ─────────────────────────────────────────────────────────
 
 function severityColor(score: number): string {
   if (score >= 90) return "var(--accent-red, #dc2626)";
   if (score >= 75) return "var(--accent-orange, #ea580c)";
   if (score >= 60) return "var(--accent-yellow, #eab308)";
   return "var(--text-muted)";
+}
+
+function severityBg(score: number): string {
+  if (score >= 90) return "rgba(220, 38, 38, 0.12)";
+  if (score >= 75) return "rgba(234, 88, 12, 0.12)";
+  if (score >= 60) return "rgba(234, 179, 8, 0.12)";
+  return "rgba(128, 128, 128, 0.08)";
 }
 
 function severityLabel(score: number): string {
@@ -18,14 +25,13 @@ function severityLabel(score: number): string {
   return "Low";
 }
 
-// ─── Entity type icon (text-based, no icon lib dependency) ────────────────────
-
 function entityIcon(entityType: ScoredMatch["entityType"]): string {
   switch (entityType) {
-    case "blocker":  return "⊘";
-    case "agent":    return "◉";
-    case "review":   return "✗";
-    case "task":     return "□";
+    case "blocker": return "⊘";
+    case "agent":   return "◉";
+    case "review":  return "✗";
+    case "task":    return "□";
+    default:        return "·";
   }
 }
 
@@ -81,9 +87,9 @@ export function HotSpotsView() {
   const [matches, setMatches] = useState<ScoredMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  async function fetchMatches() {
+  const fetchMatches = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -91,16 +97,18 @@ export function HotSpotsView() {
       setMatches(data);
       setLastRefresh(new Date());
     } catch (e) {
+      // Keep stale data visible; show error as a banner overlay.
       setError(e instanceof Error ? e.message : "Failed to load anomalies");
     } finally {
       setLoading(false);
     }
-  }
+  }, [api]);
 
-  useEffect(() => { fetchMatches(); }, []);
+  useEffect(() => { void fetchMatches(); }, [fetchMatches]);
 
   const criticalCount = matches.filter((m) => m.score >= 90).length;
   const highCount = matches.filter((m) => m.score >= 75 && m.score < 90).length;
+  const initialLoad = loading && matches.length === 0;
 
   return (
     <div style={{ padding: "16px 20px", maxWidth: "800px", margin: "0 auto" }}>
@@ -119,7 +127,7 @@ export function HotSpotsView() {
             <span style={{
               fontSize: "11px", fontWeight: 600,
               color: "var(--accent-red, #dc2626)",
-              background: "color-mix(in srgb, var(--accent-red, #dc2626) 12%, transparent)",
+              background: severityBg(95),
               padding: "2px 8px", borderRadius: "12px",
             }}>
               {criticalCount} critical
@@ -129,14 +137,14 @@ export function HotSpotsView() {
             <span style={{
               fontSize: "11px", fontWeight: 600,
               color: "var(--accent-orange, #ea580c)",
-              background: "color-mix(in srgb, var(--accent-orange, #ea580c) 12%, transparent)",
+              background: severityBg(80),
               padding: "2px 8px", borderRadius: "12px",
             }}>
               {highCount} high
             </span>
           )}
           <button
-            onClick={fetchMatches}
+            onClick={() => void fetchMatches()}
             disabled={loading}
             style={{
               fontSize: "12px", padding: "4px 10px",
@@ -152,14 +160,25 @@ export function HotSpotsView() {
         </div>
       </div>
 
+      {/* Error banner — shown above stale data when a refresh fails */}
+      {error && (
+        <div style={{
+          color: "var(--accent-red, #dc2626)",
+          background: severityBg(95),
+          border: "1px solid var(--accent-red, #dc2626)",
+          borderRadius: "4px",
+          fontSize: "12px",
+          padding: "8px 12px",
+          marginBottom: "12px",
+        }}>
+          {error}
+        </div>
+      )}
+
       {/* Body */}
-      {loading && matches.length === 0 ? (
+      {initialLoad ? (
         <div style={{ color: "var(--text-muted)", fontSize: "13px", padding: "40px 0", textAlign: "center" }}>
           Loading anomalies…
-        </div>
-      ) : error ? (
-        <div style={{ color: "var(--accent-red, #dc2626)", fontSize: "13px", padding: "16px 0" }}>
-          {error}
         </div>
       ) : matches.length === 0 ? (
         <div style={{
@@ -179,10 +198,11 @@ export function HotSpotsView() {
       )}
 
       {/* Footer */}
-      {!loading && !error && matches.length > 0 && (
+      {!initialLoad && matches.length > 0 && lastRefresh && (
         <div style={{ marginTop: "12px", fontSize: "11px", color: "var(--text-muted)", textAlign: "right" }}>
           {matches.length} anomal{matches.length === 1 ? "y" : "ies"} ·{" "}
           refreshed {lastRefresh.toLocaleTimeString()}
+          {loading && " · refreshing…"}
         </div>
       )}
     </div>
