@@ -5,6 +5,7 @@ import {
   getAgentCostSummary,
   getMilestoneCostSummary,
   getProjectCostSummary,
+  getGlobalCostSummary,
   getCostTimeseries,
   getCostByModel,
   getCostByAgent,
@@ -15,7 +16,7 @@ import { handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { logCostSchema } from "../../shared/schemas.js";
 
-const VALID_GROUP_BY = ["model", "agent", "day", "project", "milestone", "agent-summary"] as const;
+const VALID_GROUP_BY = ["model", "agent", "day", "project", "milestone", "agent-summary", "global"] as const;
 type GroupBy = typeof VALID_GROUP_BY[number];
 
 export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
@@ -45,7 +46,11 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const agent_id = req.query.agent_id as string | undefined;
     const id = req.query.id as string | undefined;
     const rawDays = req.query.days as string | undefined;
-    const days = rawDays !== undefined ? parseInt(rawDays, 10) : undefined;
+    let days: number | undefined;
+    if (rawDays !== undefined) {
+      days = parseInt(rawDays, 10);
+      if (isNaN(days)) { res.status(400).json({ error: "days must be a number" }); return; }
+    }
 
     switch (groupBy as GroupBy) {
       case "model":
@@ -75,6 +80,9 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
         res.json(getAgentCostSummary(db, aid));
         break;
       }
+      case "global":
+        res.json(getGlobalCostSummary(db));
+        break;
     }
   });
 

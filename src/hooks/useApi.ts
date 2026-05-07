@@ -503,7 +503,9 @@ async function getCostTimeseries(params: Record<string, string | undefined> = {}
 }
 
 async function getCostSummary(projectId?: string): Promise<CostSummary> {
-  const qs = buildQueryString({ groupBy: "project", ...(projectId ? { id: projectId } : {}) });
+  const qs = projectId
+    ? buildQueryString({ groupBy: "project", id: projectId })
+    : "groupBy=global";
   const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) throw new Error(`getCostSummary failed: ${res.status}`);
   return res.json();

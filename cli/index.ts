@@ -11,7 +11,8 @@
  */
 
 import { resolve, join } from "path";
-import { mkdirSync, writeFileSync } from "fs";
+import { homedir } from "os";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
 import { generateDigest, isAiConfigured } from "../server/intelligence.js";
@@ -54,16 +55,20 @@ const dbPath = resolve(flags.db ?? "./vibe-dash.db");
 const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 
-// ─── Open DB ─────────────────────────────────────────────────────────────────
+// ─── install-hooks runs before DB open (no DB needed) ────────────────────────
 
-let db: Database.Database;
-try {
-  db = new Database(dbPath);
-  initDb(db);
-} catch (e) {
-  console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
-  console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
-  process.exit(1);
+// ─── Open DB (skipped for install-hooks which talks to the server via HTTP) ──
+
+let db!: Database.Database;
+if (command !== "install-hooks") {
+  try {
+    db = new Database(dbPath);
+    initDb(db);
+  } catch (e) {
+    console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
+    console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
+    process.exit(1);
+  }
 }
 
 // ─── Commands ────────────────────────────────────────────────────────────────
@@ -283,6 +288,90 @@ function buildStaticDigest(db: Database.Database, date: string): string {
   return lines.join("\n");
 }
 
+// ─── install-hooks ───────────────────────────────────────────────────────────
+
+async function installHooks(): Promise<void> {
+  const serverUrl = (flags.server ?? "http://localhost:3001").replace(/\/$/, "");
+
+  // 1. Verify server is reachable
+  let token: string;
+  try {
+    const check = await fetch(`${serverUrl}/api/auth/status`);
+    if (!check.ok) throw new Error(`server returned ${check.status}`);
+  } catch (e) {
+    throw new Error(`Cannot reach vibe-dash server at ${serverUrl}. Is it running?\n  ${(e as Error).message}`);
+  }
+
+  // 2. Create (or reuse) a claude_code ingestion source
+  const sourceName = "claude-code-hooks";
+  const createRes = await fetch(`${serverUrl}/api/ingest/sources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: sourceName, kind: "claude_code" }),
+  });
+  if (!createRes.ok && createRes.status !== 409) {
+    throw new Error(`Failed to create ingestion source: ${createRes.status} ${await createRes.text()}`);
+  }
+  if (createRes.ok) {
+    const source = (await createRes.json()) as { token: string };
+    token = source.token;
+  } else {
+    // 409 means it exists — list sources and find it
+    const listRes = await fetch(`${serverUrl}/api/ingest/sources`);
+    if (!listRes.ok) throw new Error(`Failed to list ingestion sources: ${listRes.status}`);
+    const sources = (await listRes.json()) as { name: string; token?: string }[];
+    const existing = sources.find((s) => s.name === sourceName);
+    if (!existing?.token) throw new Error(`Source "${sourceName}" exists but token is not exposed. Rotate it via the dashboard.`);
+    token = existing.token;
+  }
+
+  // 3. Build hook command (inline node, works cross-platform, requires Node >=18)
+  const endpoint = `${serverUrl}/api/ingest/claude_code`;
+  const hookCmd = `node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{fetch('${endpoint}',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${token}'},body:d}).catch(()=>{})});"`;
+
+  // 4. Merge into ~/.claude/settings.json
+  const settingsDir = join(homedir(), ".claude");
+  const settingsPath = join(settingsDir, "settings.json");
+
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
+    } catch {
+      throw new Error(`Cannot parse ${settingsPath} — fix the JSON first`);
+    }
+  } else {
+    mkdirSync(settingsDir, { recursive: true });
+  }
+
+  const hookEntry = { type: "command", command: hookCmd };
+  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+
+  // PostToolUse: capture every tool call
+  const postToolUse = (hooks.PostToolUse ?? []) as { matcher?: string; hooks: unknown[] }[];
+  const vibeEntry = postToolUse.find((e) => e.matcher === ".*" && JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
+  if (!vibeEntry) {
+    postToolUse.push({ matcher: ".*", hooks: [hookEntry] });
+  }
+  hooks.PostToolUse = postToolUse;
+
+  // Stop: capture session end
+  const stop = (hooks.Stop ?? []) as { hooks: unknown[] }[];
+  const vibeStop = stop.find((e) => JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
+  if (!vibeStop) {
+    stop.push({ hooks: [hookEntry] });
+  }
+  hooks.Stop = stop;
+
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+
+  console.log(`${GREEN}✓ Hooks installed${RESET} → ${settingsPath}`);
+  console.log(`  Ingestion source: ${sourceName}`);
+  console.log(`  Endpoint: ${endpoint}`);
+  console.log(`  Every PostToolUse + Stop event will POST to vibe-dash.`);
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -292,6 +381,7 @@ async function main() {
     case "status": cmdStatus(); break;
     case "agents": cmdAgents(); break;
     case "digest": await cmdDigest(); break;
+    case "install-hooks": await installHooks(); break;
     default: cmdHelp(); break;
   }
 }
