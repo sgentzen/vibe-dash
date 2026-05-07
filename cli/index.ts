@@ -15,6 +15,7 @@ import { homedir } from "os";
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
+import { resolveDbPath } from "../server/utils/resolveDbPath.js";
 import { generateDigest, isAiConfigured } from "../server/intelligence.js";
 import {
   RESET,
@@ -51,7 +52,7 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-const dbPath = resolve(flags.db ?? "./vibe-dash.db");
+const dbPath = resolveDbPath(flags.db);
 const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 

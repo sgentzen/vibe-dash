@@ -13,10 +13,10 @@ export function AlertBanner() {
       style={{
         background: "var(--yellow-bg)",
         borderTop: "1px solid var(--status-warning)",
-        padding: "8px 16px",
+        padding: "var(--space-2) var(--space-4)",
         display: "flex",
         alignItems: "center",
-        gap: "12px",
+        gap: "var(--space-3)",
         flexShrink: 0,
       }}
     >

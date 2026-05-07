@@ -1,14 +1,60 @@
 import { memo } from "react";
-import type { CSSProperties } from "react";
+import { Sparkline } from "../Sparkline.js";
+import { typeScale } from "../../styles/shared.js";
 
-export const KpiCard = memo(function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+export const KpiCard = memo(function KpiCard({
+  label,
+  value,
+  color,
+  sparkline,
+  tooltip,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  sparkline?: number[];
+  tooltip?: string;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div title={tooltip} style={{
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "var(--space-2) var(--space-3)",
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-2)",
+        height: "80px",
+        flex: 1,
+      }}>
+        <div style={{ ...typeScale.micro, color: "var(--text-muted)", textAlign: "left" }}>{label}</div>
+        <div style={{ ...typeScale.h2, color, fontFamily: "monospace", flexShrink: 0 }}>{value}</div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{
-      background: "var(--bg-secondary)", border: "1px solid var(--border)",
-      borderRadius: "8px", padding: "12px", textAlign: "center",
+    <div title={tooltip} style={{
+      background: "var(--bg-secondary)",
+      border: "1px solid var(--border)",
+      borderRadius: "8px",
+      padding: "var(--space-3)",
+      textAlign: "center",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "var(--space-1)",
     }}>
-      <div style={{ fontSize: "24px", fontWeight: 700, color, fontFamily: "monospace" }}>{value}</div>
-      <div style={{ fontSize: "10px", color: "var(--text-muted)", letterSpacing: "0.05em", marginTop: "4px" }}>{label}</div>
+      <div style={{ ...typeScale.h1, color, fontFamily: "monospace" }}>{value}</div>
+      <div style={{ ...typeScale.micro, color: "var(--text-muted)" }}>{label}</div>
+      {sparkline && sparkline.length >= 2 && (
+        <Sparkline values={sparkline} width={60} height={16} color={color} />
+      )}
     </div>
   );
 });

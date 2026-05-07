@@ -21,7 +21,40 @@ import {
   logCost,
 } from "../db/index.js";
 import { registerAgentSchema } from "../../shared/schemas.js";
+import { realpathSync } from "fs";
+import path from "path";
 import { broadcast } from "../websocket.js";
+
+// Allowlisted workspace roots — symlink escapes are caught by realpathSync resolution.
+const WORKSPACE_ROOTS: string[] = (process.env.WORKSPACE_ROOTS ?? process.cwd())
+  .split(",")
+  .map((r) => r.trim())
+  .filter(Boolean)
+  .map((r) => {
+    try {
+      return realpathSync(r);
+    } catch {
+      return path.resolve(r);
+    }
+  });
+
+/**
+ * Resolves `p` to its real path and verifies it starts with an allowed root.
+ * Throws with a descriptive message if the check fails.
+ */
+function assertAllowedPath(p: string): void {
+  let real: string;
+  try {
+    real = realpathSync(p);
+  } catch {
+    // Path does not yet exist (e.g. new worktree target) — resolve without following symlinks.
+    real = path.resolve(p);
+  }
+  const allowed = WORKSPACE_ROOTS.some((root) => real === root || real.startsWith(root + path.sep));
+  if (!allowed) {
+    throw new Error(`Path not in allowed workspace roots: ${real}`);
+  }
+}
 
 /** Auto-log activity and broadcast it for any mutation */
 function autoLog(
@@ -112,7 +145,7 @@ export async function handleTool(
         title: args.title as string,
         description: (args.description as string | undefined) ?? null,
         priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
-        status: (args.status as "planned" | "in_progress" | "blocked" | "done" | undefined) ?? "planned",
+        status: (args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined) ?? "planned",
       });
       broadcast({ type: "task_created", payload: task });
       autoLog(db, task.id, `Created task: ${task.title}`, agentName);
@@ -127,7 +160,7 @@ export async function handleTool(
     case "list_tasks": {
       const tasks = listTasks(db, {
         project_id: args.project_id as string | undefined,
-        status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
+        status: args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined,
         parent_task_id: args.parent_task_id as string | undefined,
         assigned_agent_id: args.assigned_agent_id as string | undefined,
       });
@@ -154,7 +187,7 @@ export async function handleTool(
       const updated = updateTask(db, args.task_id as string, {
         title: args.title as string | undefined,
         description: args.description as string | null | undefined,
-        status: args.status as "planned" | "in_progress" | "blocked" | "done" | undefined,
+        status: args.status as "planned" | "in_progress" | "blocked" | "done" | "cancelled" | undefined,
         priority: args.priority as "low" | "medium" | "high" | "urgent" | undefined,
         progress: args.progress as number | undefined,
         parent_task_id: args.parent_task_id as string | null | undefined,

@@ -21,7 +21,7 @@ export type NavigationState = Pick<
 
 export type NotificationState = Pick<
   AppState,
-  "notifications" | "unreadCount"
+  "notifications" | "unreadCount" | "fileConflicts" | "loadError"
 >;
 
 export type PollingState = Pick<AppState, "pollGeneration">;
@@ -48,6 +48,7 @@ const initialState: AppState = {
   taskDepsMap: {},
   notifications: [],
   unreadCount: 0,
+  fileConflicts: [],
   worktrees: [],
   searchQuery: "",
   searchScope: getInitialSearchScope(),
@@ -63,6 +64,7 @@ const initialState: AppState = {
   isAuthenticated: false,
   authEnabled: false,
   teamMode: false,
+  loadError: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -121,8 +123,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       notifications: state.notifications,
       unreadCount: state.unreadCount,
+      fileConflicts: state.fileConflicts,
+      loadError: state.loadError,
     }),
-    [state.notifications, state.unreadCount]
+    [state.notifications, state.unreadCount, state.fileConflicts, state.loadError]
   );
 
   const pollingValue = useMemo<PollingState>(
