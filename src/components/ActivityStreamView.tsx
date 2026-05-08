@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useDataState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
-import { inputStyle } from "../styles/shared.js";
+import { inputStyle, typeScale } from "../styles/shared.js";
 import type { ActivityEntry } from "../types";
 
 const LAST_VISIT_KEY = "vibe-dash-last-visit";
@@ -76,13 +76,13 @@ export function ActivityStreamView() {
   const selectStyle: React.CSSProperties = { ...inputStyle, width: "auto", borderRadius: "4px", padding: "4px 8px", fontSize: "12px" };
 
   return (
-    <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-      <h2 style={{ color: "var(--text-primary)", fontSize: "16px", marginBottom: "12px", fontWeight: 600 }}>
+    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+      <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-3) 0" }}>
         Activity Stream
       </h2>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "16px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
         <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} style={selectStyle}>
           <option value="">All agents</option>
           {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

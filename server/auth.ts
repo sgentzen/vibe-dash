@@ -19,9 +19,14 @@ if (!PEPPER) {
   console.warn("[auth] VIBE_DASH_KEY_PEPPER is not set — API key hashes have no pepper.");
 }
 
+export function isTeamMode(): boolean {
+  return !!process.env.VIBE_TEAM_MODE;
+}
+
 // Cache the "auth is enabled" state — once true it never reverts
 let _authEnabled: boolean | null = null;
 export function isAuthEnabled(db: Database.Database): boolean {
+  if (!isTeamMode()) return false;
   if (_authEnabled === true) return true;
   _authEnabled = countUsers(db) > 0;
   return _authEnabled;
