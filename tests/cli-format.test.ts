@@ -14,6 +14,7 @@ import {
   formatAgentHeaderRow,
   formatAgentRow,
   formatStatusSummary,
+  formatCompactStatus,
   formatHelp,
   RESET,
   GREEN,
@@ -284,6 +285,79 @@ describe("cli/format: formatStatusSummary", () => {
       }),
     );
     expect(out).not.toContain("Active Blockers");
+  });
+});
+
+describe("cli/format: formatCompactStatus", () => {
+  const base = { activeAgents: 0, idleAgents: 0, offlineAgents: 0, openBlockers: 0 };
+
+  it("renders header with vibe-dash brand", () => {
+    const out = stripAnsi(formatCompactStatus({ ...base, projects: [] }));
+    expect(out).toContain("vibe-dash");
+  });
+
+  it("renders one line per project with counts", () => {
+    const out = stripAnsi(
+      formatCompactStatus({
+        ...base,
+        projects: [{ name: "My Project", planned: 5, in_progress: 2, blocked: 1, done: 10 }],
+      }),
+    );
+    expect(out).toContain("My Project");
+    expect(out).toContain("▶2");
+    expect(out).toContain("✗1");
+    expect(out).toContain("—5");
+    expect(out).toContain("✓10");
+  });
+
+  it("omits milestone bracket when project has no open milestone", () => {
+    const out = stripAnsi(
+      formatCompactStatus({
+        ...base,
+        projects: [{ name: "P", planned: 0, in_progress: 0, blocked: 0, done: 3 }],
+      }),
+    );
+    expect(out).not.toContain("[");
+  });
+
+  it("includes truncated milestone name and pct when open milestone present", () => {
+    const out = stripAnsi(
+      formatCompactStatus({
+        ...base,
+        projects: [
+          {
+            name: "P",
+            planned: 0,
+            in_progress: 1,
+            blocked: 0,
+            done: 4,
+            openMilestone: { name: "Sprint Alpha", completion_pct: 75 },
+          },
+        ],
+      }),
+    );
+    expect(out).toContain("Sprint Alpha");
+    expect(out).toContain("75%");
+  });
+
+  it("shows active agent count in summary line", () => {
+    const out = stripAnsi(
+      formatCompactStatus({ ...base, activeAgents: 3, idleAgents: 1, offlineAgents: 2, projects: [] }),
+    );
+    expect(out).toContain("3 active");
+    expect(out).toContain("1 idle");
+    expect(out).toContain("2 offline");
+  });
+
+  it("uses singular 'blocker' when count is 1", () => {
+    const out = stripAnsi(formatCompactStatus({ ...base, openBlockers: 1, projects: [] }));
+    expect(out).toContain("1 blocker");
+    expect(out).not.toContain("1 blockers");
+  });
+
+  it("uses plural 'blockers' when count is 0 or >1", () => {
+    expect(stripAnsi(formatCompactStatus({ ...base, openBlockers: 0, projects: [] }))).toContain("0 blockers");
+    expect(stripAnsi(formatCompactStatus({ ...base, openBlockers: 3, projects: [] }))).toContain("3 blockers");
   });
 });
 
