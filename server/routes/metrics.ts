@@ -6,7 +6,7 @@ import {
   getAgentComparison,
   getTaskTypeBreakdown,
 } from "../db/index.js";
-import { statsLimiter } from "./middleware.js";
+import { makeReadLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest, notFound } from "./responses.js";
 
@@ -14,8 +14,9 @@ const NUMERIC_FIELDS = ["lines_added", "lines_removed", "files_changed", "tests_
 
 export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
+  const metricsLimiter = makeReadLimiter(120);
 
-  router.post("/api/metrics", statsLimiter, (req, res) => {
+  router.post("/api/metrics", metricsLimiter, (req, res) => {
     const { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds } = req.body as {
       task_id: string;
       agent_id: string;

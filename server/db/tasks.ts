@@ -77,6 +77,7 @@ export function listTasks(
     filter?.assigned_agent_id !== undefined ? ["assigned_agent_id = ?", filter.assigned_agent_id] : null,
   ]);
 
+  // SQL fragments are hardcoded; values bound via ?
   return db
     .prepare("SELECT * FROM tasks " + where + " ORDER BY created_at ASC")
     .all(...params) as Task[];
@@ -160,6 +161,7 @@ export function updateTask(
   params.push(now());
   params.push(id);
 
+  // SQL fragments are hardcoded; values bound via ?
   const row = db.prepare("UPDATE tasks SET " + sets.join(", ") + " WHERE id = ? RETURNING *").get(
     ...params
   ) as Task | undefined;
@@ -212,9 +214,13 @@ export function searchTasks(db: Database.Database, filter: SearchTasksFilter): T
 
   if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
 
-  const limit = Math.min(filter.limit ?? DEFAULT_TASK_LIST_LIMIT, MAX_TASK_LIST_LIMIT);
-  const offset = filter.offset ?? 0;
-  sql += ` ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+  const limit = Math.min(
+    Math.max(0, Math.floor(Number(filter.limit) || DEFAULT_TASK_LIST_LIMIT)),
+    MAX_TASK_LIST_LIMIT
+  );
+  const offset = Math.max(0, Math.floor(Number(filter.offset) || 0));
+  sql += " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
+  params.push(limit, offset);
 
   return db.prepare(sql).all(...params) as Task[];
 }

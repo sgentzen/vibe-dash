@@ -8,8 +8,8 @@ type SortField = "title" | "status" | "priority" | "progress" | "due_date" | "es
 type SortDir = "asc" | "desc";
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-const STATUS_ORDER: Record<TaskStatus, number> = { in_progress: 0, planned: 1, blocked: 2, done: 3 };
-const STATUS_LABELS: Record<TaskStatus, string> = { planned: "Planned", in_progress: "In Progress", blocked: "Blocked", done: "Done" };
+const STATUS_ORDER: Record<TaskStatus, number> = { in_progress: 0, planned: 1, blocked: 2, done: 3, cancelled: 4 };
+const STATUS_LABELS: Record<TaskStatus, string> = { planned: "Planned", in_progress: "In Progress", blocked: "Blocked", done: "Done", cancelled: "Cancelled" };
 const PRIORITY_LABELS: Record<TaskPriority, string> = { urgent: "Urgent", high: "High", medium: "Medium", low: "Low" };
 
 export function TaskListView() {
@@ -121,6 +121,7 @@ export function TaskListView() {
             <option value="in_progress">In Progress</option>
             <option value="blocked">Blocked</option>
             <option value="done">Done</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           <select value={bulkPriority} onChange={(e) => setBulkPriority(e.target.value as TaskPriority | "")}
             style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "4px", color: "var(--text-primary)", padding: "2px 6px", fontSize: "11px" }}>

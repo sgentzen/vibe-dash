@@ -29,10 +29,18 @@ vi.mock("../../src/hooks/useApi", () => ({
 // focus-trap-react throws in jsdom because layout/tabbable detection
 // relies on getBoundingClientRect returning real values. Render children
 // without trapping focus — behavior we care about is the form, not focus.
+// Capture the passed options so tests can assert on FocusTrap configuration.
+const focusTrapOptionsCalls: unknown[] = [];
 vi.mock("focus-trap-react", () => ({
   __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => children,
-  FocusTrap: ({ children }: { children: React.ReactNode }) => children,
+  default: ({ children, focusTrapOptions }: { children: React.ReactNode; focusTrapOptions?: unknown }) => {
+    focusTrapOptionsCalls.push(focusTrapOptions);
+    return children;
+  },
+  FocusTrap: ({ children, focusTrapOptions }: { children: React.ReactNode; focusTrapOptions?: unknown }) => {
+    focusTrapOptionsCalls.push(focusTrapOptions);
+    return children;
+  },
 }));
 
 import type React from "react";
@@ -195,6 +203,19 @@ describe("TaskEditDrawer", () => {
     await waitFor(() => {
       expect(getComments).toHaveBeenCalledWith("t1");
     });
+  });
+
+  // Regression: clickOutsideDeactivates=true caused the open-click to bubble
+  // to document AFTER FocusTrap activated, immediately deactivating the trap
+  // and unmounting the drawer. The drawer must NOT enable that option —
+  // backdrop click already provides outside-click-to-close.
+  it("does not enable clickOutsideDeactivates on its FocusTrap", () => {
+    focusTrapOptionsCalls.length = 0;
+    const task = makeTask();
+    renderWithProviders(<TaskEditDrawer task={task} onClose={onClose} />);
+    expect(focusTrapOptionsCalls.length).toBeGreaterThan(0);
+    const opts = focusTrapOptionsCalls[0] as { clickOutsideDeactivates?: boolean };
+    expect(opts.clickOutsideDeactivates).not.toBe(true);
   });
 
   it("drawer has correct ARIA attributes for modal dialog", () => {

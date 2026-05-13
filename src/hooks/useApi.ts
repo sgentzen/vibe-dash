@@ -1,16 +1,17 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
-import type { ExecutiveSummary } from "../../shared/types.js";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
 
-const API_KEY_STORAGE = "vibe-dash-api-key";
+const SESSION_KEY = "vibe-dash-api-key";
 
 export function getStoredApiKey(): string | null {
-  return localStorage.getItem(API_KEY_STORAGE);
+  const v = sessionStorage.getItem(SESSION_KEY);
+  return v ? atob(v) : null;
 }
 
 export function setStoredApiKey(key: string | null): void {
-  if (key) localStorage.setItem(API_KEY_STORAGE, key);
-  else localStorage.removeItem(API_KEY_STORAGE);
+  if (key) sessionStorage.setItem(SESSION_KEY, btoa(key));
+  else sessionStorage.removeItem(SESSION_KEY);
 }
 
 function authHeaders(): Record<string, string> {
@@ -30,32 +31,35 @@ async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   });
 }
 
+/**
+ * Error thrown by API wrappers when the server responds with non-2xx.
+ * Carries the HTTP status and `Retry-After` (in ms) so callers can
+ * back off intelligently on 429 / 503.
+ */
 export class ApiError extends Error {
   status: number;
   retryAfterMs: number | null;
-  constructor(op: string, status: number, retryAfterMs: number | null, body?: string) {
-    super(`${op} failed: ${status}${body ? ` - ${body}` : ""}`);
-    this.name = 'ApiError';
+  constructor(message: string, status: number, retryAfterMs: number | null) {
+    super(message);
+    this.name = "ApiError";
     this.status = status;
     this.retryAfterMs = retryAfterMs;
   }
 }
 
-// Parses Retry-After: either an integer (seconds) or an HTTP-date.
-function parseRetryAfter(header: string | null): number | null {
-  if (!header) return null;
-  const secs = Number(header);
-  if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
-  const when = Date.parse(header);
-  if (!Number.isNaN(when)) return Math.max(0, when - Date.now());
+function parseRetryAfter(res: Response): number | null {
+  const h = res.headers.get("Retry-After");
+  if (!h) return null;
+  // Retry-After can be seconds or an HTTP-date. Prefer seconds.
+  const secs = Number(h);
+  if (Number.isFinite(secs)) return Math.max(0, secs) * 1000;
+  const date = Date.parse(h);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
   return null;
 }
 
 async function throwApiError(res: Response, op: string): Promise<never> {
-  const retryAfterMs = parseRetryAfter(res.headers.get('Retry-After'));
-  let body: string | undefined;
-  try { body = (await res.text()).slice(0, 200) || undefined; } catch { /* ignore */ }
-  throw new ApiError(op, res.status, retryAfterMs, body);
+  throw new ApiError(`${op} failed: ${res.status}`, res.status, parseRetryAfter(res));
 }
 
 function buildQueryString(params: Record<string, string | undefined>): string {
@@ -316,26 +320,6 @@ async function searchTasks(params: Record<string, string | undefined>): Promise<
   return res.json();
 }
 
-async function getSavedFilters(): Promise<SavedFilter[]> {
-  const res = await apiFetch("/api/filters");
-  if (!res.ok) await throwApiError(res, "getSavedFilters");
-  return res.json();
-}
-
-async function createSavedFilter(name: string, filterJson: string): Promise<SavedFilter> {
-  const res = await apiFetch("/api/filters", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ name, filter_json: filterJson }),
-  });
-  if (!res.ok) await throwApiError(res, "createSavedFilter");
-  return res.json();
-}
-
-async function deleteSavedFilter(id: string): Promise<void> {
-  await apiFetch(`/api/filters/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
 // ─── R3: Comments ────────────────────────────────────────────────────
 
 async function getComments(taskId: string): Promise<TaskComment[]> {
@@ -391,14 +375,6 @@ async function updateReviewApi(reviewId: string, patch: {
   return res.json();
 }
 
-// ─── R3: File Locks ──────────────────────────────────────────────────
-
-async function getFileConflicts(): Promise<FileConflict[]> {
-  const res = await apiFetch("/api/file-locks/conflicts");
-  if (!res.ok) await throwApiError(res, "getFileConflicts");
-  return res.json();
-}
-
 // ─── R3: Notifications ──────────────────────────────────────────────
 
 async function getNotifications(limit = 50): Promise<AppNotification[]> {
@@ -420,24 +396,6 @@ async function markNotificationReadApi(id: string): Promise<void> {
 
 async function markAllRead(): Promise<void> {
   await apiFetch("/api/notifications/mark-all-read", { method: "POST" });
-}
-
-// ─── R3: Alert Rules ────────────────────────────────────────────────
-
-async function getAlertRules(): Promise<AlertRule[]> {
-  const res = await apiFetch("/api/alert-rules");
-  if (!res.ok) await throwApiError(res, "getAlertRules");
-  return res.json();
-}
-
-async function createAlertRule(eventType: string, filterJson?: string): Promise<AlertRule> {
-  const res = await apiFetch("/api/alert-rules", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ event_type: eventType, filter_json: filterJson }),
-  });
-  if (!res.ok) await throwApiError(res, "createAlertRule");
-  return res.json();
 }
 
 // ─── R3: Bulk Update ────────────────────────────────────────────────
@@ -493,24 +451,6 @@ async function generateReportApi(projectId: string, period: "day" | "week" | "mi
   if (!res.ok) await throwApiError(res, "generateReport");
   const data = await res.json();
   return data.report;
-}
-
-// ─── R5: Templates ───────────────────────────────────────────────────
-
-async function getTemplates(): Promise<ProjectTemplate[]> {
-  const res = await apiFetch("/api/templates");
-  if (!res.ok) await throwApiError(res, "getTemplates");
-  return res.json();
-}
-
-async function instantiateTemplate(templateId: string, projectName: string): Promise<Project> {
-  const res = await apiFetch(`/api/templates/${encodeURIComponent(templateId)}/instantiate`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ project_name: projectName }),
-  });
-  if (!res.ok) await throwApiError(res, "instantiateTemplate");
-  return res.json();
 }
 
 // ─── R5: Activity Stream ─────────────────────────────────────────────
@@ -588,35 +528,37 @@ interface CostByAgentEntry {
 }
 
 async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/timeseries${qs ? `?${qs}` : ""}`);
+  const qs = buildQueryString({ ...params, groupBy: "day" });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) await throwApiError(res, "getCostTimeseries");
   return res.json();
 }
 
 async function getCostSummary(projectId?: string): Promise<CostSummary> {
-  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
-  const res = await apiFetch(`/api/costs/summary${qs}`);
+  const qs = projectId
+    ? buildQueryString({ groupBy: "project", id: projectId })
+    : "groupBy=global";
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) await throwApiError(res, "getCostSummary");
   return res.json();
 }
 
 async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
-  const res = await apiFetch(`/api/costs/project/${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/costs?groupBy=project&id=${encodeURIComponent(projectId)}`);
   if (!res.ok) await throwApiError(res, "getProjectCostSummary");
   return res.json();
 }
 
 async function getCostByModel(params: Record<string, string | undefined> = {}): Promise<CostByModelEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/by-model${qs ? `?${qs}` : ""}`);
+  const qs = buildQueryString({ ...params, groupBy: "model" });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) await throwApiError(res, "getCostByModel");
   return res.json();
 }
 
 async function getCostByAgent(params: Record<string, string | undefined> = {}): Promise<CostByAgentEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/by-agent${qs ? `?${qs}` : ""}`);
+  const qs = buildQueryString({ ...params, groupBy: "agent" });
+  const res = await apiFetch(`/api/costs?${qs}`);
   if (!res.ok) await throwApiError(res, "getCostByAgent");
   return res.json();
 }
@@ -668,12 +610,19 @@ async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise
   return res.json();
 }
 
-async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/suggest-agent`);
-  if (!res.ok) await throwApiError(res, "getSuggestedAgent");
-  const data = await res.json();
-  return data ?? null;
+// ─── WS Ticket ───────────────────────────────────────────────────────────────
+
+export async function getWsTicket(): Promise<string | null> {
+  try {
+    const res = await apiFetch("/api/ws-ticket", { method: "POST" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data as { ticket: string }).ticket ?? null;
+  } catch {
+    return null;
+  }
 }
+
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -681,6 +630,7 @@ import type { User } from "../types";
 
 interface AuthStatus {
   auth_enabled: boolean;
+  team_mode: boolean;
 }
 
 async function getAuthStatus(): Promise<AuthStatus> {
@@ -790,6 +740,16 @@ async function rotateIngestionToken(id: string): Promise<{ token: string }> {
   return res.json();
 }
 
+async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<ScoredMatch[]> {
+  const params = new URLSearchParams();
+  if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
+  if (opts?.detectorId) params.set("detectorId", opts.detectorId);
+  const qs = params.size > 0 ? `?${params}` : "";
+  const res = await apiFetch(`/api/detectors/matches${qs}`);
+  if (!res.ok) await throwApiError(res, "getDetectorMatches");
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -826,21 +786,16 @@ export function useApi() {
     getReviews,
     createReview: createReviewApi,
     updateReview: updateReviewApi,
-    getFileConflicts,
     getNotifications,
     getUnreadCount,
     markNotificationRead: markNotificationReadApi,
     markAllRead,
-    getAlertRules,
-    createAlertRule,
     bulkUpdateTasks,
     getAgentStats,
     getMilestoneContributions,
     getMilestoneDailyStats,
     getActivityHeatmap,
     generateReport: generateReportApi,
-    getTemplates,
-    instantiateTemplate,
     getActivityStream: getActivityStreamApi,
     getWebhooks,
     createWebhook: createWebhookApi,
@@ -854,7 +809,6 @@ export function useApi() {
     getAgentPerformance,
     getAgentComparison,
     getTaskTypeBreakdown,
-    getSuggestedAgent,
     getWorktrees,
     updateWorktreeStatus,
     getExecutiveSummary,
@@ -873,5 +827,7 @@ export function useApi() {
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
     rotateIngestionToken,
+    getDetectorMatches,
+    getWsTicket,
   }), []);
 }

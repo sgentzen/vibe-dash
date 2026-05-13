@@ -13,10 +13,7 @@ import { blockerRoutes } from "./blockers.js";
 import { tagRoutes } from "./tags.js";
 import { dependencyRoutes } from "./dependencies.js";
 import { commentRoutes } from "./comments.js";
-import { fileLockRoutes } from "./file-locks.js";
-import { alertRoutes } from "./alerts.js";
 import { notificationRoutes } from "./notifications.js";
-import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
@@ -25,6 +22,8 @@ import { reviewRoutes } from "./reviews.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
+import { detectorRoutes } from "./detectors.js";
+import { intelligenceRoutes } from "./intelligence.js";
 import { userRoutes } from "./users.js";
 import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
@@ -67,10 +66,7 @@ const routeFactories: RouteFactory[] = [
   tagRoutes,
   dependencyRoutes,
   commentRoutes,
-  fileLockRoutes,
-  alertRoutes,
   notificationRoutes,
-  templateRoutes,
   webhookRoutes,
   costRoutes,
   bulkRoutes,
@@ -79,6 +75,8 @@ const routeFactories: RouteFactory[] = [
   executiveRoutes,
   milestoneRoutes,
   userRoutes,
+  detectorRoutes,
+  intelligenceRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {

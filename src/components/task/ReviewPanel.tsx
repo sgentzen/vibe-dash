@@ -8,13 +8,15 @@ const labelStyle: React.CSSProperties = { ...sectionHeader, display: "block", ma
 const STATUS_COLORS: Record<ReviewStatus, string> = {
   pending: "var(--accent-yellow, #eab308)",
   approved: "var(--accent-green, #16a34a)",
-  changes_requested: "var(--accent-red, #dc2626)",
+  changes_requested: "var(--accent-orange, #ea580c)",
+  failed: "var(--accent-red, #dc2626)",
 };
 
 const STATUS_LABELS: Record<ReviewStatus, string> = {
   pending: "Pending",
   approved: "Approved",
   changes_requested: "Changes requested",
+  failed: "Failed",
 };
 
 interface ReviewPanelProps {
@@ -78,6 +80,7 @@ export function ReviewPanel({ taskId, reviewerName = "User" }: ReviewPanelProps)
           <option value="pending">Pending</option>
           <option value="approved">Approve</option>
           <option value="changes_requested">Request changes</option>
+          <option value="failed">Failed</option>
         </select>
         <textarea
           value={diffSummary}
