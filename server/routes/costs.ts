@@ -9,7 +9,7 @@ import {
   getCostByModel,
   getCostByAgent,
 } from "../db/index.js";
-import { statsLimiter } from "./middleware.js";
+import { makeReadLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
@@ -17,8 +17,9 @@ import { logCostSchema } from "../../shared/schemas.js";
 
 export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
+  const costsLimiter = makeReadLimiter(120);
 
-  router.post("/api/costs", statsLimiter, validateBody(logCostSchema), (req, res) => {
+  router.post("/api/costs", costsLimiter, validateBody(logCostSchema), (req, res) => {
     const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body;
     handleMutation(res, broadcast, () => logCost(db, {
       agent_id: agent_id ?? null,

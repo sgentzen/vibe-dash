@@ -76,7 +76,7 @@ export function usePolling() {
     async function waitForServer() {
       while (!cancelled) {
         try {
-          await fetch("/api/stats");
+          await fetch("/api/health");
           return true;
         } catch {
           await new Promise((r) => setTimeout(r, STARTUP_PROBE_MS));

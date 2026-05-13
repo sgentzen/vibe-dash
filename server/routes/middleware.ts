@@ -4,12 +4,21 @@ import { logger } from "../logger.js";
 
 // ─── Rate Limiters ──────────────────────────────────────────────────────────
 
-export const statsLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+/**
+ * Factory for per-endpoint read limiters. Each call returns a fresh middleware
+ * instance with its own counter, so unrelated endpoints don't share a budget.
+ * The dashboard legitimately polls multiple endpoints every 3s, so 120/min
+ * gives healthy headroom for both polling and React StrictMode double-effects.
+ */
+export const makeReadLimiter = (max = 120) =>
+  rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+export const statsLimiter = makeReadLimiter(120);
 
 export const firstRunLimiter = rateLimit({
   windowMs: 60 * 1000,

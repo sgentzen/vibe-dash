@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
-import { useApi, getStoredApiKey } from "./hooks/useApi";
+import { useApi, getStoredApiKey, ApiError } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -153,7 +153,7 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadInitialData(retries = 10, delayMs = 500) {
+    async function loadInitialData(retries = 5, baseDelayMs = 500) {
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
@@ -219,9 +219,16 @@ export function App() {
           }
           setLoaded(true);
           return;
-        } catch {
+        } catch (err) {
           if (i < retries - 1) {
-            await new Promise((r) => setTimeout(r, delayMs));
+            // Honor Retry-After on 429/503; otherwise exponential backoff
+            // capped at 5s. This stops the retry-all loop from hammering
+            // the same rate-limit budget that just rejected us.
+            const apiErr = err instanceof ApiError ? err : null;
+            const retryAfter = apiErr?.retryAfterMs ?? null;
+            const backoff = Math.min(baseDelayMs * 2 ** i, 5000);
+            const delay = retryAfter !== null ? Math.max(retryAfter, backoff) : backoff;
+            await new Promise((r) => setTimeout(r, delay));
           }
         }
       }
