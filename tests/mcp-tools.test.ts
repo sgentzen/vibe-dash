@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { handleTool } from "../server/mcp/tools.js";
+import { createMcpServer } from "../server/mcp/server.js";
 
 // Mock websocket broadcast — we don't need a live WebSocket server in tests
 vi.mock("../server/websocket.js", () => ({
@@ -306,5 +307,28 @@ describe("onboarding wizard flow", () => {
 describe("error handling", () => {
   it("throws on unknown tool name", async () => {
     await expect(handleTool(db, "unknown_tool", {})).rejects.toThrow("Unknown tool: unknown_tool");
+  });
+});
+
+// ─── advertised MCP surface (regression guard) ────────────────────────────────
+//
+// Guards against accidental removal of milestone CRUD from the MCP tool list.
+// History: commit 6d39d0c cut milestone CRUD; 0c46e35 restored it. Without this
+// test, a future cut leaves callers (agents) unable to create milestones and
+// the regression is silent until someone notices the tool list mismatch.
+
+describe("advertised MCP tool surface", () => {
+  function registeredToolNames(): string[] {
+    const handle = createMcpServer(db);
+    const tools = (handle.server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+    return Object.keys(tools);
+  }
+
+  it("exposes milestone CRUD tools", () => {
+    const names = registeredToolNames();
+    expect(names).toContain("create_milestone");
+    expect(names).toContain("list_milestones");
+    expect(names).toContain("update_milestone");
+    expect(names).toContain("complete_milestone");
   });
 });
