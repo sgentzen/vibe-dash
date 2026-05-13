@@ -5,7 +5,6 @@ import {
   renderWithProviders,
   screen,
   within,
-  fireEvent,
   resetIdSeq,
 } from "./test-utils";
 
@@ -40,17 +39,7 @@ describe("AgentDashboard", () => {
     expect(screen.getAllByRole("heading", { name: "Agent Dashboard" }).length).toBeGreaterThan(0);
   });
 
-  it("renders Agents and Performance toggle buttons", () => {
-    renderWithProviders(<AgentDashboard />);
-    const heading = screen.getAllByRole("heading", { name: "Agent Dashboard" })[0];
-    const headerRow = heading.parentElement!;
-    const buttons = within(headerRow).getAllByRole("button");
-    const buttonTexts = buttons.map((b) => b.textContent);
-    expect(buttonTexts).toContain("Agents");
-    expect(buttonTexts).toContain("Performance");
-  });
-
-  it("shows status filter buttons when Agents view is active", () => {
+  it("shows status filter buttons", () => {
     renderWithProviders(<AgentDashboard />);
     const heading = screen.getAllByRole("heading", { name: "Agent Dashboard" })[0];
     const headerRow = heading.parentElement!;
@@ -61,32 +50,8 @@ describe("AgentDashboard", () => {
     expect(buttonTexts).toContain("Offline");
   });
 
-  it("hides status filter buttons when Performance view is active", async () => {
-    renderWithProviders(<AgentDashboard />);
-    const heading = screen.getAllByRole("heading", { name: "Agent Dashboard" })[0];
-    const headerRow = heading.parentElement!;
-    const perfBtn = within(headerRow).getByText("Performance");
-    // Use fireEvent to synchronously trigger React state update
-    fireEvent.click(perfBtn);
-    // After switching to Performance, the status filters should be gone
-    const buttons = within(headerRow).getAllByRole("button");
-    const buttonTexts = buttons.map((b) => b.textContent);
-    expect(buttonTexts).toContain("Agents");
-    expect(buttonTexts).toContain("Performance");
-    expect(buttonTexts).not.toContain("Active");
-    expect(buttonTexts).not.toContain("Offline");
-  });
-
   it("shows empty state when no agents registered", () => {
     renderWithProviders(<AgentDashboard />);
     expect(screen.getAllByText("No agents registered yet").length).toBeGreaterThan(0);
-  });
-
-  it("shows performance empty state when switching to Performance with no metrics", async () => {
-    renderWithProviders(<AgentDashboard />);
-    const heading = screen.getAllByRole("heading", { name: "Agent Dashboard" })[0];
-    const headerRow = heading.parentElement!;
-    within(headerRow).getByText("Performance").click();
-    expect((await screen.findAllByText(/No completion metrics recorded yet/))[0]).toBeInTheDocument();
   });
 });
