@@ -69,12 +69,9 @@ describe("TopBar", () => {
   it("renders navigation buttons", () => {
     renderWithProviders(<TopBar />);
     const header = getHeader();
+    expect(within(header).getByRole("button", { name: "Fleet" })).toBeInTheDocument();
     expect(within(header).getByRole("button", { name: "Board" })).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "Agents" })).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "List" })).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "Dash" })).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "Timeline" })).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "Activity" })).toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: "Feed" })).toBeInTheDocument();
   });
 
   it("renders search input", () => {
@@ -130,14 +127,13 @@ describe("TopBar", () => {
     });
   });
 
-  it("Tasks stat tile navigates to list view", async () => {
+  it("Tasks stat tile navigates to board view", async () => {
     renderWithProviders(<TopBar />);
     const tasksBtn = within(getHeader()).getByRole("button", { name: /view tasks/i });
     fireEvent.click(tasksBtn);
-    // View changes — board nav button should no longer be active; list should be active
     await waitFor(() => {
-      const listBtn = within(getHeader()).getByRole("button", { name: "List" });
-      expect(listBtn).toBeInTheDocument();
+      const boardBtn = within(getHeader()).getByRole("button", { name: "Board" });
+      expect(boardBtn).toBeInTheDocument();
     });
   });
 

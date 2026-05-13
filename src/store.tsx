@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useReducer, useMemo } from "react";
-import type { AppState, AppAction, Theme, ActiveView, SearchScope } from "./state/types";
+import type { AppState, AppAction, Theme, ActiveView, FleetPreset, SearchScope } from "./state/types";
 import { setReducer, getInitialTheme, getInitialRightRailCollapsed, getInitialSearchScope } from "./state/setReducer";
 import { wsReducer } from "./state/wsReducer";
 
-export type { AppState, AppAction, Theme, ActiveView, SearchScope };
+export type { AppState, AppAction, Theme, ActiveView, FleetPreset, SearchScope };
 
 // ─── Domain slices ────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ export type DataState = Pick<
 
 export type NavigationState = Pick<
   AppState,
-  "selectedProjectId" | "selectedMilestoneId" | "activeView" | "searchQuery" | "searchScope" | "theme" |
+  "selectedProjectId" | "selectedMilestoneId" | "activeView" | "fleetPreset" | "searchQuery" | "searchScope" | "theme" |
   "currentUser" | "isAuthenticated" | "authEnabled" | "rightRailCollapsed" | "alertsOpen"
 >;
 
@@ -52,7 +52,8 @@ const initialState: AppState = {
   worktrees: [],
   searchQuery: "",
   searchScope: getInitialSearchScope(),
-  activeView: "orchestration",
+  activeView: "fleet",
+  fleetPreset: "overview",
   theme: getInitialTheme(),
   alertsOpen: false,
   rightRailCollapsed: getInitialRightRailCollapsed(),
@@ -102,6 +103,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selectedProjectId: state.selectedProjectId,
       selectedMilestoneId: state.selectedMilestoneId,
       activeView: state.activeView,
+      fleetPreset: state.fleetPreset,
       searchQuery: state.searchQuery,
       searchScope: state.searchScope,
       theme: state.theme,
@@ -111,7 +113,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rightRailCollapsed: state.rightRailCollapsed,
       alertsOpen: state.alertsOpen,
     }),
-    [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.searchQuery,
+    [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.fleetPreset, state.searchQuery,
      state.searchScope, state.theme, state.currentUser, state.isAuthenticated, state.authEnabled,
      state.rightRailCollapsed, state.alertsOpen]
   );

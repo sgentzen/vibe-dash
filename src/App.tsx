@@ -5,17 +5,12 @@ import { useApi, getStoredApiKey } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { getInitialRightRailCollapsed } from "./state/setReducer";
 import { TopBar } from "./components/TopBar";
 import { ProjectList } from "./components/ProjectList";
 import { TaskBoard } from "./components/TaskBoard";
-import { AgentDashboard } from "./components/AgentDashboard";
-import { TaskListView } from "./components/TaskListView";
-import { DashboardView } from "./components/DashboardView";
-import { TimelineView } from "./components/TimelineView";
 import { ActivityStreamView } from "./components/ActivityStreamView";
-import { OrchestrationView } from "./components/orchestration/OrchestrationView";
-import { WorktreeView } from "./components/WorktreeView";
-import { ExecutiveView } from "./components/ExecutiveView";
+import { FleetView } from "./components/fleet/FleetView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
@@ -26,7 +21,7 @@ import { CommandPalette } from "./components/CommandPalette";
 export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
-  const { theme, activeView, isAuthenticated, authEnabled, rightRailCollapsed } = useNavigationState();
+  const { theme, activeView, fleetPreset, isAuthenticated, authEnabled, rightRailCollapsed } = useNavigationState();
   const { fileConflicts } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -81,10 +76,14 @@ export function App() {
   // Uses SET_RIGHT_RAIL_COLLAPSED (not TOGGLE) so it doesn't write to localStorage
   // and doesn't permanently override the user's stored preference.
   useEffect(() => {
-    if (activeView === "timeline" || activeView === "executive") {
+    if (activeView === "fleet" && fleetPreset === "timeline") {
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
+    } else {
+      // Restore the user's persisted preference when leaving Timeline,
+      // so the rail doesn't stay hidden after a one-off visit.
+      dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: getInitialRightRailCollapsed() });
     }
-  }, [activeView, dispatch]);
+  }, [activeView, fleetPreset, dispatch]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -118,15 +117,26 @@ export function App() {
       if (gKeyPending.current) {
         gKeyPending.current = false;
         const viewMap: Record<string, typeof activeView> = {
+          f: "fleet",
           b: "board",
-          a: "agents",
-          l: "list",
-          d: "dashboard",
-          t: "timeline",
-          v: "activity",
+          v: "feed",
         };
         const view = viewMap[e.key];
-        if (view) dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
+        if (view) {
+          dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
+          return;
+        }
+        const presetMap: Record<string, "overview" | "hotspots" | "agents" | "timeline"> = {
+          o: "overview",
+          h: "hotspots",
+          a: "agents",
+          t: "timeline",
+        };
+        const preset = presetMap[e.key];
+        if (preset) {
+          dispatch({ type: "SET_ACTIVE_VIEW", payload: "fleet" });
+          dispatch({ type: "SET_FLEET_PRESET", payload: preset });
+        }
       }
     }
 
@@ -280,7 +290,7 @@ export function App() {
           >
             <ProjectContextChip />
           </div>
-          {activeView === "orchestration" ? <OrchestrationView /> : activeView === "board" ? <TaskBoard /> : activeView === "agents" ? <AgentDashboard /> : activeView === "list" ? <TaskListView /> : activeView === "dashboard" ? <DashboardView /> : activeView === "timeline" ? <TimelineView /> : activeView === "worktrees" ? <WorktreeView /> : activeView === "executive" ? <ExecutiveView /> : <ActivityStreamView />}
+          {activeView === "board" ? <TaskBoard /> : activeView === "feed" ? <ActivityStreamView /> : <FleetView />}
         </div>
         {rightRailCollapsed ? (
           <aside
