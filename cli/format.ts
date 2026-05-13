@@ -127,6 +127,55 @@ export function formatStatusSummary(s: StatusSummary): string {
   return lines.join("\n");
 }
 
+// ─── Compact all-projects status (≤10 lines) ─────────────────────────────────
+
+export interface ProjectSnapshot {
+  name: string;
+  planned: number;
+  in_progress: number;
+  blocked: number;
+  done: number;
+  openMilestone?: { name: string; completion_pct: number };
+}
+
+export interface CompactStatusInput {
+  projects: ProjectSnapshot[];
+  activeAgents: number;
+  idleAgents: number;
+  offlineAgents: number;
+  openBlockers: number;
+}
+
+export function formatCompactStatus(input: CompactStatusInput): string {
+  const now = new Date().toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const lines: string[] = [];
+  lines.push(`${BOLD}${CYAN}vibe-dash${RESET}  ${DIM}·  ${now}${RESET}`);
+  lines.push(hr(56));
+
+  for (const p of input.projects) {
+    const inProg = p.in_progress > 0 ? `${BLUE}▶${p.in_progress}${RESET}` : `${DIM}▶${p.in_progress}${RESET}`;
+    const blocked = p.blocked > 0 ? `${RED}✗${p.blocked}${RESET}` : `${DIM}✗${p.blocked}${RESET}`;
+    const planned = `${DIM}—${p.planned}${RESET}`;
+    const done = `${GREEN}✓${p.done}${RESET}`;
+    const milestone = p.openMilestone
+      ? `  ${DIM}[${p.openMilestone.name.slice(0, 22)} ${p.openMilestone.completion_pct}%]${RESET}`
+      : "";
+    const name = pad(p.name, 26);
+    lines.push(`  ${BOLD}${name}${RESET} ${inProg}  ${blocked}  ${planned}  ${done}${milestone}`);
+  }
+
+  lines.push(hr(56));
+  const agentStr = input.activeAgents > 0
+    ? `${GREEN}${input.activeAgents} active${RESET}`
+    : `${DIM}${input.activeAgents} active${RESET}`;
+  const blockerStr = input.openBlockers > 0
+    ? `${RED}${input.openBlockers} blocker${input.openBlockers === 1 ? "" : "s"}${RESET}`
+    : `${DIM}0 blockers${RESET}`;
+  lines.push(`  Agents: ${agentStr}, ${DIM}${input.idleAgents} idle, ${input.offlineAgents} offline${RESET}  ·  ${blockerStr}`);
+
+  return lines.join("\n");
+}
+
 // ─── Help ────────────────────────────────────────────────────────────────────
 
 export function formatHelp(): string {
@@ -138,11 +187,13 @@ export function formatHelp(): string {
   lines.push(`  ${BOLD}add-task${RESET} --project <n> --title <t>  Create a task`);
   lines.push(`  ${BOLD}status${RESET} [project-name]            Project status summary`);
   lines.push(`  ${BOLD}agents${RESET}                           List agents with health`);
+  lines.push(`  ${BOLD}digest${RESET}                           Write daily digest to ./digests/YYYY-MM-DD.md`);
   lines.push("");
   lines.push("Flags:");
-  lines.push(`  --db <path>      Database file (default: ./vibe-dash.db)`);
-  lines.push(`  --project <n>    Filter by project name`);
-  lines.push(`  --priority <p>   Task priority (low|medium|high|urgent)`);
-  lines.push(`  --milestone <n>  Milestone name for add-task`);
+  lines.push(`  --db <path>          Database file (default: ./vibe-dash.db)`);
+  lines.push(`  --project <n>        Filter by project name`);
+  lines.push(`  --priority <p>       Task priority (low|medium|high|urgent)`);
+  lines.push(`  --milestone <n>      Milestone name for add-task`);
+  lines.push(`  --output-dir <path>  Digest output directory (default: ./digests)`);
   return lines.join("\n");
 }

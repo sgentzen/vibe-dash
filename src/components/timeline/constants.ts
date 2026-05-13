@@ -5,6 +5,7 @@ export const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
   in_progress: "var(--status-success)",
   blocked: "var(--status-danger)",
   planned: "var(--text-muted)",
+  cancelled: "var(--status-neutral)",
 };
 
 export const DAY_MS = 24 * 60 * 60 * 1000;

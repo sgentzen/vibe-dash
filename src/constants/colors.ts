@@ -5,6 +5,7 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   in_progress: "var(--status-success)",
   blocked: "var(--status-warning)",
   done: "var(--status-info)",
+  cancelled: "var(--status-neutral)",
 };
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {

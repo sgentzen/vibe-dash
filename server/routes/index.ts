@@ -13,10 +13,7 @@ import { blockerRoutes } from "./blockers.js";
 import { tagRoutes } from "./tags.js";
 import { dependencyRoutes } from "./dependencies.js";
 import { commentRoutes } from "./comments.js";
-import { fileLockRoutes } from "./file-locks.js";
-import { alertRoutes } from "./alerts.js";
 import { notificationRoutes } from "./notifications.js";
-import { templateRoutes } from "./templates.js";
 import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
@@ -25,6 +22,8 @@ import { reviewRoutes } from "./reviews.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
+import { detectorRoutes } from "./detectors.js";
+import { intelligenceRoutes } from "./intelligence.js";
 import { userRoutes } from "./users.js";
 import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
@@ -67,10 +66,7 @@ const routeFactories: RouteFactory[] = [
   tagRoutes,
   dependencyRoutes,
   commentRoutes,
-  fileLockRoutes,
-  alertRoutes,
   notificationRoutes,
-  templateRoutes,
   webhookRoutes,
   costRoutes,
   bulkRoutes,
@@ -79,6 +75,8 @@ const routeFactories: RouteFactory[] = [
   executiveRoutes,
   milestoneRoutes,
   userRoutes,
+  detectorRoutes,
+  intelligenceRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {
@@ -90,11 +88,17 @@ export function createRouter(db: Database.Database): Router {
 
   // Auth middleware runs before all routes; no-op when no users exist.
   // /api/auth/status is exempt — it's a public discovery endpoint.
-  // authLimiter applied before key validation to limit brute-force attempts.
+  // authLimiter scoped to /api/auth/* only: that's where credential-sensitive
+  // operations live (login, validate-key). Applying it to every API request
+  // gave the whole app a 30-req/15-min budget, which is far too tight for
+  // a polling dashboard and caused user-visible 429 cascades on first load.
   const authMiddleware = makeAuthMiddleware(db);
   router.use((req, res, next) => {
     if (req.path === "/api/auth/status") return next();
-    authLimiter(req, res, () => authMiddleware(req, res, next));
+    if (req.path.startsWith("/api/auth/")) {
+      return authLimiter(req, res, () => authMiddleware(req, res, next));
+    }
+    return authMiddleware(req, res, next);
   });
 
   for (const factory of routeFactories) {
