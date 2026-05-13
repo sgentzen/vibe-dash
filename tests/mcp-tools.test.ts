@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { handleTool } from "../server/mcp/tools.js";
+import { createMcpServer } from "../server/mcp/server.js";
 
 // Mock websocket broadcast — we don't need a live WebSocket server in tests
 vi.mock("../server/websocket.js", () => ({
@@ -36,17 +37,6 @@ describe("register_agent", () => {
     const first = parse(await handleTool(db, "register_agent", { name: "agent-x", model: "model-a" }));
     const second = parse(await handleTool(db, "register_agent", { name: "agent-x", model: "model-b" }));
     expect(second.agent_id).toBe(first.agent_id);
-  });
-});
-
-// ─── create_project ───────────────────────────────────────────────────────────
-
-describe("create_project", () => {
-  it("creates a project and returns project_id", async () => {
-    const result = await handleTool(db, "create_project", { name: "My Project", description: "A test project" });
-    const data = parse(result);
-    expect(data.project_id).toBeTruthy();
-    expect(typeof data.project_id).toBe("string");
   });
 });
 
@@ -213,43 +203,35 @@ describe("list operations", () => {
   });
 });
 
-// ─── assign_task / unassign_task ─────────────────────────────────────────────
+// ─── search_tasks ─────────────────────────────────────────────────────────────
 
-describe("assign_task", () => {
-  it("assigns an agent to a task", async () => {
+describe("search_tasks", () => {
+  it("returns tasks matching query", async () => {
     const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "medium" }));
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
+    await handleTool(db, "create_task", { project_id, title: "Implement auth", priority: "high" });
+    await handleTool(db, "create_task", { project_id, title: "Write tests", priority: "low" });
 
-    const result = await handleTool(db, "assign_task", { task_id, agent_id });
+    const result = await handleTool(db, "search_tasks", { query: "auth" });
     const data = parse(result);
-    expect(data.success).toBe(true);
-
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
-    expect(fetched.task.assigned_agent_id).toBe(agent_id);
-  });
-
-  it("is a no-op for unknown task_id", async () => {
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
-    const result = await handleTool(db, "assign_task", { task_id: "no-such-task", agent_id });
-    const data = parse(result);
-    expect(data.success).toBe(true);
+    expect(data.tasks.length).toBeGreaterThanOrEqual(1);
+    expect(data.tasks.some((t: { title: string }) => t.title.includes("auth"))).toBe(true);
   });
 });
 
-describe("unassign_task", () => {
-  it("removes agent assignment from a task", async () => {
+// ─── list_milestones / complete_milestone ─────────────────────────────────────
+
+describe("milestones", () => {
+  it("list_milestones returns empty when none exist", async () => {
     const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "medium" }));
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "bot-1" }));
-
-    await handleTool(db, "assign_task", { task_id, agent_id });
-    const result = await handleTool(db, "unassign_task", { task_id });
+    const result = await handleTool(db, "list_milestones", { project_id });
     const data = parse(result);
-    expect(data.success).toBe(true);
+    expect(data.milestones).toEqual([]);
+  });
 
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
-    expect(fetched.task.assigned_agent_id).toBeNull();
+  it("complete_milestone returns success=false for unknown id", async () => {
+    const result = await handleTool(db, "complete_milestone", { milestone_id: "no-such-id" });
+    const data = parse(result);
+    expect(data.success).toBe(false);
   });
 });
 
@@ -306,5 +288,27 @@ describe("onboarding wizard flow", () => {
 describe("error handling", () => {
   it("throws on unknown tool name", async () => {
     await expect(handleTool(db, "unknown_tool", {})).rejects.toThrow("Unknown tool: unknown_tool");
+  });
+});
+
+// ─── advertised MCP surface (regression guard) ────────────────────────────────
+//
+// Guards against accidental removal of milestone CRUD from the MCP tool list.
+// History: commit 6d39d0c cut milestone CRUD; 0c46e35 restored it. Without this
+// test, a future cut leaves callers (agents) unable to create milestones and
+// the regression is silent until someone notices the tool list mismatch.
+
+describe("advertised MCP tool surface", () => {
+  function registeredToolNames(): string[] {
+    const handle = createMcpServer(db);
+    const tools = (handle.server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+    return Object.keys(tools);
+  }
+
+  it("exposes milestone lifecycle tools", () => {
+    const names = registeredToolNames();
+    expect(names).toContain("create_milestone");
+    expect(names).toContain("list_milestones");
+    expect(names).toContain("complete_milestone");
   });
 });

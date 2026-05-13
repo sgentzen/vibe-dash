@@ -1,15 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestDb } from "./setup.js";
 import type Database from "better-sqlite3";
 import { createUser, getUserByKeyHash, listUsers, updateUserRole, deleteUser, rotateApiKey, countUsers } from "../server/db/users.js";
-import { generateApiKey, hashApiKey, makeAuthMiddleware, requireRole, isAuthEnabled } from "../server/auth.js";
+import { generateApiKey, hashApiKey, makeAuthMiddleware, requireRole, isAuthEnabled, _resetAuthCache } from "../server/auth.js";
 import type { Request, Response, NextFunction } from "express";
-
-// Reset module-level cache between tests
-function resetAuthCache() {
-  // Access the module's internal cache by re-importing — not possible cleanly,
-  // so we create fresh DBs with no users to test the zero-user path.
-}
 
 let db: Database.Database;
 
@@ -122,6 +116,15 @@ function mockRes(): { status: (n: number) => { json: (o: unknown) => void }; sta
 }
 
 describe("makeAuthMiddleware", () => {
+  beforeEach(() => {
+    process.env.VIBE_TEAM_MODE = "1";
+    _resetAuthCache();
+  });
+  afterEach(() => {
+    delete process.env.VIBE_TEAM_MODE;
+    _resetAuthCache();
+  });
+
   it("calls next() without auth when no users exist (local-only mode)", () => {
     const middleware = makeAuthMiddleware(db);
     const req = mockReq();
@@ -162,6 +165,31 @@ describe("makeAuthMiddleware", () => {
     middleware(req, res as unknown as Response, (() => { called = true; }) as NextFunction);
     expect(called).toBe(true);
     expect((req as Request & { user?: { name: string } }).user?.name).toBe("J");
+  });
+});
+
+// ─── isAuthEnabled team mode guard ────────────────────────────────────────────
+
+describe("isAuthEnabled team mode guard", () => {
+  afterEach(() => {
+    delete process.env.VIBE_TEAM_MODE;
+    _resetAuthCache();
+  });
+
+  it("returns false when VIBE_TEAM_MODE is unset even with users present", () => {
+    delete process.env.VIBE_TEAM_MODE;
+    _resetAuthCache();
+    const key = generateApiKey();
+    createUser(db, { name: "X", email: "x@test.com", role: "admin", api_key_hash: hashApiKey(key) });
+    expect(isAuthEnabled(db)).toBe(false);
+  });
+
+  it("returns true when VIBE_TEAM_MODE is set and users exist", () => {
+    process.env.VIBE_TEAM_MODE = "1";
+    _resetAuthCache();
+    const key = generateApiKey();
+    createUser(db, { name: "Y", email: "y@test.com", role: "admin", api_key_hash: hashApiKey(key) });
+    expect(isAuthEnabled(db)).toBe(true);
   });
 });
 

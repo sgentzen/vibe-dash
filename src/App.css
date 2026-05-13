@@ -5,8 +5,10 @@
   --border: #30363d;
   --text-primary: #c9d1d9;
   --text-secondary: #8b949e;
-  --text-muted: #484f58;
+  --text-muted: #9ca4ad; /* bumped from #484f58 — dark bg needs ≥7:1 for micro text (M8-T2) */
+  --accent-cyan-rgb: 6, 182, 212; /* rgba() triplet matching --accent-cyan #06b6d4 */
   --text-on-accent: #ffffff;
+  --text-on-yellow: #1a1a1a;
   --accent-red: #f85149;
   --accent-green: #3fb950;
   --accent-blue: #58a6ff;
@@ -17,6 +19,8 @@
   --status-danger: var(--accent-red);
   --status-warning: var(--accent-yellow);
   --status-info: var(--accent-blue);
+  --status-neutral: var(--text-muted);
+  --text-on-yellow: #1a1a1a;
   --green-bg: #0d1f0d;
   --green-border: #238636;
   --yellow-bg: #2a1a0a;
@@ -25,6 +29,25 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   --shadow-glow-green: 0 0 8px rgba(63, 185, 80, 0.2);
   --shadow-glow-red: 0 0 6px rgba(248, 81, 73, 0.15);
+
+  /* === Font + type scale === */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --type-display: 600 32px/1.2 var(--font-sans);
+  --type-h1: 600 24px/1.3 var(--font-sans);
+  --type-h2: 600 18px/1.4 var(--font-sans);
+  --type-body: 400 14px/1.5 var(--font-sans);
+  --type-caption: 400 12px/1.4 var(--font-sans);
+  --type-micro: 500 11px/1.3 var(--font-sans);
+
+  /* === Spacing scale === */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
 }
 
 [data-theme="light"] {
@@ -34,18 +57,22 @@
   --border: #d0d7de;
   --text-primary: #1f2328;
   --text-secondary: #656d76;
-  --text-muted: #8b949e;
+  --text-muted: #4f5960; /* bumped from #8b949e — light bg needs ≥7:1 for micro text (M8-T2) */
   --text-on-accent: #ffffff;
+  --text-on-yellow: #1a1a1a;
   --accent-red: #cf222e;
   --accent-green: #1a7f37;
   --accent-blue: #0969da;
   --accent-yellow: #9a6700;
   --accent-purple: #7c3aed;
   --accent-cyan: #0891b2;
+  --accent-cyan-rgb: 8, 145, 178; /* rgba() triplet matching --accent-cyan #0891b2 */
   --status-success: var(--accent-green);
   --status-danger: var(--accent-red);
   --status-warning: var(--accent-yellow);
   --status-info: var(--accent-blue);
+  --status-neutral: var(--text-muted);
+  --text-on-yellow: #1a1a1a;
   --green-bg: #dafbe1;
   --green-border: #1a7f37;
   --yellow-bg: #fff8c5;
@@ -73,14 +100,15 @@
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--status-info);
   outline-offset: 2px;
+  border-radius: inherit;
 }
 
 input:focus-visible,

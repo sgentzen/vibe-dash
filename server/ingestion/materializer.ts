@@ -90,6 +90,7 @@ function materializeEvent(
       task_id: taskId,
       agent_id: agentId,
       message: normalized.message,
+      source: "ingest",
     });
     broadcast({
       type: "agent_activity",

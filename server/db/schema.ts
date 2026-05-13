@@ -1,5 +1,4 @@
 import Database from "better-sqlite3";
-import { seedBuiltInTemplates } from "./templates.js";
 import { runMigrations } from "./migrator.js";
 
 // ─── Stale FK Guard ───────────────────────────────────────────────────────────
@@ -58,7 +57,6 @@ export function initDb(db: Database.Database): void {
   runMigrations(db);
   // Fix stale tasks.milestone_id FK after column rename migration may have run
   rebuildTasksIfFkStale(db);
-  seedBuiltInTemplates(db);
 }
 
 export function openDb(path: string): Database.Database {

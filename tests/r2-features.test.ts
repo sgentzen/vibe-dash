@@ -272,6 +272,24 @@ describe("3.1 Search & Filtering", () => {
     const results = searchTasks(db, { query: "zzzznonexistent" });
     expect(results).toHaveLength(0);
   });
+
+  it("rejects SQL injection via limit/offset and clamps bounds", () => {
+    const project = createProject(db, { name: "P", description: null });
+    createTask(db, { project_id: project.id, title: "T1", description: null, priority: "low" });
+    createTask(db, { project_id: project.id, title: "T2", description: null, priority: "low" });
+
+    const results = searchTasks(db, {
+      limit: "5; DROP TABLE tasks" as unknown as number,
+      offset: -10 as unknown as number,
+    });
+
+    expect(Array.isArray(results)).toBe(true);
+    const tableExists = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'")
+      .get();
+    expect(tableExists).toBeDefined();
+    expect(tableExists).not.toBeNull();
+  });
 });
 
 // ─── Agent Detail ───────────────────────────────────────────────────────────
