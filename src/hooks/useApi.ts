@@ -31,6 +31,37 @@ async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   });
 }
 
+/**
+ * Error thrown by API wrappers when the server responds with non-2xx.
+ * Carries the HTTP status and `Retry-After` (in ms) so callers can
+ * back off intelligently on 429 / 503.
+ */
+export class ApiError extends Error {
+  status: number;
+  retryAfterMs: number | null;
+  constructor(message: string, status: number, retryAfterMs: number | null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+function parseRetryAfter(res: Response): number | null {
+  const h = res.headers.get("Retry-After");
+  if (!h) return null;
+  // Retry-After can be seconds or an HTTP-date. Prefer seconds.
+  const secs = Number(h);
+  if (Number.isFinite(secs)) return Math.max(0, secs) * 1000;
+  const date = Date.parse(h);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return null;
+}
+
+async function throwApiError(res: Response, op: string): Promise<never> {
+  throw new ApiError(`${op} failed: ${res.status}`, res.status, parseRetryAfter(res));
+}
+
 function buildQueryString(params: Record<string, string | undefined>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -46,7 +77,7 @@ async function getStats(): Promise<{
   alerts: number;
 }> {
   const res = await apiFetch("/api/stats");
-  if (!res.ok) throw new Error(`getStats failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getStats");
   return res.json();
 }
 
