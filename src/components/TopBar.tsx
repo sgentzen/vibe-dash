@@ -86,11 +86,11 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
       style={{
         background: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border)",
-        padding: "0 16px",
+        padding: "0 var(--space-4)",
         height: "52px",
         display: "flex",
         alignItems: "center",
-        gap: "24px",
+        gap: "var(--space-5)",
         flexShrink: 0,
       }}
     >
@@ -103,6 +103,7 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           letterSpacing: "0.1em",
           fontFamily: "monospace",
           whiteSpace: "nowrap",
+          lineHeight: 1.5,
         }}
       >
         VIBE DASH
