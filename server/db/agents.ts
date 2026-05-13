@@ -6,12 +6,10 @@ import type {
   AgentSession,
   AgentStats,
   AgentContribution,
-  AgentFileLock,
-  FileConflict,
   AgentHealthStatus,
   ActivityEntry,
 } from "../types.js";
-import { now, genId, parseAgent } from "./helpers.js";
+import { now, genId, parseAgent, normalizeAgentName } from "./helpers.js";
 
 // ─── Agent CRUD ─────────────────────────────────────────────────────────────
 
@@ -30,6 +28,7 @@ export function registerAgent(
   const ts = now();
   const capJson = JSON.stringify(input.capabilities);
   const role = input.role ?? "agent";
+  const normalized = normalizeAgentName(input.name);
 
   let parentAgentId: string | null = null;
   if (input.parent_agent_name) {
@@ -38,19 +37,19 @@ export function registerAgent(
   }
 
   const existing = db
-    .prepare("SELECT * FROM agents WHERE name = ?")
-    .get(input.name) as Record<string, unknown> | undefined;
+    .prepare("SELECT * FROM agents WHERE name_normalized = ?")
+    .get(normalized) as Record<string, unknown> | undefined;
 
   let row: Record<string, unknown>;
   if (existing) {
     row = db.prepare(
-      "UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), last_seen_at = ? WHERE name = ? RETURNING *"
-    ).get(input.model ?? null, capJson, role, parentAgentId, ts, input.name) as Record<string, unknown>;
+      "UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), last_seen_at = ? WHERE name_normalized = ? RETURNING *"
+    ).get(input.model ?? null, capJson, role, parentAgentId, ts, normalized) as Record<string, unknown>;
   } else {
     const id = genId();
     row = db.prepare(
-      "INSERT INTO agents (id, name, model, capabilities, role, parent_agent_id, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
-    ).get(id, input.name, input.model ?? null, capJson, role, parentAgentId, ts, ts) as Record<string, unknown>;
+      "INSERT INTO agents (id, name, name_normalized, model, capabilities, role, parent_agent_id, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
+    ).get(id, input.name, normalized, input.model ?? null, capJson, role, parentAgentId, ts, ts) as Record<string, unknown>;
   }
 
   return parseAgent(row);
@@ -67,9 +66,10 @@ export function getAgentByName(
   db: Database.Database,
   name: string
 ): Agent | null {
+  const normalized = normalizeAgentName(name);
   const row = db
-    .prepare("SELECT * FROM agents WHERE name = ?")
-    .get(name) as Record<string, unknown> | undefined;
+    .prepare("SELECT * FROM agents WHERE name_normalized = ?")
+    .get(normalized) as Record<string, unknown> | undefined;
   if (!row) return null;
   return parseAgent(row);
 }
@@ -84,7 +84,7 @@ export function touchAgent(db: Database.Database, name: string): Agent {
   const existing = getAgentByName(db, name);
   if (existing) {
     const timestamp = now();
-    db.prepare("UPDATE agents SET last_seen_at = ? WHERE name = ?").run(timestamp, name);
+    db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(timestamp, existing.id);
     if (existing.parent_agent_id) {
       db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(timestamp, existing.parent_agent_id);
     }
@@ -335,58 +335,3 @@ export function getMilestoneAgentContributions(db: Database.Database, milestoneI
   return rows;
 }
 
-// ─── Agent File Locks ───────────────────────────────────────────────────────
-
-export function reportWorkingOn(
-  db: Database.Database,
-  agentId: string,
-  taskId: string,
-  filePaths: string[]
-): AgentFileLock[] {
-  const ts = now();
-  const locks: AgentFileLock[] = [];
-  for (const fp of filePaths) {
-    const id = genId();
-    const row = db.prepare(
-      "INSERT OR REPLACE INTO agent_file_locks (id, agent_id, task_id, file_path, started_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
-    ).get(id, agentId, taskId, fp, ts) as AgentFileLock;
-    locks.push(row);
-  }
-  return locks;
-}
-
-export function releaseFileLocks(db: Database.Database, agentId: string, taskId?: string): number {
-  if (taskId) {
-    return db.prepare("DELETE FROM agent_file_locks WHERE agent_id = ? AND task_id = ?").run(agentId, taskId).changes;
-  }
-  return db.prepare("DELETE FROM agent_file_locks WHERE agent_id = ?").run(agentId).changes;
-}
-
-export function getActiveFileLocks(db: Database.Database): AgentFileLock[] {
-  return db.prepare("SELECT * FROM agent_file_locks ORDER BY started_at DESC").all() as AgentFileLock[];
-}
-
-export function getFileConflicts(db: Database.Database): FileConflict[] {
-  const rows = db.prepare(
-    `SELECT fl.file_path, fl.agent_id, a.name AS agent_name, fl.task_id
-     FROM agent_file_locks fl
-     JOIN agents a ON fl.agent_id = a.id
-     WHERE fl.file_path IN (
-       SELECT file_path FROM agent_file_locks GROUP BY file_path HAVING COUNT(DISTINCT agent_id) > 1
-     )
-     ORDER BY fl.file_path, a.name`
-  ).all() as { file_path: string; agent_id: string; agent_name: string; task_id: string }[];
-
-  const map = new Map<string, FileConflict>();
-  for (const row of rows) {
-    if (!map.has(row.file_path)) {
-      map.set(row.file_path, { file_path: row.file_path, agents: [] });
-    }
-    map.get(row.file_path)!.agents.push({
-      agent_id: row.agent_id,
-      agent_name: row.agent_name,
-      task_id: row.task_id,
-    });
-  }
-  return [...map.values()];
-}

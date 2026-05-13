@@ -1,11 +1,17 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { Request, Response, NextFunction } from "express";
 import type Database from "better-sqlite3";
 import { createUser, listUsers, updateUserRole, deleteUser, rotateApiKey, countUsers } from "../db/users.js";
-import { generateApiKey, hashApiKey, requireRole } from "../auth.js";
+import { generateApiKey, hashApiKey, requireRole, isTeamMode } from "../auth.js";
 import { validateBody } from "./validate.js";
 import type { BroadcastFn } from "./types.js";
 import type { UserRole } from "../../shared/types.js";
+
+function requireTeamMode(req: Request, res: Response, next: NextFunction): void {
+  if (!isTeamMode()) { res.status(404).json({ error: "Not found" }); return; }
+  next();
+}
 
 const createUserSchema = z.object({
   name: z.string().min(1),
@@ -22,7 +28,8 @@ export function userRoutes(db: Database.Database, _broadcast: BroadcastFn): Rout
 
   // GET /api/auth/status — public discovery endpoint (exempt from auth middleware)
   router.get("/api/auth/status", (req, res) => {
-    res.json({ auth_enabled: countUsers(db) > 0 });
+    const teamMode = isTeamMode();
+    res.json({ auth_enabled: teamMode && countUsers(db) > 0, team_mode: teamMode });
   });
 
   // GET /api/auth/me — current authenticated user
@@ -35,7 +42,7 @@ export function userRoutes(db: Database.Database, _broadcast: BroadcastFn): Rout
   });
 
   // POST /api/users — create user (admin only, or first user = admin)
-  router.post("/api/users", validateBody(createUserSchema), (req, res) => {
+  router.post("/api/users", requireTeamMode, validateBody(createUserSchema), (req, res) => {
     const isFirstUser = countUsers(db) === 0;
     if (!isFirstUser) {
       // Not first user — must be admin
@@ -65,12 +72,12 @@ export function userRoutes(db: Database.Database, _broadcast: BroadcastFn): Rout
   });
 
   // GET /api/users — list users (admin only)
-  router.get("/api/users", requireRole("admin"), (req, res) => {
+  router.get("/api/users", requireTeamMode, requireRole("admin"), (req, res) => {
     res.json(listUsers(db));
   });
 
   // PATCH /api/users/:id/role — update role (admin only)
-  router.patch("/api/users/:id/role", requireRole("admin"), validateBody(updateRoleSchema), (req, res) => {
+  router.patch("/api/users/:id/role", requireTeamMode, requireRole("admin"), validateBody(updateRoleSchema), (req, res) => {
     const user = updateUserRole(db, req.params.id as string, req.body.role as UserRole);
     if (!user) {
       res.status(404).json({ error: "User not found" });
@@ -80,7 +87,7 @@ export function userRoutes(db: Database.Database, _broadcast: BroadcastFn): Rout
   });
 
   // DELETE /api/users/:id — delete user (admin only)
-  router.delete("/api/users/:id", requireRole("admin"), (req, res) => {
+  router.delete("/api/users/:id", requireTeamMode, requireRole("admin"), (req, res) => {
     if (req.user?.id === req.params.id as string) {
       res.status(400).json({ error: "Cannot delete your own account" });
       return;
@@ -90,7 +97,7 @@ export function userRoutes(db: Database.Database, _broadcast: BroadcastFn): Rout
   });
 
   // POST /api/users/:id/rotate-key — rotate API key (admin or self)
-  router.post("/api/users/:id/rotate-key", (req, res) => {
+  router.post("/api/users/:id/rotate-key", requireTeamMode, (req, res) => {
     const isSelf = req.user?.id === req.params.id as string;
     const isAdmin = req.user?.role === "admin";
     if (!isSelf && !isAdmin) {

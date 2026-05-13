@@ -12,11 +12,6 @@ import {
   listMentions,
   handleRecurringTaskCompletion,
   getTask,
-  createTemplate,
-  listTemplates,
-  getTemplate,
-  deleteTemplate,
-  createProjectFromTemplate,
   getActivityStream,
 } from "../server/db/index.js";
 import { getNextDueDate } from "../server/recurrence";
@@ -130,62 +125,6 @@ describe("4.3 @Mentions", () => {
     const mentions = listMentions(db, "bot-1");
     expect(mentions).toHaveLength(1);
     expect(mentions[0].message).toContain("@bot-1");
-  });
-});
-
-// ─── 5.2 Project Templates ──────────────────────────────────────────────────
-
-describe("5.2 Project Templates", () => {
-  it("seeds built-in templates on init", () => {
-    const templates = listTemplates(db);
-    expect(templates.length).toBeGreaterThanOrEqual(4);
-    expect(templates.some(t => t.name === "API Project")).toBe(true);
-    expect(templates.some(t => t.name === "Bug Triage")).toBe(true);
-  });
-
-  it("creates and lists custom templates", () => {
-    const t = createTemplate(db, "My Template", "Custom", JSON.stringify([{ title: "Task 1" }]));
-    expect(t.name).toBe("My Template");
-
-    const all = listTemplates(db);
-    expect(all.some(x => x.name === "My Template")).toBe(true);
-  });
-
-  it("gets template by id", () => {
-    const t = createTemplate(db, "Test", null, "[]");
-    const found = getTemplate(db, t.id);
-    expect(found).not.toBeNull();
-    expect(found!.name).toBe("Test");
-  });
-
-  it("deletes template", () => {
-    const t = createTemplate(db, "ToDelete", null, "[]");
-    expect(deleteTemplate(db, t.id)).toBe(true);
-    expect(getTemplate(db, t.id)).toBeNull();
-  });
-
-  it("creates project from template with tasks", () => {
-    const t = createTemplate(db, "WithTasks", "Test", JSON.stringify([
-      { title: "Parent Task", priority: "high", children: [
-        { title: "Subtask A" },
-        { title: "Subtask B" },
-      ]},
-      { title: "Another Task" },
-    ]));
-
-    const project = createProjectFromTemplate(db, t.id, "New Project");
-    expect(project).not.toBeNull();
-    expect(project!.name).toBe("New Project");
-
-    // Check tasks were created
-    const tasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(project!.id) as Array<{ title: string }>;
-    expect(tasks.length).toBe(4); // 2 parents + 2 children
-    expect(tasks.some((x) => x.title === "Parent Task")).toBe(true);
-    expect(tasks.some((x) => x.title === "Subtask A")).toBe(true);
-  });
-
-  it("returns null for unknown template", () => {
-    expect(createProjectFromTemplate(db, "nonexistent", "Test")).toBeNull();
   });
 });
 

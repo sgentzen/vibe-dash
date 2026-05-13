@@ -14,7 +14,7 @@ import { requireEntity, handleMutation } from "./handlers.js";
 import { createReviewSchema, updateReviewSchema } from "../../shared/schemas.js";
 import { validateBody } from "./validate.js";
 
-const VALID_STATUSES: ReviewStatus[] = ["pending", "approved", "changes_requested"];
+const VALID_STATUSES: ReviewStatus[] = ["pending", "approved", "changes_requested", "failed"];
 
 export function reviewRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();

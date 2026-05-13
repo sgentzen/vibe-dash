@@ -55,11 +55,6 @@ import {
   deleteWebhook,
   fireWebhooks,
   handleRecurringTaskCompletion,
-  createTemplate,
-  listTemplates,
-  getTemplate,
-  deleteTemplate,
-  createProjectFromTemplate,
   getActivityStream,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
@@ -71,19 +66,10 @@ import {
   getReview,
   listReviewsForTask,
   updateReview,
-  reportWorkingOn,
-  releaseFileLocks,
-  getActiveFileLocks,
-  getFileConflicts,
-  createAlertRule,
-  listAlertRules,
-  toggleAlertRule,
-  deleteAlertRule,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   getUnreadNotificationCount,
-  evaluateAlertRules,
   bulkUpdateTasks,
   ACTIVE_THRESHOLD_MINUTES,
   logCost,
@@ -353,6 +339,7 @@ export function createRouter(db: Database.Database): Router {
         task_id: updated!.id,
         agent_id: null,
         message: `${changes.join(", ")} on "${updated!.title}"`,
+        source: "api",
       });
       broadcast({
         type: "agent_activity",
@@ -378,8 +365,6 @@ export function createRouter(db: Database.Database): Router {
     for (const b of resolveBlockersForTask(db, req.params.id)) {
       broadcast({ type: "blocker_resolved", payload: b });
     }
-    const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     // Record daily stats if task has a milestone
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
@@ -395,6 +380,7 @@ export function createRouter(db: Database.Database): Router {
       task_id: completed!.id,
       agent_id: null,
       message: `Completed "${completed!.title}"`,
+      source: "api",
     });
     broadcast({
       type: "agent_activity",
@@ -451,8 +437,6 @@ export function createRouter(db: Database.Database): Router {
     const task = getTask(db, task_id);
     broadcast({ type: "blocker_reported", payload: blocker });
     if (task) broadcast({ type: "task_updated", payload: task });
-    const alertNotifs = evaluateAlertRules(db, "blocker_reported", { task_id, priority: task?.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     res.status(201).json(blocker);
   });
 
@@ -658,10 +642,6 @@ export function createRouter(db: Database.Database): Router {
       broadcast({ type: "notification_created", payload: notif });
     }
 
-    // Evaluate alert rules for comment events
-    const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id });
-    for (const n of notifications) broadcast({ type: "notification_created", payload: n });
-
     res.status(201).json(comment);
   });
 
@@ -722,55 +702,6 @@ export function createRouter(db: Database.Database): Router {
     if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
     broadcast({ type: "review_updated", payload: updated });
     res.json(updated);
-  });
-
-  // ─── R3: Agent File Locks ──────────────────────────────────────────
-
-  router.post("/api/agents/:id/file-locks", (req, res) => {
-    const { task_id, file_paths } = req.body as { task_id: string; file_paths: string[] };
-    if (!task_id || !file_paths?.length) { res.status(400).json({ error: "task_id and file_paths are required" }); return; }
-    const locks = reportWorkingOn(db, req.params.id, task_id, file_paths);
-    for (const lock of locks) broadcast({ type: "file_lock_acquired", payload: lock });
-    const conflicts = getFileConflicts(db);
-    for (const c of conflicts) broadcast({ type: "file_conflict_detected", payload: c });
-    res.status(201).json({ locks, conflicts });
-  });
-
-  router.delete("/api/agents/:id/file-locks", (req, res) => {
-    const taskId = req.query.task_id as string | undefined;
-    const released = releaseFileLocks(db, req.params.id, taskId);
-    res.json({ released });
-  });
-
-  router.get("/api/file-locks", (_req, res) => {
-    res.json(getActiveFileLocks(db));
-  });
-
-  router.get("/api/file-locks/conflicts", (_req, res) => {
-    res.json(getFileConflicts(db));
-  });
-
-  // ─── R3: Alert Rules ───────────────────────────────────────────────
-
-  router.get("/api/alert-rules", (_req, res) => {
-    res.json(listAlertRules(db));
-  });
-
-  router.post("/api/alert-rules", (req, res) => {
-    const { event_type, filter_json } = req.body as { event_type: string; filter_json?: string };
-    if (!event_type) { res.status(400).json({ error: "event_type is required" }); return; }
-    res.status(201).json(createAlertRule(db, event_type, filter_json));
-  });
-
-  router.patch("/api/alert-rules/:id", (req, res) => {
-    const { enabled } = req.body as { enabled: boolean };
-    const rule = toggleAlertRule(db, req.params.id, enabled);
-    if (!rule) { res.status(404).json({ error: "Rule not found" }); return; }
-    res.json(rule);
-  });
-
-  router.delete("/api/alert-rules/:id", (req, res) => {
-    res.json({ success: deleteAlertRule(db, req.params.id) });
   });
 
   // ─── R3: Notifications ─────────────────────────────────────────────
@@ -835,37 +766,6 @@ export function createRouter(db: Database.Database): Router {
 
   router.get("/api/mentions/:agent_name", (req, res) => {
     res.json(listMentions(db, req.params.agent_name));
-  });
-
-  // ─── R5: Templates ────────────────────────────────────────────
-
-  router.get("/api/templates", (_req, res) => {
-    res.json(listTemplates(db));
-  });
-
-  router.post("/api/templates", (req, res) => {
-    const { name, description, template_json } = req.body as { name: string; description?: string; template_json: string };
-    if (!name || !template_json) { res.status(400).json({ error: "name and template_json are required" }); return; }
-    res.status(201).json(createTemplate(db, name, description ?? null, template_json));
-  });
-
-  router.get("/api/templates/:id", (req, res) => {
-    const t = getTemplate(db, req.params.id);
-    if (!t) { res.status(404).json({ error: "Template not found" }); return; }
-    res.json(t);
-  });
-
-  router.delete("/api/templates/:id", (req, res) => {
-    res.json({ success: deleteTemplate(db, req.params.id) });
-  });
-
-  router.post("/api/templates/:id/instantiate", (req, res) => {
-    const { project_name } = req.body as { project_name: string };
-    if (!project_name) { res.status(400).json({ error: "project_name is required" }); return; }
-    const project = createProjectFromTemplate(db, req.params.id, project_name);
-    if (!project) { res.status(404).json({ error: "Template not found" }); return; }
-    broadcast({ type: "project_created", payload: project });
-    res.status(201).json(project);
   });
 
   // ─── R5: Activity Stream ───────────────────────────────────────
@@ -1047,7 +947,6 @@ export function createRouter(db: Database.Database): Router {
     broadcast({ type: "milestone_deleted", payload: existing });
     res.json({ success: true });
   });
-
 
   return router;
 }
