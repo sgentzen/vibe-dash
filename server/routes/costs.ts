@@ -10,7 +10,7 @@ import {
   getCostByModel,
   getCostByAgent,
 } from "../db/index.js";
-import { statsLimiter } from "./middleware.js";
+import { makeReadLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
@@ -21,8 +21,9 @@ type GroupBy = typeof VALID_GROUP_BY[number];
 
 export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
+  const costsLimiter = makeReadLimiter(120);
 
-  router.post("/api/costs", statsLimiter, validateBody(logCostSchema), (req, res) => {
+  router.post("/api/costs", costsLimiter, validateBody(logCostSchema), (req, res) => {
     const { model, provider, input_tokens, output_tokens, cost_usd, agent_id, task_id, milestone_id, project_id } = req.body;
     handleMutation(res, broadcast, () => logCost(db, {
       agent_id: agent_id ?? null,
@@ -35,7 +36,7 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
 
   // GET /api/costs?groupBy=model|agent|day|project|milestone|agent-summary
   //   &id=<entity-id>  &project_id=...  &milestone_id=...  &agent_id=...  &days=...
-  router.get("/api/costs", statsLimiter, (req, res) => {
+  router.get("/api/costs", costsLimiter, (req, res) => {
     const groupBy = req.query.groupBy as string | undefined;
     if (!groupBy || !VALID_GROUP_BY.includes(groupBy as GroupBy)) {
       res.status(400).json({ error: `groupBy must be one of: ${VALID_GROUP_BY.join(", ")}` });

@@ -70,9 +70,9 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
 
   // Determine if search scope matches the active view's domain
   const scopeMismatch =
-    (searchScope === "tasks" && activeView !== "board" && activeView !== "list") ||
-    (searchScope === "projects" && activeView !== "dashboard" && activeView !== "orchestration") ||
-    (searchScope === "agents" && activeView !== "agents");
+    (searchScope === "tasks" && activeView !== "board") ||
+    (searchScope === "projects" && activeView !== "fleet") ||
+    (searchScope === "agents" && activeView !== "fleet");
 
   const scopeHintLabel: Record<SearchScope, string> = {
     tasks: "tasks",
@@ -129,7 +129,8 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           value={stats.activeAgents}
           color="var(--status-success)"
           onClick={() => {
-            dispatch({ type: "SET_ACTIVE_VIEW", payload: "agents" });
+            dispatch({ type: "SET_ACTIVE_VIEW", payload: "fleet" });
+            dispatch({ type: "SET_FLEET_PRESET", payload: "agents" });
             dispatch({ type: "SET_SEARCH_SCOPE", payload: "agents" });
           }}
         />
@@ -143,7 +144,7 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           label="TASKS"
           value={stats.tasks}
           color="var(--text-secondary)"
-          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "list" })}
+          onClick={() => dispatch({ type: "SET_ACTIVE_VIEW", payload: "board" })}
         />
       </div>
 

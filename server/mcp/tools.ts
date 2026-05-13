@@ -13,6 +13,7 @@ import {
   resolveBlocker,
   resolveBlockersForTask,
   touchAgent,
+  createMilestone,
   listMilestones,
   completeMilestone,
   searchTasks,
@@ -122,6 +123,18 @@ export async function handleTool(
     case "list_projects": {
       const projects = listProjects(db);
       return ok({ projects });
+    }
+
+    case "create_milestone": {
+      const milestone = createMilestone(db, {
+        project_id: args.project_id as string,
+        name: args.name as string,
+        description: (args.description as string | undefined) ?? null,
+        acceptance_criteria: (args.acceptance_criteria as string | undefined) ?? null,
+        target_date: (args.target_date as string | undefined) ?? null,
+      });
+      broadcast({ type: "milestone_created", payload: milestone });
+      return ok({ milestone_id: milestone.id });
     }
 
     case "list_milestones": {

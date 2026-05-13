@@ -50,6 +50,8 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, alertsOpen: action.payload };
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
+    case "SET_FLEET_PRESET":
+      return { ...state, fleetPreset: action.payload };
     case "SET_NOTIFICATIONS":
       return { ...state, notifications: action.payload };
     case "SET_UNREAD_COUNT":

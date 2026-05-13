@@ -16,7 +16,9 @@ export type Theme = "dark" | "light";
 
 export type SearchScope = "tasks" | "projects" | "agents" | "all";
 
-export type ActiveView = "orchestration" | "board" | "agents" | "list" | "dashboard" | "timeline" | "activity" | "worktrees" | "executive" | "hotspots";
+export type ActiveView = "fleet" | "board" | "feed";
+
+export type FleetPreset = "overview" | "hotspots" | "agents" | "timeline";
 
 export interface AppState {
   projects: Project[];
@@ -35,6 +37,7 @@ export interface AppState {
   searchQuery: string;
   searchScope: SearchScope;
   activeView: ActiveView;
+  fleetPreset: FleetPreset;
   theme: Theme;
   alertsOpen: boolean;
   selectedProjectId: string | null;
@@ -69,6 +72,7 @@ export type AppAction =
   | { type: "SET_SEARCH_SCOPE"; payload: SearchScope }
   | { type: "SET_ALERTS_OPEN"; payload: boolean }
   | { type: "SET_ACTIVE_VIEW"; payload: ActiveView }
+  | { type: "SET_FLEET_PRESET"; payload: FleetPreset }
   | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
   | { type: "SET_UNREAD_COUNT"; payload: number }
   | { type: "SET_WORKTREES"; payload: TaskWorktree[] }

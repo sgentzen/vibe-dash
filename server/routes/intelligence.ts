@@ -7,20 +7,35 @@ import {
   getDigestAnomalies,
   shouldSendDigest,
 } from "../intelligence.js";
-import { statsLimiter } from "./middleware.js";
+import { makeReadLimiter } from "./middleware.js";
+import rateLimit from "express-rate-limit";
 import type { BroadcastFn } from "./types.js";
 
 export function intelligenceRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
 
+  // Cheap reads share a per-route budget (status / anomalies / should-send).
+  // Kept separate from /api/stats and /api/detectors/* so polling-heavy
+  // dashboard presets don't trip each other's limit. See PR #86.
+  const intelligenceReadLimiter = makeReadLimiter(120);
+
+  // AI-call endpoints are tight: each request burns Anthropic tokens, so a
+  // 60/min global cap is intentionally low.
+  const aiCallLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // GET /api/intelligence/status — whether AI is configured.
-  router.get("/api/intelligence/status", statsLimiter, (_req, res) => {
+  router.get("/api/intelligence/status", intelligenceReadLimiter, (_req, res) => {
     res.json({ configured: isAiConfigured() });
   });
 
   // GET /api/intelligence/digest?period=daily|weekly&projectId=...
   // Generate an AI-written digest. 503 when ANTHROPIC_API_KEY not configured.
-  router.get("/api/intelligence/digest", statsLimiter, async (req, res) => {
+  router.get("/api/intelligence/digest", aiCallLimiter, async (req, res) => {
     if (!isAiConfigured()) {
       res.status(503).json({ error: "AI not configured — set ANTHROPIC_API_KEY" });
       return;
@@ -36,7 +51,7 @@ export function intelligenceRoutes(db: Database.Database, _broadcast: BroadcastF
   });
 
   // POST /api/intelligence/query — natural-language question about project data.
-  router.post("/api/intelligence/query", statsLimiter, async (req, res) => {
+  router.post("/api/intelligence/query", aiCallLimiter, async (req, res) => {
     if (!isAiConfigured()) {
       res.status(503).json({ error: "AI not configured — set ANTHROPIC_API_KEY" });
       return;
@@ -57,7 +72,7 @@ export function intelligenceRoutes(db: Database.Database, _broadcast: BroadcastF
   // GET /api/intelligence/anomalies?minScore=50&limit=10
   // Run detectors and return formatted anomaly list for digest/push triggers.
   // Does not require ANTHROPIC_API_KEY.
-  router.get("/api/intelligence/anomalies", statsLimiter, (req, res) => {
+  router.get("/api/intelligence/anomalies", intelligenceReadLimiter, (req, res) => {
     const rawMin = req.query.minScore;
     const rawLimit = req.query.limit;
 
@@ -87,7 +102,7 @@ export function intelligenceRoutes(db: Database.Database, _broadcast: BroadcastF
 
   // GET /api/intelligence/should-send?threshold=50
   // "Silent when fine" check — returns { shouldSend: boolean }.
-  router.get("/api/intelligence/should-send", statsLimiter, (req, res) => {
+  router.get("/api/intelligence/should-send", intelligenceReadLimiter, (req, res) => {
     const rawThreshold = req.query.threshold;
     let threshold = 50;
     if (rawThreshold !== undefined) {

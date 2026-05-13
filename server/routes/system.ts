@@ -12,6 +12,13 @@ const wsTicketLimiter = rateLimit({ windowMs: 60_000, max: 60 });
 export function systemRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
 
+  // Cheap, unauthenticated liveness probe with no rate limit. Used by the
+  // client's usePolling.waitForServer() loop so the probe doesn't burn the
+  // /api/stats budget on every page load.
+  router.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
+  });
+
   router.get("/api/first-run", firstRunLimiter, (_req, res) => {
     const count = (
       db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number }
