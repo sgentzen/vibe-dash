@@ -10,6 +10,7 @@ import {
   registerAgentSchema,
   createTaskSchema,
   updateTaskSchema,
+  createMilestoneSchema,
 } from "../../shared/schemas.js";
 
 export interface McpServerHandle {
@@ -77,6 +78,13 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "List all projects",
     {},
     call("list_projects")
+  );
+
+  server.tool(
+    "create_milestone",
+    "Create a milestone for a project",
+    createMilestoneSchema.shape,
+    call("create_milestone")
   );
 
   server.tool(
