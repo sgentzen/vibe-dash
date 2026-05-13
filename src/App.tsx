@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
-import { useApi, getStoredApiKey } from "./hooks/useApi";
+import { useApi, getStoredApiKey, ApiError } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -219,9 +219,14 @@ export function App() {
           }
           setLoaded(true);
           return;
-        } catch {
+        } catch (err) {
           if (i < retries - 1) {
-            await new Promise((r) => setTimeout(r, delayMs));
+            // Honor server's Retry-After when present; otherwise exponential backoff (capped at 5s).
+            const backoff = Math.min(delayMs * 2 ** i, 5000);
+            const wait = err instanceof ApiError && err.retryAfterMs != null
+              ? Math.max(err.retryAfterMs, backoff)
+              : backoff;
+            await new Promise((r) => setTimeout(r, wait));
           }
         }
       }
