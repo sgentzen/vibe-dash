@@ -8,6 +8,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type Database from "better-sqlite3";
+import { runDetectors } from "./detectors/index.js";
+import type { ScoredMatch } from "./detectors/index.js";
 
 export const MODEL = "claude-haiku-4-5-20251001";
 
@@ -15,6 +17,40 @@ export const MODEL = "claude-haiku-4-5-20251001";
 
 export function isAiConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+export interface DigestAnomaly {
+  detectorId: string;
+  category: string;
+  score: number;
+  label: string;
+  detail?: string;
+}
+
+// Returns top anomalies from the detector framework for use in digests.
+export function getDigestAnomalies(
+  db: Database.Database,
+  limit = 10,
+  minScore = 50
+): DigestAnomaly[] {
+  const matches = runDetectors(db, { minScore });
+  return trimArray(
+    matches.map((m: ScoredMatch) => ({
+      detectorId: m.detectorId,
+      category: m.category,
+      score: m.score,
+      label: m.label,
+      detail: m.detail,
+    })),
+    limit
+  );
+}
+
+// Returns true when at least one detector match exceeds the threshold — i.e., the
+// system is "not fine" and a push notification or digest is worth sending.
+// Returns false (silent) when all detectors are quiet below the threshold.
+export function shouldSendDigest(db: Database.Database, threshold = 50): boolean {
+  return runDetectors(db, { minScore: threshold }).length > 0;
 }
 
 export async function generateDigest(
@@ -85,7 +121,7 @@ function extractText(response: Anthropic.Message): string {
 
 /** Trim an array to at most maxItems elements to stay within context budget */
 function trimArray<T>(arr: T[], maxItems: number): T[] {
-  return arr.slice(0, maxItems);
+  return arr.slice(0, Math.max(0, Math.round(maxItems)));
 }
 
 // ── Digest context ─────────────────────────────────────────────────────────────
@@ -100,6 +136,7 @@ interface DigestContext {
   activeBlockers: Array<{ reason: string; task_title: string }>;
   topCostsByModel: Array<{ model: string; total_cost: number; total_tokens: number }>;
   activeAgents: Array<{ name: string; last_seen_at: string }>;
+  topAnomalies: DigestAnomaly[];
 }
 
 function buildDigestContext(
@@ -198,6 +235,8 @@ function buildDigestContext(
     .prepare("SELECT name, last_seen_at FROM agents WHERE last_seen_at >= ? ORDER BY last_seen_at DESC LIMIT 20")
     .all(agentSince) as Array<{ name: string; last_seen_at: string }>;
 
+  const topAnomalies = getDigestAnomalies(db, 10, 50);
+
   return {
     period,
     projectName,
@@ -215,6 +254,7 @@ function buildDigestContext(
     activeBlockers: trimArray(blockerRows, 20),
     topCostsByModel: trimArray(costRows, 10),
     activeAgents: trimArray(agentRows, 20),
+    topAnomalies,
   };
 }
 
@@ -338,10 +378,11 @@ function buildDigestSystemPrompt(): string {
 When given project data in JSON format, write a clear markdown summary covering:
 - What was accomplished (completed tasks)
 - Current state (active work, blocked items)
+- Anomalies and hot spots (topAnomalies array — highlight any score ≥75 prominently)
 - Cost and usage highlights if noteworthy
 - Active agents and their contributions
 
-Keep the digest concise (under 400 words). Use markdown headings and bullet lists. Be direct and factual — avoid padding.`;
+Keep the digest concise (under 400 words). Use markdown headings and bullet lists. Be direct and factual — avoid padding. If topAnomalies is empty, skip that section.`;
 }
 
 function buildQuerySystemPrompt(): string {
