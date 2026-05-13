@@ -110,7 +110,7 @@ export function getCostTimeseries(
     ["created_at >= ?", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()],
   ]);
 
-  return db.prepare(
+  const rows = db.prepare(
     `SELECT DATE(created_at) AS date,
             SUM(cost_usd) AS total_cost_usd,
             SUM(input_tokens) AS total_input_tokens,
@@ -121,6 +121,25 @@ export function getCostTimeseries(
      GROUP BY DATE(created_at)
      ORDER BY date ASC`
   ).all(...params) as CostTimeseriesEntry[];
+
+  const byDate = new Map(rows.map((r) => [r.date, r]));
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const out: CostTimeseriesEntry[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(todayUtc - i * dayMs).toISOString().slice(0, 10);
+    out.push(
+      byDate.get(date) ?? {
+        date,
+        total_cost_usd: 0,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        entry_count: 0,
+      }
+    );
+  }
+  return out;
 }
 
 export function getCostByModel(
