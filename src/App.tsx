@@ -235,7 +235,7 @@ export function App() {
             // the same rate-limit budget that just rejected us.
             const apiErr = err instanceof ApiError ? err : null;
             const retryAfter = apiErr?.retryAfterMs ?? null;
-            const backoff = Math.min(baseDelayMs * 2 ** i, 5000);
+            const backoff = Math.min(delayMs * 2 ** i, 5000);
             const delay = retryAfter !== null ? Math.max(retryAfter, backoff) : backoff;
             await new Promise((r) => setTimeout(r, delay));
           }

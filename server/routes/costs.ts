@@ -36,7 +36,7 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
 
   // GET /api/costs?groupBy=model|agent|day|project|milestone|agent-summary
   //   &id=<entity-id>  &project_id=...  &milestone_id=...  &agent_id=...  &days=...
-  router.get("/api/costs", statsLimiter, (req, res) => {
+  router.get("/api/costs", costsLimiter, (req, res) => {
     const groupBy = req.query.groupBy as string | undefined;
     if (!groupBy || !VALID_GROUP_BY.includes(groupBy as GroupBy)) {
       res.status(400).json({ error: `groupBy must be one of: ${VALID_GROUP_BY.join(", ")}` });
