@@ -144,7 +144,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
         }}>
           {/* Step indicators */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-5)" }}>
             {[0, 1, 2].map((i) => (
               <div
                 key={i}

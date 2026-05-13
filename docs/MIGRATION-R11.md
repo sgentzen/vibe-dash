@@ -14,9 +14,9 @@ DELETE /api/filters/:id
 
 **Migration:** Use `GET /api/tasks/search` with query parameters instead.
 
-### Removed: MCP tools (none in R11)
+### Removed: MCP tools
 
-No MCP tools were removed in R11. `suggest_agent` is deprecated and will be removed in R12.
+- **`suggest_agent`** — removed. Humans assign tasks; agents claim them via `update_task`. No agent-selection logic is needed.
 
 ### Removed: OpenAPI spec endpoint
 
@@ -25,10 +25,6 @@ The `/api/openapi.json` and `/api/docs` endpoints have been removed. The spec wa
 ---
 
 ## Deprecation Warnings (removal in R12)
-
-### `suggest_agent` MCP tool
-
-This tool is deprecated. It returns `null` for projects without `completion_metrics` data. After R11.3's ingestion system provides real usage data, a replacement based on ingestion-derived performance will be designed.
 
 ### `alert_rules` (REST endpoints + DB table)
 

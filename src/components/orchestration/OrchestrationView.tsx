@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppState } from "../../store";
+import { useApi } from "../../hooks/useApi";
+import type { ExecutiveSummary } from "../../../shared/types.js";
 import { HealthScoreGauge } from "./HealthScoreGauge";
 import { ActiveBlockersPanel } from "./ActiveBlockersPanel";
 import { TopAtRiskMilestonesTile } from "./TopAtRiskMilestonesTile";
@@ -29,7 +31,31 @@ export function OrchestrationView() {
     [milestones, activeProjectId],
   );
 
+  const openMilestoneCount = useMemo(
+    () => projectMilestones.filter((m) => m.status === "open").length,
+    [projectMilestones],
+  );
+
   const done = useMemo(() => projectTasks.filter((t) => t.status === "done").length, [projectTasks]);
+
+  const api = useApi();
+  const [summary, setSummary] = useState<ExecutiveSummary | null>(null);
+  // Refetch when project changes OR when WS-driven task/milestone state shifts,
+  // so the server-authoritative milestone_health stays in sync with the rest of the view.
+  const projectTaskCount = projectTasks.length;
+  const projectDoneCount = done;
+  const projectMilestoneCount = projectMilestones.length;
+  useEffect(() => {
+    if (!activeProjectId) {
+      setSummary(null);
+      return;
+    }
+    let cancelled = false;
+    api.getExecutiveSummary(activeProjectId)
+      .then((s) => { if (!cancelled) setSummary(s); })
+      .catch(() => { if (!cancelled) setSummary(null); });
+    return () => { cancelled = true; };
+  }, [api, activeProjectId, projectTaskCount, projectDoneCount, projectMilestoneCount]);
 
   return (
     <div className="orch-wrapper">
@@ -53,8 +79,8 @@ export function OrchestrationView() {
         {/* Right column */}
         <div className="orch-right-col">
           <TopAtRiskMilestonesTile
-            milestones={projectMilestones}
-            tasks={projectTasks}
+            health={summary?.milestone_health ?? []}
+            openCount={openMilestoneCount}
           />
           <div className="orch-right-bottom">
             <AgentComputeHeatmap activeProjectId={activeProjectId} />

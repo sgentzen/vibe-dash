@@ -8,7 +8,6 @@ import type {
   TaskTag,
   TaskDependency,
   Task,
-  FileConflict,
   AppNotification,
   TaskWorktree,
   WsEvent,
@@ -135,13 +134,6 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
         unreadCount: state.unreadCount + 1,
       };
     }
-    case "file_conflict_detected": {
-      const conflict = event.payload as FileConflict;
-      const existing = state.fileConflicts.filter((c) => c.file_path !== conflict.file_path);
-      return { ...state, fileConflicts: [...existing, conflict] };
-    }
-    case "file_lock_acquired":
-      return state;
     case "daily_stats_recorded":
       return state;
     case "worktree_created": {

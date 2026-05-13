@@ -7,6 +7,7 @@ export interface LogActivityInput {
   task_id: string;
   agent_id: string | null;
   message: string;
+  source?: string;
 }
 
 export function logActivity(
@@ -15,9 +16,10 @@ export function logActivity(
 ): ActivityEntry {
   const id = genId();
   const ts = now();
+  const src = input.source ?? "internal";
   const row = db.prepare(
-    "INSERT INTO activity_log (id, task_id, agent_id, message, timestamp) VALUES (?, ?, ?, ?, ?) RETURNING *"
-  ).get(id, input.task_id, input.agent_id ?? null, input.message, ts) as ActivityEntry;
+    "INSERT INTO activity_log (id, task_id, agent_id, message, timestamp, source) VALUES (?, ?, ?, ?, ?, ?) RETURNING *"
+  ).get(id, input.task_id, input.agent_id ?? null, input.message, ts, src) as ActivityEntry;
   if (input.agent_id) {
     db.prepare(
       `UPDATE agents SET last_seen_at = ?
@@ -33,7 +35,8 @@ export function getRecentActivity(
 ): ActivityEntry[] {
   return db
     .prepare(
-      `SELECT a.*, ag.name AS agent_name, t.title AS task_title
+      `SELECT a.id, a.task_id, a.agent_id, a.message, a.timestamp, a.source,
+              ag.name AS agent_name, t.title AS task_title
        FROM activity_log a
        LEFT JOIN agents ag ON a.agent_id = ag.id
        LEFT JOIN tasks t ON a.task_id = t.id
@@ -75,7 +78,7 @@ export function getActivityStream(db: Database.Database, filter: ActivityStreamF
     filter.since ? ["a.timestamp >= ?", filter.since] : null,
   ]);
 
-  const sql = `SELECT a.id, a.task_id, a.agent_id, a.message, a.timestamp,
+  const sql = `SELECT a.id, a.task_id, a.agent_id, a.message, a.timestamp, a.source,
        ag.name AS agent_name, t.title AS task_title,
        p.name AS project_name, p.id AS project_id,
        parent_ag.name AS parent_agent_name
