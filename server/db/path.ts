@@ -1,0 +1,70 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Walk up from `start` looking for a `.git` directory or file. If `.git` is a
+// file (the worktree pointer format `gitdir: <path>`), follow it back to the
+// main repository root so every worktree resolves to the same root.
+function findRepoRoot(start: string): string | null {
+  let dir = path.resolve(start);
+  while (true) {
+    const gitPath = path.join(dir, ".git");
+    if (fs.existsSync(gitPath)) {
+      const stat = fs.statSync(gitPath);
+      if (stat.isDirectory()) return dir;
+
+      const content = fs.readFileSync(gitPath, "utf8");
+      const match = content.match(/^gitdir:\s*(.+)$/m);
+      if (match) {
+        const gitdir = path.resolve(dir, match[1].trim());
+        // Standard layout: gitdir = `<repo>/.git/worktrees/<name>` → repo root is two levels above.
+        const grandparent = path.dirname(path.dirname(gitdir));
+        if (path.basename(grandparent) === ".git") {
+          return path.dirname(grandparent);
+        }
+        // Non-standard layout: try `commondir` file (Git writes the relative path
+        // to the main `.git` here for linked worktrees with custom gitdirs).
+        const commondirFile = path.join(gitdir, "commondir");
+        if (fs.existsSync(commondirFile)) {
+          const commondir = path.resolve(gitdir, fs.readFileSync(commondirFile, "utf8").trim());
+          if (path.basename(commondir) === ".git") {
+            return path.dirname(commondir);
+          }
+        }
+        // Last resort: walk upward from the gitdir's parent rather than silently
+        // returning the worktree dir (which would reproduce the per-worktree-DB bug).
+        const upward = findRepoRoot(path.dirname(gitdir));
+        if (upward) return upward;
+      }
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
+ * Resolve the SQLite path used by the server, MCP transports, and CLI.
+ *
+ * Priority:
+ *   1. Explicit override (CLI flag or argument)
+ *   2. `VIBE_DASH_DB` env var
+ *   3. `<git-common-root>/vibe-dash.db` — same DB across all worktrees of a repo
+ *   4. Two levels above this file (`server/db/..` -> repo root) as a non-git fallback
+ *
+ * Always returns an absolute path so the caller can log it unambiguously.
+ */
+export function resolveDbPath(override?: string | null | undefined): string {
+  if (override && override.length > 0) return path.resolve(override);
+  if (process.env.VIBE_DASH_DB && process.env.VIBE_DASH_DB.length > 0) {
+    return path.resolve(process.env.VIBE_DASH_DB);
+  }
+
+  const repoRoot = findRepoRoot(__dirname);
+  if (repoRoot) return path.join(repoRoot, "vibe-dash.db");
+
+  return path.resolve(__dirname, "..", "..", "vibe-dash.db");
+}

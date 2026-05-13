@@ -5,7 +5,6 @@ import {
   listComments,
   extractMentions,
   createNotification,
-  evaluateAlertRules,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest } from "./responses.js";
@@ -29,9 +28,6 @@ export function commentRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
       const notif = createNotification(db, `${author_name} mentioned @${name} in a comment`);
       broadcast({ type: "notification_created", payload: notif });
     }
-
-    const notifications = evaluateAlertRules(db, "comment_added", { task_id: req.params.id as string });
-    for (const n of notifications) broadcast({ type: "notification_created", payload: n });
 
     res.status(201).json(comment);
   });
