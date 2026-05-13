@@ -170,9 +170,9 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
           style={{
             display: "flex",
             alignItems: "center",
-            padding: "12px 16px",
+            padding: "var(--space-3) var(--space-4)",
             borderBottom: "1px solid var(--border)",
-            gap: "10px",
+            gap: "var(--space-3)",
           }}
         >
           <span style={{ color: "var(--text-muted)", fontSize: "15px", lineHeight: 1 }}>⌘</span>
@@ -210,7 +210,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
           {sections.length === 0 ? (
             <div
               style={{
-                padding: "24px",
+                padding: "var(--space-5)",
                 textAlign: "center",
                 color: "var(--text-muted)",
                 fontSize: "13px",
@@ -244,7 +244,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "10px",
+                        gap: "var(--space-3)",
                         padding: "7px 16px",
                         cursor: "pointer",
                         background: isSelected ? "var(--bg-tertiary)" : "transparent",
@@ -294,7 +294,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             padding: "6px 16px",
             borderTop: "1px solid var(--border)",
             display: "flex",
-            gap: "16px",
+            gap: "var(--space-4)",
             fontSize: "11px",
             color: "var(--text-muted)",
           }}

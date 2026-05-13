@@ -5,6 +5,7 @@ import { loadPlugins } from "../plugins/loader.js";
 import { createPluginContext } from "../plugins/sandbox.js";
 import type { LoadedPlugin } from "../plugins/types.js";
 import type { BroadcastFn, RouteFactory } from "./types.js";
+import { requireRoleWhenEnabled } from "../auth.js";
 
 // In-memory registry — populated at startup and refreshed on reload
 let registry: LoadedPlugin[] = [];
@@ -43,8 +44,8 @@ export const pluginRoutes: RouteFactory = (db: Database.Database, broadcast: Bro
     res.json({ plugins: list });
   });
 
-  /** POST /api/plugins/reload — reload all plugins from disk */
-  router.post("/api/plugins/reload", reloadLimiter, async (_req, res) => {
+  /** POST /api/plugins/reload — reload all plugins from disk (admin only) */
+  router.post("/api/plugins/reload", reloadLimiter, requireRoleWhenEnabled(db, "admin"), async (_req, res) => {
     try {
       registry = await loadPlugins(db);
       broadcast({ type: "plugins_reloaded", payload: { count: registry.length } });

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // ─── Enums ──────────────────────────────────────────────────────────────
 
-export const taskStatusEnum = z.enum(["planned", "in_progress", "blocked", "done"]);
+export const taskStatusEnum = z.enum(["planned", "in_progress", "blocked", "done", "cancelled"]);
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 export const milestoneStatusEnum = z.enum(["open", "achieved"]);
 export const agentRoleEnum = z.enum([
@@ -124,12 +124,6 @@ export const bulkUpdateTasksSchema = z.object({
   updates: updateTaskSchema,
 });
 
-// ─── Routing ────────────────────────────────────────────────────────────
-
-export const suggestAgentSchema = z.object({
-  task_id: z.string().min(1),
-});
-
 // ─── Costs ──────────────────────────────────────────────────────────────
 
 export const logCostSchema = z.object({
@@ -157,43 +151,12 @@ export const updateWebhookSchema = z.object({
   active: z.boolean().optional(),
 });
 
-// ─── File locks ──────────────────────────────────────────────────────────
-
-export const reportWorkingOnSchema = z.object({
-  task_id: z.string().min(1),
-  file_paths: z.array(z.string().min(1)).nonempty(),
-});
-
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");
 
-// ─── Templates ──────────────────────────────────────────────────────────
-
-export const createTemplateSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().nullable().optional(),
-  template_json: validJson,
-});
-
-export const instantiateTemplateSchema = z.object({
-  project_name: z.string().min(1),
-  description: z.string().nullable().optional(),
-});
-
 export const generateReportSchema = z.object({
   period: z.enum(["day", "week", "milestone"]).optional(),
-});
-
-// ─── Alert rules ────────────────────────────────────────────────────────
-
-export const createAlertRuleSchema = z.object({
-  event_type: z.string().min(1),
-  filter_json: validJson.optional(),
-});
-
-export const updateAlertRuleSchema = z.object({
-  enabled: z.boolean(),
 });
 
 // ─── Blockers ───────────────────────────────────────────────────────────
@@ -231,7 +194,7 @@ export const updateWorktreeStatusSchema = z.object({
 
 // ─── Reviews ────────────────────────────────────────────────────────────
 
-export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested"]);
+export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested", "failed"]);
 
 export const createReviewSchema = z.object({
   task_id: z.string().min(1),

@@ -56,8 +56,6 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, notifications: action.payload };
     case "SET_UNREAD_COUNT":
       return { ...state, unreadCount: action.payload };
-    case "SET_FILE_CONFLICTS":
-      return { ...state, fileConflicts: action.payload };
     case "SET_WORKTREES":
       return { ...state, worktrees: action.payload };
     case "SET_STATS":
@@ -82,6 +80,8 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, rightRailCollapsed: action.payload };
     case "SET_AUTH":
       return { ...state, ...action.payload };
+    case "SET_LOAD_ERROR":
+      return { ...state, loadError: action.payload };
     default:
       return null;
   }

@@ -2,6 +2,7 @@ import { useNavigationState, useAppDispatch } from "../../store";
 import { DashboardView } from "../DashboardView";
 import { ExecutiveView } from "../ExecutiveView";
 import { OrchestrationView } from "../orchestration/OrchestrationView";
+import { HotSpotsView } from "../HotSpotsView";
 import { AgentDashboard } from "../AgentDashboard";
 import { WorktreeView } from "../WorktreeView";
 import { TimelineView } from "../TimelineView";
@@ -24,7 +25,10 @@ export function FleetView() {
             <ExecutiveView />
           </>
         ) : fleetPreset === "hotspots" ? (
-          <OrchestrationView />
+          <>
+            <HotSpotsView />
+            <OrchestrationView />
+          </>
         ) : fleetPreset === "agents" ? (
           <>
             <AgentDashboard />

@@ -12,11 +12,9 @@ import {
   bulkUpdateTasks,
   logActivity,
   recordMilestoneDailyStats,
-  evaluateAlertRules,
   handleRecurringTaskCompletion,
   getTimeSpent,
   resolveBlockersForTask,
-  suggestAgent,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { requireEntity, handleMutation } from "./handlers.js";
@@ -118,6 +116,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
         task_id: updated!.id,
         agent_id: null,
         message: `${changes.join(", ")} on "${updated!.title}"`,
+        source: "api",
       });
       broadcast({
         type: "agent_activity",
@@ -138,8 +137,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     for (const b of resolveBlockersForTask(db, req.params.id as string)) {
       broadcast({ type: "blocker_resolved", payload: b });
     }
-    const alertNotifs = evaluateAlertRules(db, "task_completed", { task_id: completed!.id, priority: completed!.priority });
-    for (const n of alertNotifs) broadcast({ type: "notification_created", payload: n });
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
     }
@@ -153,6 +150,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       task_id: completed!.id,
       agent_id: null,
       message: `Completed "${completed!.title}"`,
+      source: "api",
     });
     broadcast({
       type: "agent_activity",
@@ -165,13 +163,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     const task = getTask(db, req.params.id as string);
     if (!requireEntity(res, task, "Task")) return;
     res.json({ time_spent_seconds: getTimeSpent(db, req.params.id as string) });
-  });
-
-  router.get("/api/tasks/:id/suggest-agent", (req, res) => {
-    const task = getTask(db, req.params.id as string);
-    if (!requireEntity(res, task, "Task")) return;
-    const suggestion = suggestAgent(db, req.params.id as string);
-    res.json(suggestion ?? null);
   });
 
   return router;

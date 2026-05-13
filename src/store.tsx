@@ -16,12 +16,12 @@ export type DataState = Pick<
 export type NavigationState = Pick<
   AppState,
   "selectedProjectId" | "selectedMilestoneId" | "activeView" | "fleetPreset" | "searchQuery" | "searchScope" | "theme" |
-  "currentUser" | "isAuthenticated" | "authEnabled" | "rightRailCollapsed" | "alertsOpen"
+  "currentUser" | "isAuthenticated" | "authEnabled" | "teamMode" | "rightRailCollapsed" | "alertsOpen"
 >;
 
 export type NotificationState = Pick<
   AppState,
-  "notifications" | "unreadCount" | "fileConflicts"
+  "notifications" | "unreadCount" | "fileConflicts" | "loadError"
 >;
 
 export type PollingState = Pick<AppState, "pollGeneration">;
@@ -64,6 +64,8 @@ const initialState: AppState = {
   currentUser: null,
   isAuthenticated: false,
   authEnabled: false,
+  teamMode: false,
+  loadError: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -110,12 +112,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       currentUser: state.currentUser,
       isAuthenticated: state.isAuthenticated,
       authEnabled: state.authEnabled,
+      teamMode: state.teamMode,
       rightRailCollapsed: state.rightRailCollapsed,
       alertsOpen: state.alertsOpen,
     }),
     [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.fleetPreset, state.searchQuery,
      state.searchScope, state.theme, state.currentUser, state.isAuthenticated, state.authEnabled,
-     state.rightRailCollapsed, state.alertsOpen]
+     state.teamMode, state.rightRailCollapsed, state.alertsOpen]
   );
 
   const notificationValue = useMemo<NotificationState>(
@@ -123,8 +126,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notifications: state.notifications,
       unreadCount: state.unreadCount,
       fileConflicts: state.fileConflicts,
+      loadError: state.loadError,
     }),
-    [state.notifications, state.unreadCount, state.fileConflicts]
+    [state.notifications, state.unreadCount, state.fileConflicts, state.loadError]
   );
 
   const pollingValue = useMemo<PollingState>(

@@ -74,9 +74,42 @@ describe("cost tracking", () => {
     logCost(db, { project_id: project.id, model: "m1", provider: "p1", input_tokens: 200, output_tokens: 100, cost_usd: 0.02 });
 
     const ts = getCostTimeseries(db, { project_id: project.id, days: 7 });
-    expect(ts.length).toBeGreaterThanOrEqual(1);
-    expect(ts[0].total_cost_usd).toBe(0.03);
-    expect(ts[0].entry_count).toBe(2);
+    expect(ts).toHaveLength(7);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(ts[ts.length - 1].date).toBe(today);
+    const todays = ts.find((r) => r.date === today)!;
+    expect(todays.total_cost_usd).toBe(0.03);
+    expect(todays.entry_count).toBe(2);
+  });
+
+  it("zero-fills days with no cost entries across the requested window", () => {
+    const project = createProject(db, { name: "P", description: null });
+    // Backdate a cost to 5 days ago (UTC)
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare(
+      `INSERT INTO cost_entries (id, agent_id, task_id, milestone_id, project_id, model, provider, input_tokens, output_tokens, cost_usd, created_at)
+       VALUES (?, NULL, NULL, NULL, ?, 'm1', 'p1', 100, 50, 0.07, ?)`
+    ).run("backdated-1", project.id, fiveDaysAgo);
+
+    const ts = getCostTimeseries(db, { project_id: project.id, days: 7 });
+    expect(ts).toHaveLength(7);
+
+    const today = new Date().toISOString().slice(0, 10);
+    expect(ts[ts.length - 1].date).toBe(today);
+    expect(ts[ts.length - 1].total_cost_usd).toBe(0);
+    expect(ts[ts.length - 1].entry_count).toBe(0);
+
+    const backdatedDate = fiveDaysAgo.slice(0, 10);
+    const backdatedRow = ts.find((r) => r.date === backdatedDate)!;
+    expect(backdatedRow.total_cost_usd).toBe(0.07);
+    expect(backdatedRow.entry_count).toBe(1);
+
+    // Dates are strictly contiguous ascending
+    for (let i = 1; i < ts.length; i++) {
+      const prev = new Date(ts[i - 1].date + "T00:00:00Z").getTime();
+      const cur = new Date(ts[i].date + "T00:00:00Z").getTime();
+      expect(cur - prev).toBe(24 * 60 * 60 * 1000);
+    }
   });
 
   it("breaks down costs by model", () => {

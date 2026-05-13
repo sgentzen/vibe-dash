@@ -6,7 +6,6 @@ import type {
   ActivityEntry,
   Blocker,
   Tag,
-  FileConflict,
   AppNotification,
   TaskWorktree,
   WsEvent,
@@ -33,7 +32,7 @@ export interface AppState {
   taskDepsMap: Record<string, string[]>;
   notifications: AppNotification[];
   unreadCount: number;
-  fileConflicts: FileConflict[];
+  fileConflicts: unknown[];
   worktrees: TaskWorktree[];
   searchQuery: string;
   searchScope: SearchScope;
@@ -51,10 +50,12 @@ export interface AppState {
   };
   pollGeneration: number;
   rightRailCollapsed: boolean;
+  loadError: string | null;
   // Auth
   currentUser: User | null;
   isAuthenticated: boolean;
   authEnabled: boolean;
+  teamMode: boolean;
 }
 
 export type AppAction =
@@ -74,7 +75,6 @@ export type AppAction =
   | { type: "SET_FLEET_PRESET"; payload: FleetPreset }
   | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
   | { type: "SET_UNREAD_COUNT"; payload: number }
-  | { type: "SET_FILE_CONFLICTS"; payload: FileConflict[] }
   | { type: "SET_WORKTREES"; payload: TaskWorktree[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
@@ -84,4 +84,5 @@ export type AppAction =
   | { type: "TOGGLE_RIGHT_RAIL" }
   | { type: "SET_RIGHT_RAIL_COLLAPSED"; payload: boolean }
   | { type: "WS_EVENT"; payload: WsEvent }
-  | { type: "SET_AUTH"; payload: { currentUser: User | null; isAuthenticated: boolean; authEnabled: boolean } };
+  | { type: "SET_AUTH"; payload: { currentUser: User | null; isAuthenticated: boolean; authEnabled: boolean; teamMode: boolean } }
+  | { type: "SET_LOAD_ERROR"; payload: string | null };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
-import { useApi, getStoredApiKey } from "./hooks/useApi";
+import { useApi, getStoredApiKey, ApiError } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -22,7 +22,7 @@ export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
   const { theme, activeView, fleetPreset, isAuthenticated, authEnabled, rightRailCollapsed } = useNavigationState();
-  const { fileConflicts } = useNotificationState();
+  const { fileConflicts, loadError } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -45,8 +45,9 @@ export function App() {
     (async () => {
       try {
         const status = await api.getAuthStatus();
+        const teamMode = status.team_mode ?? false;
         if (!status.auth_enabled) {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode } });
           setAuthChecked(true);
           return;
         }
@@ -55,17 +56,17 @@ export function App() {
         if (storedKey) {
           try {
             const user = await api.validateApiKey(storedKey);
-            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true } });
+            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true, teamMode } });
           } catch {
             // Key invalid or expired — prompt login
-            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
           }
         } else {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true } });
+          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
         }
       } catch {
         // Server unreachable — treat as local-only; polling will retry data loading
-        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false } });
+        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode: false } });
       }
       setAuthChecked(true);
     })();
@@ -76,7 +77,7 @@ export function App() {
   // Uses SET_RIGHT_RAIL_COLLAPSED (not TOGGLE) so it doesn't write to localStorage
   // and doesn't permanently override the user's stored preference.
   useEffect(() => {
-    if (activeView === "fleet" && fleetPreset === "timeline") {
+    if (activeView === "fleet" && (fleetPreset === "timeline" || fleetPreset === "agents")) {
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
     } else {
       // Restore the user's persisted preference when leaving Timeline,
@@ -163,78 +164,94 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
+    // Atomic load: gather everything first, dispatch only once on success.
+    // This prevents partially-failed retries from clobbering previously-good
+    // state with empty arrays while the server is mid-restart.
     async function loadInitialData(retries = 10, delayMs = 500) {
+      let lastError: unknown = null;
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
-          const [stats, projects, milestones, tasks, agents, activity, blockerList] =
+          // Batch 1: global resources.
+          const [stats, projects, tasks, agents, activity, blockerList] =
             await Promise.all([
               api.getStats(),
               api.getProjects(),
-              api.getMilestones(),
               api.getTasks(),
               api.getAgents(),
               api.getActivity(),
               api.getBlockers(),
             ]);
           if (cancelled) return;
-          dispatch({ type: "SET_STATS", payload: stats });
-          dispatch({ type: "SET_PROJECTS", payload: projects });
-          dispatch({ type: "SET_MILESTONES", payload: milestones });
-          dispatch({ type: "SET_TASKS", payload: tasks });
-          dispatch({ type: "SET_AGENTS", payload: agents });
-          dispatch({ type: "SET_ACTIVITY", payload: activity });
-          dispatch({ type: "SET_BLOCKERS", payload: blockerList });
 
-          // Load tags and milestones for all projects
-          const [allTags, allMilestones] = await Promise.all([
+          // Batch 2: per-project fan-out + auxiliary collections.
+          const [
+            allTags,
+            allMilestones,
+            taskTagPairs,
+            allDeps,
+            notifs,
+            unread,
+            worktrees,
+          ] = await Promise.all([
             Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
             Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
-          ]);
-          dispatch({ type: "SET_TAGS", payload: allTags });
-          dispatch({ type: "SET_MILESTONES", payload: allMilestones });
-
-          // Load task tags and dependencies in bulk (one request per project instead of N per task)
-          const [taskTagPairs, allDeps] = await Promise.all([
             Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
             Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
+            api.getNotifications(50),
+            api.getUnreadCount(),
+            api.getWorktrees(),
           ]);
+          if (cancelled) return;
+
           const tagMap: Record<string, string[]> = {};
           for (const { task_id, tag } of taskTagPairs) {
             (tagMap[task_id] ??= []).push(tag.id);
           }
-          dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
-
           const depsMap: Record<string, string[]> = {};
           for (const d of allDeps) {
             (depsMap[d.task_id] ??= []).push(d.depends_on_task_id);
           }
-          dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
 
-          // Load notifications, file conflicts, and worktrees
-          const [notifs, unread, conflicts, worktrees] = await Promise.all([
-            api.getNotifications(50),
-            api.getUnreadCount(),
-            api.getFileConflicts(),
-            api.getWorktrees(),
-          ]);
+          // Single atomic dispatch sequence — only runs after both batches succeed.
+          dispatch({ type: "SET_STATS", payload: stats });
+          dispatch({ type: "SET_PROJECTS", payload: projects });
+          dispatch({ type: "SET_MILESTONES", payload: allMilestones });
+          dispatch({ type: "SET_TASKS", payload: tasks });
+          dispatch({ type: "SET_AGENTS", payload: agents });
+          dispatch({ type: "SET_ACTIVITY", payload: activity });
+          dispatch({ type: "SET_BLOCKERS", payload: blockerList });
+          dispatch({ type: "SET_TAGS", payload: allTags });
+          dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
+          dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
           dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
           dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
-          dispatch({ type: "SET_FILE_CONFLICTS", payload: conflicts });
           dispatch({ type: "SET_WORKTREES", payload: worktrees });
+          dispatch({ type: "SET_LOAD_ERROR", payload: null });
 
-          // Show onboarding wizard on first run (no projects)
           if (projects.length === 0) {
             setShowOnboarding(true);
           }
           setLoaded(true);
           return;
-        } catch {
+        } catch (err) {
+          lastError = err;
+          console.error(`[loadInitialData] attempt ${i + 1}/${retries} failed:`, err);
           if (i < retries - 1) {
-            await new Promise((r) => setTimeout(r, delayMs));
+            // Honor Retry-After on 429/503; otherwise exponential backoff
+            // capped at 5s. This stops the retry-all loop from hammering
+            // the same rate-limit budget that just rejected us.
+            const apiErr = err instanceof ApiError ? err : null;
+            const retryAfter = apiErr?.retryAfterMs ?? null;
+            const backoff = Math.min(delayMs * 2 ** i, 5000);
+            const delay = retryAfter !== null ? Math.max(retryAfter, backoff) : backoff;
+            await new Promise((r) => setTimeout(r, delay));
           }
         }
       }
+      if (cancelled) return;
+      const message = lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
+      dispatch({ type: "SET_LOAD_ERROR", payload: `Could not load data after ${retries} attempts: ${message}` });
     }
 
     loadInitialData();
@@ -244,23 +261,27 @@ export function App() {
 
   async function handleOnboardingComplete() {
     setShowOnboarding(false);
-    // Reload data to reflect newly created project/task
+    // Reload data to reflect newly created project/task. Mirror loadInitialData's
+    // per-project milestone fan-out so we don't clobber per-project milestones
+    // with a global call that may return an empty list for the new project.
     try {
-      const [stats, projects, milestones, tasks] = await Promise.all([
+      const [stats, projects, tasks] = await Promise.all([
         api.getStats(),
         api.getProjects(),
-        api.getMilestones(),
         api.getTasks(),
       ]);
+      const allMilestones = (
+        await Promise.all(projects.map((p) => api.getMilestones(p.id)))
+      ).flat();
       dispatch({ type: "SET_STATS", payload: stats });
       dispatch({ type: "SET_PROJECTS", payload: projects });
-      dispatch({ type: "SET_MILESTONES", payload: milestones });
+      dispatch({ type: "SET_MILESTONES", payload: allMilestones });
       dispatch({ type: "SET_TASKS", payload: tasks });
       if (projects.length > 0) {
         dispatch({ type: "SELECT_PROJECT", payload: projects[0].id });
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("[handleOnboardingComplete] reload failed:", err);
     }
   }
 
@@ -327,6 +348,42 @@ export function App() {
         )}
       </div>
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
+      {loadError && (
+        <div
+          role="alert"
+          style={{
+            position: "fixed",
+            bottom: 16,
+            right: 16,
+            maxWidth: 420,
+            padding: "12px 16px",
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--accent-red, #d32f2f)",
+            borderRadius: 6,
+            color: "var(--text-primary)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            zIndex: 1000,
+            fontSize: 13,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Failed to load data</div>
+          <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>{loadError}</div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              padding: "4px 10px",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
+            Reload
+          </button>
+        </div>
+      )}
       {loaded && showOnboarding && (
         <OnboardingWizard onComplete={handleOnboardingComplete} />
       )}
