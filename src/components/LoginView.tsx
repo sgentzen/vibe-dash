@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useApi, setStoredApiKey } from "../hooks/useApi";
-import { useAppDispatch } from "../store";
+import { useAppDispatch, useNavigationState } from "../store";
 
 export function LoginView() {
   const api = useApi();
   const dispatch = useAppDispatch();
+  const { teamMode } = useNavigationState();
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,7 @@ export function LoginView() {
       setStoredApiKey(apiKey.trim());
       dispatch({
         type: "SET_AUTH",
-        payload: { currentUser: user, isAuthenticated: true, authEnabled: true },
+        payload: { currentUser: user, isAuthenticated: true, authEnabled: true, teamMode },
       });
     } catch {
       setError("Invalid API key. Check your key and try again.");

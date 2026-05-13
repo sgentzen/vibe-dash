@@ -1,7 +1,7 @@
 // Single source of truth for types shared between server and client.
 // Both server/types.ts and src/types.ts re-export from this module.
 
-export type TaskStatus = "planned" | "in_progress" | "blocked" | "done";
+export type TaskStatus = "planned" | "in_progress" | "blocked" | "done" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type MilestoneStatus = "open" | "achieved";
 
@@ -45,14 +45,6 @@ export interface Task {
   updated_at: string;
 }
 
-export interface ProjectTemplate {
-  id: string;
-  name: string;
-  description: string | null;
-  template_json: string;
-  created_at: string;
-}
-
 export type AgentRole = "orchestrator" | "coder" | "reviewer" | "explorer" | "planner" | "agent";
 
 export interface Agent {
@@ -75,6 +67,7 @@ export interface ActivityEntry {
   agent_id: string | null;
   message: string;
   timestamp: string;
+  source: string;
   agent_name?: string | null;
   task_title?: string | null;
   project_name?: string | null;
@@ -127,27 +120,6 @@ export interface TaskComment {
   agent_id: string | null;
   author_name: string;
   message: string;
-  created_at: string;
-}
-
-export interface AgentFileLock {
-  id: string;
-  agent_id: string;
-  task_id: string;
-  file_path: string;
-  started_at: string;
-}
-
-export interface FileConflict {
-  file_path: string;
-  agents: { agent_id: string; agent_name: string; task_id: string }[];
-}
-
-export interface AlertRule {
-  id: string;
-  event_type: string;
-  filter_json: string;
-  enabled: boolean;
   created_at: string;
 }
 
@@ -207,7 +179,7 @@ export interface Blocker {
   resolved_at: string | null;
 }
 
-export type ReviewStatus = "pending" | "approved" | "changes_requested";
+export type ReviewStatus = "pending" | "approved" | "changes_requested" | "failed";
 
 export type WorktreeStatus = "active" | "merged" | "abandoned" | "removed";
 
@@ -285,22 +257,6 @@ export interface TaskTypeBreakdown {
   avg_lines_added: number;
 }
 
-export interface AgentScore {
-  agent_id: string;
-  agent_name: string;
-  score: number;
-  speed_score: number;
-  quality_score: number;
-  cost_score: number;
-  familiarity_score: number;
-  task_count: number;
-}
-
-export interface AgentSuggestion {
-  agent: AgentScore;
-  confidence: number;
-}
-
 export type UserRole = "admin" | "developer" | "viewer";
 
 export interface User {
@@ -337,8 +293,6 @@ export type WsEventType =
   | "session_started"
   | "session_ended"
   | "comment_added"
-  | "file_lock_acquired"
-  | "file_conflict_detected"
   | "notification_created"
   | "daily_stats_recorded"
   | "cost_logged"
@@ -378,8 +332,6 @@ export type WsEvent =
   | WsEventOf<"session_started", AgentSession>
   | WsEventOf<"session_ended", AgentSession>
   | WsEventOf<"comment_added", TaskComment>
-  | WsEventOf<"file_lock_acquired", AgentFileLock>
-  | WsEventOf<"file_conflict_detected", FileConflict>
   | WsEventOf<"notification_created", AppNotification>
   | WsEventOf<"daily_stats_recorded", MilestoneDailyStats>
   | WsEventOf<"cost_logged", CostEntry>
@@ -391,15 +343,6 @@ export type WsEvent =
   | WsEventOf<"ingestion_source_created", { id: string; name: string; kind: string }>
   | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
   | WsEventOf<"plugins_reloaded", { count: number }>;
-
-// ─── Saved Filters ────────────────────────────────────────────────────────────
-
-export interface SavedFilter {
-  id: string;
-  name: string;
-  filter_json: string;
-  created_at: string;
-}
 
 // ─── Git Sync ─────────────────────────────────────────────────────────────────
 
@@ -471,4 +414,21 @@ export interface ExecutiveSummary {
   velocity: TaskVelocity;
   costs: CostOverview;
   generated_at: string;
+}
+
+// ─── Detector Framework ───────────────────────────────────────────────────────
+
+export type DetectorEntityType = "task" | "agent" | "blocker" | "review";
+
+export interface DetectorMatch {
+  entityId: string;
+  entityType: DetectorEntityType;
+  label: string;
+  detail?: string;
+}
+
+export interface ScoredMatch extends DetectorMatch {
+  detectorId: string;
+  category: string;
+  score: number; // 0–100
 }

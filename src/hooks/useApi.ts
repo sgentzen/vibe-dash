@@ -1,16 +1,17 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, SavedFilter, MilestoneProgress, TaskComment, FileConflict, AlertRule, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, ProjectTemplate, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, AgentSuggestion, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
-import type { ExecutiveSummary } from "../../shared/types.js";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
 
-const API_KEY_STORAGE = "vibe-dash-api-key";
+const SESSION_KEY = "vibe-dash-api-key";
 
 export function getStoredApiKey(): string | null {
-  return localStorage.getItem(API_KEY_STORAGE);
+  const v = sessionStorage.getItem(SESSION_KEY);
+  return v ? atob(v) : null;
 }
 
 export function setStoredApiKey(key: string | null): void {
-  if (key) localStorage.setItem(API_KEY_STORAGE, key);
-  else localStorage.removeItem(API_KEY_STORAGE);
+  if (key) sessionStorage.setItem(SESSION_KEY, btoa(key));
+  else sessionStorage.removeItem(SESSION_KEY);
 }
 
 function authHeaders(): Record<string, string> {
@@ -30,6 +31,37 @@ async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   });
 }
 
+/**
+ * Error thrown by API wrappers when the server responds with non-2xx.
+ * Carries the HTTP status and `Retry-After` (in ms) so callers can
+ * back off intelligently on 429 / 503.
+ */
+export class ApiError extends Error {
+  status: number;
+  retryAfterMs: number | null;
+  constructor(message: string, status: number, retryAfterMs: number | null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+function parseRetryAfter(res: Response): number | null {
+  const h = res.headers.get("Retry-After");
+  if (!h) return null;
+  // Retry-After can be seconds or an HTTP-date. Prefer seconds.
+  const secs = Number(h);
+  if (Number.isFinite(secs)) return Math.max(0, secs) * 1000;
+  const date = Date.parse(h);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return null;
+}
+
+async function throwApiError(res: Response, op: string): Promise<never> {
+  throw new ApiError(`${op} failed: ${res.status}`, res.status, parseRetryAfter(res));
+}
+
 function buildQueryString(params: Record<string, string | undefined>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -45,13 +77,13 @@ async function getStats(): Promise<{
   alerts: number;
 }> {
   const res = await apiFetch("/api/stats");
-  if (!res.ok) throw new Error(`getStats failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getStats");
   return res.json();
 }
 
 async function getProjects(): Promise<Project[]> {
   const res = await apiFetch("/api/projects");
-  if (!res.ok) throw new Error(`getProjects failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getProjects");
   return res.json();
 }
 
@@ -64,7 +96,7 @@ async function createProject(data: {
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`createProject failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createProject");
   return res.json();
 }
 
@@ -73,7 +105,7 @@ async function getTasks(projectId?: string): Promise<Task[]> {
     ? `/api/tasks?project_id=${encodeURIComponent(projectId)}`
     : "/api/tasks";
   const res = await apiFetch(url);
-  if (!res.ok) throw new Error(`getTasks failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getTasks");
   return res.json();
 }
 
@@ -89,7 +121,7 @@ async function createTask(data: {
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`createTask failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createTask");
   return res.json();
 }
 
@@ -102,7 +134,7 @@ async function updateTask(
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`updateTask failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "updateTask");
   return res.json();
 }
 
@@ -111,25 +143,25 @@ async function completeTask(id: string): Promise<Task> {
     method: "POST",
     headers: jsonHeaders(),
   });
-  if (!res.ok) throw new Error(`completeTask failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "completeTask");
   return res.json();
 }
 
 async function getAgents(): Promise<Agent[]> {
   const res = await apiFetch("/api/agents");
-  if (!res.ok) throw new Error(`getAgents failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgents");
   return res.json();
 }
 
 async function getActivity(limit = 50): Promise<ActivityEntry[]> {
   const res = await apiFetch(`/api/activity?limit=${limit}`);
-  if (!res.ok) throw new Error(`getActivity failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getActivity");
   return res.json();
 }
 
 async function getBlockers(): Promise<Blocker[]> {
   const res = await apiFetch("/api/blockers");
-  if (!res.ok) throw new Error(`getBlockers failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getBlockers");
   return res.json();
 }
 
@@ -138,7 +170,7 @@ async function getMilestones(projectId?: string): Promise<Milestone[]> {
     ? `/api/milestones?project_id=${encodeURIComponent(projectId)}`
     : "/api/milestones";
   const res = await apiFetch(url);
-  if (!res.ok) throw new Error(`getMilestones failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getMilestones");
   return res.json();
 }
 
@@ -155,7 +187,7 @@ async function createMilestone(data: {
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`createMilestone failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createMilestone");
   return res.json();
 }
 
@@ -168,13 +200,13 @@ async function updateMilestone(
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`updateMilestone failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "updateMilestone");
   return res.json();
 }
 
 async function getTags(projectId: string): Promise<Tag[]> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/tags`);
-  if (!res.ok) throw new Error(`getTags failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getTags");
   return res.json();
 }
 
@@ -184,25 +216,25 @@ async function createTag(projectId: string, data: { name: string; color?: string
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`createTag failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createTag");
   return res.json();
 }
 
 async function getTaskTags(taskId: string): Promise<Tag[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`);
-  if (!res.ok) throw new Error(`getTaskTags failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getTaskTags");
   return res.json();
 }
 
 async function getProjectTaskTags(projectId: string): Promise<Array<{ task_id: string; tag: Tag }>> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-tags`);
-  if (!res.ok) throw new Error(`getProjectTaskTags failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getProjectTaskTags");
   return res.json();
 }
 
 async function getProjectTaskDependencies(projectId: string): Promise<TaskDependency[]> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-dependencies`);
-  if (!res.ok) throw new Error(`getProjectTaskDependencies failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getProjectTaskDependencies");
   return res.json();
 }
 
@@ -212,7 +244,7 @@ async function addTagToTask(taskId: string, tagId: string): Promise<TaskTag> {
     headers: jsonHeaders(),
     body: JSON.stringify({ tag_id: tagId }),
   });
-  if (!res.ok) throw new Error(`addTagToTask failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "addTagToTask");
   return res.json();
 }
 
@@ -220,14 +252,14 @@ async function removeTagFromTask(taskId: string, tagId: string): Promise<void> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error(`removeTagFromTask failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "removeTagFromTask");
 }
 
 // ─── R2: Milestone Progress ─────────────────────────────────────────────
 
 async function getMilestoneProgress(milestoneId: string): Promise<MilestoneProgress> {
   const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/progress`);
-  if (!res.ok) throw new Error(`getMilestoneProgress failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getMilestoneProgress");
   return res.json();
 }
 
@@ -235,13 +267,13 @@ async function getMilestoneProgress(milestoneId: string): Promise<MilestoneProgr
 
 async function getDependencies(taskId: string): Promise<TaskDependency[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/dependencies`);
-  if (!res.ok) throw new Error(`getDependencies failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getDependencies");
   return res.json();
 }
 
 async function getBlockingTasks(taskId: string): Promise<Task[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/blocking`);
-  if (!res.ok) throw new Error(`getBlockingTasks failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getBlockingTasks");
   return res.json();
 }
 
@@ -251,7 +283,7 @@ async function addDependency(taskId: string, dependsOnTaskId: string): Promise<T
     headers: jsonHeaders(),
     body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }),
   });
-  if (!res.ok) throw new Error(`addDependency failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "addDependency");
   return res.json();
 }
 
@@ -263,19 +295,19 @@ async function removeDependency(depId: string): Promise<void> {
 
 async function getAgentDetail(agentId: string): Promise<Agent & { health_status: string; completed_today: number; current_task_title: string | null }> {
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}`);
-  if (!res.ok) throw new Error(`getAgentDetail failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgentDetail");
   return res.json();
 }
 
 async function getAgentActivity(agentId: string, limit = 50): Promise<ActivityEntry[]> {
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/activity?limit=${limit}`);
-  if (!res.ok) throw new Error(`getAgentActivity failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgentActivity");
   return res.json();
 }
 
 async function getAgentSessions(agentId: string): Promise<AgentSession[]> {
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/sessions`);
-  if (!res.ok) throw new Error(`getAgentSessions failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgentSessions");
   return res.json();
 }
 
@@ -284,35 +316,15 @@ async function getAgentSessions(agentId: string): Promise<AgentSession[]> {
 async function searchTasks(params: Record<string, string | undefined>): Promise<Task[]> {
   const qs = buildQueryString(params);
   const res = await apiFetch(`/api/tasks/search?${qs}`);
-  if (!res.ok) throw new Error(`searchTasks failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "searchTasks");
   return res.json();
-}
-
-async function getSavedFilters(): Promise<SavedFilter[]> {
-  const res = await apiFetch("/api/filters");
-  if (!res.ok) throw new Error(`getSavedFilters failed: ${res.status}`);
-  return res.json();
-}
-
-async function createSavedFilter(name: string, filterJson: string): Promise<SavedFilter> {
-  const res = await apiFetch("/api/filters", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ name, filter_json: filterJson }),
-  });
-  if (!res.ok) throw new Error(`createSavedFilter failed: ${res.status}`);
-  return res.json();
-}
-
-async function deleteSavedFilter(id: string): Promise<void> {
-  await apiFetch(`/api/filters/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // ─── R3: Comments ────────────────────────────────────────────────────
 
 async function getComments(taskId: string): Promise<TaskComment[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`);
-  if (!res.ok) throw new Error(`getComments failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getComments");
   return res.json();
 }
 
@@ -322,7 +334,7 @@ async function addCommentApi(taskId: string, message: string, authorName: string
     headers: jsonHeaders(),
     body: JSON.stringify({ message, author_name: authorName }),
   });
-  if (!res.ok) throw new Error(`addComment failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "addComment");
   return res.json();
 }
 
@@ -330,7 +342,7 @@ async function addCommentApi(taskId: string, message: string, authorName: string
 
 async function getReviews(taskId: string): Promise<TaskReview[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/reviews`);
-  if (!res.ok) throw new Error(`getReviews failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getReviews");
   return res.json();
 }
 
@@ -345,7 +357,7 @@ async function createReviewApi(taskId: string, input: {
     headers: jsonHeaders(),
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(`createReview failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createReview");
   return res.json();
 }
 
@@ -359,15 +371,7 @@ async function updateReviewApi(reviewId: string, patch: {
     headers: jsonHeaders(),
     body: JSON.stringify(patch),
   });
-  if (!res.ok) throw new Error(`updateReview failed: ${res.status}`);
-  return res.json();
-}
-
-// ─── R3: File Locks ──────────────────────────────────────────────────
-
-async function getFileConflicts(): Promise<FileConflict[]> {
-  const res = await apiFetch("/api/file-locks/conflicts");
-  if (!res.ok) throw new Error(`getFileConflicts failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "updateReview");
   return res.json();
 }
 
@@ -375,13 +379,13 @@ async function getFileConflicts(): Promise<FileConflict[]> {
 
 async function getNotifications(limit = 50): Promise<AppNotification[]> {
   const res = await apiFetch(`/api/notifications?limit=${limit}`);
-  if (!res.ok) throw new Error(`getNotifications failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getNotifications");
   return res.json();
 }
 
 async function getUnreadCount(): Promise<number> {
   const res = await apiFetch("/api/notifications/unread-count");
-  if (!res.ok) throw new Error(`getUnreadCount failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getUnreadCount");
   const data = await res.json();
   return data.count;
 }
@@ -394,24 +398,6 @@ async function markAllRead(): Promise<void> {
   await apiFetch("/api/notifications/mark-all-read", { method: "POST" });
 }
 
-// ─── R3: Alert Rules ────────────────────────────────────────────────
-
-async function getAlertRules(): Promise<AlertRule[]> {
-  const res = await apiFetch("/api/alert-rules");
-  if (!res.ok) throw new Error(`getAlertRules failed: ${res.status}`);
-  return res.json();
-}
-
-async function createAlertRule(eventType: string, filterJson?: string): Promise<AlertRule> {
-  const res = await apiFetch("/api/alert-rules", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ event_type: eventType, filter_json: filterJson }),
-  });
-  if (!res.ok) throw new Error(`createAlertRule failed: ${res.status}`);
-  return res.json();
-}
-
 // ─── R3: Bulk Update ────────────────────────────────────────────────
 
 async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknown>): Promise<{ updated: number; tasks: Task[] }> {
@@ -420,7 +406,7 @@ async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknow
     headers: jsonHeaders(),
     body: JSON.stringify({ task_ids: taskIds, updates }),
   });
-  if (!res.ok) throw new Error(`bulkUpdateTasks failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "bulkUpdateTasks");
   return res.json();
 }
 
@@ -429,13 +415,13 @@ async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknow
 async function getAgentStats(agentId: string, milestoneId?: string): Promise<AgentStats> {
   const qs = milestoneId ? `?milestone_id=${encodeURIComponent(milestoneId)}` : "";
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/stats${qs}`);
-  if (!res.ok) throw new Error(`getAgentStats failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgentStats");
   return res.json();
 }
 
 async function getMilestoneContributions(milestoneId: string): Promise<AgentContribution[]> {
   const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/contributions`);
-  if (!res.ok) throw new Error(`getMilestoneContributions failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getMilestoneContributions");
   return res.json();
 }
 
@@ -443,7 +429,7 @@ async function getMilestoneContributions(milestoneId: string): Promise<AgentCont
 
 async function getMilestoneDailyStats(milestoneId: string): Promise<MilestoneDailyStats[]> {
   const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/daily-stats`);
-  if (!res.ok) throw new Error(`getMilestoneDailyStats failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getMilestoneDailyStats");
   return res.json();
 }
 
@@ -452,7 +438,7 @@ async function getMilestoneDailyStats(milestoneId: string): Promise<MilestoneDai
 async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEntry[]> {
   const url = projectId ? `/api/activity-heatmap?project_id=${encodeURIComponent(projectId)}` : "/api/activity-heatmap";
   const res = await apiFetch(url);
-  if (!res.ok) throw new Error(`getActivityHeatmap failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getActivityHeatmap");
   return res.json();
 }
 
@@ -462,27 +448,9 @@ async function generateReportApi(projectId: string, period: "day" | "week" | "mi
     headers: jsonHeaders(),
     body: JSON.stringify({ period }),
   });
-  if (!res.ok) throw new Error(`generateReport failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "generateReport");
   const data = await res.json();
   return data.report;
-}
-
-// ─── R5: Templates ───────────────────────────────────────────────────
-
-async function getTemplates(): Promise<ProjectTemplate[]> {
-  const res = await apiFetch("/api/templates");
-  if (!res.ok) throw new Error(`getTemplates failed: ${res.status}`);
-  return res.json();
-}
-
-async function instantiateTemplate(templateId: string, projectName: string): Promise<Project> {
-  const res = await apiFetch(`/api/templates/${encodeURIComponent(templateId)}/instantiate`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ project_name: projectName }),
-  });
-  if (!res.ok) throw new Error(`instantiateTemplate failed: ${res.status}`);
-  return res.json();
 }
 
 // ─── R5: Activity Stream ─────────────────────────────────────────────
@@ -490,7 +458,7 @@ async function instantiateTemplate(templateId: string, projectName: string): Pro
 async function getActivityStreamApi(params: Record<string, string | undefined> = {}): Promise<ActivityEntry[]> {
   const qs = buildQueryString(params);
   const res = await apiFetch(`/api/activity-stream${qs ? `?${qs}` : ""}`);
-  if (!res.ok) throw new Error(`getActivityStream failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getActivityStream");
   return res.json();
 }
 
@@ -498,7 +466,7 @@ async function getActivityStreamApi(params: Record<string, string | undefined> =
 
 async function getWebhooks(): Promise<Webhook[]> {
   const res = await apiFetch("/api/webhooks");
-  if (!res.ok) throw new Error(`getWebhooks failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getWebhooks");
   return res.json();
 }
 
@@ -508,7 +476,7 @@ async function createWebhookApi(url: string, eventTypes: string[]): Promise<Webh
     headers: jsonHeaders(),
     body: JSON.stringify({ url, event_types: eventTypes }),
   });
-  if (!res.ok) throw new Error(`createWebhook failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createWebhook");
   return res.json();
 }
 
@@ -518,7 +486,7 @@ async function updateWebhookApi(id: string, updates: { url?: string; event_types
     headers: jsonHeaders(),
     body: JSON.stringify(updates),
   });
-  if (!res.ok) throw new Error(`updateWebhook failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "updateWebhook");
   return res.json();
 }
 
@@ -560,36 +528,38 @@ interface CostByAgentEntry {
 }
 
 async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/timeseries${qs ? `?${qs}` : ""}`);
-  if (!res.ok) throw new Error(`getCostTimeseries failed: ${res.status}`);
+  const qs = buildQueryString({ ...params, groupBy: "day" });
+  const res = await apiFetch(`/api/costs?${qs}`);
+  if (!res.ok) await throwApiError(res, "getCostTimeseries");
   return res.json();
 }
 
 async function getCostSummary(projectId?: string): Promise<CostSummary> {
-  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
-  const res = await apiFetch(`/api/costs/summary${qs}`);
-  if (!res.ok) throw new Error(`getCostSummary failed: ${res.status}`);
+  const qs = projectId
+    ? buildQueryString({ groupBy: "project", id: projectId })
+    : "groupBy=global";
+  const res = await apiFetch(`/api/costs?${qs}`);
+  if (!res.ok) await throwApiError(res, "getCostSummary");
   return res.json();
 }
 
 async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
-  const res = await apiFetch(`/api/costs/project/${encodeURIComponent(projectId)}`);
-  if (!res.ok) throw new Error(`getProjectCostSummary failed: ${res.status}`);
+  const res = await apiFetch(`/api/costs?groupBy=project&id=${encodeURIComponent(projectId)}`);
+  if (!res.ok) await throwApiError(res, "getProjectCostSummary");
   return res.json();
 }
 
 async function getCostByModel(params: Record<string, string | undefined> = {}): Promise<CostByModelEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/by-model${qs ? `?${qs}` : ""}`);
-  if (!res.ok) throw new Error(`getCostByModel failed: ${res.status}`);
+  const qs = buildQueryString({ ...params, groupBy: "model" });
+  const res = await apiFetch(`/api/costs?${qs}`);
+  if (!res.ok) await throwApiError(res, "getCostByModel");
   return res.json();
 }
 
 async function getCostByAgent(params: Record<string, string | undefined> = {}): Promise<CostByAgentEntry[]> {
-  const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/costs/by-agent${qs ? `?${qs}` : ""}`);
-  if (!res.ok) throw new Error(`getCostByAgent failed: ${res.status}`);
+  const qs = buildQueryString({ ...params, groupBy: "agent" });
+  const res = await apiFetch(`/api/costs?${qs}`);
+  if (!res.ok) await throwApiError(res, "getCostByAgent");
   return res.json();
 }
 
@@ -597,19 +567,19 @@ async function getCostByAgent(params: Record<string, string | undefined> = {}): 
 
 async function getAgentPerformance(agentId: string): Promise<AgentPerformance> {
   const res = await apiFetch(`/api/agents/${agentId}/performance`);
-  if (!res.ok) throw new Error(`getAgentPerformance failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgentPerformance");
   return res.json();
 }
 
 async function getAgentComparison(): Promise<AgentComparison> {
   const res = await apiFetch("/api/agents/comparison");
-  if (!res.ok) throw new Error(`getAgentComparison failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAgentComparison");
   return res.json();
 }
 
 async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[]> {
   const res = await apiFetch(`/api/agents/${agentId}/task-type-breakdown`);
-  if (!res.ok) throw new Error(`getTaskTypeBreakdown failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getTaskTypeBreakdown");
   return res.json();
 }
 
@@ -618,7 +588,7 @@ export type { ExecutiveSummary } from "../../shared/types.js";
 
 async function getExecutiveSummary(projectId: string): Promise<ExecutiveSummary> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/executive-summary`);
-  if (!res.ok) throw new Error(`getExecutiveSummary failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getExecutiveSummary");
   return res.json();
 }
 
@@ -626,7 +596,7 @@ async function getExecutiveSummary(projectId: string): Promise<ExecutiveSummary>
 
 async function getWorktrees(): Promise<TaskWorktree[]> {
   const res = await apiFetch("/api/worktrees");
-  if (!res.ok) throw new Error(`getWorktrees failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getWorktrees");
   return res.json();
 }
 
@@ -636,16 +606,23 @@ async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise
     headers: jsonHeaders(),
     body: JSON.stringify({ status }),
   });
-  if (!res.ok) throw new Error(`updateWorktreeStatus failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "updateWorktreeStatus");
   return res.json();
 }
 
-async function getSuggestedAgent(taskId: string): Promise<AgentSuggestion | null> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/suggest-agent`);
-  if (!res.ok) throw new Error(`getSuggestedAgent failed: ${res.status}`);
-  const data = await res.json();
-  return data ?? null;
+// ─── WS Ticket ───────────────────────────────────────────────────────────────
+
+export async function getWsTicket(): Promise<string | null> {
+  try {
+    const res = await apiFetch("/api/ws-ticket", { method: "POST" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data as { ticket: string }).ticket ?? null;
+  } catch {
+    return null;
+  }
 }
+
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -653,11 +630,12 @@ import type { User } from "../types";
 
 interface AuthStatus {
   auth_enabled: boolean;
+  team_mode: boolean;
 }
 
 async function getAuthStatus(): Promise<AuthStatus> {
   const res = await fetch("/api/auth/status"); // no auth header — public endpoint
-  if (!res.ok) throw new Error(`getAuthStatus failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getAuthStatus");
   return res.json();
 }
 
@@ -684,7 +662,7 @@ async function createUserApi(data: { name: string; email: string; role?: string 
 
 async function listUsersApi(): Promise<User[]> {
   const res = await apiFetch("/api/users");
-  if (!res.ok) throw new Error(`listUsers failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "listUsers");
   return res.json();
 }
 
@@ -694,7 +672,7 @@ async function updateUserRoleApi(id: string, role: string): Promise<User> {
     headers: jsonHeaders(),
     body: JSON.stringify({ role }),
   });
-  if (!res.ok) throw new Error(`updateUserRole failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "updateUserRole");
   return res.json();
 }
 
@@ -707,7 +685,7 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
     method: "POST",
     headers: jsonHeaders(),
   });
-  if (!res.ok) throw new Error(`rotateKey failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "rotateKey");
   return res.json();
 }
 
@@ -716,24 +694,24 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
 async function getGitIntegrations(projectId?: string): Promise<GitIntegrationSafe[]> {
   const url = projectId ? `/api/git/integrations?project_id=${encodeURIComponent(projectId)}` : "/api/git/integrations";
   const res = await apiFetch(url);
-  if (!res.ok) throw new Error(`getGitIntegrations failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "getGitIntegrations");
   return res.json();
 }
 
 async function addGitIntegration(data: { project_id: string; provider: string; owner: string; repo: string; token: string; auto_sync?: boolean }): Promise<GitIntegrationSafe> {
   const res = await apiFetch("/api/git/integrations", { method: "POST", headers: jsonHeaders(), body: JSON.stringify(data) });
-  if (!res.ok) throw new Error(`addGitIntegration failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "addGitIntegration");
   return res.json();
 }
 
 async function deleteGitIntegration(id: string): Promise<void> {
   const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`deleteGitIntegration failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "deleteGitIntegration");
 }
 
 async function syncGitIntegration(id: string): Promise<GitSyncResult> {
   const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}/sync`, { method: "POST" });
-  if (!res.ok) throw new Error(`syncGitIntegration failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "syncGitIntegration");
   return res.json();
 }
 
@@ -741,24 +719,34 @@ async function syncGitIntegration(id: string): Promise<GitSyncResult> {
 
 async function listIngestionSources(): Promise<IngestionSource[]> {
   const res = await apiFetch("/api/ingest/sources");
-  if (!res.ok) throw new Error(`listIngestionSources failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "listIngestionSources");
   return res.json();
 }
 
 async function createIngestionSource(name: string, kind: IngestionSourceKind, project_id?: string | null): Promise<IngestionSource & { token: string }> {
   const res = await apiFetch("/api/ingest/sources", { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ name, kind, project_id }) });
-  if (!res.ok) throw new Error(`createIngestionSource failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "createIngestionSource");
   return res.json();
 }
 
 async function deleteIngestionSource(id: string): Promise<void> {
   const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`deleteIngestionSource failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "deleteIngestionSource");
 }
 
 async function rotateIngestionToken(id: string): Promise<{ token: string }> {
   const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}/rotate`, { method: "POST" });
-  if (!res.ok) throw new Error(`rotateIngestionToken failed: ${res.status}`);
+  if (!res.ok) await throwApiError(res, "rotateIngestionToken");
+  return res.json();
+}
+
+async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<ScoredMatch[]> {
+  const params = new URLSearchParams();
+  if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
+  if (opts?.detectorId) params.set("detectorId", opts.detectorId);
+  const qs = params.size > 0 ? `?${params}` : "";
+  const res = await apiFetch(`/api/detectors/matches${qs}`);
+  if (!res.ok) await throwApiError(res, "getDetectorMatches");
   return res.json();
 }
 
@@ -798,21 +786,16 @@ export function useApi() {
     getReviews,
     createReview: createReviewApi,
     updateReview: updateReviewApi,
-    getFileConflicts,
     getNotifications,
     getUnreadCount,
     markNotificationRead: markNotificationReadApi,
     markAllRead,
-    getAlertRules,
-    createAlertRule,
     bulkUpdateTasks,
     getAgentStats,
     getMilestoneContributions,
     getMilestoneDailyStats,
     getActivityHeatmap,
     generateReport: generateReportApi,
-    getTemplates,
-    instantiateTemplate,
     getActivityStream: getActivityStreamApi,
     getWebhooks,
     createWebhook: createWebhookApi,
@@ -826,7 +809,6 @@ export function useApi() {
     getAgentPerformance,
     getAgentComparison,
     getTaskTypeBreakdown,
-    getSuggestedAgent,
     getWorktrees,
     updateWorktreeStatus,
     getExecutiveSummary,
@@ -845,5 +827,7 @@ export function useApi() {
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
     rotateIngestionToken,
+    getDetectorMatches,
+    getWsTicket,
   }), []);
 }

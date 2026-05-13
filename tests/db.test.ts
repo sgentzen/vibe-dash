@@ -273,6 +273,7 @@ describe("activity log", () => {
     expect(entry.agent_id).toBe(agentId);
     expect(entry.message).toBe("Started work");
     expect(entry.timestamp).toBeTruthy();
+    expect(entry.source).toBe("internal");
   });
 
   it("logs activity without an agent", () => {
@@ -370,6 +371,7 @@ describe("schema indexes", () => {
     "idx_activity_log_agent_id",
     "idx_activity_log_task_id",
     "idx_activity_log_timestamp",
+    "idx_activity_log_source",
     "idx_task_tags_tag_id",
     "idx_task_dependencies_depends_on",
     "idx_blockers_task_id",
@@ -377,7 +379,6 @@ describe("schema indexes", () => {
     "idx_tags_project_id",
     "idx_milestones_project_id",
     "idx_task_comments_task_id",
-    "idx_agent_file_locks_agent_id",
     "idx_cost_entries_agent_id",
     "idx_cost_entries_project_id",
     "idx_cost_entries_milestone_id",
