@@ -27,7 +27,8 @@ export function TopAtRiskMilestonesTile({ health, openCount }: Props) {
 
   const goToExecutive = (milestoneId: string) => {
     dispatch({ type: "SELECT_MILESTONE", payload: milestoneId });
-    dispatch({ type: "SET_ACTIVE_VIEW", payload: "executive" });
+    dispatch({ type: "SET_ACTIVE_VIEW", payload: "fleet" });
+    dispatch({ type: "SET_FLEET_PRESET", payload: "overview" });
   };
 
   return (

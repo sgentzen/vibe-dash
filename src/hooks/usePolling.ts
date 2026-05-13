@@ -15,17 +15,20 @@ const STARTUP_PROBE_MS = 1000;
  */
 export function usePolling() {
   const dispatch = useAppDispatch();
-  const { activeView } = useNavigationState();
+  const { activeView, fleetPreset } = useNavigationState();
   const api = useApi();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeViewRef = useRef(activeView);
+  const fleetPresetRef = useRef(fleetPreset);
   activeViewRef.current = activeView;
+  fleetPresetRef.current = fleetPreset;
 
   useEffect(() => {
     let cancelled = false;
 
     async function poll() {
       const view = activeViewRef.current;
+      const preset = fleetPresetRef.current;
 
       // Always fetch core data
       const promises: Promise<unknown>[] = [
@@ -34,31 +37,34 @@ export function usePolling() {
         api.getBlockers().then((v) => dispatch({ type: "SET_BLOCKERS", payload: v })),
       ];
 
-      // Tasks + milestones needed for board, list, dashboard, timeline views
-      if (view !== "agents") {
+      // Tasks + milestones needed for board view and most fleet presets
+      // (skip only when in fleet/agents — a pure-agent preset doesn't need tasks)
+      const skipTasks = view === "fleet" && preset === "agents";
+      if (!skipTasks) {
         promises.push(
           api.getTasks().then((v) => dispatch({ type: "SET_TASKS", payload: v })),
           api.getMilestones().then((v) => dispatch({ type: "SET_MILESTONES", payload: v })),
         );
       }
 
-      // Agents needed for board, agents, dashboard views
-      if (view !== "list" && view !== "timeline") {
+      // Agents needed everywhere except when looking at a pure timeline
+      const skipAgents = view === "fleet" && preset === "timeline";
+      if (!skipAgents) {
         promises.push(
           api.getAgents().then((v) => dispatch({ type: "SET_AGENTS", payload: v })),
         );
       }
 
-      // Activity needed for activity, agents, dashboard views
-      if (view === "activity" || view === "agents" || view === "dashboard") {
+      // Activity needed for the feed view and the agents preset
+      if (view === "feed" || (view === "fleet" && preset === "agents")) {
         promises.push(
           api.getActivity().then((v) => dispatch({ type: "SET_ACTIVITY", payload: v })),
         );
       }
 
-      // Worktrees needed for the worktrees view (stdio MCP writes bypass WebSocket,
-      // so polling is the only path that reflects create_worktree / cleanup_worktree)
-      if (view === "worktrees") {
+      // Worktrees needed when the agents preset is showing them (stdio MCP writes
+      // bypass WebSocket, so polling is the only path that reflects worktree CRUD).
+      if (view === "fleet" && preset === "agents") {
         promises.push(
           api.getWorktrees().then((v) => dispatch({ type: "SET_WORKTREES", payload: v })),
         );

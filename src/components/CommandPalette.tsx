@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAppState, useAppDispatch } from "../store.js";
-import type { AppState } from "../store.js";
+import type { AppState, FleetPreset } from "../store.js";
 
 type ViewId = AppState["activeView"];
 
@@ -17,12 +17,16 @@ interface CommandPaletteProps {
 }
 
 const VIEW_COMMANDS: { id: ViewId; label: string; icon: string }[] = [
+  { id: "fleet", label: "Fleet", icon: "⊡" },
   { id: "board", label: "Board", icon: "⊞" },
-  { id: "agents", label: "Agents", icon: "◎" },
-  { id: "list", label: "List", icon: "≡" },
-  { id: "dashboard", label: "Dashboard", icon: "⊡" },
-  { id: "timeline", label: "Timeline", icon: "⌛" },
-  { id: "activity", label: "Activity", icon: "⚡" },
+  { id: "feed", label: "Feed", icon: "⚡" },
+];
+
+const PRESET_COMMANDS: { id: FleetPreset; label: string; icon: string }[] = [
+  { id: "overview", label: "Fleet · Overview", icon: "⊡" },
+  { id: "hotspots", label: "Fleet · Hot spots", icon: "◎" },
+  { id: "agents", label: "Fleet · Agents", icon: "◎" },
+  { id: "timeline", label: "Fleet · Timeline", icon: "⌛" },
 ];
 
 export function CommandPalette({ onClose }: CommandPaletteProps) {
@@ -37,16 +41,29 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
     inputRef.current?.focus();
   }, []);
 
-  const viewCommands: Command[] = VIEW_COMMANDS.map(({ id, label, icon }) => ({
-    id: `view-${id}`,
-    label,
-    description: `Go to ${label} view`,
-    icon,
-    action: () => {
-      dispatch({ type: "SET_ACTIVE_VIEW", payload: id });
-      onClose();
-    },
-  }));
+  const viewCommands: Command[] = [
+    ...VIEW_COMMANDS.map(({ id, label, icon }) => ({
+      id: `view-${id}`,
+      label,
+      description: `Go to ${label} view`,
+      icon,
+      action: () => {
+        dispatch({ type: "SET_ACTIVE_VIEW", payload: id });
+        onClose();
+      },
+    })),
+    ...PRESET_COMMANDS.map(({ id, label, icon }) => ({
+      id: `view-preset-${id}`,
+      label,
+      description: `Open fleet ${id} preset`,
+      icon,
+      action: () => {
+        dispatch({ type: "SET_ACTIVE_VIEW", payload: "fleet" });
+        dispatch({ type: "SET_FLEET_PRESET", payload: id });
+        onClose();
+      },
+    })),
+  ];
 
   const projectCommands: Command[] = projects.map((p) => ({
     id: `project-${p.id}`,

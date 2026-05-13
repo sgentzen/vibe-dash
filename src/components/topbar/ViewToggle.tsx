@@ -2,16 +2,9 @@ import type { ActiveView } from "../../state/types";
 import { viewBtnStyle } from "./styles";
 
 const VIEWS: { key: ActiveView; label: string }[] = [
-  { key: "orchestration", label: "Overview" },
+  { key: "fleet", label: "Fleet" },
   { key: "board", label: "Board" },
-  { key: "agents", label: "Agents" },
-  { key: "list", label: "List" },
-  { key: "dashboard", label: "Dash" },
-  { key: "timeline", label: "Timeline" },
-  { key: "activity", label: "Activity" },
-  { key: "worktrees", label: "Worktrees" },
-  { key: "executive", label: "Executive" },
-  { key: "hotspots", label: "Hot spots" },
+  { key: "feed", label: "Feed" },
 ];
 
 interface ViewToggleProps {
