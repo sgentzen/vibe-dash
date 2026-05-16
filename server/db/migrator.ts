@@ -491,6 +491,34 @@ const MIGRATIONS: Migration[] = [
       db.prepare("DROP TABLE alert_rules").run();
     },
   },
+  {
+    name: "014_commits_and_milestone_history",
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS commits (
+          sha TEXT PRIMARY KEY,
+          subject TEXT NOT NULL,
+          author_email TEXT,
+          authored_at TEXT NOT NULL,
+          ingested_at TEXT NOT NULL,
+          linked_task_id TEXT REFERENCES tasks(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_commits_authored_at ON commits(authored_at);
+        CREATE INDEX IF NOT EXISTS idx_commits_linked_task_id ON commits(linked_task_id);
+
+        CREATE TABLE IF NOT EXISTS milestone_history (
+          id TEXT PRIMARY KEY,
+          milestone_id TEXT NOT NULL REFERENCES milestones(id),
+          field TEXT NOT NULL,
+          old_value TEXT,
+          new_value TEXT,
+          changed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_milestone_history_milestone_id ON milestone_history(milestone_id);
+        CREATE INDEX IF NOT EXISTS idx_milestone_history_changed_at ON milestone_history(changed_at);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
