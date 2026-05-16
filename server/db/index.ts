@@ -138,3 +138,4 @@ export {
   countUsers,
 } from "./users.js";
 export * from "./commits.js";
+export * from "./milestone_history.js";
