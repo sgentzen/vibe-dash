@@ -57,3 +57,45 @@ describe("scope-change detector", () => {
     expect(matches).toHaveLength(0);
   });
 });
+
+describe("activity-burst detector", () => {
+  it("emits when current-window count exceeds baseline × 3 and is ≥ 5", () => {
+    const p = createProject(db, { name: "Bursty", description: null });
+    const t = db.prepare(
+      "INSERT INTO tasks (id, project_id, title, status, priority, progress, created_at, updated_at) VALUES (?, ?, ?, 'planned', 'medium', 0, ?, ?) RETURNING *"
+    ).get("task-1", p.id, "T", new Date().toISOString(), new Date().toISOString()) as { id: string };
+
+    // 6 recent activity rows in the last 60 minutes (current window)
+    for (let i = 0; i < 6; i++) {
+      const ts = new Date(Date.now() - i * 60_000).toISOString();
+      db.prepare(
+        "INSERT INTO activity_log (id, task_id, agent_id, message, timestamp, source) VALUES (?, ?, NULL, ?, ?, 'test')"
+      ).run(`a-${i}`, t.id, `msg ${i}`, ts);
+    }
+    // baseline: 7 historical rows spread one per day across 7 days
+    for (let d = 1; d <= 7; d++) {
+      db.prepare(
+        "INSERT INTO activity_log (id, task_id, agent_id, message, timestamp, source) VALUES (?, ?, NULL, ?, ?, 'test')"
+      ).run(`b-${d}`, t.id, `baseline ${d}`, new Date(Date.now() - d * 86_400_000).toISOString());
+    }
+
+    const matches = runDetectors(db, { minScore: 0 }).filter((m) => m.detectorId === "activity-burst");
+    expect(matches).toHaveLength(1);
+    expect(matches[0].entityType).toBe("area");
+    expect(matches[0].entityId).toBe(p.id);
+  });
+
+  it("suppresses bursts with current count < 5", () => {
+    const p = createProject(db, { name: "Quiet", description: null });
+    const t = db.prepare(
+      "INSERT INTO tasks (id, project_id, title, status, priority, progress, created_at, updated_at) VALUES (?, ?, ?, 'planned', 'medium', 0, ?, ?) RETURNING *"
+    ).get("task-2", p.id, "T", new Date().toISOString(), new Date().toISOString()) as { id: string };
+    for (let i = 0; i < 4; i++) {
+      db.prepare(
+        "INSERT INTO activity_log (id, task_id, agent_id, message, timestamp, source) VALUES (?, ?, NULL, ?, ?, 'test')"
+      ).run(`q-${i}`, t.id, "m", new Date(Date.now() - i * 60_000).toISOString());
+    }
+    const matches = runDetectors(db, { minScore: 0 }).filter((m) => m.detectorId === "activity-burst");
+    expect(matches).toHaveLength(0);
+  });
+});
