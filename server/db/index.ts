@@ -137,3 +137,4 @@ export {
   rotateApiKey,
   countUsers,
 } from "./users.js";
+export * from "./commits.js";
