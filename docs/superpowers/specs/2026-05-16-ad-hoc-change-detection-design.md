@@ -1,7 +1,7 @@
 # Ad Hoc Change Detection — Design
 
 **Date:** 2026-05-16
-**Status:** Approved (brainstorming phase)
+**Status:** Approved (revised to extend existing detector framework)
 **Author:** Scott + Claude
 
 ## Problem
@@ -9,132 +9,191 @@
 Project state in vibe-dash drifts in ways the structured task/milestone flow doesn't capture. Three classes of drift matter most:
 
 1. **Scope/direction pivots** — milestones get redefined mid-flight
-2. **Out-of-band decisions** — choices made outside any task
-3. **Unplanned work** — commits shipped without a linked task
+2. **Unplanned work** — commits shipped without a linked task
+3. **Activity bursts** — sudden spikes in an area outside any planned task
 
-Today these only surface if a human writes a note. We want them surfaced automatically with no manual capture burden.
+Today these only surface if a human writes a note. We want them surfaced automatically with no manual capture burden, alongside the existing tier-1 and tier-2 detectors.
 
 ## Goals
 
-- Auto-detect ad hoc changes from existing signals (git, DB mutations, activity volume)
-- Surface them in the existing `ActivityStreamView` with visual distinction
-- Persist to `activity_log` so they participate in WebSocket broadcast and existing filtering for free
-- Keep each detector isolated, independently testable, and individually disable-able
+- Auto-detect three new ad hoc change classes
+- Reuse the existing `server/detectors/` framework (`predicate → Match[] → /api/detectors/matches → HotSpotsView`)
+- Persist source data (commits, milestone history) so predicates can query the DB without external calls at request time
 
 ## Non-goals
 
 - Manual note capture (out of scope — pure auto-detect)
-- New MCP tools (detectors are read-only consumers + activity_log writers)
-- Multi-repo support (single `GIT_REPO_PATH` only)
-- Per-project burst threshold tuning (global threshold only in v1)
-- Confirm/dismiss UX for noisy events (auto-persist, user can filter source off)
+- New emission pipeline / `activity_log` writes for detector results — detectors return `Match[]`, the existing render surface handles display
+- Confirm/dismiss UX — user can suppress detectors via `VIBE_SUPPRESS_DETECTORS` env var (existing mechanism)
+- New UI surface — `HotSpotsView` already renders all detector matches; this spec adds icons/labels for the new entity types but no new screens
+- Multi-repo support — single local git path only in v1
+- Per-project burst thresholds — global threshold only in v1
+- Backfill of historical commits or milestone history older than the table's creation
 
 ## Architecture
-
-Three independent detector modules driven by one scheduler, all writing through the existing `logActivity()` path so the WebSocket broadcast and ActivityStreamView pick them up unchanged.
 
 ```
 server/
   detectors/
-    types.ts            # Detector interface, DetectionResult
-    index.ts            # Registry + runAll(db)
-    scheduler.ts        # setInterval loop, try/catch per detector
-    gitLog.ts           # Thin wrapper around `git log` (stubbable in tests)
-    unlinkedCommit.ts   # Polling detector
-    scopeChange.ts      # Event-driven (called from updateMilestone), also supports backfill
-    burst.ts            # Polling detector with rolling baseline
-```
-
-### Detector interface
-
-```ts
-export interface Detector {
-  name: string;
-  run(db: Database.Database): Promise<DetectionResult>;
-}
-
-export interface DetectionResult {
-  emitted: number;   // rows written this tick
-  skipped: number;   // signals already seen (idempotent)
-}
+    types.ts          # MODIFY: add 'commit' | 'milestone' | 'area' to EntityType
+    tier3.ts          # NEW: unlinked-commit, scope-change, activity-burst
+    index.ts          # MODIFY: export registerTier3Detectors
+  db/
+    schema.ts         # unchanged (delegates to migrator)
+    migrator.ts       # MODIFY: add migration for commits + milestone_history tables
+    milestones.ts     # MODIFY: hook updateMilestone to write milestone_history
+    commits.ts        # NEW: CRUD for commits table
+    milestone_history.ts # NEW: CRUD for milestone_history table
+  ingestion/
+    commits.ts        # NEW: scheduled git-log poll that upserts commits
+  index.ts            # MODIFY: register tier3, start commit ingestion loop
+shared/
+  types.ts            # MODIFY: extend EntityType to match server (UI consumes)
+src/
+  components/
+    HotSpotsView.tsx  # MODIFY: add icons + click targets for new entity types
+tests/
+  detectors-tier3.test.ts        # NEW
+  ingestion-commits.test.ts      # NEW
+  milestone_history.test.ts      # NEW
 ```
 
 ## Data model
 
-### Reuse `activity_log`
-
-All detected events become `activity_log` rows. No schema change to the table itself — only a convention for the `source` column:
-
-| source                          | message format                                                        | task_id | agent_id |
-|---------------------------------|-----------------------------------------------------------------------|---------|----------|
-| `detector:unlinked-commit`      | `unlinked commit <sha7>: <subject>`                                   | null    | null     |
-| `detector:scope-change`         | `milestone <name> <field> changed: <before> → <after>`                | null    | null     |
-| `detector:burst`                | `activity burst in <area>: <N> events in <window>, baseline <M>`      | null    | null     |
-
-### New `detector_state` table
-
-For idempotency and rolling baselines:
+### Two new tables (single migration)
 
 ```sql
-CREATE TABLE detector_state (
-  detector TEXT NOT NULL,        -- 'unlinked-commit' | 'scope-change' | 'burst'
-  key TEXT NOT NULL,             -- commit sha, milestone_id+field, area bucket
-  last_seen TEXT NOT NULL,       -- ISO 8601 timestamp
-  payload TEXT,                  -- JSON; detector-specific (e.g. baseline counts for burst)
-  PRIMARY KEY (detector, key)
+-- Local git commits, populated by ingestion loop.
+CREATE TABLE commits (
+  sha TEXT PRIMARY KEY,
+  subject TEXT NOT NULL,
+  author_email TEXT,
+  authored_at TEXT NOT NULL,
+  ingested_at TEXT NOT NULL,
+  linked_task_id TEXT REFERENCES tasks(id)  -- nullable; set if subject mentions a known task id
 );
+CREATE INDEX idx_commits_authored_at ON commits(authored_at);
+CREATE INDEX idx_commits_linked_task_id ON commits(linked_task_id);
+
+-- Audit log of milestone field changes that signal scope pivots.
+CREATE TABLE milestone_history (
+  id TEXT PRIMARY KEY,
+  milestone_id TEXT NOT NULL REFERENCES milestones(id),
+  field TEXT NOT NULL,            -- 'name' | 'description' | 'target_date' | 'acceptance_criteria'
+  old_value TEXT,
+  new_value TEXT,
+  changed_at TEXT NOT NULL
+);
+CREATE INDEX idx_milestone_history_milestone_id ON milestone_history(milestone_id);
+CREATE INDEX idx_milestone_history_changed_at ON milestone_history(changed_at);
 ```
 
-- `unlinked-commit` writes one row per commit sha (`key = sha`) to avoid re-emitting on the next poll
-- `scope-change` writes one row per `<milestone_id>:<field>` so backfills are idempotent
-- `burst` writes one row per area bucket; `payload` stores the rolling 7-day hourly baseline
+No state table for detectors — matches are computed per request, matching existing tier-1/2 behavior. Idempotency lives in the source tables (commits dedupe on `sha`; milestone_history is append-only).
+
+### EntityType extension
+
+```ts
+// server/detectors/types.ts (before): "task" | "agent" | "blocker" | "review"
+// after:                              "task" | "agent" | "blocker" | "review" | "commit" | "milestone" | "area"
+```
+
+`shared/types.ts` mirrors this for the UI.
+
+## Commit ingestion (separate from detector framework)
+
+Detectors query the DB; they don't shell out to git. A small ingestion module keeps the `commits` table fresh.
+
+**Module:** `server/ingestion/commits.ts`
+
+**Behavior:**
+- On start, run `git log --since=<7 days ago> --format=%H%x00%s%x00%ae%x00%aI` once
+- Then every `COMMIT_INGEST_INTERVAL_MS` (default 5 min), run `git log --since=<last ingested_at - 1h>` (1h buffer for clock skew)
+- For each row: `INSERT OR IGNORE INTO commits` (dedupe on `sha`)
+- For each new commit, regex-match the subject for known task IDs and set `linked_task_id`. Task ID regex: built from `tasks.id` values, plus a `[VD-\w+]` convention if present
+- All git calls go through a `gitLog()` wrapper in `server/ingestion/gitLog.ts` that's stubbable in tests via dependency injection
+
+**Disable conditions (one-time warning at startup, then no-op):**
+- `git` not installed
+- `GIT_REPO_PATH` (default `process.cwd()`) is not a git repository
+- `COMMIT_INGEST_ENABLED=false`
+
+## Milestone history hook
+
+`server/db/milestones.ts → updateMilestone` is modified to: before applying the UPDATE, fetch the current row; for each watched field (`name`, `description`, `target_date`, `acceptance_criteria`) where the new value differs from the old, insert a `milestone_history` row.
+
+This is a small inline change (~15 lines) and does not require a new module.
 
 ## Detectors
 
-### unlinkedCommit
+All three follow the existing `Detector` interface (`id`, `category`, `defaultThreshold`, `predicate`, `score`).
 
-- Reads `git log --since=<last_seen> --format=%H%n%s` via `gitLog()` wrapper
-- For each commit, checks subject against known task IDs (regex match against `tasks.id` rows, and the `[VD-xxx]` convention if present)
-- If no match: write `activity_log` row with `source='detector:unlinked-commit'`, write `detector_state` row to mark seen
-- Idempotent: skips commits already in `detector_state`
+### `unlinked-commit`
 
-### scopeChange
+- **Category:** `change`
+- **Default threshold:** 50
+- **Predicate:** `SELECT * FROM commits WHERE linked_task_id IS NULL AND authored_at >= datetime('now', '-7 days')`
+- **Score:** Constant 60 per commit (mild — frequent unlinked commits will surface in count, not severity)
+- **Match:** `entityType: "commit"`, `entityId: sha`, `label: "Unlinked commit"`, `detail: subject + " · " + author_email`
 
-- Not polled — called inline from `updateMilestone()` in `server/db/milestones.ts` when watched fields (`name`, `description`, `target_date`) change
-- Diffs old vs new value, emits `activity_log` row with a human-readable before→after message
-- Also implements the `Detector` interface so an operator can invoke it as a backfill (re-scan milestone history on demand)
+### `scope-change`
 
-### burst
+- **Category:** `change`
+- **Default threshold:** 50
+- **Predicate:** `SELECT * FROM milestone_history WHERE changed_at >= datetime('now', '-30 days')` — one match per row
+- **Score:**
+  - `field = 'name'` → 90 (renaming a milestone mid-flight is a big signal)
+  - `field = 'target_date'` → 80
+  - `field = 'description'` or `'acceptance_criteria'` → 60
+- **Match:** `entityType: "milestone"`, `entityId: milestone_id`, `label: "Milestone <name> <field> changed"`, `detail: "<old_value_truncated_80> → <new_value_truncated_80>"`
 
-- Every tick: bucket recent commits by top-level directory (from `git log --name-only --since=<DETECTOR_BURST_WINDOW_MIN>`)
-- Compare current-window bucket count to the 7-day baseline (scaled to the same window length) stored in `detector_state.payload`
-- Emit when `count > baseline × DETECTOR_BURST_THRESHOLD` (default 3.0)
-- Update baseline using EWMA so it adapts over time
-- One emission per bucket per window (idempotent via `detector_state.key = <area>:<windowBucket>`)
+### `activity-burst`
 
-### Scheduler
+- **Category:** `change`
+- **Default threshold:** 60
+- **Predicate (one match per area where burst detected):**
+  1. Bucket recent `activity_log` rows by area. Area = first path segment of `task.title`-prefix tags if available, else "general". For v1, **bucket by project_id** (joined via `tasks.project_id` from `activity_log.task_id`) — keeps logic simple, no path heuristics needed
+  2. Compute current-window count (last `DETECTOR_BURST_WINDOW_MIN` minutes, default 60) per bucket
+  3. Compute 7-day baseline mean count for the same window length, per bucket
+  4. Emit when `current > baseline × DETECTOR_BURST_THRESHOLD` (default 3.0) AND current ≥ 5 (suppress small-number noise)
+- **Score:**
+  - `ratio < 5` → 65
+  - `5 ≤ ratio < 10` → 80
+  - `ratio ≥ 10` → 95
+- **Match:** `entityType: "area"`, `entityId: project_id`, `label: "Activity burst in <project_name>"`, `detail: "<N> events in <window_min>m, baseline <M>"`
 
-- Started from `server/index.ts` after DB init, only if `DETECTOR_ENABLED !== 'false'`
-- `setInterval` with `DETECTOR_INTERVAL_MS` (default 5 min)
-- Iterates registered polling detectors, wraps each `run()` in try/catch
-- A failing detector logs to stderr and is skipped this tick — never crashes the loop or other detectors
-- Logs one-line summary per tick: `[detectors] unlinked-commit: 2 emitted, scope-change: 0, burst: 1`
+### Registration
 
-### Startup backfill
+```ts
+// server/detectors/tier3.ts
+export function registerTier3Detectors(): void {
+  registerDetector({ id: "unlinked-commit", category: "change", defaultThreshold: 50, predicate: unlinkedCommitPredicate, score: () => 60 });
+  registerDetector({ id: "scope-change", category: "change", defaultThreshold: 50, predicate: scopeChangePredicate, score: scopeChangeScore });
+  registerDetector({ id: "activity-burst", category: "change", defaultThreshold: 60, predicate: activityBurstPredicate, score: activityBurstScore });
+}
+```
 
-- First scheduler run after process start: unlinked-commit scans last 7 days of git history; burst seeds baseline from last 7 days of `activity_log`; scope-change does nothing (event-driven)
+Called from `server/detectors/index.ts` alongside `registerTier1Detectors()` and (future) `registerTier2Detectors()`.
 
-## UI changes (`ActivityStreamView`)
+## UI changes (`HotSpotsView.tsx`)
 
-Minimal — the stream already renders activity rows; detector rows just need a different look.
+Minimal extensions to support the new entity types:
 
-- **Visual:** subtle left border in an accent color, one per detector type (amber for scope-change, blue for unlinked-commit, magenta for burst). Small icon prefix. "detected" pill where the agent name would normally appear.
-- **Filter:** new "Detected changes" chip in the existing filter bar, defaulting **on**. Backed by a new `sources?: string[]` field on `ActivityStreamFilter` in `server/db/activity.ts`; SQL gains a `source LIKE ANY` clause; route passes it through.
-- **Click behavior:**
-  - `scope-change` → link to milestone detail page
-  - `unlinked-commit` → link to `<REPO_URL>/commit/<sha>` if `REPO_URL` env var is set, else plain text
-  - `burst` → link to a filtered stream view scoped to the area + time window
-- All changes confined to `src/components/ActivityStreamView.tsx` plus a small style addition. No new component files.
+```ts
+function entityIcon(entityType: ScoredMatch["entityType"]): string {
+  switch (entityType) {
+    case "blocker":   return "⊘";
+    case "agent":     return "◉";
+    case "review":    return "✗";
+    case "task":      return "□";
+    case "commit":    return "◇";   // NEW
+    case "milestone": return "⤳";   // NEW
+    case "area":      return "⚡";   // NEW
+    default:          return "·";
+  }
+}
+```
+
+No new components, no routing changes. The existing AnomalyRow renders the new matches identically.
 
 ## Configuration
 
@@ -142,35 +201,35 @@ All env vars optional with sensible defaults.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DETECTOR_ENABLED` | `true` | Master kill switch |
-| `DETECTOR_INTERVAL_MS` | `300000` (5 min) | Polling loop interval |
-| `DETECTOR_BURST_THRESHOLD` | `3.0` | Multiplier over baseline that triggers a burst row |
-| `DETECTOR_BURST_WINDOW_MIN` | `60` | Bucket window for burst detection |
-| `REPO_URL` | unset | Base URL for commit links in the UI |
+| `COMMIT_INGEST_ENABLED` | `true` | Kill switch for commit ingestion loop |
+| `COMMIT_INGEST_INTERVAL_MS` | `300000` (5 min) | Commit ingestion loop interval |
 | `GIT_REPO_PATH` | `process.cwd()` | Working directory for `git log` |
+| `DETECTOR_BURST_THRESHOLD` | `3.0` | Burst ratio multiplier |
+| `DETECTOR_BURST_WINDOW_MIN` | `60` | Burst bucket window in minutes |
+| `VIBE_SUPPRESS_DETECTORS` | unset | (existing) Comma-separated detector IDs to suppress |
 
 ## Error handling
 
-- Per-detector try/catch in the scheduler — one detector's failure does not affect others
-- `git` not installed or directory not a repo → unlinkedCommit and burst log a one-time warning at startup and disable themselves; scopeChange still works (DB-only)
-- DB write failures bubble up from `logActivity` and are caught by the scheduler's per-detector wrapper
+- **Detector predicates:** existing registry already wraps each predicate in try/catch; a failing tier-3 detector is dropped from results without affecting others
+- **Ingestion loop:** wrapped in try/catch per tick; logs to stderr and continues. A single failed tick does not stop the loop
+- **Git unavailable:** ingestion logs one-time warning and disables itself for the process lifetime
+- **Empty data:** all predicates handle empty tables gracefully (return `[]`)
 
 ## Testing
 
-- One integration test file per detector in `tests/detectors/<name>.test.ts`
-- Use `createTestDb()` per test (consistent with existing test conventions)
-- `gitLog()` wrapper is stubbed in tests via dependency injection (passed into detector constructor or module-level injection point)
-- Tests assert: correct rows written to `activity_log`, idempotency via `detector_state`, no emission when signals don't match, baseline updates for burst
-- Scheduler test: verifies one failing detector doesn't break others
+- `tests/detectors-tier3.test.ts` — uses `createTestDb()`, seeds rows in `commits` / `milestone_history` / `activity_log` directly (no git or scheduler), asserts predicate output and scoring. One block per detector.
+- `tests/ingestion-commits.test.ts` — stubs `gitLog()` to return fixture commit data, asserts `commits` table population, dedupe on `sha`, and `linked_task_id` linking when subject matches.
+- `tests/milestone_history.test.ts` — calls `updateMilestone()` with field changes, asserts `milestone_history` rows; calls with same values, asserts no rows written.
+- Existing `tests/detectors.test.ts` registry behavior is unchanged and remains passing.
 
 ## Open questions
 
-None — all design decisions made during brainstorming.
+None — all design decisions made during brainstorming and reconciliation with the existing framework.
 
-## Out of scope (deferred)
+## Deferred to future work
 
-- Manual note entry as a complement to detection
-- Multi-repo / per-project git path config
+- Multi-repo / per-project git config
 - Per-project burst thresholds
-- ML-based anomaly detection for bursts (statistical baseline is sufficient for v1)
-- Detector dashboard / observability page (relying on stderr summary for v1)
+- More sophisticated area bucketing (file-path-based, not project-based)
+- A `tier3.ts` follow-up: detector for tasks reassigned more than N times in a window
+- Surfacing tier-3 matches in the daily digest (relies on tier-2 wiring in `intelligence.ts`)
