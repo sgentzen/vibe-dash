@@ -27,11 +27,14 @@ function severityLabel(score: number): string {
 
 function entityIcon(entityType: ScoredMatch["entityType"]): string {
   switch (entityType) {
-    case "blocker": return "⊘";
-    case "agent":   return "◉";
-    case "review":  return "✗";
-    case "task":    return "□";
-    default:        return "·";
+    case "blocker":   return "⊘";
+    case "agent":     return "◉";
+    case "review":    return "✗";
+    case "task":      return "□";
+    case "commit":    return "◇";
+    case "milestone": return "⤳";
+    case "area":      return "⚡";
+    default:          return "·";
   }
 }
 
