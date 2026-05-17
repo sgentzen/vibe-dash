@@ -35,7 +35,7 @@ describe("unlinked-commit detector", () => {
 });
 
 describe("scope-change detector", () => {
-  it("emits 90 for name, 80 for target_date, 60 for description", () => {
+  it("emits one match per milestone with score = max field score", () => {
     const p = createProject(db, { name: "P", description: null });
     const m = createMilestone(db, { project_id: p.id, name: "M", description: "d" });
     updateMilestone(db, m.id, { name: "M2" });
@@ -43,8 +43,10 @@ describe("scope-change detector", () => {
     updateMilestone(db, m.id, { description: "d2" });
 
     const matches = runDetectors(db, { minScore: 0 }).filter((x) => x.detectorId === "scope-change");
-    const byScore = matches.map((x) => x.score).sort();
-    expect(byScore).toEqual([60, 80, 90]);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].entityId).toBe(m.id);   // milestone id, not history id
+    expect(matches[0].entityType).toBe("milestone");
+    expect(matches[0].score).toBe(90);        // max of (90 name, 80 target_date, 60 description)
   });
 
   it("excludes changes older than 30 days", () => {
@@ -55,6 +57,20 @@ describe("scope-change detector", () => {
     ).run("h-old", m.id, "name", "a", "b", new Date(Date.now() - 40 * 86_400_000).toISOString());
     const matches = runDetectors(db, { minScore: 0 }).filter((x) => x.detectorId === "scope-change");
     expect(matches).toHaveLength(0);
+  });
+
+  it("emits one match per distinct milestone", () => {
+    const p = createProject(db, { name: "P", description: null });
+    const m1 = createMilestone(db, { project_id: p.id, name: "First" });
+    const m2 = createMilestone(db, { project_id: p.id, name: "Second" });
+    updateMilestone(db, m1.id, { name: "First-renamed" });
+    updateMilestone(db, m2.id, { description: "added desc" });
+
+    const matches = runDetectors(db, { minScore: 0 }).filter((x) => x.detectorId === "scope-change");
+    expect(matches).toHaveLength(2);
+    const byId = Object.fromEntries(matches.map((x) => [x.entityId, x.score]));
+    expect(byId[m1.id]).toBe(90);  // name change
+    expect(byId[m2.id]).toBe(60);  // description change
   });
 });
 

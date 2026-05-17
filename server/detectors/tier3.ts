@@ -34,13 +34,26 @@ function unlinkedCommitPredicate({ db, now }: DetectorContext): Match[] {
 
 // ─── scope-change ─────────────────────────────────────────────────────────────
 
-interface HistoryMatchRow {
-  id: string;
+interface HistoryAggregateRow {
   milestone_id: string;
+  milestone_name: string | null;
+  changes: string;       // JSON array of {field, old_value, new_value}, newest first
+}
+
+interface HistoryChange {
   field: string;
   old_value: string | null;
   new_value: string | null;
-  milestone_name: string | null;
+}
+
+function fieldScore(field: string): number {
+  switch (field) {
+    case "name": return 90;
+    case "target_date": return 80;
+    case "description":
+    case "acceptance_criteria": return 60;
+    default: return 50;
+  }
 }
 
 function truncate(s: string | null, n: number): string {
@@ -51,30 +64,46 @@ function truncate(s: string | null, n: number): string {
 function scopeChangePredicate({ db, now }: DetectorContext): Match[] {
   const since = new Date(new Date(now).getTime() - 30 * 86_400_000).toISOString();
   const rows = db.prepare(
-    `SELECT h.id, h.milestone_id, h.field, h.old_value, h.new_value, m.name AS milestone_name
+    `SELECT h.milestone_id,
+            m.name AS milestone_name,
+            json_group_array(json_object(
+              'field', h.field,
+              'old_value', h.old_value,
+              'new_value', h.new_value,
+              'changed_at', h.changed_at
+            )) AS changes
      FROM milestone_history h
      LEFT JOIN milestones m ON h.milestone_id = m.id
-     WHERE h.changed_at >= ?`
-  ).all(since) as HistoryMatchRow[];
+     WHERE h.changed_at >= ?
+     GROUP BY h.milestone_id`
+  ).all(since) as HistoryAggregateRow[];
 
-  return rows.map((r) => ({
-    entityId: r.id,
-    entityType: "milestone" as const,
-    label: `Milestone ${r.milestone_name ?? "?"} ${r.field} changed`,
-    detail: `${truncate(r.old_value, 80)} → ${truncate(r.new_value, 80)}`,
-  }));
+  return rows.map((r) => {
+    const changes = JSON.parse(r.changes) as HistoryChange[];
+    // Highest-impact field drives the label/detail.
+    const top = changes.reduce((best, c) =>
+      fieldScore(c.field) > fieldScore(best.field) ? c : best,
+      changes[0]
+    );
+    const fieldsLabel = changes.length === 1
+      ? top.field
+      : `${top.field} (+${changes.length - 1} more)`;
+    return {
+      entityId: r.milestone_id,
+      entityType: "milestone" as const,
+      label: `Milestone ${r.milestone_name ?? "?"} ${fieldsLabel} changed`,
+      detail: `${truncate(top.old_value, 80)} → ${truncate(top.new_value, 80)}`,
+    };
+  });
 }
 
-function scopeChangeScore(match: Match, { db }: DetectorContext): number {
-  const row = db.prepare("SELECT field FROM milestone_history WHERE id = ?").get(match.entityId) as { field: string } | undefined;
-  if (!row) return 0;
-  switch (row.field) {
-    case "name": return 90;
-    case "target_date": return 80;
-    case "description":
-    case "acceptance_criteria": return 60;
-    default: return 50;
-  }
+function scopeChangeScore(match: Match, { db, now }: DetectorContext): number {
+  const since = new Date(new Date(now).getTime() - 30 * 86_400_000).toISOString();
+  const rows = db.prepare(
+    "SELECT field FROM milestone_history WHERE milestone_id = ? AND changed_at >= ?"
+  ).all(match.entityId, since) as { field: string }[];
+  if (rows.length === 0) return 0;
+  return Math.max(...rows.map((r) => fieldScore(r.field)));
 }
 
 // ─── activity-burst ───────────────────────────────────────────────────────────
