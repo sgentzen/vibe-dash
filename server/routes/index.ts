@@ -88,11 +88,17 @@ export function createRouter(db: Database.Database): Router {
 
   // Auth middleware runs before all routes; no-op when no users exist.
   // /api/auth/status is exempt — it's a public discovery endpoint.
-  // authLimiter applied before key validation to limit brute-force attempts.
+  // authLimiter scoped to /api/auth/* only: that's where credential-sensitive
+  // operations live (login, validate-key). Applying it to every API request
+  // gave the whole app a 30-req/15-min budget, which is far too tight for
+  // a polling dashboard and caused user-visible 429 cascades on first load.
   const authMiddleware = makeAuthMiddleware(db);
   router.use((req, res, next) => {
     if (req.path === "/api/auth/status") return next();
-    authLimiter(req, res, () => authMiddleware(req, res, next));
+    if (req.path.startsWith("/api/auth/")) {
+      return authLimiter(req, res, () => authMiddleware(req, res, next));
+    }
+    return authMiddleware(req, res, next);
   });
 
   for (const factory of routeFactories) {
