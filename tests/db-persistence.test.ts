@@ -5,6 +5,7 @@ import path from "path";
 import Database from "better-sqlite3";
 import { initDb, createProject, listProjects, createTask, listTasks } from "../server/db/index.js";
 import { resolveDbPath } from "../server/db/path.js";
+import { createTestDb } from "./setup.js";
 
 describe("DB persistence across restarts", () => {
   let dbDir: string;
@@ -85,5 +86,43 @@ describe("resolveDbPath", () => {
       if (prevEnv === undefined) delete process.env.VIBE_DASH_DB;
       else process.env.VIBE_DASH_DB = prevEnv;
     }
+  });
+});
+
+describe("migration 014 — commits + milestone_history", () => {
+  it("creates commits and milestone_history tables with expected columns", () => {
+    const db = createTestDb();
+    const tables = db.pragma("table_list") as { name: string }[];
+    expect(tables.some((t) => t.name === "commits")).toBe(true);
+    expect(tables.some((t) => t.name === "milestone_history")).toBe(true);
+
+    const commitsCols = (db.pragma("table_info(commits)") as { name: string }[]).map((c) => c.name);
+    expect(commitsCols).toEqual(
+      expect.arrayContaining(["sha", "subject", "author_email", "authored_at", "ingested_at", "linked_task_id"])
+    );
+
+    const histCols = (db.pragma("table_info(milestone_history)") as { name: string }[]).map((c) => c.name);
+    expect(histCols).toEqual(
+      expect.arrayContaining(["id", "milestone_id", "field", "old_value", "new_value", "changed_at"])
+    );
+
+    // Verify nullability and primary key constraints
+    const commitsRows = db.pragma("table_info(commits)") as { name: string; notnull: number; pk: number }[];
+    const commitsBy = (n: string) => commitsRows.find((c) => c.name === n);
+    expect(commitsBy("sha")?.pk).toBe(1);
+    expect(commitsBy("subject")?.notnull).toBe(1);
+    expect(commitsBy("authored_at")?.notnull).toBe(1);
+    expect(commitsBy("ingested_at")?.notnull).toBe(1);
+    expect(commitsBy("linked_task_id")?.notnull).toBe(0);
+    expect(commitsBy("author_email")?.notnull).toBe(0);
+
+    const histRows = db.pragma("table_info(milestone_history)") as { name: string; notnull: number; pk: number }[];
+    const histBy = (n: string) => histRows.find((c) => c.name === n);
+    expect(histBy("id")?.pk).toBe(1);
+    expect(histBy("milestone_id")?.notnull).toBe(1);
+    expect(histBy("field")?.notnull).toBe(1);
+    expect(histBy("changed_at")?.notnull).toBe(1);
+    expect(histBy("old_value")?.notnull).toBe(0);
+    expect(histBy("new_value")?.notnull).toBe(0);
   });
 });
