@@ -16,18 +16,31 @@ export const MilestoneProgressCard = memo(function MilestoneProgressCard({ daily
           message={openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
         />
       ) : (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
-          {dailyStats.map((d) => (
-            <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{
-                width: "100%", background: "var(--accent-blue)", borderRadius: "2px",
-                height: `${d.completion_pct}%`, minHeight: "2px",
-              }} />
-              <span style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "var(--space-1)" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
+            {dailyStats.map((d) => (
+              <div
+                key={d.date}
+                style={{
+                  flex: 1,
+                  background: "var(--accent-blue)",
+                  borderRadius: "2px",
+                  height: `${d.completion_pct}%`,
+                  minHeight: "2px",
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "4px", marginTop: "var(--space-1)" }}>
+            {dailyStats.map((d) => (
+              <span
+                key={d.date}
+                style={{ flex: 1, fontSize: "9px", color: "var(--text-muted)", textAlign: "center" }}
+              >
                 {d.date.slice(5)}
               </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </CardWrapper>
