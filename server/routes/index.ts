@@ -29,9 +29,14 @@ import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
 import rateLimit from "express-rate-limit";
 
+// The dashboard polls every 3s, with the active view firing ad-hoc requests on
+// top of that (executive summary, milestone daily stats, contributions, cost
+// charts). A 1500/15min budget was tight enough that a single tab could hit it
+// and cascade visible 429s ("Failed to load executive summary"). 10000/15min
+// (~11 req/s) leaves comfortable headroom for multiple tabs.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1500,
+  max: 10000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
