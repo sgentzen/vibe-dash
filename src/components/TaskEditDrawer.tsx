@@ -54,6 +54,16 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const currentTags = currentTagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => !!t);
   const availableTags = projectTags.filter((t) => !currentTagIds.includes(t.id));
 
+  // Close on Escape (handled here so focus-trap's onDeactivate doesn't fire
+  // during React StrictMode's dev mount-unmount-remount cycle and instantly close us)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   // Keep local state fresh if task changes externally
   useEffect(() => {
     setTitle(task.title);
@@ -110,7 +120,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   }
 
   return (
-    <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: false, allowOutsideClick: true, escapeDeactivates: true, onDeactivate: onClose }}>
+    <FocusTrap focusTrapOptions={{ clickOutsideDeactivates: false, allowOutsideClick: true, escapeDeactivates: false }}>
       <div>
       <ModalBackdrop onClick={onClose} />
       <ModalDrawer ariaLabel="Edit task">
