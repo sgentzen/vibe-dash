@@ -164,11 +164,11 @@ implementation plans live under [`docs/plans/R11/`](plans/R11),
 | **R12 — Intelligence + Density** | NL query/digests, Git host sync, density pass |
 | **R13 — Reach** | Self-hostable team mode, docs + hero examples |
 
-**R11 tasks**
-- [R11.1 — Multi-project fleet view](plans/R11/R11.1-multi-project-fleet-view.md)
-- [R11.2 — Cost intelligence v2](plans/R11/R11.2-cost-intelligence-v2.md)
-- [R11.3 — Cross-platform agent ingestion](plans/R11/R11.3-cross-platform-agent-ingestion.md)
-- [R11.4 — Feature deprecation audit](plans/R11/R11.4-feature-deprecation-audit.md)
+**R11 tasks** (shipped — archived)
+- [R11.1 — Multi-project fleet view](archive/completed-plans/R11.1-multi-project-fleet-view.md)
+- [R11.2 — Cost intelligence v2](archive/completed-plans/R11.2-cost-intelligence-v2.md)
+- [R11.3 — Cross-platform agent ingestion](archive/completed-plans/R11.3-cross-platform-agent-ingestion.md)
+- [R11.4 — Feature deprecation audit](archive/completed-plans/R11.4-feature-deprecation-audit.md)
 
 **R12 tasks**
 - [R12.1 — AI-summarized digests + NL query](plans/R12/R12.1-nl-query-and-digests.md)

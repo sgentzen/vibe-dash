@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, better-sqlite3, Express, Vitest, React. ESM (`.js` suffixes on relative imports).
 
-**Spec:** [docs/superpowers/specs/2026-05-16-ad-hoc-change-detection-design.md](../specs/2026-05-16-ad-hoc-change-detection-design.md)
+**Spec:** [docs/superpowers/specs/2026-05-16-ad-hoc-change-detection-design.md](../../superpowers/specs/2026-05-16-ad-hoc-change-detection-design.md)
 
 **Security note:** All shell-outs in this plan use `child_process.execFile` (via `node:util`'s `promisify`), never the shell-spawning forms. Arguments are passed as an array and never concatenated into a shell string, so user-controlled input cannot be injected.
 

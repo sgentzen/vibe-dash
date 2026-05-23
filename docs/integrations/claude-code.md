@@ -2,6 +2,13 @@
 
 Connect Claude Code to Vibe Dash so every session reports task progress, activity, and cost to your dashboard.
 
+> **Two integration paths.** Pick one:
+>
+> - **MCP (this doc)** — gives Claude *tools* (`list_tasks`, `update_task`, `log_activity`, …). Best when you want Claude to actively read and write task state during work.
+> - **Hooks** — automatic, no-prompt ingestion of tool calls, file changes, sessions, and cost via `.claude/settings.json` hooks. See [integrations/claude-code/README.md](../../integrations/claude-code/README.md). Best when you just want passive observability without changing how Claude works.
+>
+> The two can be used together — MCP for task management, hooks for automatic activity capture.
+
 ---
 
 ## Step 1 — Start Vibe Dash
