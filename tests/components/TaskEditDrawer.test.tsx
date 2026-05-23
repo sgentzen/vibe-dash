@@ -218,6 +218,18 @@ describe("TaskEditDrawer", () => {
     expect(opts.clickOutsideDeactivates).not.toBe(true);
   });
 
+  // Regression: focus-trap's onDeactivate fires from componentWillUnmount,
+  // including React StrictMode's dev mount-unmount-remount cycle. Routing
+  // onClose through onDeactivate caused the drawer to close itself on first
+  // render. Close must be driven by backdrop click and our own Escape handler.
+  it("does not route onClose through FocusTrap onDeactivate", () => {
+    focusTrapOptionsCalls.length = 0;
+    const task = makeTask();
+    renderWithProviders(<TaskEditDrawer task={task} onClose={onClose} />);
+    const opts = focusTrapOptionsCalls[0] as { onDeactivate?: unknown };
+    expect(opts.onDeactivate).toBeUndefined();
+  });
+
   it("drawer has correct ARIA attributes for modal dialog", () => {
     const task = makeTask();
     renderWithProviders(<TaskEditDrawer task={task} onClose={onClose} />);
