@@ -44,7 +44,9 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
     case "SET_SEARCH_QUERY":
       return { ...state, searchQuery: action.payload };
     case "SET_SEARCH_SCOPE":
-      localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, action.payload);
+      if (action.payload === "tasks" || action.payload === "projects" || action.payload === "agents" || action.payload === "all") {
+        localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, action.payload);
+      }
       return { ...state, searchScope: action.payload };
     case "SET_ALERTS_OPEN":
       return { ...state, alertsOpen: action.payload };
@@ -65,7 +67,9 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
     case "SELECT_MILESTONE":
       return { ...state, selectedMilestoneId: action.payload };
     case "SET_THEME":
-      localStorage.setItem(THEME_STORAGE_KEY, action.payload);
+      if (action.payload === "light" || action.payload === "dark") {
+        localStorage.setItem(THEME_STORAGE_KEY, action.payload);
+      }
       return { ...state, theme: action.payload };
     case "INCREMENT_POLL_GENERATION":
       return { ...state, pollGeneration: state.pollGeneration + 1 };
