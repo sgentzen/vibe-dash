@@ -19,8 +19,11 @@ export function useWebSocket() {
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ticket = await getWsTicket();
-      const ticketParam = ticket ? `?ticket=${encodeURIComponent(ticket)}` : "";
-      const ws = new WebSocket(`${protocol}//${window.location.host}/ws${ticketParam}`);
+      // Restrict ticket to an opaque token charset so it cannot inject extra URL components.
+      const safeTicket = ticket && /^[A-Za-z0-9_-]+$/.test(ticket) ? ticket : "";
+      const ticketParam = safeTicket ? `?ticket=${encodeURIComponent(safeTicket)}` : "";
+      const wsUrl = new URL(`${protocol}//${window.location.host}/ws${ticketParam}`);
+      const ws = new WebSocket(wsUrl.toString());
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

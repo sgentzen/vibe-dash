@@ -42,6 +42,9 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   }, [showAppearance]);
 
   function handleAccentChange(color: string) {
+    // Validate hex color format before persisting / applying — prevents tainted
+    // input from being written to storage or injected as a CSS value.
+    if (!/^#[0-9a-fA-F]{3,8}$/.test(color)) return;
     setAccentColor(color);
     localStorage.setItem("vibe-dash-accent", color);
     document.documentElement.style.setProperty("--accent-user", color);

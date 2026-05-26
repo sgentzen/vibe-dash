@@ -64,9 +64,11 @@ describe("DB persistence across restarts", () => {
 describe("resolveDbPath", () => {
   it("prefers explicit override over env vars", () => {
     const prevEnv = process.env.VIBE_DASH_DB;
-    process.env.VIBE_DASH_DB = "/tmp/from-env.db";
+    const envPath = path.join(os.tmpdir(), "from-env.db");
+    const explicitPath = path.join(os.tmpdir(), "explicit.db");
+    process.env.VIBE_DASH_DB = envPath;
     try {
-      expect(resolveDbPath("/tmp/explicit.db")).toBe(path.resolve("/tmp/explicit.db"));
+      expect(resolveDbPath(explicitPath)).toBe(path.resolve(explicitPath));
     } finally {
       if (prevEnv === undefined) delete process.env.VIBE_DASH_DB;
       else process.env.VIBE_DASH_DB = prevEnv;
