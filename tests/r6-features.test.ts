@@ -59,7 +59,7 @@ describe("5.3 Webhooks", () => {
 
     const matches = getMatchingWebhooks(db, "blocker_reported");
     expect(matches).toHaveLength(2);
-    expect(matches.map((m) => m.url).sort()).toEqual(["https://a.com/hook", "https://b.com/hook"]);
+    expect(matches.map((m) => m.url).sort((a, b) => a.localeCompare(b))).toEqual(["https://a.com/hook", "https://b.com/hook"]);
   });
 
   it("excludes inactive webhooks from matching", () => {

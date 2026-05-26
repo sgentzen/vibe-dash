@@ -238,7 +238,7 @@ describe("syncGitHubIssues (mocked Octokit)", () => {
     const items = listLinkedItems(db, integration.id);
     expect(items).toHaveLength(2);
 
-    const numbers = items.map((i) => i.external_number).sort();
+    const numbers = items.map((i) => i.external_number).sort((a, b) => a - b);
     expect(numbers).toEqual([1, 2]);
 
     // Each item should have a linked task_id
