@@ -17,7 +17,7 @@ describe("milestone_history helpers", () => {
 
     const rows = listMilestoneHistorySince(db, "2000-01-01T00:00:00Z");
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.field).sort()).toEqual(["name", "target_date"]);
+    expect(rows.map((r) => r.field).sort((a, b) => a.localeCompare(b))).toEqual(["name", "target_date"]);
   });
 
   it("excludes rows before the cutoff", () => {
@@ -54,6 +54,6 @@ describe("updateMilestone history hook", () => {
     const m = createMilestone(db, { project_id: p.id, name: "M", description: "old desc" });
     updateMilestone(db, m.id, { name: "M2", description: "new desc", target_date: "2026-06-01" });
     const rows = listMilestoneHistorySince(db, "2000-01-01T00:00:00Z");
-    expect(rows.map((r) => r.field).sort()).toEqual(["description", "name", "target_date"]);
+    expect(rows.map((r) => r.field).sort((a, b) => a.localeCompare(b))).toEqual(["description", "name", "target_date"]);
   });
 });

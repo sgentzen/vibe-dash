@@ -23,8 +23,8 @@ function str(v: unknown): string | null {
 function num(v: unknown): number | null {
   if (typeof v === "number") return v;
   if (typeof v === "string") {
-    const n = parseFloat(v);
-    return isNaN(n) ? null : n;
+    const n = Number.parseFloat(v);
+    return Number.isNaN(n) ? null : n;
   }
   return null;
 }

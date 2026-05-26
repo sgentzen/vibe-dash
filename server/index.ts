@@ -40,7 +40,7 @@ const messagesLimiter = rateLimit({
   message: { error: "Too many message requests, please try again later." },
 });
 
-const PORT = parseInt(process.env.PORT ?? "3001");
+const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
 const DB_PATH = resolveDbPath(PROJECT_ROOT);
 const COMMIT_INGEST_ENABLED = process.env.COMMIT_INGEST_ENABLED !== "false";
 const COMMIT_INGEST_INTERVAL_MS = Number(process.env.COMMIT_INGEST_INTERVAL_MS ?? 300_000);
@@ -62,13 +62,15 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: "256kb" }));
 
-let db: Database.Database;
-try {
-  db = openDb(DB_PATH);
-} catch (err) {
-  logger.error({ err, DB_PATH }, "Failed to open database — aborting startup");
-  process.exit(1);
+function openDbOrExit(): Database.Database {
+  try {
+    return openDb(DB_PATH);
+  } catch (err) {
+    logger.error({ err, DB_PATH }, "Failed to open database — aborting startup");
+    process.exit(1);
+  }
 }
+const db: Database.Database = openDbOrExit();
 registerTier1Detectors();
 registerTier3Detectors();
 app.use(createRouter(db));

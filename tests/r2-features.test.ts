@@ -108,7 +108,8 @@ describe("2.5 Task Dependencies", () => {
 
     const deps = listDependencies(db, t1.id);
     expect(deps).toHaveLength(2);
-    expect(deps.map(d => d.depends_on_task_id).sort()).toEqual([t2.id, t3.id].sort());
+    const cmp = (a: string, b: string) => a.localeCompare(b);
+    expect(deps.map(d => d.depends_on_task_id).sort(cmp)).toEqual([t2.id, t3.id].sort(cmp));
   });
 
   it("removes dependency", () => {

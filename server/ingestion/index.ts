@@ -71,7 +71,7 @@ export function ingestionRoutes(db: Database.Database, _broadcast: BroadcastFn):
   router.get("/api/ingest/events", adminLimiter, adminAuth, (req, res) => {
     const source_id = req.query.source_id as string | undefined;
     const since = req.query.since as string | undefined;
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 200;
+    const limit = req.query.limit ? Number.parseInt(req.query.limit as string, 10) : 200;
     res.json(listIngestionEvents(db, { source_id, since, limit }));
   });
 

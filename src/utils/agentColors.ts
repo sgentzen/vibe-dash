@@ -51,7 +51,7 @@ const AGENT_COLORS = [
 export function agentColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
+    hash = Math.imul(hash, 31) + name.charCodeAt(i);
   }
   return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length];
 }
