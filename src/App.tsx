@@ -233,6 +233,9 @@ export function App() {
           if (await attemptLoad()) return;
         } catch (err) {
           lastError = err;
+          // Template literal is interpolated before console.error is called, so no
+          // util.format-style specifier injection is possible (i, retries are numbers).
+          // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring
           console.error(`[loadInitialData] attempt ${i + 1}/${retries} failed:`, err);
           if (i < retries - 1) {
             await new Promise((r) => setTimeout(r, computeRetryDelay(i, err, delayMs)));

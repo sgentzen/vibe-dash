@@ -1,3 +1,7 @@
+// All path.join/resolve calls in this file operate on operator-controlled inputs
+// (VIBE_DASH_DB env var, CLI override, __dirname, git internals). They are never
+// reached from HTTP/MCP request data, so the path-traversal rule is a false positive.
+// nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

@@ -73,6 +73,9 @@ export function usePolling() {
       const results = await Promise.allSettled(promises);
       const failures = results.filter((r) => r.status === "rejected");
       if (failures.length > 0) {
+        // Interpolated values are numeric counts; template literal is fully resolved
+        // before console.warn is called, so format-specifier injection cannot occur.
+        // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring
         console.warn(`[usePolling] ${failures.length}/${results.length} endpoints failed`, failures.map((f) => (f as PromiseRejectedResult).reason));
       }
 

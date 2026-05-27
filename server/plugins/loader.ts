@@ -1,3 +1,8 @@
+// path.join/resolve inputs here are: the operator-controlled plugin directory
+// (~/.vibe-dash/plugins by default), filesystem-listed entry names, and the
+// manifest-declared entrypoint — which is explicitly verified to stay under
+// resolvedPluginDir below. Not reachable from HTTP/MCP request data.
+// nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";

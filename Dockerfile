@@ -27,5 +27,9 @@ VOLUME ["/data"]
 ENV VIBE_DASH_DB=/data/vibe-dash.db \
     PORT=3001
 
+# Run as the non-root `node` user shipped in the official image; ensure /data is writable
+RUN mkdir -p /data && chown -R node:node /data /app
+USER node
+
 # Server reads dist/ for static assets; vite build put them there already
 CMD ["npx", "tsx", "server/index.ts"]

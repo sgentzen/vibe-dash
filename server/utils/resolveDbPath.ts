@@ -1,3 +1,7 @@
+// Inputs to path.join here are the caller-provided projectRoot (a trusted constant)
+// and the output of `git rev-parse --git-common-dir`. Neither is reachable from
+// untrusted HTTP/MCP input, so the path-traversal rule is a false positive.
+// nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
 import path from "path";
 import { execFileSync } from "child_process";
 
