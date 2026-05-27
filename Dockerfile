@@ -16,6 +16,7 @@ RUN npm ci --omit=dev
 # Copy built frontend assets and server source
 COPY --from=builder /app/dist ./dist
 COPY server ./server
+COPY shared ./shared
 
 # Default port; override with PORT env var
 EXPOSE 3001
