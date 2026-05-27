@@ -1,5 +1,5 @@
 # Stage 1: build the React frontend
-FROM node:26.1.0-alpine3.23 AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY . .
 RUN npx vite build
 
 # Stage 2: production image
-FROM node:26.1.0-alpine3.23 AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 COPY package*.json ./
