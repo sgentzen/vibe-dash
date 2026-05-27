@@ -237,6 +237,76 @@ function MilestoneHealthCard({
   );
 }
 
+type ToolbarProps = {
+  projects: Array<{ id: string; name: string }>;
+  projectId: string | null;
+  summary: ExecutiveSummary | null;
+  loading: boolean;
+  atRiskCount: number;
+  onProjectChange: (id: string) => void;
+  onRefresh: () => void;
+  onExport: () => void;
+  onExportAtRisk: () => void;
+};
+
+function ExecutiveToolbar(props: Readonly<ToolbarProps>) {
+  const { projects, projectId, summary, loading, atRiskCount, onProjectChange, onRefresh, onExport, onExportAtRisk } = props;
+  const exportAtRiskTitle = atRiskCount === 0
+    ? "No at-risk milestones to export"
+    : `Export ${atRiskCount} at-risk milestone${atRiskCount === 1 ? "" : "s"}`;
+  const btnStyle: React.CSSProperties = { padding: "6px 12px", borderRadius: "5px", border: "1px solid var(--border)", background: "var(--bg-tertiary)", color: "var(--text-secondary)", fontSize: "12px" };
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-5)", flexWrap: "wrap", gap: "var(--space-3)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+        <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>
+          Executive Summary
+        </h2>
+        {projects.length > 1 && (
+          <select
+            value={projectId ?? ""}
+            onChange={(e) => onProjectChange(e.target.value)}
+            style={{ fontSize: "13px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", borderRadius: "5px", padding: "4px 8px" }}
+            aria-label="Select project"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        {summary && (
+          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+            Generated {new Date(summary.generated_at).toLocaleTimeString()}
+          </span>
+        )}
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          style={{ ...btnStyle, cursor: loading ? "default" : "pointer" }}
+        >
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+        <button
+          onClick={onExport}
+          disabled={!summary}
+          style={{ ...btnStyle, cursor: summary ? "pointer" : "default" }}
+        >
+          Export JSON
+        </button>
+        <button
+          onClick={onExportAtRisk}
+          disabled={!summary || atRiskCount === 0}
+          title={exportAtRiskTitle}
+          style={{ ...btnStyle, cursor: summary && atRiskCount > 0 ? "pointer" : "default" }}
+        >
+          Export At-Risk JSON
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ExecutiveView() {
   const { selectedProjectId } = useNavigationState();
   const { projects } = useDataState();
@@ -309,54 +379,17 @@ export function ExecutiveView() {
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-5)", flexWrap: "wrap", gap: "var(--space-3)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-          <h2 style={{ ...typeScale.h2, color: "var(--text-primary)", margin: 0 }}>
-            Executive Summary
-          </h2>
-          {projects.length > 1 && (
-            <select
-              value={projectId ?? ""}
-              onChange={(e) => setLocalProjectId(e.target.value)}
-              style={{ fontSize: "13px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", borderRadius: "5px", padding: "4px 8px" }}
-              aria-label="Select project"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          {summary && (
-            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-              Generated {new Date(summary.generated_at).toLocaleTimeString()}
-            </span>
-          )}
-          <button
-            onClick={() => projectId && load(projectId)}
-            disabled={loading}
-            style={{ padding: "6px 12px", borderRadius: "5px", border: "1px solid var(--border)", background: "var(--bg-tertiary)", color: "var(--text-secondary)", fontSize: "12px", cursor: loading ? "default" : "pointer" }}
-          >
-            {loading ? "Loading…" : "Refresh"}
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={!summary}
-            style={{ padding: "6px 12px", borderRadius: "5px", border: "1px solid var(--border)", background: "var(--bg-tertiary)", color: "var(--text-secondary)", fontSize: "12px", cursor: summary ? "pointer" : "default" }}
-          >
-            Export JSON
-          </button>
-          <button
-            onClick={handleExportAtRisk}
-            disabled={!summary || atRiskCount === 0}
-            title={atRiskCount === 0 ? "No at-risk milestones to export" : `Export ${atRiskCount} at-risk milestone${atRiskCount === 1 ? "" : "s"}`}
-            style={{ padding: "6px 12px", borderRadius: "5px", border: "1px solid var(--border)", background: "var(--bg-tertiary)", color: "var(--text-secondary)", fontSize: "12px", cursor: summary && atRiskCount > 0 ? "pointer" : "default" }}
-          >
-            Export At-Risk JSON
-          </button>
-        </div>
-      </div>
+      <ExecutiveToolbar
+        projects={projects}
+        projectId={projectId}
+        summary={summary}
+        loading={loading}
+        atRiskCount={atRiskCount}
+        onProjectChange={setLocalProjectId}
+        onRefresh={() => { if (projectId) load(projectId); }}
+        onExport={handleExport}
+        onExportAtRisk={handleExportAtRisk}
+      />
 
       {!projectId && (
         <div style={{ color: "var(--text-muted)", fontSize: "13px" }}>No project selected.</div>

@@ -4,6 +4,29 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Resolve a worktree `.git` pointer (`gitdir: <path>`) back to the main repo root.
+function resolveWorktreePointer(dir: string, gitFileContent: string): string | null {
+  const match = gitFileContent.match(/^gitdir:\s*(.+)$/m);
+  if (!match) return null;
+
+  const gitdir = path.resolve(dir, match[1].trim());
+
+  // Standard layout: gitdir = `<repo>/.git/worktrees/<name>` → repo root is two levels above.
+  const grandparent = path.dirname(path.dirname(gitdir));
+  if (path.basename(grandparent) === ".git") return path.dirname(grandparent);
+
+  // Non-standard layout: `commondir` file holds the path to the main `.git`.
+  const commondirFile = path.join(gitdir, "commondir");
+  if (fs.existsSync(commondirFile)) {
+    const commondir = path.resolve(gitdir, fs.readFileSync(commondirFile, "utf8").trim());
+    if (path.basename(commondir) === ".git") return path.dirname(commondir);
+  }
+
+  // Last resort: walk upward from the gitdir's parent (avoids reproducing the
+  // per-worktree-DB bug by returning the worktree dir itself).
+  return findRepoRoot(path.dirname(gitdir));
+}
+
 // Walk up from `start` looking for a `.git` directory or file. If `.git` is a
 // file (the worktree pointer format `gitdir: <path>`), follow it back to the
 // main repository root so every worktree resolves to the same root.
@@ -12,33 +35,9 @@ function findRepoRoot(start: string): string | null {
   while (true) {
     const gitPath = path.join(dir, ".git");
     if (fs.existsSync(gitPath)) {
-      const stat = fs.statSync(gitPath);
-      if (stat.isDirectory()) return dir;
-
-      const content = fs.readFileSync(gitPath, "utf8");
-      const match = content.match(/^gitdir:\s*(.+)$/m);
-      if (match) {
-        const gitdir = path.resolve(dir, match[1].trim());
-        // Standard layout: gitdir = `<repo>/.git/worktrees/<name>` → repo root is two levels above.
-        const grandparent = path.dirname(path.dirname(gitdir));
-        if (path.basename(grandparent) === ".git") {
-          return path.dirname(grandparent);
-        }
-        // Non-standard layout: try `commondir` file (Git writes the relative path
-        // to the main `.git` here for linked worktrees with custom gitdirs).
-        const commondirFile = path.join(gitdir, "commondir");
-        if (fs.existsSync(commondirFile)) {
-          const commondir = path.resolve(gitdir, fs.readFileSync(commondirFile, "utf8").trim());
-          if (path.basename(commondir) === ".git") {
-            return path.dirname(commondir);
-          }
-        }
-        // Last resort: walk upward from the gitdir's parent rather than silently
-        // returning the worktree dir (which would reproduce the per-worktree-DB bug).
-        const upward = findRepoRoot(path.dirname(gitdir));
-        if (upward) return upward;
-      }
-      return dir;
+      if (fs.statSync(gitPath).isDirectory()) return dir;
+      const resolved = resolveWorktreePointer(dir, fs.readFileSync(gitPath, "utf8"));
+      return resolved ?? dir;
     }
     const parent = path.dirname(dir);
     if (parent === dir) return null;
