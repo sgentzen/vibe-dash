@@ -35,6 +35,33 @@ export interface RunOptions {
   detectorId?: string;
 }
 
+function safePredicate(d: Detector, ctx: DetectorContext): ReturnType<Detector["predicate"]> {
+  try {
+    return d.predicate(ctx);
+  } catch {
+    return [];
+  }
+}
+
+function safeScore(d: Detector, match: ReturnType<Detector["predicate"]>[number], ctx: DetectorContext): number | null {
+  try {
+    return Math.max(0, Math.min(100, Math.round(d.score(match, ctx))));
+  } catch {
+    return null;
+  }
+}
+
+function runOneDetector(d: Detector, ctx: DetectorContext, options: RunOptions): ScoredMatch[] {
+  const threshold = options.minScore !== undefined ? options.minScore : d.defaultThreshold;
+  const out: ScoredMatch[] = [];
+  for (const match of safePredicate(d, ctx)) {
+    const score = safeScore(d, match, ctx);
+    if (score === null || score < threshold) continue;
+    out.push({ ...match, detectorId: d.id, category: d.category, score });
+  }
+  return out;
+}
+
 export function runDetectors(db: Database.Database, options: RunOptions = {}): ScoredMatch[] {
   const ctx: DetectorContext = { db, now: new Date().toISOString() };
   const suppressed = suppressedIds();
@@ -43,28 +70,7 @@ export function runDetectors(db: Database.Database, options: RunOptions = {}): S
   for (const d of REGISTRY) {
     if (suppressed.has(d.id)) continue;
     if (options.detectorId && d.id !== options.detectorId) continue;
-
-    let matches;
-    try {
-      matches = d.predicate(ctx);
-    } catch {
-      // Individual detector failures must not crash the runner.
-      continue;
-    }
-
-    for (const match of matches) {
-      let score: number;
-      try {
-        score = Math.max(0, Math.min(100, Math.round(d.score(match, ctx))));
-      } catch {
-        continue;
-      }
-
-      const threshold = options.minScore !== undefined ? options.minScore : d.defaultThreshold;
-      if (score < threshold) continue;
-
-      results.push({ ...match, detectorId: d.id, category: d.category, score });
-    }
+    results.push(...runOneDetector(d, ctx, options));
   }
 
   // Highest score first.
