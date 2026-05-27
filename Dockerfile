@@ -24,7 +24,8 @@ EXPOSE 3001
 # DB is stored in a volume so data survives container restarts
 VOLUME ["/data"]
 
-ENV VIBE_DASH_DB=/data/vibe-dash.db \
+ENV NODE_ENV=production \
+    VIBE_DASH_DB=/data/vibe-dash.db \
     PORT=3001
 
 # Server reads dist/ for static assets; vite build put them there already
