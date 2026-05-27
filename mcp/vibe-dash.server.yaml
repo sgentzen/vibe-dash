@@ -1,0 +1,14 @@
+name: vibe-dash
+type: remote
+description: Local-first real-time dashboard for monitoring AI-driven development projects.
+title: Vibe Dash
+remote:
+  url: http://localhost:3001/mcp
+  transport_type: streamable-http
+metadata:
+  category: ai
+  tags:
+    - vibe-dash
+    - tasks
+    - ai
+  owner: sgentzen
