@@ -148,7 +148,7 @@ export function DashboardView() {
       </h2>
 
       <div style={{ display: "grid", gridTemplateColumns: "65fr 35fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <LiveRosterCard agents={agents} tasks={projectTasks} />
+        <LiveRosterCard agents={agents} tasks={tasks} />
         <TodayCard
           spendToday={stats.spend_today}
           tasksCompletedToday={stats.tasks_completed_today}
