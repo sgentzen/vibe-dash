@@ -101,4 +101,3 @@ export {
   updateWorktreeStatus,
 } from "./worktrees.js";
 export type { CreateWorktreeInput } from "./worktrees.js";
-export * from "./milestone_history.js";

@@ -16,10 +16,6 @@ export function serverError(res: Response, message = "Internal server error"): v
   res.status(500).json({ error: message });
 }
 
-export function unauthorized(res: Response, message = "Unauthorized"): void {
-  res.status(401).json({ error: message });
-}
-
 export function forbidden(res: Response, message = "Forbidden"): void {
   res.status(403).json({ error: message });
 }

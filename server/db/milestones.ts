@@ -1,7 +1,6 @@
 import type Database from "better-sqlite3";
 import type { Milestone, MilestoneProgress, MilestoneDailyStats, MilestoneStatus } from "../types.js";
 import { now, genId } from "./helpers.js";
-import { recordMilestoneChange, type WatchedMilestoneField } from "./milestone_history.js";
 
 export interface CreateMilestoneInput {
   project_id: string;
@@ -65,20 +64,6 @@ export function updateMilestone(
   if (input.status !== undefined) { sets.push("status = ?"); params.push(input.status); }
 
   if (sets.length === 0) return getMilestone(db, id);
-
-  const existing = getMilestone(db, id);
-  // No row to compare against — let the UPDATE below run (it will affect 0 rows).
-  if (existing) {
-    const watched: WatchedMilestoneField[] = ["name", "description", "target_date", "acceptance_criteria"];
-    for (const field of watched) {
-      if (input[field] === undefined) continue;
-      const oldVal = (existing as unknown as Record<string, string | null>)[field] ?? null;
-      const newVal = input[field] ?? null;
-      if (oldVal !== newVal) {
-        recordMilestoneChange(db, id, field, oldVal, newVal);
-      }
-    }
-  }
 
   sets.push("updated_at = ?");
   params.push(now());
