@@ -106,7 +106,7 @@ export function HotSpotsView() {
     }
   }, [api]);
 
-  useEffect(() => { void fetchMatches(); }, [fetchMatches]);
+  useEffect(() => { fetchMatches().catch(() => {}); }, [fetchMatches]);
 
   const criticalCount = matches.filter((m) => m.score >= 90).length;
   const highCount = matches.filter((m) => m.score >= 75 && m.score < 90).length;
@@ -146,7 +146,7 @@ export function HotSpotsView() {
             </span>
           )}
           <button
-            onClick={() => void fetchMatches()}
+            onClick={() => { fetchMatches().catch(() => {}); }}
             disabled={loading}
             style={{
               fontSize: "12px", padding: "4px 10px",

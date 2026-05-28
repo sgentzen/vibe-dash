@@ -12,6 +12,77 @@ import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards"
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
+type ChartSetters = {
+  setHeatmap: (h: ActivityHeatmapEntry[]) => void;
+  setDailyStats: (s: MilestoneDailyStats[]) => void;
+  setContributions: (c: AgentContribution[]) => void;
+};
+
+type CostSetters = {
+  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null) => void;
+  setCostTimeseries: (ts: { date: string; total_cost_usd: number }[]) => void;
+  setCostByModel: (m: { model: string; provider: string; total_cost_usd: number; total_tokens: number }[]) => void;
+  setCostByAgent: (a: { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]) => void;
+};
+
+async function loadChartData(
+  api: ReturnType<typeof useApi>,
+  projectId: string | null,
+  firstOpenMilestoneId: string | null | undefined,
+  setters: ChartSetters,
+): Promise<void> {
+  try {
+    const heat = await api.getActivityHeatmap(projectId ?? undefined);
+    setters.setHeatmap(heat);
+
+    if (firstOpenMilestoneId) {
+      const [stats, contrib] = await Promise.all([
+        api.getMilestoneDailyStats(firstOpenMilestoneId),
+        api.getMilestoneContributions(firstOpenMilestoneId),
+      ]);
+      setters.setDailyStats(stats);
+      setters.setContributions(contrib);
+    } else {
+      setters.setDailyStats([]);
+      setters.setContributions([]);
+    }
+  } catch (e) {
+    console.warn("[DashboardView] failed to load chart data", e);
+  }
+}
+
+async function loadCostData(
+  api: ReturnType<typeof useApi>,
+  projectId: string | null,
+  setters: CostSetters,
+): Promise<void> {
+  try {
+    const [summary, ts, byModel, byAgent] = await Promise.all([
+      api.getCostSummary(projectId ?? undefined),
+      api.getCostTimeseries({ project_id: projectId ?? undefined, days: "30" }),
+      api.getCostByModel({ project_id: projectId ?? undefined }),
+      api.getCostByAgent({ project_id: projectId ?? undefined }),
+    ]);
+    setters.setCostSummary(summary);
+    setters.setCostTimeseries(ts);
+    setters.setCostByModel(byModel);
+    setters.setCostByAgent(byAgent);
+  } catch (e) {
+    console.warn("[DashboardView] failed to load cost data", e);
+  }
+}
+
+// Bucket the heatmap entries (Unix-hour timestamps) into a 7-element day-count array.
+function computeActivityLast7(heatmap: ActivityHeatmapEntry[]): number[] {
+  const todayDay = Math.floor(Date.now() / 86_400_000);
+  const buckets: Record<number, number> = {};
+  for (const e of heatmap) {
+    const day = Math.floor((e.hour * 3_600_000) / 86_400_000);
+    if (day >= todayDay - 6) buckets[day] = (buckets[day] ?? 0) + e.count;
+  }
+  return Array.from({ length: 7 }, (_, i) => buckets[todayDay - 6 + i] ?? 0);
+}
+
 export function DashboardView() {
   const { projects, milestones, blockers, tasks } = useDataState();
   const { selectedProjectId } = useNavigationState();
@@ -41,15 +112,7 @@ export function DashboardView() {
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
   // Last-7-days activity sparkline derived from heatmap (ActivityHeatmapEntry.hour is Unix hour number)
-  const activityLast7: number[] = (() => {
-    const todayDay = Math.floor(Date.now() / 86_400_000);
-    const buckets: Record<number, number> = {};
-    for (const e of heatmap) {
-      const day = Math.floor((e.hour * 3_600_000) / 86_400_000);
-      if (day >= todayDay - 6) buckets[day] = (buckets[day] ?? 0) + e.count;
-    }
-    return Array.from({ length: 7 }, (_, i) => buckets[todayDay - 6 + i] ?? 0);
-  })();
+  const activityLast7 = computeActivityLast7(heatmap);
 
   // Compact tile layout when ≥2 of the 4 KPI values are zero
   const activeTasks = projectTasks.filter((t) => t.status !== "done").length;
@@ -62,49 +125,14 @@ export function DashboardView() {
     ? openMilestones.map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";")).join("|")
     : "";
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const heat = await api.getActivityHeatmap(projectId ?? undefined);
-        setHeatmap(heat);
-
-        if (openMilestones.length > 0) {
-          const firstOpenMilestone = openMilestones[0];
-          const [stats, contrib] = await Promise.all([
-            api.getMilestoneDailyStats(firstOpenMilestone.id),
-            api.getMilestoneContributions(firstOpenMilestone.id),
-          ]);
-          setDailyStats(stats);
-          setContributions(contrib);
-        } else {
-          setDailyStats([]);
-          setContributions([]);
-        }
-      } catch (e) {
-        console.warn("[DashboardView] failed to load chart data", e);
-      }
-    }
-    load();
-  }, [api, openMilestones.length > 0 ? openMilestones[0]?.id : null, projectId, milestoneTaskStatusKey, pollGeneration]);
+  const firstOpenMilestoneId = openMilestones.length > 0 ? openMilestones[0]?.id : null;
 
   useEffect(() => {
-    async function loadCosts() {
-      try {
-        const [summary, ts, byModel, byAgent] = await Promise.all([
-          api.getCostSummary(projectId ?? undefined),
-          api.getCostTimeseries({ project_id: projectId ?? undefined, days: "30" }),
-          api.getCostByModel({ project_id: projectId ?? undefined }),
-          api.getCostByAgent({ project_id: projectId ?? undefined }),
-        ]);
-        setCostSummary(summary);
-        setCostTimeseries(ts);
-        setCostByModel(byModel);
-        setCostByAgent(byAgent);
-      } catch (e) {
-        console.warn("[DashboardView] failed to load cost data", e);
-      }
-    }
-    loadCosts();
+    loadChartData(api, projectId, firstOpenMilestoneId, { setHeatmap, setDailyStats, setContributions });
+  }, [api, firstOpenMilestoneId, projectId, milestoneTaskStatusKey, pollGeneration]);
+
+  useEffect(() => {
+    loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
   }, [api, projectId, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {

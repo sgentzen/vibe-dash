@@ -242,36 +242,34 @@ async function cmdDigest() {
   console.log(`${GREEN}Digest written:${RESET} ${outPath}`);
 }
 
+function appendTaskSection(lines: string[], heading: string, tasks: { title: string }[], limit: number): void {
+  if (tasks.length === 0) return;
+  lines.push("", `### ${heading}`);
+  for (const t of tasks.slice(0, limit)) lines.push(`- ${t.title}`);
+}
+
+function appendProjectDigest(lines: string[], db: Database.Database, p: { id: string; name: string }, since: string): void {
+  const tasks = listTasks(db, { project_id: p.id }).filter((t) => !t.parent_task_id);
+  const inProgress = tasks.filter((t) => t.status === "in_progress");
+  const done24h = tasks.filter((t) => t.status === "done" && t.updated_at >= since);
+  const blocked = tasks.filter((t) => t.status === "blocked");
+  const openMilestone = listMilestones(db, p.id).find((m) => m.status === "open");
+  const pct = openMilestone ? getMilestoneProgress(db, openMilestone.id).completion_pct : null;
+
+  lines.push(`## ${p.name}`);
+  if (openMilestone) lines.push(`**Milestone:** ${openMilestone.name}${pct !== null ? ` (${pct}%)` : ""}`);
+  lines.push(`**In progress:** ${inProgress.length}  **Completed today:** ${done24h.length}  **Blocked:** ${blocked.length}`);
+  appendTaskSection(lines, "Completed today", done24h, 10);
+  appendTaskSection(lines, "In progress", inProgress, 10);
+  appendTaskSection(lines, "Blocked", blocked, 5);
+  lines.push("");
+}
+
 function buildStaticDigest(db: Database.Database, date: string): string {
-  const projects = listProjects(db);
   const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
   const lines: string[] = [`# Daily Digest — ${date}`, ""];
 
-  for (const p of projects) {
-    const tasks = listTasks(db, { project_id: p.id }).filter((t) => !t.parent_task_id);
-    const inProgress = tasks.filter((t) => t.status === "in_progress");
-    const done24h = tasks.filter((t) => t.status === "done" && t.updated_at >= since);
-    const blocked = tasks.filter((t) => t.status === "blocked");
-    const openMilestone = listMilestones(db, p.id).find((m) => m.status === "open");
-    const pct = openMilestone ? getMilestoneProgress(db, openMilestone.id).completion_pct : null;
-
-    lines.push(`## ${p.name}`);
-    if (openMilestone) lines.push(`**Milestone:** ${openMilestone.name}${pct !== null ? ` (${pct}%)` : ""}`);
-    lines.push(`**In progress:** ${inProgress.length}  **Completed today:** ${done24h.length}  **Blocked:** ${blocked.length}`);
-    if (done24h.length > 0) {
-      lines.push("", "### Completed today");
-      for (const t of done24h.slice(0, 10)) lines.push(`- ${t.title}`);
-    }
-    if (inProgress.length > 0) {
-      lines.push("", "### In progress");
-      for (const t of inProgress.slice(0, 10)) lines.push(`- ${t.title}`);
-    }
-    if (blocked.length > 0) {
-      lines.push("", "### Blocked");
-      for (const t of blocked.slice(0, 5)) lines.push(`- ${t.title}`);
-    }
-    lines.push("");
-  }
+  for (const p of listProjects(db)) appendProjectDigest(lines, db, p, since);
 
   const activeBlockers = getActiveBlockers(db);
   if (activeBlockers.length > 0) {
@@ -289,20 +287,16 @@ function buildStaticDigest(db: Database.Database, date: string): string {
 
 // ─── install-hooks ───────────────────────────────────────────────────────────
 
-async function installHooks(): Promise<void> {
-  const serverUrl = (flags.server ?? "http://localhost:3001").replace(/\/$/, "");
-
-  // 1. Verify server is reachable
-  let token: string;
+async function verifyServerReachable(serverUrl: string): Promise<void> {
   try {
     const check = await fetch(`${serverUrl}/api/auth/status`);
     if (!check.ok) throw new Error(`server returned ${check.status}`);
   } catch (e) {
     throw new Error(`Cannot reach vibe-dash server at ${serverUrl}. Is it running?\n  ${(e as Error).message}`);
   }
+}
 
-  // 2. Find or create a claude_code ingestion source, then rotate to get a fresh token
-  const sourceName = "claude-code-hooks";
+async function fetchOrCreateIngestToken(serverUrl: string, sourceName: string): Promise<{ token: string; existing: boolean }> {
   const listRes = await fetch(`${serverUrl}/api/ingest/sources`);
   if (!listRes.ok) throw new Error(`Failed to list ingestion sources: ${listRes.status}`);
   const sources = (await listRes.json()) as { id: string; name: string }[];
@@ -312,59 +306,64 @@ async function installHooks(): Promise<void> {
     const rotateRes = await fetch(`${serverUrl}/api/ingest/sources/${existing.id}/rotate`, { method: "POST" });
     if (!rotateRes.ok) throw new Error(`Failed to rotate token: ${rotateRes.status} ${await rotateRes.text()}`);
     const rotated = (await rotateRes.json()) as { token: string };
-    token = rotated.token;
-  } else {
-    const createRes = await fetch(`${serverUrl}/api/ingest/sources`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: sourceName, kind: "claude_code" }),
-    });
-    if (!createRes.ok) throw new Error(`Failed to create ingestion source: ${createRes.status} ${await createRes.text()}`);
-    const created = (await createRes.json()) as { token: string };
-    token = created.token;
+    return { token: rotated.token, existing: true };
   }
+  const createRes = await fetch(`${serverUrl}/api/ingest/sources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: sourceName, kind: "claude_code" }),
+  });
+  if (!createRes.ok) throw new Error(`Failed to create ingestion source: ${createRes.status} ${await createRes.text()}`);
+  const created = (await createRes.json()) as { token: string };
+  return { token: created.token, existing: false };
+}
 
-  // 3. Build hook command (inline node, works cross-platform, requires Node >=18)
-  const endpoint = `${serverUrl}/api/ingest/claude_code`;
-  const hookCmd = `node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{fetch('${endpoint}',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${token}'},body:d}).catch(()=>{})});"`;
-
-  // 4. Merge into ~/.claude/settings.json
-  const settingsDir = join(homedir(), ".claude");
-  const settingsPath = join(settingsDir, "settings.json");
-
-  let settings: Record<string, unknown> = {};
+function readSettings(settingsPath: string, settingsDir: string): Record<string, unknown> {
   if (existsSync(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
+      return JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
     } catch {
       throw new Error(`Cannot parse ${settingsPath} — fix the JSON first`);
     }
-  } else {
-    mkdirSync(settingsDir, { recursive: true });
   }
+  mkdirSync(settingsDir, { recursive: true });
+  return {};
+}
 
+function upsertHookEntry<T extends { hooks: unknown[] }>(list: T[], newEntry: T, matchExisting: (e: T) => boolean): T[] {
+  const idx = list.findIndex(matchExisting);
+  if (idx >= 0) list[idx] = newEntry; else list.push(newEntry);
+  return list;
+}
+
+async function installHooks(): Promise<void> {
+  const serverUrl = (flags.server ?? "http://localhost:3001").replace(/\/$/, "");
+  await verifyServerReachable(serverUrl);
+
+  const sourceName = "claude-code-hooks";
+  const { token, existing } = await fetchOrCreateIngestToken(serverUrl, sourceName);
+
+  // Build hook command (inline node, works cross-platform, requires Node >=18)
+  const endpoint = `${serverUrl}/api/ingest/claude_code`;
+  const hookCmd = `node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{fetch('${endpoint}',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${token}'},body:d}).catch(()=>{})});"`;
   const hookEntry = { type: "command", command: hookCmd };
+  const isVibeDashHook = (e: { hooks: unknown[] }) => JSON.stringify(e.hooks).includes("api/ingest/claude_code");
+
+  const settingsDir = join(homedir(), ".claude");
+  const settingsPath = join(settingsDir, "settings.json");
+  const settings = readSettings(settingsPath, settingsDir);
   const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
 
-  // PostToolUse: capture every tool call — replace existing vibe-dash entry to refresh token
-  const postToolUse = (hooks.PostToolUse ?? []) as { matcher?: string; hooks: unknown[] }[];
-  const vibeIdx = postToolUse.findIndex((e) => e.matcher === ".*" && JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
-  if (vibeIdx >= 0) {
-    postToolUse[vibeIdx] = { matcher: ".*", hooks: [hookEntry] };
-  } else {
-    postToolUse.push({ matcher: ".*", hooks: [hookEntry] });
-  }
-  hooks.PostToolUse = postToolUse;
-
-  // Stop: capture session end — replace existing vibe-dash entry to refresh token
-  const stop = (hooks.Stop ?? []) as { hooks: unknown[] }[];
-  const stopIdx = stop.findIndex((e) => JSON.stringify(e.hooks).includes("api/ingest/claude_code"));
-  if (stopIdx >= 0) {
-    stop[stopIdx] = { hooks: [hookEntry] };
-  } else {
-    stop.push({ hooks: [hookEntry] });
-  }
-  hooks.Stop = stop;
+  hooks.PostToolUse = upsertHookEntry(
+    (hooks.PostToolUse ?? []) as { matcher?: string; hooks: unknown[] }[],
+    { matcher: ".*", hooks: [hookEntry] },
+    (e) => e.matcher === ".*" && isVibeDashHook(e),
+  );
+  hooks.Stop = upsertHookEntry(
+    (hooks.Stop ?? []) as { hooks: unknown[] }[],
+    { hooks: [hookEntry] },
+    isVibeDashHook,
+  );
 
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");

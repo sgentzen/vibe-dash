@@ -167,85 +167,78 @@ export function App() {
     // Atomic load: gather everything first, dispatch only once on success.
     // This prevents partially-failed retries from clobbering previously-good
     // state with empty arrays while the server is mid-restart.
+    async function attemptLoad(): Promise<boolean> {
+      const [stats, projects, tasks, agents, activity, blockerList] = await Promise.all([
+        api.getStats(), api.getProjects(), api.getTasks(),
+        api.getAgents(), api.getActivity(), api.getBlockers(),
+      ]);
+      if (cancelled) return true;
+
+      const [allTags, allMilestones, taskTagPairs, allDeps, notifs, unread, worktrees] = await Promise.all([
+        Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
+        Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
+        Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
+        Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
+        api.getNotifications(50), api.getUnreadCount(), api.getWorktrees(),
+      ]);
+      if (cancelled) return true;
+
+      const tagMap: Record<string, string[]> = {};
+      for (const { task_id, tag } of taskTagPairs) {
+        const list = tagMap[task_id] ?? [];
+        list.push(tag.id);
+        tagMap[task_id] = list;
+      }
+      const depsMap: Record<string, string[]> = {};
+      for (const d of allDeps) {
+        const list = depsMap[d.task_id] ?? [];
+        list.push(d.depends_on_task_id);
+        depsMap[d.task_id] = list;
+      }
+
+      // Single atomic dispatch sequence — only runs after both batches succeed.
+      dispatch({ type: "SET_STATS", payload: stats });
+      dispatch({ type: "SET_PROJECTS", payload: projects });
+      dispatch({ type: "SET_MILESTONES", payload: allMilestones });
+      dispatch({ type: "SET_TASKS", payload: tasks });
+      dispatch({ type: "SET_AGENTS", payload: agents });
+      dispatch({ type: "SET_ACTIVITY", payload: activity });
+      dispatch({ type: "SET_BLOCKERS", payload: blockerList });
+      dispatch({ type: "SET_TAGS", payload: allTags });
+      dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
+      dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
+      dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
+      dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
+      dispatch({ type: "SET_WORKTREES", payload: worktrees });
+      dispatch({ type: "SET_LOAD_ERROR", payload: null });
+
+      if (projects.length === 0) setShowOnboarding(true);
+      setLoaded(true);
+      return true;
+    }
+
+    function computeRetryDelay(attempt: number, err: unknown, delayMs: number): number {
+      // Honor Retry-After on 429/503; otherwise exponential backoff capped at 5s.
+      const apiErr = err instanceof ApiError ? err : null;
+      const retryAfter = apiErr?.retryAfterMs ?? null;
+      const backoff = Math.min(delayMs * 2 ** attempt, 5000);
+      return retryAfter !== null ? Math.max(retryAfter, backoff) : backoff;
+    }
+
     async function loadInitialData(retries = 10, delayMs = 500) {
       let lastError: unknown = null;
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
-          // Batch 1: global resources.
-          const [stats, projects, tasks, agents, activity, blockerList] =
-            await Promise.all([
-              api.getStats(),
-              api.getProjects(),
-              api.getTasks(),
-              api.getAgents(),
-              api.getActivity(),
-              api.getBlockers(),
-            ]);
-          if (cancelled) return;
-
-          // Batch 2: per-project fan-out + auxiliary collections.
-          const [
-            allTags,
-            allMilestones,
-            taskTagPairs,
-            allDeps,
-            notifs,
-            unread,
-            worktrees,
-          ] = await Promise.all([
-            Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
-            Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
-            Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
-            Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
-            api.getNotifications(50),
-            api.getUnreadCount(),
-            api.getWorktrees(),
-          ]);
-          if (cancelled) return;
-
-          const tagMap: Record<string, string[]> = {};
-          for (const { task_id, tag } of taskTagPairs) {
-            (tagMap[task_id] ??= []).push(tag.id);
-          }
-          const depsMap: Record<string, string[]> = {};
-          for (const d of allDeps) {
-            (depsMap[d.task_id] ??= []).push(d.depends_on_task_id);
-          }
-
-          // Single atomic dispatch sequence — only runs after both batches succeed.
-          dispatch({ type: "SET_STATS", payload: stats });
-          dispatch({ type: "SET_PROJECTS", payload: projects });
-          dispatch({ type: "SET_MILESTONES", payload: allMilestones });
-          dispatch({ type: "SET_TASKS", payload: tasks });
-          dispatch({ type: "SET_AGENTS", payload: agents });
-          dispatch({ type: "SET_ACTIVITY", payload: activity });
-          dispatch({ type: "SET_BLOCKERS", payload: blockerList });
-          dispatch({ type: "SET_TAGS", payload: allTags });
-          dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
-          dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
-          dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
-          dispatch({ type: "SET_UNREAD_COUNT", payload: unread });
-          dispatch({ type: "SET_WORKTREES", payload: worktrees });
-          dispatch({ type: "SET_LOAD_ERROR", payload: null });
-
-          if (projects.length === 0) {
-            setShowOnboarding(true);
-          }
-          setLoaded(true);
-          return;
+          if (await attemptLoad()) return;
         } catch (err) {
           lastError = err;
+          // Template literal is interpolated before console.error is called, so no
+          // util.format-style specifier injection is possible (i, retries are numbers).
+          // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring
           console.error(`[loadInitialData] attempt ${i + 1}/${retries} failed:`, err);
           if (i < retries - 1) {
-            // Honor Retry-After on 429/503; otherwise exponential backoff
-            // capped at 5s. This stops the retry-all loop from hammering
-            // the same rate-limit budget that just rejected us.
-            const apiErr = err instanceof ApiError ? err : null;
-            const retryAfter = apiErr?.retryAfterMs ?? null;
-            const backoff = Math.min(delayMs * 2 ** i, 5000);
-            const delay = retryAfter !== null ? Math.max(retryAfter, backoff) : backoff;
-            await new Promise((r) => setTimeout(r, delay));
+            await new Promise((r) => setTimeout(r, computeRetryDelay(i, err, delayMs)));
           }
         }
       }
