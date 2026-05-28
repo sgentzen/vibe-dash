@@ -14,7 +14,6 @@ import {
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
   getAgentActivityHeatmap,
-  generateReport,
   getMilestoneProgress,
 } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
@@ -148,43 +147,3 @@ describe("Activity Heatmap", () => {
   });
 });
 
-// ─── 4.4 Report Generation ──────────────────────────────────────────────────
-
-describe("4.4 Report Generation", () => {
-  it("generates a markdown report", () => {
-    const project = createProject(db, { name: "Test Project", description: null });
-    const task = createTask(db, { project_id: project.id, title: "Fix bug", description: null, priority: "high" });
-    completeTask(db, task.id);
-
-    const report = generateReport(db, project.id, "week");
-    expect(report).toContain("Test Project");
-    expect(report).toContain("Fix bug");
-    expect(report).toContain("Tasks Completed");
-  });
-
-  it("includes blocker info", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
-    createBlocker(db, { task_id: task.id, reason: "DB is down" });
-
-    const report = generateReport(db, project.id, "day");
-    expect(report).toContain("DB is down");
-    expect(report).toContain("unresolved");
-  });
-
-  it("includes milestone progress when open milestone exists", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const milestone = createMilestone(db, { project_id: project.id, name: "Active Milestone" });
-    updateMilestone(db, milestone.id, { status: "open" });
-    createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium", milestone_id: milestone.id, estimate: 5 });
-
-    const report = generateReport(db, project.id, "milestone");
-    expect(report).toContain("Active Milestone");
-    expect(report).toContain("Progress:");
-  });
-
-  it("returns error for unknown project", () => {
-    const report = generateReport(db, "nonexistent", "week");
-    expect(report).toContain("not found");
-  });
-});

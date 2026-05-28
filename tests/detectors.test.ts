@@ -260,7 +260,7 @@ import type { EntityType } from "../server/detectors/types.js";
 
 describe("EntityType extension", () => {
   it("allows commit, milestone, and area as valid entity types", () => {
-    const types: EntityType[] = ["task", "agent", "blocker", "review", "commit", "milestone", "area"];
-    expect(types).toHaveLength(7);
+    const types: EntityType[] = ["task", "agent", "blocker", "commit", "milestone", "area"];
+    expect(types).toHaveLength(6);
   });
 });

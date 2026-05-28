@@ -38,7 +38,6 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     due_date: null,
     start_date: null,
     estimate: null,
-    recurrence_rule: null,
     task_type: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",

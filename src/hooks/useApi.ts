@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskReview, ReviewStatus, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
@@ -127,7 +127,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "milestone_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "milestone_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate">>
 ): Promise<Task> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -338,43 +338,6 @@ async function addCommentApi(taskId: string, message: string, authorName: string
   return res.json();
 }
 
-// ─── 5.4: Code Reviews ──────────────────────────────────────────────────
-
-async function getReviews(taskId: string): Promise<TaskReview[]> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/reviews`);
-  if (!res.ok) await throwApiError(res, "getReviews");
-  return res.json();
-}
-
-async function createReviewApi(taskId: string, input: {
-  reviewer_name: string;
-  status?: ReviewStatus;
-  comments?: string | null;
-  diff_summary?: string | null;
-}): Promise<TaskReview> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/reviews`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) await throwApiError(res, "createReview");
-  return res.json();
-}
-
-async function updateReviewApi(reviewId: string, patch: {
-  status?: ReviewStatus;
-  comments?: string | null;
-  diff_summary?: string | null;
-}): Promise<TaskReview> {
-  const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}`, {
-    method: "PATCH",
-    headers: jsonHeaders(),
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) await throwApiError(res, "updateReview");
-  return res.json();
-}
-
 // ─── R3: Notifications ──────────────────────────────────────────────
 
 async function getNotifications(limit = 50): Promise<AppNotification[]> {
@@ -440,17 +403,6 @@ async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEn
   const res = await apiFetch(url);
   if (!res.ok) await throwApiError(res, "getActivityHeatmap");
   return res.json();
-}
-
-async function generateReportApi(projectId: string, period: "day" | "week" | "milestone"): Promise<string> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/report`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ period }),
-  });
-  if (!res.ok) await throwApiError(res, "generateReport");
-  const data = await res.json();
-  return data.report;
 }
 
 // ─── R5: Activity Stream ─────────────────────────────────────────────
@@ -783,9 +735,6 @@ export function useApi() {
     searchTasks,
     getComments,
     addComment: addCommentApi,
-    getReviews,
-    createReview: createReviewApi,
-    updateReview: updateReviewApi,
     getNotifications,
     getUnreadCount,
     markNotificationRead: markNotificationReadApi,
@@ -795,7 +744,6 @@ export function useApi() {
     getMilestoneContributions,
     getMilestoneDailyStats,
     getActivityHeatmap,
-    generateReport: generateReportApi,
     getActivityStream: getActivityStreamApi,
     getWebhooks,
     createWebhook: createWebhookApi,

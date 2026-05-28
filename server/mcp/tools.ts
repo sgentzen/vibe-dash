@@ -17,7 +17,6 @@ import {
   listMilestones,
   completeMilestone,
   searchTasks,
-  handleRecurringTaskCompletion,
   recordMilestoneDailyStats,
   logCost,
 } from "../db/index.js";
@@ -177,7 +176,6 @@ function handleUpdateTask(db: Database.Database, args: Args, agentName?: string)
     due_date: args.due_date as string | null | undefined,
     start_date: args.start_date as string | null | undefined,
     estimate: args.estimate as number | null | undefined,
-    recurrence_rule: args.recurrence_rule as string | null | undefined,
   });
   if (!updated) return ok({ success: true });
 
@@ -215,9 +213,6 @@ function handleCompleteTask(db: Database.Database, args: Args, agentName?: strin
   }
   autoLog(db, completed.id, `Completed "${completed.title}"`, agentName);
   if (completed.milestone_id) recordMilestoneDailyStats(db, completed.milestone_id);
-
-  const nextTask = handleRecurringTaskCompletion(db, completed.id);
-  if (nextTask) broadcast({ type: "task_created", payload: nextTask });
   return ok({ success: true });
 }
 

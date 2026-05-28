@@ -39,7 +39,6 @@ export interface Task {
   due_date: string | null;
   start_date: string | null;
   estimate: number | null;
-  recurrence_rule: string | null;
   task_type: string | null;
   created_at: string;
   updated_at: string;
@@ -179,8 +178,6 @@ export interface Blocker {
   resolved_at: string | null;
 }
 
-export type ReviewStatus = "pending" | "approved" | "changes_requested" | "failed";
-
 export type WorktreeStatus = "active" | "merged" | "abandoned" | "removed";
 
 export interface TaskWorktree {
@@ -190,18 +187,6 @@ export interface TaskWorktree {
   branch_name: string;
   worktree_path: string;
   status: WorktreeStatus;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TaskReview {
-  id: string;
-  task_id: string;
-  reviewer_agent_id: string | null;
-  reviewer_name: string;
-  status: ReviewStatus;
-  comments: string | null;
-  diff_summary: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -297,8 +282,6 @@ export type WsEventType =
   | "daily_stats_recorded"
   | "cost_logged"
   | "metrics_logged"
-  | "review_created"
-  | "review_updated"
   | "worktree_created"
   | "worktree_updated"
   | "plugins_reloaded"
@@ -336,8 +319,6 @@ export type WsEvent =
   | WsEventOf<"daily_stats_recorded", MilestoneDailyStats>
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>
-  | WsEventOf<"review_created", TaskReview>
-  | WsEventOf<"review_updated", TaskReview>
   | WsEventOf<"worktree_created", TaskWorktree>
   | WsEventOf<"worktree_updated", TaskWorktree>
   | WsEventOf<"ingestion_source_created", { id: string; name: string; kind: string }>
@@ -418,7 +399,7 @@ export interface ExecutiveSummary {
 
 // ─── Detector Framework ───────────────────────────────────────────────────────
 
-export type DetectorEntityType = "task" | "agent" | "blocker" | "review" | "commit" | "milestone" | "area";
+export type DetectorEntityType = "task" | "agent" | "blocker" | "commit" | "milestone" | "area";
 
 export interface DetectorMatch {
   entityId: string;

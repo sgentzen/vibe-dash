@@ -26,7 +26,6 @@ export {
   completeTask,
   searchTasks,
   bulkUpdateTasks,
-  handleRecurringTaskCompletion,
 } from "./tasks.js";
 export type { CreateTaskInput, ListTasksFilter, UpdateTaskInput, SearchTasksFilter } from "./tasks.js";
 export {
@@ -83,9 +82,6 @@ export {
   getMatchingWebhooks,
   fireWebhooks,
 } from "./webhooks.js";
-export { generateReport } from "./reports.js";
-export { createReview, getReview, listReviewsForTask, updateReview } from "./reviews.js";
-export type { CreateReviewInput, UpdateReviewInput } from "./reviews.js";
 export {
   logCost,
   getAgentCostSummary,

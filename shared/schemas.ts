@@ -57,7 +57,6 @@ export const createTaskSchema = z.object({
   due_date: z.string().nullable().optional(),
   start_date: z.string().nullable().optional(),
   estimate: z.number().int().min(0).nullable().optional(),
-  recurrence_rule: z.string().nullable().optional(),
   agent_name: z.string().optional(),
 });
 
@@ -73,7 +72,6 @@ export const updateTaskSchema = z.object({
   due_date: z.string().nullable().optional(),
   start_date: z.string().nullable().optional(),
   estimate: z.number().int().min(0).nullable().optional(),
-  recurrence_rule: z.string().nullable().optional(),
   agent_name: z.string().optional(),
 });
 
@@ -155,10 +153,6 @@ export const updateWebhookSchema = z.object({
 
 const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");
 
-export const generateReportSchema = z.object({
-  period: z.enum(["day", "week", "milestone"]).optional(),
-});
-
 // ─── Blockers ───────────────────────────────────────────────────────────
 
 export const createBlockerSchema = z.object({
@@ -190,23 +184,4 @@ export const createWorktreeSchema = z.object({
 
 export const updateWorktreeStatusSchema = z.object({
   status: worktreeStatusEnum,
-});
-
-// ─── Reviews ────────────────────────────────────────────────────────────
-
-export const reviewStatusEnum = z.enum(["pending", "approved", "changes_requested", "failed"]);
-
-export const createReviewSchema = z.object({
-  task_id: z.string().min(1),
-  reviewer_name: z.string().optional(),
-  reviewer_agent_id: z.string().optional(),
-  status: reviewStatusEnum.optional(),
-  comments: z.string().optional(),
-  diff_summary: z.string().optional(),
-});
-
-export const updateReviewSchema = z.object({
-  status: reviewStatusEnum.optional(),
-  comments: z.string().nullable().optional(),
-  diff_summary: z.string().nullable().optional(),
 });

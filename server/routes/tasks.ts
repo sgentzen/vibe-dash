@@ -12,7 +12,6 @@ import {
   bulkUpdateTasks,
   logActivity,
   recordMilestoneDailyStats,
-  handleRecurringTaskCompletion,
   getTimeSpent,
   resolveBlockersForTask,
 } from "../db/index.js";
@@ -46,7 +45,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
-    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } = req.body;
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate } = req.body;
     handleMutation(res, broadcast, () => createTask(db, {
       project_id,
       parent_task_id: parent_task_id ?? null,
@@ -59,7 +58,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       due_date: due_date ?? null,
       start_date: start_date ?? null,
       estimate: estimate ?? null,
-      recurrence_rule: recurrence_rule ?? null,
     }), "task_created", 201);
   });
 
@@ -139,12 +137,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     }
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
-    }
-    if (completed) {
-      const nextTask = handleRecurringTaskCompletion(db, completed.id);
-      if (nextTask) {
-        broadcast({ type: "task_created", payload: nextTask });
-      }
     }
     const entry = logActivity(db, {
       task_id: completed!.id,

@@ -54,18 +54,12 @@ import {
   updateWebhook,
   deleteWebhook,
   fireWebhooks,
-  handleRecurringTaskCompletion,
   getActivityStream,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
   getAgentActivityHeatmap,
-  generateReport,
   addComment,
   listComments,
-  createReview,
-  getReview,
-  listReviewsForTask,
-  updateReview,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -240,7 +234,7 @@ export function createRouter(db: Database.Database): Router {
 
   // POST /api/tasks
   router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
-    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
@@ -253,7 +247,6 @@ export function createRouter(db: Database.Database): Router {
         due_date?: string | null;
         start_date?: string | null;
         estimate?: number | null;
-        recurrence_rule?: string | null;
       };
     const task = createTask(db, {
       project_id,
@@ -267,7 +260,6 @@ export function createRouter(db: Database.Database): Router {
       due_date: due_date ?? null,
       start_date: start_date ?? null,
       estimate: estimate ?? null,
-      recurrence_rule: recurrence_rule ?? null,
     });
     broadcast({ type: "task_created", payload: task });
     res.status(201).json(task);
@@ -368,13 +360,6 @@ export function createRouter(db: Database.Database): Router {
     // Record daily stats if task has a milestone
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
-    }
-    // Handle recurring tasks — create next instance
-    if (completed) {
-      const nextTask = handleRecurringTaskCompletion(db, completed.id);
-      if (nextTask) {
-        broadcast({ type: "task_created", payload: nextTask });
-      }
     }
     const entry = logActivity(db, {
       task_id: completed!.id,
@@ -645,65 +630,6 @@ export function createRouter(db: Database.Database): Router {
     res.status(201).json(comment);
   });
 
-  // ─── 5.4: Code Review Integration ───────────────────────────────────
-
-  router.get("/api/tasks/:id/reviews", (req, res) => {
-    res.json(listReviewsForTask(db, req.params.id));
-  });
-
-  router.post("/api/tasks/:id/reviews", (req, res) => {
-    const task = getTask(db, req.params.id);
-    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
-    const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } =
-      req.body as {
-        reviewer_name?: string;
-        reviewer_agent_id?: string | null;
-        status?: "pending" | "approved" | "changes_requested";
-        comments?: string | null;
-        diff_summary?: string | null;
-      };
-    if (!reviewer_name) {
-      res.status(400).json({ error: "reviewer_name is required" });
-      return;
-    }
-    if (reviewer_name.length > 200) {
-      res.status(400).json({ error: "reviewer_name too long" });
-      return;
-    }
-    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
-      res.status(400).json({ error: "invalid status" });
-      return;
-    }
-    const review = createReview(db, {
-      task_id: req.params.id,
-      reviewer_name,
-      reviewer_agent_id: reviewer_agent_id ?? null,
-      status,
-      comments: comments ?? null,
-      diff_summary: diff_summary ?? null,
-    });
-    broadcast({ type: "review_created", payload: review });
-    res.status(201).json(review);
-  });
-
-  router.patch("/api/reviews/:id", (req, res) => {
-    const existing = getReview(db, req.params.id);
-    if (!existing) { res.status(404).json({ error: "Review not found" }); return; }
-    const { status, comments, diff_summary } = req.body as {
-      status?: "pending" | "approved" | "changes_requested";
-      comments?: string | null;
-      diff_summary?: string | null;
-    };
-    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
-      res.status(400).json({ error: "invalid status" });
-      return;
-    }
-    const updated = updateReview(db, req.params.id, { status, comments, diff_summary });
-    if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
-    broadcast({ type: "review_updated", payload: updated });
-    res.json(updated);
-  });
-
   // ─── R3: Notifications ─────────────────────────────────────────────
 
   router.get("/api/notifications", (req, res) => {
@@ -753,13 +679,6 @@ export function createRouter(db: Database.Database): Router {
   router.get("/api/activity-heatmap", (req, res) => {
     const projectId = req.query.project_id as string | undefined;
     res.json(getAgentActivityHeatmap(db, projectId));
-  });
-
-  // ─── R4: Reports ───────────────────────────────────────────────────
-
-  router.post("/api/projects/:id/report", (req, res) => {
-    const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
-    res.json({ report: generateReport(db, req.params.id, period) });
   });
 
   // ─── R5: Mentions ───────────────────────────────────────────────

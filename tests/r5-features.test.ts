@@ -4,94 +4,19 @@ import {
   createProject,
   createTask,
   registerAgent,
-  completeTask,
   updateTask,
   logActivity,
   addComment,
   extractMentions,
   listMentions,
-  handleRecurringTaskCompletion,
-  getTask,
   getActivityStream,
 } from "../server/db/index.js";
-import { getNextDueDate } from "../server/recurrence";
 import { createTestDb } from "./setup.js";
 
 let db: Database.Database;
 
 beforeEach(() => {
   db = createTestDb();
-});
-
-// ─── 2.6 Recurring Tasks ────────────────────────────────────────────────────
-
-describe("2.6 Recurring Tasks", () => {
-  it("creates task with recurrence_rule", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, {
-      project_id: project.id, title: "Standup", description: null,
-      priority: "medium", recurrence_rule: "daily", due_date: "2026-04-01",
-    });
-    expect(task.recurrence_rule).toBe("daily");
-  });
-
-  it("updates recurrence_rule", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
-    const updated = updateTask(db, task.id, { recurrence_rule: "weekly" });
-    expect(updated!.recurrence_rule).toBe("weekly");
-  });
-
-  it("auto-creates next instance on completion", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, {
-      project_id: project.id, title: "Weekly Review", description: "Do review",
-      priority: "high", recurrence_rule: "weekly", due_date: "2026-04-01",
-    });
-
-    const nextTask = handleRecurringTaskCompletion(db, task.id);
-    expect(nextTask).not.toBeNull();
-    expect(nextTask!.title).toBe("Weekly Review");
-    expect(nextTask!.recurrence_rule).toBe("weekly");
-    expect(nextTask!.due_date).toBe("2026-04-08");
-    expect(nextTask!.status).toBe("planned");
-  });
-
-  it("returns null for non-recurring task", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
-    expect(handleRecurringTaskCompletion(db, task.id)).toBeNull();
-  });
-});
-
-describe("getNextDueDate", () => {
-  it("computes daily", () => {
-    expect(getNextDueDate("2026-04-01", "daily")).toBe("2026-04-02");
-  });
-
-  it("computes weekly", () => {
-    expect(getNextDueDate("2026-04-01", "weekly")).toBe("2026-04-08");
-  });
-
-  it("computes monthly", () => {
-    expect(getNextDueDate("2026-04-01", "monthly")).toBe("2026-05-01");
-  });
-
-  it("computes yearly", () => {
-    expect(getNextDueDate("2026-04-01", "yearly")).toBe("2027-04-01");
-  });
-
-  it("computes every Nd", () => {
-    expect(getNextDueDate("2026-04-01", "every 3d")).toBe("2026-04-04");
-  });
-
-  it("computes every Nw", () => {
-    expect(getNextDueDate("2026-04-01", "every 2w")).toBe("2026-04-15");
-  });
-
-  it("defaults to daily for unknown rule", () => {
-    expect(getNextDueDate("2026-04-01", "unknown_rule")).toBe("2026-04-02");
-  });
 });
 
 // ─── 4.3 @Mentions ──────────────────────────────────────────────────────────

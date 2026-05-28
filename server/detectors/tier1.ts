@@ -56,28 +56,6 @@ function agentSilenceScore(silenceHours: number): number {
   return 60;
 }
 
-// ─── failing-review ───────────────────────────────────────────────────────────
-// Reviews with status='failed' that have been sitting for > 24 h unresolved.
-
-interface ReviewRow {
-  id: string;
-  task_id: string;
-  reviewer_name: string;
-  task_title: string | null;
-  updated_at: string;
-}
-
-function reviewAgeHours(review: ReviewRow, now: string): number {
-  const ms = new Date(now).getTime() - new Date(review.updated_at).getTime();
-  return ms / 3_600_000;
-}
-
-function reviewScore(ageHours: number): number {
-  if (ageHours >= 72) return 90;
-  if (ageHours >= 48) return 70;
-  return 55;
-}
-
 // ─── Registration ─────────────────────────────────────────────────────────────
 
 export function registerTier1Detectors(): void {
@@ -149,38 +127,6 @@ export function registerTier1Detectors(): void {
       if (!row) return 0;
       const hours = agentSilenceHours({ ...row, task_id: "", task_title: null }, now);
       return agentSilenceScore(hours);
-    },
-  });
-
-  registerDetector({
-    id: "failing-review",
-    category: "review",
-    defaultThreshold: 55,
-
-    predicate({ db, now }: DetectorContext): Match[] {
-      const rows = db.prepare(`
-        SELECT r.id, r.task_id, r.reviewer_name, r.updated_at, t.title AS task_title
-        FROM task_reviews r
-        LEFT JOIN tasks t ON r.task_id = t.id
-        WHERE r.status = 'failed'
-      `).all() as ReviewRow[];
-
-      return rows
-        .filter((r) => reviewAgeHours(r, now) >= 24)
-        .map((r) => ({
-          entityId: r.id,
-          entityType: "review" as const,
-          label: r.task_title ? `Failed review for "${r.task_title}"` : "Failed review",
-          detail: `Reviewer: ${r.reviewer_name}`,
-        }));
-    },
-
-    score(match, { db, now }: DetectorContext): number {
-      const row = db.prepare(
-        "SELECT id, task_id, reviewer_name, updated_at FROM task_reviews WHERE id = ?"
-      ).get(match.entityId) as ReviewRow | undefined;
-      if (!row) return 0;
-      return reviewScore(reviewAgeHours({ ...row, task_title: null }, now));
     },
   });
 }
