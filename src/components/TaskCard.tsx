@@ -16,6 +16,7 @@ interface TaskCardProps {
   taskTags?: Tag[];
   blockingCount?: number;
   grabbed?: boolean;
+  justAppeared?: boolean;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
   onGrab?: (taskId: string) => void;
@@ -35,7 +36,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, onClick, onDragStart, onGrab }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -86,7 +87,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
   return (
     <div
-      className={statusPulse ? "highlight-pulse" : undefined}
+      className={(statusPulse || justAppeared) ? "highlight-pulse" : undefined}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);

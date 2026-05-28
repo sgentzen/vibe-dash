@@ -293,3 +293,13 @@ describe("TaskCard just-changed pulse (status)", () => {
     expect((view.container.firstElementChild as HTMLElement).className).toContain("highlight-pulse");
   });
 });
+
+describe("TaskCard justAppeared pulse", () => {
+  it("adds highlight-pulse when justAppeared is true", () => {
+    const t = makeTask({ id: "appear-1" });
+    const view = renderWithProviders(
+      <TaskCard task={t} allTasks={[t]} activity={[]} agents={[makeAgent({})]} justAppeared onClick={() => {}} onDragStart={() => {}} />
+    );
+    expect((view.container.firstElementChild as HTMLElement).className).toContain("highlight-pulse");
+  });
+});

@@ -4,6 +4,7 @@ import { useApi } from "../hooks/useApi";
 import { TaskEditDrawer } from "./TaskEditDrawer";
 import { MilestoneFilter } from "./board/MilestoneFilter";
 import { KanbanColumn } from "./board/KanbanColumn";
+import { newlyAppearedIds } from "../utils/boardPulse";
 import type { Task, TaskStatus } from "../types";
 
 const COLUMNS: { key: TaskStatus; label: string }[] = [
@@ -27,6 +28,17 @@ export function TaskBoard() {
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const dragTaskId = useRef<string>("");
+
+  const knownTaskIdsRef = useRef<Set<string>>(new Set());
+  const boardInitializedRef = useRef(false);
+  const justAppearedIds = useMemo(
+    () => (boardInitializedRef.current ? newlyAppearedIds(knownTaskIdsRef.current, tasks) : new Set<string>()),
+    [tasks]
+  );
+  useEffect(() => {
+    boardInitializedRef.current = true;
+    knownTaskIdsRef.current = new Set(tasks.map((t) => t.id));
+  }, [tasks]);
 
   useEffect(() => {
     setFilterTagId(null);
@@ -279,6 +291,7 @@ export function TaskBoard() {
             taskDepsMap={taskDepsMap}
             selectedProjectId={selectedProjectId}
             selectedMilestoneId={selectedMilestoneId}
+            justAppearedIds={justAppearedIds}
             grabbedTaskId={keyboardGrab?.taskId ?? null}
             onDragStart={(id) => { dragTaskId.current = id; }}
             onDrop={() => handleDrop(key)}

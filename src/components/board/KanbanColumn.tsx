@@ -20,6 +20,7 @@ interface KanbanColumnProps {
   taskDepsMap: Record<string, string[]>;
   selectedProjectId: string | null;
   selectedMilestoneId: string | null;
+  justAppearedIds: Set<string>;
   grabbedTaskId: string | null;
   onDragStart: (id: string) => void;
   onDrop: () => void;
@@ -42,6 +43,7 @@ export function KanbanColumn({
   taskDepsMap,
   selectedProjectId,
   selectedMilestoneId,
+  justAppearedIds,
   grabbedTaskId,
   onDragStart,
   onDrop,
@@ -158,6 +160,7 @@ export function KanbanColumn({
               tags={tags}
               taskTagMap={taskTagMap}
               taskDepsMap={taskDepsMap}
+              justAppearedIds={justAppearedIds}
               grabbedTaskId={grabbedTaskId}
               onClickTask={onClickTask}
               onDragStart={onDragStart}
@@ -175,6 +178,7 @@ export function KanbanColumn({
               taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
               blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
               grabbed={grabbedTaskId === task.id}
+              justAppeared={justAppearedIds.has(task.id)}
               onClick={() => onClickTask(task)}
               onDragStart={onDragStart}
               onGrab={onGrab}
