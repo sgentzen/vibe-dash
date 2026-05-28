@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TaskCard } from "../../src/components/TaskCard";
 import {
   renderWithProviders,
@@ -269,5 +269,27 @@ describe("TaskCard agent badge", () => {
     const badge = screen.getByTestId("agent-badge");
     const pri = screen.getByText("high");
     expect(badge.compareDocumentPosition(pri) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("TaskCard just-changed pulse (status)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("adds highlight-pulse when status changes between renders, not on first render", () => {
+    const t = makeTask({ id: "pulse-task-1", status: "planned" });
+    const agents = [makeAgent({})];
+    const view = renderWithProviders(
+      <TaskCard task={t} allTasks={[t]} activity={[]} agents={agents} onClick={() => {}} onDragStart={() => {}} />
+    );
+    const card = view.container.firstElementChild as HTMLElement;
+    expect(card.className).not.toContain("highlight-pulse");
+    const t2 = makeTask({ id: "pulse-task-1", status: "in_progress" });
+    view.rerender(
+      <TaskCard task={t2} allTasks={[t2]} activity={[]} agents={agents} onClick={() => {}} onDragStart={() => {}} />
+    );
+    expect((view.container.firstElementChild as HTMLElement).className).toContain("highlight-pulse");
   });
 });

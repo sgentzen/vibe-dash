@@ -6,6 +6,7 @@ import { HEALTH_COLORS } from "../constants/colors.js";
 import { StatusPill } from "./StatusPill.js";
 import type { StatusToken } from "../constants/statusTokens.js";
 import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
+import { usePulseOnChange } from "../hooks/usePulseOnChange";
 
 interface TaskCardProps {
   task: Task;
@@ -43,6 +44,8 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   const assignedAgent = task.assigned_agent_id
     ? agents.find((a) => a.id === task.assigned_agent_id)
     : null;
+
+  const statusPulse = usePulseOnChange(task.status);
 
   const dueUrgency = useMemo(
     () => (isDone ? null : getDueUrgency(task.due_date)),
@@ -83,6 +86,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
   return (
     <div
+      className={statusPulse ? "highlight-pulse" : undefined}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);
