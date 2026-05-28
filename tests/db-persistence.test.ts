@@ -91,40 +91,41 @@ describe("resolveDbPath", () => {
   });
 });
 
-describe("migration 014 — commits + milestone_history", () => {
-  it("creates commits and milestone_history tables with expected columns", () => {
+describe("migration 014 — commits + milestone_history (create-then-drop)", () => {
+  it("migration sequence runs cleanly (014 creates, 015 drops)", () => {
+    // 014 creates commits + milestone_history; 015 immediately drops them.
+    // A fresh DB running all migrations should NOT have these tables.
     const db = createTestDb();
-    const tables = db.pragma("table_list") as { name: string }[];
-    expect(tables.some((t) => t.name === "commits")).toBe(true);
-    expect(tables.some((t) => t.name === "milestone_history")).toBe(true);
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((t) => t.name);
+    expect(tables).not.toContain("commits");
+    expect(tables).not.toContain("milestone_history");
+  });
+});
 
-    const commitsCols = (db.pragma("table_info(commits)") as { name: string }[]).map((c) => c.name);
-    expect(commitsCols).toEqual(
-      expect.arrayContaining(["sha", "subject", "author_email", "authored_at", "ingested_at", "linked_task_id"])
-    );
+describe("migration 015 — orphan schema dropped", () => {
+  it("drops all orphan tables", () => {
+    const db = createTestDb();
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((t) => t.name);
+    for (const orphan of [
+      "task_reviews", "webhooks", "commits", "milestone_history",
+      "git_linked_items", "git_integrations", "ingestion_events",
+      "ingestion_sources", "users",
+    ]) {
+      expect(tables).not.toContain(orphan);
+    }
+  });
 
-    const histCols = (db.pragma("table_info(milestone_history)") as { name: string }[]).map((c) => c.name);
-    expect(histCols).toEqual(
-      expect.arrayContaining(["id", "milestone_id", "field", "old_value", "new_value", "changed_at"])
-    );
+  it("drops the recurrence_rule column from tasks", () => {
+    const db = createTestDb();
+    const cols = (db.pragma("table_info(tasks)") as { name: string }[]).map((c) => c.name);
+    expect(cols).not.toContain("recurrence_rule");
+  });
 
-    // Verify nullability and primary key constraints
-    const commitsRows = db.pragma("table_info(commits)") as { name: string; notnull: number; pk: number }[];
-    const commitsBy = (n: string) => commitsRows.find((c) => c.name === n);
-    expect(commitsBy("sha")?.pk).toBe(1);
-    expect(commitsBy("subject")?.notnull).toBe(1);
-    expect(commitsBy("authored_at")?.notnull).toBe(1);
-    expect(commitsBy("ingested_at")?.notnull).toBe(1);
-    expect(commitsBy("linked_task_id")?.notnull).toBe(0);
-    expect(commitsBy("author_email")?.notnull).toBe(0);
-
-    const histRows = db.pragma("table_info(milestone_history)") as { name: string; notnull: number; pk: number }[];
-    const histBy = (n: string) => histRows.find((c) => c.name === n);
-    expect(histBy("id")?.pk).toBe(1);
-    expect(histBy("milestone_id")?.notnull).toBe(1);
-    expect(histBy("field")?.notnull).toBe(1);
-    expect(histBy("changed_at")?.notnull).toBe(1);
-    expect(histBy("old_value")?.notnull).toBe(0);
-    expect(histBy("new_value")?.notnull).toBe(0);
+  it("keeps the core tables intact", () => {
+    const db = createTestDb();
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((t) => t.name);
+    for (const kept of ["projects", "milestones", "tasks", "agents", "blockers"]) {
+      expect(tables).toContain(kept);
+    }
   });
 });

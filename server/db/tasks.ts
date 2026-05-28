@@ -16,7 +16,6 @@ export interface CreateTaskInput {
   due_date?: string | null;
   start_date?: string | null;
   estimate?: number | null;
-  recurrence_rule?: string | null;
 }
 
 export function createTask(
@@ -27,8 +26,8 @@ export function createTask(
   const ts = now();
   const status: TaskStatus = input.status ?? "planned";
   return db.prepare(
-    "INSERT INTO tasks (id, project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, status, priority, progress, due_date, start_date, estimate, recurrence_rule, created_at, updated_at)" +
-      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?) RETURNING *"
+    "INSERT INTO tasks (id, project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, status, priority, progress, due_date, start_date, estimate, created_at, updated_at)" +
+      " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?) RETURNING *"
   ).get(
     id,
     input.project_id,
@@ -42,7 +41,6 @@ export function createTask(
     input.due_date ?? null,
     input.start_date ?? null,
     input.estimate ?? null,
-    input.recurrence_rule ?? null,
     ts,
     ts
   ) as Task;
@@ -94,7 +92,6 @@ export interface UpdateTaskInput {
   due_date?: string | null;
   start_date?: string | null;
   estimate?: number | null;
-  recurrence_rule?: string | null;
 }
 
 export function updateTask(
@@ -144,10 +141,6 @@ export function updateTask(
   if (input.estimate !== undefined) {
     sets.push("estimate = ?");
     params.push(input.estimate);
-  }
-  if (input.recurrence_rule !== undefined) {
-    sets.push("recurrence_rule = ?");
-    params.push(input.recurrence_rule);
   }
   if (input.start_date !== undefined) {
     sets.push("start_date = ?");

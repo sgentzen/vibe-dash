@@ -519,6 +519,28 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "015_drop_orphan_tables_and_recurrence_column",
+    run(db) {
+      // Tables orphaned by Phases 1A-1C feature removals. All have only
+      // outbound FKs to kept tables, so DROP succeeds under foreign_keys=ON.
+      db.exec(`
+        DROP TABLE IF EXISTS task_reviews;
+        DROP TABLE IF EXISTS webhooks;
+        DROP TABLE IF EXISTS commits;
+        DROP TABLE IF EXISTS milestone_history;
+        DROP TABLE IF EXISTS git_linked_items;
+        DROP TABLE IF EXISTS git_integrations;
+        DROP TABLE IF EXISTS ingestion_events;
+        DROP TABLE IF EXISTS ingestion_sources;
+        DROP TABLE IF EXISTS users;
+      `);
+      // Orphan column from the 1A recurring-tasks removal. SQLite has no
+      // DROP COLUMN IF EXISTS, but this migration runs once and the column
+      // exists by migrations 001/002. No index/trigger references it.
+      db.exec(`ALTER TABLE tasks DROP COLUMN recurrence_rule;`);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -400,7 +400,7 @@ describe("schema indexes", () => {
     for (const col of [
       "id", "project_id", "parent_task_id", "milestone_id", "assigned_agent_id",
       "title", "description", "status", "priority", "progress",
-      "due_date", "start_date", "estimate", "recurrence_rule",
+      "due_date", "start_date", "estimate",
       "created_at", "updated_at",
     ]) {
       expect(names.has(col), `missing column: ${col}`).toBe(true);
