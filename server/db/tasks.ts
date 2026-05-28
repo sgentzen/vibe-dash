@@ -164,6 +164,15 @@ export function completeTask(db: Database.Database, id: string): Task | null {
   return updateTask(db, id, { status: "done", progress: 100 });
 }
 
+export function getTasksCompletedToday(db: Database.Database): number {
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const row = db
+    .prepare("SELECT COUNT(*) AS n FROM tasks WHERE status = 'done' AND updated_at >= ?")
+    .get(todayStart.toISOString()) as { n: number };
+  return row.n;
+}
+
 // ─── Search ─────────────────────────────────────────────────────────────────
 
 export interface SearchTasksFilter {

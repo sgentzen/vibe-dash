@@ -3,22 +3,12 @@ import { useAppState } from "../store";
 import { agentColor, agentGlyph, ROLE_COLORS, groupAgents } from "../utils/agentColors";
 import { HEALTH_COLORS, HEALTH_LABELS } from "../constants/colors.js";
 import type { Agent, AgentHealthStatus } from "../types";
+import { relativeTime } from "../utils/time";
 
 // Keep in sync with server/db.ts ACTIVE_THRESHOLD_MS / IDLE_THRESHOLD_MS
 const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 const EVENT_AGE_OUT_MS = 10 * 60 * 1000; // 10 minutes
-
-function relativeTime(ts: string): string {
-  const diff = Date.now() - new Date(ts).getTime();
-  const secs = Math.max(0, Math.floor(diff / 1000));
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
   const elapsed = Date.now() - new Date(lastSeenAt).getTime();

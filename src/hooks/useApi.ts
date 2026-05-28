@@ -53,6 +53,8 @@ async function getStats(): Promise<{
   tasks: number;
   activeAgents: number;
   alerts: number;
+  spend_today: number;
+  tasks_completed_today: number;
 }> {
   const res = await apiFetch("/api/stats");
   if (!res.ok) await throwApiError(res, "getStats");

@@ -21,7 +21,7 @@ const baseState: AppState = {
   activeView: "fleet", fleetPreset: "overview",
   theme: "dark", alertsOpen: false,
   selectedProjectId: null, selectedMilestoneId: null,
-  stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
+  stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0, spend_today: 0, tasks_completed_today: 0 },
   pollGeneration: 0, rightRailCollapsed: false,
   loadError: null,
 };
