@@ -10,6 +10,7 @@ import {
   createTask,
   updateTask,
   createBlocker,
+  logActivity,
   getProjectContext,
 } from "../server/db/index.js";
 
@@ -62,6 +63,20 @@ describe("getProjectContext", () => {
     expect(ctx.in_progress_tasks.map((t) => t.id)).toEqual([t1.id]);
     expect(ctx.active_blockers.some((b) => b.task_id === t2.id)).toBe(true);
     expect(Array.isArray(ctx.recent_activity)).toBe(true);
+  });
+
+  it("scopes recent_activity to the project's tasks", () => {
+    const p = createProject(db, { name: "P", description: null });
+    const other = createProject(db, { name: "Other", description: null });
+    const mine = createTask(db, { project_id: p.id, title: "mine", priority: "medium" });
+    const theirs = createTask(db, { project_id: other.id, title: "theirs", priority: "medium" });
+    logActivity(db, { task_id: mine.id, agent_id: null, message: "in-project", source: "mcp" });
+    logActivity(db, { task_id: theirs.id, agent_id: null, message: "other-project", source: "mcp" });
+
+    const ctx = getProjectContext(db, p.id);
+    const messages = ctx.recent_activity.map((a) => a.message);
+    expect(messages).toContain("in-project");
+    expect(messages).not.toContain("other-project");
   });
 
   it("returns null project for an unknown id", () => {
