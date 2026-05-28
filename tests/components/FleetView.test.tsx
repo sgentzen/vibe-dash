@@ -29,8 +29,8 @@ const baseState: AppState = {
 
 describe("SET_FLEET_PRESET reducer", () => {
   it("updates fleetPreset", () => {
-    const next = setReducer(baseState, { type: "SET_FLEET_PRESET", payload: "hotspots" });
-    expect(next?.fleetPreset).toBe("hotspots");
+    const next = setReducer(baseState, { type: "SET_FLEET_PRESET", payload: "agents" });
+    expect(next?.fleetPreset).toBe("agents");
   });
 
   it("leaves activeView untouched when only preset changes", () => {
@@ -41,16 +41,16 @@ describe("SET_FLEET_PRESET reducer", () => {
 });
 
 describe("PresetSwitcher", () => {
-  it("renders 4 preset tabs", () => {
+  it("renders 3 preset tabs", () => {
     renderWithProviders(<PresetSwitcher active="overview" onChange={() => {}} />);
     const tablist = screen.getByRole("tablist", { name: /fleet view presets/i });
-    expect(within(tablist).getAllByRole("tab")).toHaveLength(4);
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(3);
   });
 
   it("marks the active preset with aria-selected=true", () => {
-    renderWithProviders(<PresetSwitcher active="hotspots" onChange={() => {}} />);
-    const hotspotsTab = screen.getByRole("tab", { name: /hot spots preset/i });
-    expect(hotspotsTab).toHaveAttribute("aria-selected", "true");
+    renderWithProviders(<PresetSwitcher active="agents" onChange={() => {}} />);
+    const agentsTab = screen.getByRole("tab", { name: /agents preset/i });
+    expect(agentsTab).toHaveAttribute("aria-selected", "true");
   });
 
   it("calls onChange with the clicked preset key", () => {

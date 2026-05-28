@@ -14,7 +14,6 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
-import { registerTier1Detectors } from "./detectors/index.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -66,7 +65,6 @@ function openDbOrExit(): Database.Database {
   }
 }
 const db: Database.Database = openDbOrExit();
-registerTier1Detectors();
 app.use(createRouter(db));
 
 const spaLimiter = rateLimit({

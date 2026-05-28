@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
-import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
+import type { ExecutiveSummary } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
 
@@ -666,16 +666,6 @@ async function rotateIngestionToken(id: string): Promise<{ token: string }> {
   return res.json();
 }
 
-async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<ScoredMatch[]> {
-  const params = new URLSearchParams();
-  if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
-  if (opts?.detectorId) params.set("detectorId", opts.detectorId);
-  const qs = params.size > 0 ? `?${params}` : "";
-  const res = await apiFetch(`/api/detectors/matches${qs}`);
-  if (!res.ok) await throwApiError(res, "getDetectorMatches");
-  return res.json();
-}
-
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -745,7 +735,6 @@ export function useApi() {
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
     rotateIngestionToken,
-    getDetectorMatches,
     getWsTicket,
   }), []);
 }

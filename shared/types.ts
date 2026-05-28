@@ -375,19 +375,3 @@ export interface ExecutiveSummary {
   generated_at: string;
 }
 
-// ─── Detector Framework ───────────────────────────────────────────────────────
-
-export type DetectorEntityType = "agent" | "blocker";
-
-export interface DetectorMatch {
-  entityId: string;
-  entityType: DetectorEntityType;
-  label: string;
-  detail?: string;
-}
-
-export interface ScoredMatch extends DetectorMatch {
-  detectorId: string;
-  category: string;
-  score: number; // 0–100
-}

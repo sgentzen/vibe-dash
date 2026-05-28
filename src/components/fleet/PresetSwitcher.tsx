@@ -2,7 +2,6 @@ import type { FleetPreset } from "../../state/types";
 
 const PRESETS: { key: FleetPreset; label: string; hint: string }[] = [
   { key: "overview", label: "Overview", hint: "go" },
-  { key: "hotspots", label: "Hot spots", hint: "gh" },
   { key: "agents", label: "Agents", hint: "ga" },
   { key: "timeline", label: "Timeline", hint: "gt" },
 ];
