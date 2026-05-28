@@ -325,28 +325,6 @@ export type WsEvent =
   | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
   | WsEventOf<"plugins_reloaded", { count: number }>;
 
-// ─── Git Sync ─────────────────────────────────────────────────────────────────
-
-export interface GitIntegrationSafe {
-  id: string;
-  project_id: string;
-  provider: "github" | "gitlab";
-  owner: string;
-  repo: string;
-  token_configured: boolean;
-  auto_sync: boolean;
-  last_synced_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface GitSyncResult {
-  integration_id: string;
-  issues_pulled: number;
-  issues_updated: number;
-  errors: string[];
-}
-
 // ─── Ingestion ────────────────────────────────────────────────────────────────
 
 export type IngestionSourceKind = "claude_code" | "cursor" | "codex" | "copilot" | "aider" | "generic";

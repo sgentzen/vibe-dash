@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
@@ -641,32 +641,6 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
   return res.json();
 }
 
-// ─── Git Sync ─────────────────────────────────────────────────────────────────
-
-async function getGitIntegrations(projectId?: string): Promise<GitIntegrationSafe[]> {
-  const url = projectId ? `/api/git/integrations?project_id=${encodeURIComponent(projectId)}` : "/api/git/integrations";
-  const res = await apiFetch(url);
-  if (!res.ok) await throwApiError(res, "getGitIntegrations");
-  return res.json();
-}
-
-async function addGitIntegration(data: { project_id: string; provider: string; owner: string; repo: string; token: string; auto_sync?: boolean }): Promise<GitIntegrationSafe> {
-  const res = await apiFetch("/api/git/integrations", { method: "POST", headers: jsonHeaders(), body: JSON.stringify(data) });
-  if (!res.ok) await throwApiError(res, "addGitIntegration");
-  return res.json();
-}
-
-async function deleteGitIntegration(id: string): Promise<void> {
-  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) await throwApiError(res, "deleteGitIntegration");
-}
-
-async function syncGitIntegration(id: string): Promise<GitSyncResult> {
-  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}/sync`, { method: "POST" });
-  if (!res.ok) await throwApiError(res, "syncGitIntegration");
-  return res.json();
-}
-
 // ─── Ingestion ────────────────────────────────────────────────────────────────
 
 async function listIngestionSources(): Promise<IngestionSource[]> {
@@ -767,10 +741,6 @@ export function useApi() {
     updateUserRole: updateUserRoleApi,
     deleteUser: deleteUserApi,
     rotateKey: rotateKeyApi,
-    getGitIntegrations,
-    addGitIntegration,
-    deleteGitIntegration,
-    syncGitIntegration,
     listIngestionSources,
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
