@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
@@ -414,38 +414,6 @@ async function getActivityStreamApi(params: Record<string, string | undefined> =
   return res.json();
 }
 
-// ─── R6: Webhooks ────────────────────────────────────────────────────
-
-async function getWebhooks(): Promise<Webhook[]> {
-  const res = await apiFetch("/api/webhooks");
-  if (!res.ok) await throwApiError(res, "getWebhooks");
-  return res.json();
-}
-
-async function createWebhookApi(url: string, eventTypes: string[]): Promise<Webhook> {
-  const res = await apiFetch("/api/webhooks", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ url, event_types: eventTypes }),
-  });
-  if (!res.ok) await throwApiError(res, "createWebhook");
-  return res.json();
-}
-
-async function updateWebhookApi(id: string, updates: { url?: string; event_types?: string[]; active?: boolean }): Promise<Webhook> {
-  const res = await apiFetch(`/api/webhooks/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: jsonHeaders(),
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) await throwApiError(res, "updateWebhook");
-  return res.json();
-}
-
-async function deleteWebhookApi(id: string): Promise<void> {
-  await apiFetch(`/api/webhooks/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
 // ─── Cost & Token Tracking ──────────────────────────────────────────
 
 interface CostSummary {
@@ -709,10 +677,6 @@ export function useApi() {
     getMilestoneDailyStats,
     getActivityHeatmap,
     getActivityStream: getActivityStreamApi,
-    getWebhooks,
-    createWebhook: createWebhookApi,
-    updateWebhook: updateWebhookApi,
-    deleteWebhook: deleteWebhookApi,
     getCostTimeseries,
     getProjectCostSummary,
     getCostSummary,

@@ -75,14 +75,6 @@ export {
   getUnreadNotificationCount,
 } from "./notifications.js";
 export {
-  createWebhook,
-  listWebhooks,
-  updateWebhook,
-  deleteWebhook,
-  getMatchingWebhooks,
-  fireWebhooks,
-} from "./webhooks.js";
-export {
   logCost,
   getAgentCostSummary,
   getMilestoneCostSummary,

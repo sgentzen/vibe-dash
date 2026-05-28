@@ -162,14 +162,6 @@ export interface ActivityHeatmapEntry {
   count: number;
 }
 
-export interface Webhook {
-  id: string;
-  url: string;
-  event_types: string[];
-  active: boolean;
-  created_at: string;
-}
-
 export interface Blocker {
   id: string;
   task_id: string;

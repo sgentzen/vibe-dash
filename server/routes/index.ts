@@ -1,8 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import { broadcast as wsBroadcast } from "../websocket.js";
-import { fireWebhooks } from "../db/index.js";
-import { logger } from "../logger.js";
 import type { WsEvent } from "../types.js";
 import { systemRoutes } from "./system.js";
 import { projectRoutes } from "./projects.js";
@@ -14,7 +12,6 @@ import { tagRoutes } from "./tags.js";
 import { dependencyRoutes } from "./dependencies.js";
 import { commentRoutes } from "./comments.js";
 import { notificationRoutes } from "./notifications.js";
-import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
 import { bulkRoutes } from "./bulk.js";
@@ -49,12 +46,9 @@ const authLimiter = rateLimit({
   message: { error: "Too many authentication attempts, please try again later." },
 });
 
-function makeBroadcast(db: Database.Database) {
+function makeBroadcast(_db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
-    fireWebhooks(db, event.type, event.payload).catch((err) => {
-      logger.warn({ err, event: event.type }, "webhook dispatch failed");
-    });
   };
 }
 
@@ -70,7 +64,6 @@ const routeFactories: RouteFactory[] = [
   dependencyRoutes,
   commentRoutes,
   notificationRoutes,
-  webhookRoutes,
   costRoutes,
   bulkRoutes,
   worktreeRoutes,

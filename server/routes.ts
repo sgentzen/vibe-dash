@@ -1,7 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus, TaskPriority, MilestoneStatus, TaskDependency } from "./types.js";
-import { validateWebhookUrl } from "./utils/validateWebhookUrl.js";
 import {
   listProjects,
   createProject,
@@ -49,11 +48,6 @@ import {
   extractMentions,
   createNotification,
   listMentions,
-  createWebhook,
-  listWebhooks,
-  updateWebhook,
-  deleteWebhook,
-  fireWebhooks,
   getActivityStream,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
@@ -80,7 +74,6 @@ import {
   getTaskTypeBreakdown,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
-import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 import { validateBody } from "./routes/validate.js";
@@ -101,12 +94,9 @@ const dependencyDeleteLimiter = rateLimit({
   max: 30, // limit each IP to 30 delete requests per windowMs
 });
 
-function makeBroadcast(db: Database.Database) {
+function makeBroadcast(_db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
-    fireWebhooks(db, event.type, event.payload).catch((err) => {
-      logger.warn({ err, event: event.type }, "webhook dispatch failed");
-    });
   };
 }
 
@@ -197,9 +187,6 @@ export function createRouter(db: Database.Database): Router {
       return;
     }
     broadcast({ type: "project_updated", payload: project });
-    fireWebhooks(db, "project_updated", project).catch((err) => {
-      logger.warn({ err, event: "project_updated" }, "webhook dispatch failed");
-    });
     res.json(project);
   });
 
@@ -687,35 +674,6 @@ export function createRouter(db: Database.Database): Router {
       since: q.since,
       limit: q.limit ? parseInt(q.limit, 10) : undefined,
     }));
-  });
-
-  // ─── R6: Webhooks ───────────────────────────────────────────────
-
-  router.get("/api/webhooks", (_req, res) => {
-    res.json(listWebhooks(db));
-  });
-
-  router.post("/api/webhooks", (req, res) => {
-    const { url, event_types } = req.body as { url: string; event_types: string[] };
-    if (!url || !event_types || !Array.isArray(event_types)) { res.status(400).json({ error: "url and event_types (array) are required" }); return; }
-    const urlError = validateWebhookUrl(url);
-    if (urlError) { res.status(400).json({ error: urlError }); return; }
-    res.status(201).json(createWebhook(db, url, event_types));
-  });
-
-  router.patch("/api/webhooks/:id", (req, res) => {
-    const updates = req.body as { url?: string; event_types?: string[]; active?: boolean };
-    if (updates.url !== undefined) {
-      const urlError = validateWebhookUrl(updates.url);
-      if (urlError) { res.status(400).json({ error: urlError }); return; }
-    }
-    const hook = updateWebhook(db, req.params.id, updates);
-    if (!hook) { res.status(404).json({ error: "Webhook not found" }); return; }
-    res.json(hook);
-  });
-
-  router.delete("/api/webhooks/:id", (req, res) => {
-    res.json({ success: deleteWebhook(db, req.params.id) });
   });
 
   // ─── Cost & Token Tracking ──────────────────────────────────────
