@@ -187,13 +187,11 @@ export function formatHelp(): string {
   lines.push(`  ${BOLD}add-task${RESET} --project <n> --title <t>  Create a task`);
   lines.push(`  ${BOLD}status${RESET} [project-name]            Project status summary`);
   lines.push(`  ${BOLD}agents${RESET}                           List agents with health`);
-  lines.push(`  ${BOLD}digest${RESET}                           Write daily digest to ./digests/YYYY-MM-DD.md`);
   lines.push("");
   lines.push("Flags:");
   lines.push(`  --db <path>          Database file (default: ./vibe-dash.db)`);
   lines.push(`  --project <n>        Filter by project name`);
   lines.push(`  --priority <p>       Task priority (low|medium|high|urgent)`);
   lines.push(`  --milestone <n>      Milestone name for add-task`);
-  lines.push(`  --output-dir <path>  Digest output directory (default: ./digests)`);
   return lines.join("\n");
 }
