@@ -123,4 +123,3 @@ router.get("/api/resource", limiter, (req, res) => {
 | `PORT` | `3001` | Express server (`server/index.ts`) |
 | `DB_PATH` | `./vibe-dash.db` | Server SQLite path |
 | `VIBE_DASH_DB` | `./vibe-dash.db` | Stdio MCP SQLite path — must match `DB_PATH` to share data with the server |
-| `VIBE_TEAM_MODE` | _(unset)_ | Set to any non-empty value to enable auth UI (login, user management) and API key enforcement. Unset = local single-user mode: auth middleware is a no-op and `/api/users` endpoints return 404. |
