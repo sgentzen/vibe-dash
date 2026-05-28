@@ -15,7 +15,3 @@ export function conflict(res: Response, message: string): void {
 export function serverError(res: Response, message = "Internal server error"): void {
   res.status(500).json({ error: message });
 }
-
-export function forbidden(res: Response, message = "Forbidden"): void {
-  res.status(403).json({ error: message });
-}
