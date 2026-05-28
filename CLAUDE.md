@@ -22,14 +22,13 @@ server/
   routes.ts         # All REST API endpoints (Express Router)
   types.ts          # Shared TypeScript interfaces/types
   websocket.ts      # WebSocket broadcast
-  recurrence.ts     # Recurring task logic
   db/
     index.ts        # Barrel re-export (all consumers import from here)
     schema.ts       # DDL, migrations, initDb(), openDb()
     helpers.ts      # now(), genId(), parseAgent()
     projects.ts     # createProject, listProjects
     milestones.ts   # CRUD + progress, daily stats, completion tracking
-    tasks.ts        # CRUD + search, bulk update, recurring tasks
+    tasks.ts        # CRUD + search, bulk update
     agents.ts       # CRUD + health, sessions, stats, file locks
     activity.ts     # logActivity, activity stream, heatmap
     blockers.ts     # createBlocker, resolveBlocker
@@ -37,10 +36,7 @@ server/
     dependencies.ts # task dependency graph
     comments.ts     # comments + @mentions
     notifications.ts # alert rules + notifications
-    filters.ts      # saved search filters
-    templates.ts    # project templates + seeding
     webhooks.ts     # webhook CRUD + fireWebhooks
-    reports.ts      # generateReport
     costs.ts        # cost/token tracking per agent/milestone/project
   mcp/
     server.ts       # MCP server factory + tool registration

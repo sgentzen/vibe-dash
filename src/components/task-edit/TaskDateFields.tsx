@@ -48,7 +48,6 @@ export function TaskDateFields({
           onChange={(e) => onStartDateChange(e.target.value)}
         />
       </FormField>
-
     </>
   );
 }

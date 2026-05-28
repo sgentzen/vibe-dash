@@ -203,7 +203,6 @@ export function DashboardView() {
       )}
 
       {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
-
     </div>
   );
 }
