@@ -29,7 +29,7 @@ function makeDetector(overrides: Partial<Detector> = {}): Detector {
     category: "test",
     defaultThreshold: 0,
     predicate: (_ctx: DetectorContext): Match[] => [
-      { entityId: "entity-1", entityType: "task", label: "Test match" },
+      { entityId: "entity-1", entityType: "blocker", label: "Test match" },
     ],
     score: (_match: Match, _ctx: DetectorContext): number => 50,
     ...overrides,
@@ -80,7 +80,7 @@ describe("runDetectors — basic", () => {
       category: "test",
       score: 50,
       entityId: "entity-1",
-      entityType: "task",
+      entityType: "blocker",
       label: "Test match",
     });
   });
@@ -89,14 +89,14 @@ describe("runDetectors — basic", () => {
     registerDetector(
       makeDetector({
         id: "low",
-        predicate: () => [{ entityId: "e1", entityType: "task", label: "Low" }],
+        predicate: () => [{ entityId: "e1", entityType: "blocker", label: "Low" }],
         score: () => 20,
       })
     );
     registerDetector(
       makeDetector({
         id: "high",
-        predicate: () => [{ entityId: "e2", entityType: "task", label: "High" }],
+        predicate: () => [{ entityId: "e2", entityType: "agent", label: "High" }],
         score: () => 80,
       })
     );
@@ -109,7 +109,7 @@ describe("runDetectors — basic", () => {
     registerDetector(
       makeDetector({
         predicate: () => [
-          { entityId: "e1", entityType: "task", label: "A" },
+          { entityId: "e1", entityType: "agent", label: "A" },
           { entityId: "e2", entityType: "blocker", label: "B" },
         ],
       })
@@ -254,13 +254,3 @@ describe("ScoredMatch shape", () => {
   });
 });
 
-// ─── EntityType extension ─────────────────────────────────────────────────────
-
-import type { EntityType } from "../server/detectors/types.js";
-
-describe("EntityType extension", () => {
-  it("allows commit, milestone, and area as valid entity types", () => {
-    const types: EntityType[] = ["task", "agent", "blocker", "commit", "milestone", "area"];
-    expect(types).toHaveLength(6);
-  });
-});

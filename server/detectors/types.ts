@@ -5,7 +5,7 @@ export interface DetectorContext {
   now: string; // ISO timestamp — fixed per run for deterministic scoring
 }
 
-export type EntityType = "task" | "agent" | "blocker" | "commit" | "milestone" | "area";
+export type EntityType = "agent" | "blocker";
 
 export interface Match {
   entityId: string;
