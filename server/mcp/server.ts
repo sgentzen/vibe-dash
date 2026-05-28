@@ -218,5 +218,12 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("log_cost")
   );
 
+  server.tool(
+    "heartbeat",
+    "Report what you're working on right now (a short freeform status)",
+    { status: z.string().min(1).max(280) },
+    call("heartbeat")
+  );
+
   return { server, cleanup };
 }

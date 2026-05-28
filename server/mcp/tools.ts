@@ -19,6 +19,7 @@ import {
   searchTasks,
   recordMilestoneDailyStats,
   logCost,
+  setAgentStatus,
 } from "../db/index.js";
 import { registerAgentSchema } from "../../shared/schemas.js";
 import { broadcast } from "../websocket.js";
@@ -274,6 +275,10 @@ const HANDLERS: Record<string, Handler> = {
   report_blocker: handleReportBlocker,
   resolve_blocker: handleResolveBlocker,
   log_cost: handleLogCost,
+  heartbeat: (db, args, agentName) => {
+    if (agentName) setAgentStatus(db, agentName, args.status as string);
+    return ok({ success: true });
+  },
 };
 
 export async function handleTool(
