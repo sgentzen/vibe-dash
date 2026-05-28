@@ -399,7 +399,7 @@ export interface ExecutiveSummary {
 
 // ─── Detector Framework ───────────────────────────────────────────────────────
 
-export type DetectorEntityType = "task" | "agent" | "blocker" | "review" | "commit" | "milestone" | "area";
+export type DetectorEntityType = "task" | "agent" | "blocker" | "commit" | "milestone" | "area";
 
 export interface DetectorMatch {
   entityId: string;

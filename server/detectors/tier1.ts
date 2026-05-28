@@ -129,5 +129,4 @@ export function registerTier1Detectors(): void {
       return agentSilenceScore(hours);
     },
   });
-
 }
