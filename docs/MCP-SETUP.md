@@ -177,6 +177,8 @@ This project reports task status to Vibe Dash via MCP. When working on tasks:
 | `report_blocker` | Flag a task as blocked with reason |
 | `resolve_blocker` | Clear a blocker |
 | `register_agent` | Register/update an agent identity |
+| `heartbeat` | Report what you're working on right now (short freeform status) |
+| `get_project_context` | Get a project's state in one call (open milestones, in-progress tasks, active blockers, recent activity) |
 ```
 
 ### Minimal version (add to CLAUDE.md)
