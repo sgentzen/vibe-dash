@@ -20,6 +20,7 @@ import {
   recordMilestoneDailyStats,
   logCost,
   setAgentStatus,
+  getProjectContext,
 } from "../db/index.js";
 import { registerAgentSchema } from "../../shared/schemas.js";
 import { broadcast } from "../websocket.js";
@@ -279,6 +280,7 @@ const HANDLERS: Record<string, Handler> = {
     if (agentName) setAgentStatus(db, agentName, args.status as string);
     return ok({ success: true });
   },
+  get_project_context: (db, args) => ok(getProjectContext(db, args.project_id as string)),
 };
 
 export async function handleTool(

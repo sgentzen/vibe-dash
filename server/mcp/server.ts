@@ -225,5 +225,12 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("heartbeat")
   );
 
+  server.tool(
+    "get_project_context",
+    "Get a project's current state in one call: open milestones (with progress), in-progress tasks, active blockers, and recent activity",
+    { project_id: z.string() },
+    call("get_project_context")
+  );
+
   return { server, cleanup };
 }
