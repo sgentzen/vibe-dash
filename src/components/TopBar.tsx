@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch, type SearchScope } from "../store";
 import { useApi } from "../hooks/useApi";
-import { WebhookSettings } from "./WebhookSettings";
-import { GitSyncSettings } from "./GitSyncSettings";
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
@@ -19,8 +17,6 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   const { unreadCount, notifications } = useNotificationState();
   const dispatch = useAppDispatch();
   const api = useApi();
-  const [showSettings, setShowSettings] = useState<"webhooks" | "git" | null>(null);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
   const appearanceRef = useRef<HTMLDivElement>(null);
 
@@ -338,57 +334,6 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           </div>
         )}
       </div>
-
-      {/* Settings Gear */}
-      <div style={{ position: "relative" }}>
-        <button
-          onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-          aria-label="Settings"
-          style={{
-            background: "transparent",
-            border: "1px solid var(--border)",
-            borderRadius: "6px",
-            padding: "4px 8px",
-            cursor: "pointer",
-            color: "var(--text-secondary)",
-            fontSize: "14px",
-          }}
-        >
-          {"⚙️"}
-        </button>
-        {showSettingsMenu && (
-          <div style={{
-            position: "absolute", top: "100%", right: 0, marginTop: "4px",
-            background: "var(--bg-secondary)", border: "1px solid var(--border)",
-            borderRadius: "8px", zIndex: 100, boxShadow: "var(--shadow-md)",
-            minWidth: "160px", overflow: "hidden",
-          }}>
-            <button
-              onClick={() => { setShowSettings("webhooks"); setShowSettingsMenu(false); }}
-              style={{
-                display: "block", width: "100%", textAlign: "left",
-                background: "transparent", border: "none", padding: "8px 14px",
-                fontSize: "13px", color: "var(--text-primary)", cursor: "pointer",
-              }}
-            >
-              Webhooks
-            </button>
-            <button
-              onClick={() => { setShowSettings("git"); setShowSettingsMenu(false); }}
-              style={{
-                display: "block", width: "100%", textAlign: "left",
-                background: "transparent", border: "none", padding: "8px 14px",
-                fontSize: "13px", color: "var(--text-primary)", cursor: "pointer",
-              }}
-            >
-              GitHub Sync
-            </button>
-          </div>
-        )}
-      </div>
-
-      {showSettings === "webhooks" && <WebhookSettings onClose={() => setShowSettings(null)} />}
-      {showSettings === "git" && <GitSyncSettings onClose={() => setShowSettings(null)} />}
 
       {/* Notification Bell */}
       <NotificationBell

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, Webhook, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, GitIntegrationSafe, GitSyncResult, IngestionSource, IngestionSourceKind } from "../types";
-import type { ExecutiveSummary, ScoredMatch } from "../../shared/types.js";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
+import type { ExecutiveSummary } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
 
@@ -414,38 +414,6 @@ async function getActivityStreamApi(params: Record<string, string | undefined> =
   return res.json();
 }
 
-// ─── R6: Webhooks ────────────────────────────────────────────────────
-
-async function getWebhooks(): Promise<Webhook[]> {
-  const res = await apiFetch("/api/webhooks");
-  if (!res.ok) await throwApiError(res, "getWebhooks");
-  return res.json();
-}
-
-async function createWebhookApi(url: string, eventTypes: string[]): Promise<Webhook> {
-  const res = await apiFetch("/api/webhooks", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ url, event_types: eventTypes }),
-  });
-  if (!res.ok) await throwApiError(res, "createWebhook");
-  return res.json();
-}
-
-async function updateWebhookApi(id: string, updates: { url?: string; event_types?: string[]; active?: boolean }): Promise<Webhook> {
-  const res = await apiFetch(`/api/webhooks/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: jsonHeaders(),
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) await throwApiError(res, "updateWebhook");
-  return res.json();
-}
-
-async function deleteWebhookApi(id: string): Promise<void> {
-  await apiFetch(`/api/webhooks/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
 // ─── Cost & Token Tracking ──────────────────────────────────────────
 
 interface CostSummary {
@@ -641,32 +609,6 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
   return res.json();
 }
 
-// ─── Git Sync ─────────────────────────────────────────────────────────────────
-
-async function getGitIntegrations(projectId?: string): Promise<GitIntegrationSafe[]> {
-  const url = projectId ? `/api/git/integrations?project_id=${encodeURIComponent(projectId)}` : "/api/git/integrations";
-  const res = await apiFetch(url);
-  if (!res.ok) await throwApiError(res, "getGitIntegrations");
-  return res.json();
-}
-
-async function addGitIntegration(data: { project_id: string; provider: string; owner: string; repo: string; token: string; auto_sync?: boolean }): Promise<GitIntegrationSafe> {
-  const res = await apiFetch("/api/git/integrations", { method: "POST", headers: jsonHeaders(), body: JSON.stringify(data) });
-  if (!res.ok) await throwApiError(res, "addGitIntegration");
-  return res.json();
-}
-
-async function deleteGitIntegration(id: string): Promise<void> {
-  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) await throwApiError(res, "deleteGitIntegration");
-}
-
-async function syncGitIntegration(id: string): Promise<GitSyncResult> {
-  const res = await apiFetch(`/api/git/integrations/${encodeURIComponent(id)}/sync`, { method: "POST" });
-  if (!res.ok) await throwApiError(res, "syncGitIntegration");
-  return res.json();
-}
-
 // ─── Ingestion ────────────────────────────────────────────────────────────────
 
 async function listIngestionSources(): Promise<IngestionSource[]> {
@@ -689,16 +631,6 @@ async function deleteIngestionSource(id: string): Promise<void> {
 async function rotateIngestionToken(id: string): Promise<{ token: string }> {
   const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}/rotate`, { method: "POST" });
   if (!res.ok) await throwApiError(res, "rotateIngestionToken");
-  return res.json();
-}
-
-async function getDetectorMatches(opts?: { minScore?: number; detectorId?: string }): Promise<ScoredMatch[]> {
-  const params = new URLSearchParams();
-  if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
-  if (opts?.detectorId) params.set("detectorId", opts.detectorId);
-  const qs = params.size > 0 ? `?${params}` : "";
-  const res = await apiFetch(`/api/detectors/matches${qs}`);
-  if (!res.ok) await throwApiError(res, "getDetectorMatches");
   return res.json();
 }
 
@@ -745,10 +677,6 @@ export function useApi() {
     getMilestoneDailyStats,
     getActivityHeatmap,
     getActivityStream: getActivityStreamApi,
-    getWebhooks,
-    createWebhook: createWebhookApi,
-    updateWebhook: updateWebhookApi,
-    deleteWebhook: deleteWebhookApi,
     getCostTimeseries,
     getProjectCostSummary,
     getCostSummary,
@@ -767,15 +695,10 @@ export function useApi() {
     updateUserRole: updateUserRoleApi,
     deleteUser: deleteUserApi,
     rotateKey: rotateKeyApi,
-    getGitIntegrations,
-    addGitIntegration,
-    deleteGitIntegration,
-    syncGitIntegration,
     listIngestionSources,
     createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
     deleteIngestionSource,
     rotateIngestionToken,
-    getDetectorMatches,
     getWsTicket,
   }), []);
 }

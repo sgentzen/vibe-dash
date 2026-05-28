@@ -20,9 +20,6 @@ vi.mock("../../src/hooks/useApi", () => ({
     createProject: vi.fn().mockResolvedValue({ id: "p1", name: "New Project" }),
     markNotificationRead: vi.fn().mockResolvedValue({}),
     markAllRead: vi.fn().mockResolvedValue({}),
-    getWebhooks: vi.fn().mockResolvedValue([]),
-    createWebhook: vi.fn().mockResolvedValue({}),
-    deleteWebhook: vi.fn().mockResolvedValue({}),
   }),
 }));
 

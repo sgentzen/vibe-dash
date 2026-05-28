@@ -1,7 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import type { TaskStatus, TaskPriority, MilestoneStatus, TaskDependency } from "./types.js";
-import { validateWebhookUrl } from "./utils/validateWebhookUrl.js";
 import {
   listProjects,
   createProject,
@@ -49,11 +48,6 @@ import {
   extractMentions,
   createNotification,
   listMentions,
-  createWebhook,
-  listWebhooks,
-  updateWebhook,
-  deleteWebhook,
-  fireWebhooks,
   getActivityStream,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
@@ -80,12 +74,9 @@ import {
   getTaskTypeBreakdown,
 } from "./db/index.js";
 import { broadcast as wsBroadcast } from "./websocket.js";
-import { closeLinkedIssue } from "./git-sync-service.js";
-import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 import { validateBody } from "./routes/validate.js";
-import { integrationRoutes } from "./routes/integrations.js";
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -103,22 +94,15 @@ const dependencyDeleteLimiter = rateLimit({
   max: 30, // limit each IP to 30 delete requests per windowMs
 });
 
-const gitSyncLimiter = rateLimit({ windowMs: 60_000, max: 5 }); // 5 syncs/min per IP
-
-function makeBroadcast(db: Database.Database) {
+function makeBroadcast(_db: Database.Database) {
   return (event: WsEvent) => {
     wsBroadcast(event);
-    fireWebhooks(db, event.type, event.payload).catch((err) => {
-      logger.warn({ err, event: event.type }, "webhook dispatch failed");
-    });
   };
 }
 
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
-
-  router.use(integrationRoutes(db, broadcast));
 
   const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -203,9 +187,6 @@ export function createRouter(db: Database.Database): Router {
       return;
     }
     broadcast({ type: "project_updated", payload: project });
-    fireWebhooks(db, "project_updated", project).catch((err) => {
-      logger.warn({ err, event: "project_updated" }, "webhook dispatch failed");
-    });
     res.json(project);
   });
 
@@ -371,10 +352,6 @@ export function createRouter(db: Database.Database): Router {
       type: "agent_activity",
       payload: { ...entry, agent_name: null, task_title: completed!.title },
     });
-    // R12.2: Close linked GitHub issue (fire-and-forget)
-    closeLinkedIssue(db, completed!.id).catch((err: unknown) =>
-      console.error("[git-sync] Failed to close linked GitHub issue:", err instanceof Error ? err.message : err)
-    );
     res.json(completed);
   });
 
@@ -697,35 +674,6 @@ export function createRouter(db: Database.Database): Router {
       since: q.since,
       limit: q.limit ? parseInt(q.limit, 10) : undefined,
     }));
-  });
-
-  // ─── R6: Webhooks ───────────────────────────────────────────────
-
-  router.get("/api/webhooks", (_req, res) => {
-    res.json(listWebhooks(db));
-  });
-
-  router.post("/api/webhooks", (req, res) => {
-    const { url, event_types } = req.body as { url: string; event_types: string[] };
-    if (!url || !event_types || !Array.isArray(event_types)) { res.status(400).json({ error: "url and event_types (array) are required" }); return; }
-    const urlError = validateWebhookUrl(url);
-    if (urlError) { res.status(400).json({ error: urlError }); return; }
-    res.status(201).json(createWebhook(db, url, event_types));
-  });
-
-  router.patch("/api/webhooks/:id", (req, res) => {
-    const updates = req.body as { url?: string; event_types?: string[]; active?: boolean };
-    if (updates.url !== undefined) {
-      const urlError = validateWebhookUrl(updates.url);
-      if (urlError) { res.status(400).json({ error: urlError }); return; }
-    }
-    const hook = updateWebhook(db, req.params.id, updates);
-    if (!hook) { res.status(404).json({ error: "Webhook not found" }); return; }
-    res.json(hook);
-  });
-
-  router.delete("/api/webhooks/:id", (req, res) => {
-    res.json({ success: deleteWebhook(db, req.params.id) });
   });
 
   // ─── Cost & Token Tracking ──────────────────────────────────────

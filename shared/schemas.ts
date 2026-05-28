@@ -136,19 +136,6 @@ export const logCostSchema = z.object({
   project_id: z.string().optional(),
 });
 
-// ─── Webhooks ───────────────────────────────────────────────────────────
-
-export const createWebhookSchema = z.object({
-  url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed"),
-  event_types: z.array(z.string().min(1)).nonempty(),
-});
-
-export const updateWebhookSchema = z.object({
-  url: z.string().url().refine((u) => /^https?:/.test(u), "Only http/https URLs allowed").optional(),
-  event_types: z.array(z.string().min(1)).optional(),
-  active: z.boolean().optional(),
-});
-
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");

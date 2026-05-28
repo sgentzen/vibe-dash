@@ -15,8 +15,8 @@ export function intelligenceRoutes(db: Database.Database, _broadcast: BroadcastF
   const router = Router();
 
   // Cheap reads share a per-route budget (status / anomalies / should-send).
-  // Kept separate from /api/stats and /api/detectors/* so polling-heavy
-  // dashboard presets don't trip each other's limit. See PR #86.
+  // Kept separate from /api/stats so polling-heavy dashboard presets don't
+  // trip each other's limit.
   const intelligenceReadLimiter = makeReadLimiter(120);
 
   // AI-call endpoints are tight: each request burns Anthropic tokens, so a

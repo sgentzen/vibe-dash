@@ -8,8 +8,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type Database from "better-sqlite3";
-import { runDetectors } from "./detectors/index.js";
-import type { ScoredMatch } from "./detectors/index.js";
 
 export const MODEL = "claude-haiku-4-5-20251001";
 
@@ -27,30 +25,20 @@ export interface DigestAnomaly {
   detail?: string;
 }
 
-// Returns top anomalies from the detector framework for use in digests.
+// Returns top anomalies for use in digests.
+// The detector framework has been removed; always returns an empty list.
 export function getDigestAnomalies(
-  db: Database.Database,
-  limit = 10,
-  minScore = 50
+  _db: Database.Database,
+  _limit = 10,
+  _minScore = 50
 ): DigestAnomaly[] {
-  const matches = runDetectors(db, { minScore });
-  return trimArray(
-    matches.map((m: ScoredMatch) => ({
-      detectorId: m.detectorId,
-      category: m.category,
-      score: m.score,
-      label: m.label,
-      detail: m.detail,
-    })),
-    limit
-  );
+  return [];
 }
 
-// Returns true when at least one detector match exceeds the threshold — i.e., the
-// system is "not fine" and a push notification or digest is worth sending.
-// Returns false (silent) when all detectors are quiet below the threshold.
-export function shouldSendDigest(db: Database.Database, threshold = 50): boolean {
-  return runDetectors(db, { minScore: threshold }).length > 0;
+// Returns true when the digest is worth sending.
+// The detector framework has been removed; always returns false (silent when fine).
+export function shouldSendDigest(_db: Database.Database, _threshold = 50): boolean {
+  return false;
 }
 
 export async function generateDigest(

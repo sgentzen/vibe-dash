@@ -14,9 +14,6 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
-import { registerTier1Detectors, registerTier3Detectors } from "./detectors/index.js";
-import { runCommitIngestionOnce } from "./ingestion/commits.js";
-import { realGitLog, isGitRepo } from "./ingestion/gitLog.js";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -42,9 +39,6 @@ const messagesLimiter = rateLimit({
 
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
 const DB_PATH = resolveDbPath(PROJECT_ROOT);
-const COMMIT_INGEST_ENABLED = process.env.COMMIT_INGEST_ENABLED !== "false";
-const COMMIT_INGEST_INTERVAL_MS = Number(process.env.COMMIT_INGEST_INTERVAL_MS ?? 300_000);
-const GIT_REPO_PATH = process.env.GIT_REPO_PATH ?? process.cwd();
 
 const app = express();
 app.use(helmet({
@@ -71,8 +65,6 @@ function openDbOrExit(): Database.Database {
   }
 }
 const db: Database.Database = openDbOrExit();
-registerTier1Detectors();
-registerTier3Detectors();
 app.use(createRouter(db));
 
 const spaLimiter = rateLimit({
@@ -149,27 +141,6 @@ app.get("/{*splat}", spaLimiter, (_req, res) => {
 
 // Centralized error handler — must be last middleware
 app.use(errorHandler);
-
-async function startCommitIngestion(): Promise<void> {
-  if (!COMMIT_INGEST_ENABLED) return;
-  if (!(await isGitRepo(GIT_REPO_PATH))) {
-    console.warn(`[commit-ingest] ${GIT_REPO_PATH} is not a git repo — disabling`);
-    return;
-  }
-  const tick = async (): Promise<void> => {
-    try {
-      const r = await runCommitIngestionOnce(db, { gitLog: realGitLog, repoPath: GIT_REPO_PATH, lookbackDays: 7 });
-      if (r.inserted > 0 || r.linked > 0) {
-        console.log(`[commit-ingest] inserted=${r.inserted} linked=${r.linked}`);
-      }
-    } catch (err) {
-      console.warn(`[commit-ingest] tick failed:`, err);
-    }
-  };
-  void tick();
-  setInterval(() => { void tick(); }, COMMIT_INGEST_INTERVAL_MS);
-}
-void startCommitIngestion();
 
 const server = createServer(app);
 initWebSocket(server, db);

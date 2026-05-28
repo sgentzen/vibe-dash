@@ -127,9 +127,8 @@ export function App() {
           dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
           return;
         }
-        const presetMap: Record<string, "overview" | "hotspots" | "agents" | "timeline"> = {
+        const presetMap: Record<string, "overview" | "agents" | "timeline"> = {
           o: "overview",
-          h: "hotspots",
           a: "agents",
           t: "timeline",
         };

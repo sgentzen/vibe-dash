@@ -24,7 +24,6 @@ const VIEW_COMMANDS: { id: ViewId; label: string; icon: string }[] = [
 
 const PRESET_COMMANDS: { id: FleetPreset; label: string; icon: string }[] = [
   { id: "overview", label: "Fleet · Overview", icon: "⊡" },
-  { id: "hotspots", label: "Fleet · Hot spots", icon: "◎" },
   { id: "agents", label: "Fleet · Agents", icon: "◎" },
   { id: "timeline", label: "Fleet · Timeline", icon: "⌛" },
 ];
