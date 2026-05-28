@@ -313,23 +313,7 @@ export type WsEvent =
   | WsEventOf<"metrics_logged", CompletionMetrics>
   | WsEventOf<"worktree_created", TaskWorktree>
   | WsEventOf<"worktree_updated", TaskWorktree>
-  | WsEventOf<"ingestion_source_created", { id: string; name: string; kind: string }>
-  | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
   | WsEventOf<"plugins_reloaded", { count: number }>;
-
-// ─── Ingestion ────────────────────────────────────────────────────────────────
-
-export type IngestionSourceKind = "claude_code" | "cursor" | "codex" | "copilot" | "aider" | "generic";
-
-export interface IngestionSource {
-  id: string;
-  name: string;
-  kind: IngestionSourceKind;
-  project_id: string | null;
-  active: boolean;
-  created_at: string;
-  last_event_at: string | null;
-}
 
 // ─── Agent Cost ───────────────────────────────────────────────────────────────
 

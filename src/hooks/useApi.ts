@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
 import type { ExecutiveSummary } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
@@ -609,31 +609,6 @@ async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }
   return res.json();
 }
 
-// ─── Ingestion ────────────────────────────────────────────────────────────────
-
-async function listIngestionSources(): Promise<IngestionSource[]> {
-  const res = await apiFetch("/api/ingest/sources");
-  if (!res.ok) await throwApiError(res, "listIngestionSources");
-  return res.json();
-}
-
-async function createIngestionSource(name: string, kind: IngestionSourceKind, project_id?: string | null): Promise<IngestionSource & { token: string }> {
-  const res = await apiFetch("/api/ingest/sources", { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ name, kind, project_id }) });
-  if (!res.ok) await throwApiError(res, "createIngestionSource");
-  return res.json();
-}
-
-async function deleteIngestionSource(id: string): Promise<void> {
-  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) await throwApiError(res, "deleteIngestionSource");
-}
-
-async function rotateIngestionToken(id: string): Promise<{ token: string }> {
-  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}/rotate`, { method: "POST" });
-  if (!res.ok) await throwApiError(res, "rotateIngestionToken");
-  return res.json();
-}
-
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -695,10 +670,6 @@ export function useApi() {
     updateUserRole: updateUserRoleApi,
     deleteUser: deleteUserApi,
     rotateKey: rotateKeyApi,
-    listIngestionSources,
-    createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
-    deleteIngestionSource,
-    rotateIngestionToken,
     getWsTicket,
   }), []);
 }
