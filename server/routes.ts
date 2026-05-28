@@ -59,7 +59,6 @@ import {
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
   getAgentActivityHeatmap,
-  generateReport,
   addComment,
   listComments,
   createReview,
@@ -753,13 +752,6 @@ export function createRouter(db: Database.Database): Router {
   router.get("/api/activity-heatmap", (req, res) => {
     const projectId = req.query.project_id as string | undefined;
     res.json(getAgentActivityHeatmap(db, projectId));
-  });
-
-  // ─── R4: Reports ───────────────────────────────────────────────────
-
-  router.post("/api/projects/:id/report", (req, res) => {
-    const period = (req.body.period as "day" | "week" | "milestone") ?? "week";
-    res.json({ report: generateReport(db, req.params.id, period) });
   });
 
   // ─── R5: Mentions ───────────────────────────────────────────────

@@ -155,10 +155,6 @@ export const updateWebhookSchema = z.object({
 
 const validJson = z.string().refine((s) => { try { JSON.parse(s); return true; } catch { return false; } }, "must be valid JSON");
 
-export const generateReportSchema = z.object({
-  period: z.enum(["day", "week", "milestone"]).optional(),
-});
-
 // ─── Blockers ───────────────────────────────────────────────────────────
 
 export const createBlockerSchema = z.object({

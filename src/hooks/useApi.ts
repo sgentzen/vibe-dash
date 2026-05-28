@@ -442,17 +442,6 @@ async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEn
   return res.json();
 }
 
-async function generateReportApi(projectId: string, period: "day" | "week" | "milestone"): Promise<string> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/report`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ period }),
-  });
-  if (!res.ok) await throwApiError(res, "generateReport");
-  const data = await res.json();
-  return data.report;
-}
-
 // ─── R5: Activity Stream ─────────────────────────────────────────────
 
 async function getActivityStreamApi(params: Record<string, string | undefined> = {}): Promise<ActivityEntry[]> {
@@ -795,7 +784,6 @@ export function useApi() {
     getMilestoneContributions,
     getMilestoneDailyStats,
     getActivityHeatmap,
-    generateReport: generateReportApi,
     getActivityStream: getActivityStreamApi,
     getWebhooks,
     createWebhook: createWebhookApi,

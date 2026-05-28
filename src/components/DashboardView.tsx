@@ -9,7 +9,6 @@ import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { AgentContributionsCard, ActivityHeatmapCard } from "./dashboard/ActivityCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
-import { ReportGeneratorCard } from "./dashboard/ReportGeneratorCard";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
@@ -112,8 +111,6 @@ export function DashboardView() {
     api.getAgentComparison().then(setAgentComparison).catch(() => {});
   }, [api, pollGeneration]);
 
-  const reportProjectId = projectId ?? projects[0]?.id ?? null;
-
   return (
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
@@ -207,7 +204,6 @@ export function DashboardView() {
 
       {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
 
-      <ReportGeneratorCard projectId={reportProjectId} />
     </div>
   );
 }
