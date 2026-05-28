@@ -544,8 +544,10 @@ const MIGRATIONS: Migration[] = [
   {
     name: "016_agent_current_status",
     run(db) {
-      db.prepare("ALTER TABLE agents ADD COLUMN current_status TEXT").run();
-      db.prepare("ALTER TABLE agents ADD COLUMN current_status_at TEXT").run();
+      const cols = db.pragma("table_info(agents)") as { name: string }[];
+      const has = (n: string) => cols.some((c) => c.name === n);
+      if (!has("current_status")) db.prepare("ALTER TABLE agents ADD COLUMN current_status TEXT").run();
+      if (!has("current_status_at")) db.prepare("ALTER TABLE agents ADD COLUMN current_status_at TEXT").run();
     },
   },
 ];
