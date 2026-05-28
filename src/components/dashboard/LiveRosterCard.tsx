@@ -142,7 +142,7 @@ export function LiveRosterCard({ agents, tasks }: LiveRosterCardProps) {
               }}
             >
               <span>
-                {a.health_status} · {relativeTime(a.last_seen_at)}
+                {a.health_status ?? "offline"} · {relativeTime(a.last_seen_at)}
               </span>
               <span>✓ {a.completed_today ?? 0} today</span>
             </div>

@@ -26,7 +26,7 @@ describe("LiveRosterCard", () => {
     render(<LiveRosterCard agents={[agent({})]} tasks={[]} />);
     expect(screen.getByText("coder-1")).toBeInTheDocument();
     expect(screen.getByText("Implementing X")).toBeInTheDocument();
-    expect(screen.getByText(/3/)).toBeInTheDocument();
+    expect(screen.getByText(/3 today/)).toBeInTheDocument();
   });
 
   it("collapses offline agents into an expandable footer", () => {

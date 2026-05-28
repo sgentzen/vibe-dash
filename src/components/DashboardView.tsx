@@ -9,6 +9,8 @@ import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { AgentContributionsCard, ActivityHeatmapCard } from "./dashboard/ActivityCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
+import { LiveRosterCard } from "./dashboard/LiveRosterCard";
+import { TodayCard } from "./dashboard/TodayCard";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
@@ -84,7 +86,7 @@ function computeActivityLast7(heatmap: ActivityHeatmapEntry[]): number[] {
 }
 
 export function DashboardView() {
-  const { projects, milestones, blockers, tasks } = useDataState();
+  const { projects, milestones, blockers, tasks, agents, stats } = useDataState();
   const { selectedProjectId } = useNavigationState();
   const { pollGeneration } = usePollingState();
   const api = useApi();
@@ -144,6 +146,15 @@ export function DashboardView() {
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
         Dashboard
       </h2>
+
+      <div style={{ display: "grid", gridTemplateColumns: "65fr 35fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+        <LiveRosterCard agents={agents} tasks={projectTasks} />
+        <TodayCard
+          spendToday={stats.spend_today}
+          tasksCompletedToday={stats.tasks_completed_today}
+          activeAgents={agents.filter((a) => a.health_status === "active").length}
+        />
+      </div>
 
       <div style={isCompact ? {
         display: "flex",
