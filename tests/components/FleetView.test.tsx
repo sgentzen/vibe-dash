@@ -23,7 +23,6 @@ const baseState: AppState = {
   selectedProjectId: null, selectedMilestoneId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
   pollGeneration: 0, rightRailCollapsed: false,
-  currentUser: null, isAuthenticated: true, authEnabled: false, teamMode: false,
   loadError: null,
 };
 

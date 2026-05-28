@@ -9,7 +9,6 @@ import type {
   AppNotification,
   TaskWorktree,
   WsEvent,
-  User,
 } from "../types";
 
 export type Theme = "dark" | "light";
@@ -51,11 +50,6 @@ export interface AppState {
   pollGeneration: number;
   rightRailCollapsed: boolean;
   loadError: string | null;
-  // Auth
-  currentUser: User | null;
-  isAuthenticated: boolean;
-  authEnabled: boolean;
-  teamMode: boolean;
 }
 
 export type AppAction =
@@ -84,5 +78,4 @@ export type AppAction =
   | { type: "TOGGLE_RIGHT_RAIL" }
   | { type: "SET_RIGHT_RAIL_COLLAPSED"; payload: boolean }
   | { type: "WS_EVENT"; payload: WsEvent }
-  | { type: "SET_AUTH"; payload: { currentUser: User | null; isAuthenticated: boolean; authEnabled: boolean; teamMode: boolean } }
   | { type: "SET_LOAD_ERROR"; payload: string | null };

@@ -17,8 +17,6 @@ import { metricRoutes } from "./metrics.js";
 import { bulkRoutes } from "./bulk.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { milestoneRoutes } from "./milestones.js";
-import { userRoutes } from "./users.js";
-import { makeAuthMiddleware } from "../auth.js";
 import type { RouteFactory } from "./types.js";
 import rateLimit from "express-rate-limit";
 
@@ -33,15 +31,6 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
-});
-
-// Tight limiter for auth operations to prevent brute-force key enumeration
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many authentication attempts, please try again later." },
 });
 
 function makeBroadcast(_db: Database.Database) {
@@ -66,7 +55,6 @@ const routeFactories: RouteFactory[] = [
   bulkRoutes,
   worktreeRoutes,
   milestoneRoutes,
-  userRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {
@@ -75,21 +63,6 @@ export function createRouter(db: Database.Database): Router {
 
   // Global rate limit — applies to all API routes
   router.use(apiLimiter);
-
-  // Auth middleware runs before all routes; no-op when no users exist.
-  // /api/auth/status is exempt — it's a public discovery endpoint.
-  // authLimiter scoped to /api/auth/* only: that's where credential-sensitive
-  // operations live (login, validate-key). Applying it to every API request
-  // gave the whole app a 30-req/15-min budget, which is far too tight for
-  // a polling dashboard and caused user-visible 429 cascades on first load.
-  const authMiddleware = makeAuthMiddleware(db);
-  router.use((req, res, next) => {
-    if (req.path === "/api/auth/status") return next();
-    if (req.path.startsWith("/api/auth/")) {
-      return authLimiter(req, res, () => authMiddleware(req, res, next));
-    }
-    return authMiddleware(req, res, next);
-  });
 
   for (const factory of routeFactories) {
     router.use(factory(db, broadcast));
