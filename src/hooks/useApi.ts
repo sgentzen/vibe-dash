@@ -499,20 +499,6 @@ async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise
   return res.json();
 }
 
-// ─── WS Ticket ───────────────────────────────────────────────────────────────
-
-export async function getWsTicket(): Promise<string | null> {
-  try {
-    const res = await apiFetch("/api/ws-ticket", { method: "POST" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data as { ticket: string }).ticket ?? null;
-  } catch {
-    return null;
-  }
-}
-
-
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -566,6 +552,5 @@ export function useApi() {
     getTaskTypeBreakdown,
     getWorktrees,
     updateWorktreeStatus,
-    getWsTicket,
   }), []);
 }
