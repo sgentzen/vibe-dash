@@ -541,6 +541,13 @@ const MIGRATIONS: Migration[] = [
       db.exec(`ALTER TABLE tasks DROP COLUMN recurrence_rule;`);
     },
   },
+  {
+    name: "016_agent_current_status",
+    run(db) {
+      db.prepare("ALTER TABLE agents ADD COLUMN current_status TEXT").run();
+      db.prepare("ALTER TABLE agents ADD COLUMN current_status_at TEXT").run();
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
