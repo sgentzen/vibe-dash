@@ -17,7 +17,6 @@ import {
   listMilestones,
   completeMilestone,
   searchTasks,
-  handleRecurringTaskCompletion,
   recordMilestoneDailyStats,
   logCost,
 } from "../db/index.js";
@@ -209,7 +208,6 @@ export async function handleTool(
         due_date: args.due_date as string | null | undefined,
         start_date: args.start_date as string | null | undefined,
         estimate: args.estimate as number | null | undefined,
-        recurrence_rule: args.recurrence_rule as string | null | undefined,
       });
       if (updated) {
         // Auto-assign agent when status changes to in_progress or done
@@ -258,11 +256,6 @@ export async function handleTool(
         // Record milestone daily stats
         if (completed.milestone_id) {
           recordMilestoneDailyStats(db, completed.milestone_id);
-        }
-        // Handle recurring tasks
-        const nextTask = handleRecurringTaskCompletion(db, completed.id);
-        if (nextTask) {
-          broadcast({ type: "task_created", payload: nextTask });
         }
       }
       return ok({ success: true });

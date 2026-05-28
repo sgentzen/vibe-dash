@@ -127,7 +127,7 @@ async function createTask(data: {
 
 async function updateTask(
   id: string,
-  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "milestone_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate" | "recurrence_rule">>
+  data: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "progress" | "milestone_id" | "assigned_agent_id" | "due_date" | "start_date" | "estimate">>
 ): Promise<Task> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",

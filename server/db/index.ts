@@ -26,7 +26,6 @@ export {
   completeTask,
   searchTasks,
   bulkUpdateTasks,
-  handleRecurringTaskCompletion,
 } from "./tasks.js";
 export type { CreateTaskInput, ListTasksFilter, UpdateTaskInput, SearchTasksFilter } from "./tasks.js";
 export {

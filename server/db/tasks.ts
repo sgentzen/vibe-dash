@@ -1,7 +1,6 @@
 import type Database from "better-sqlite3";
 import type { Task, TaskStatus, TaskPriority } from "../types.js";
 import { now, genId } from "./helpers.js";
-import { getNextDueDate } from "../recurrence.js";
 import { DEFAULT_TASK_LIST_LIMIT, MAX_TASK_LIST_LIMIT } from "../constants.js";
 import { buildWhere } from "./where.js";
 
@@ -243,26 +242,3 @@ export function bulkUpdateTasks(
   return run();
 }
 
-// ─── Recurring Tasks ────────────────────────────────────────────────────────
-
-export function handleRecurringTaskCompletion(db: Database.Database, taskId: string): Task | null {
-  const task = getTask(db, taskId);
-  if (!task || !task.recurrence_rule) return null;
-
-  const nextDueDate = getNextDueDate(task.due_date, task.recurrence_rule);
-  const nextStartDate = task.start_date ? getNextDueDate(task.start_date, task.recurrence_rule) : null;
-  const nextTask = createTask(db, {
-    project_id: task.project_id,
-    parent_task_id: task.parent_task_id,
-    milestone_id: task.milestone_id,
-    assigned_agent_id: task.assigned_agent_id,
-    title: task.title,
-    description: task.description,
-    priority: task.priority,
-    due_date: nextDueDate,
-    start_date: nextStartDate,
-    estimate: task.estimate,
-    recurrence_rule: task.recurrence_rule,
-  });
-  return nextTask;
-}

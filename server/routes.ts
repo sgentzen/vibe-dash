@@ -54,7 +54,6 @@ import {
   updateWebhook,
   deleteWebhook,
   fireWebhooks,
-  handleRecurringTaskCompletion,
   getActivityStream,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
@@ -239,7 +238,7 @@ export function createRouter(db: Database.Database): Router {
 
   // POST /api/tasks
   router.post("/api/tasks", validateBody(createTaskSchema), (req, res) => {
-    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate, recurrence_rule } =
+    const { project_id, parent_task_id, milestone_id, assigned_agent_id, title, description, priority, status, due_date, start_date, estimate } =
       req.body as {
         project_id: string;
         parent_task_id?: string | null;
@@ -252,7 +251,6 @@ export function createRouter(db: Database.Database): Router {
         due_date?: string | null;
         start_date?: string | null;
         estimate?: number | null;
-        recurrence_rule?: string | null;
       };
     const task = createTask(db, {
       project_id,
@@ -266,7 +264,6 @@ export function createRouter(db: Database.Database): Router {
       due_date: due_date ?? null,
       start_date: start_date ?? null,
       estimate: estimate ?? null,
-      recurrence_rule: recurrence_rule ?? null,
     });
     broadcast({ type: "task_created", payload: task });
     res.status(201).json(task);
@@ -367,13 +364,6 @@ export function createRouter(db: Database.Database): Router {
     // Record daily stats if task has a milestone
     if (completed?.milestone_id) {
       recordMilestoneDailyStats(db, completed.milestone_id);
-    }
-    // Handle recurring tasks — create next instance
-    if (completed) {
-      const nextTask = handleRecurringTaskCompletion(db, completed.id);
-      if (nextTask) {
-        broadcast({ type: "task_created", payload: nextTask });
-      }
     }
     const entry = logActivity(db, {
       task_id: completed!.id,

@@ -39,7 +39,6 @@ export interface Task {
   due_date: string | null;
   start_date: string | null;
   estimate: number | null;
-  recurrence_rule: string | null;
   task_type: string | null;
   created_at: string;
   updated_at: string;

@@ -35,7 +35,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
   const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
   const [startDate, setStartDate] = useState<string>(task.start_date ?? "");
-  const [recurrenceRule, setRecurrenceRule] = useState<string>(task.recurrence_rule ?? "");
   const [saving, setSaving] = useState(false);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -76,7 +75,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setDueDate(task.due_date ?? "");
     setEstimate(task.estimate != null ? String(task.estimate) : "");
     setStartDate(task.start_date ?? "");
-    setRecurrenceRule(task.recurrence_rule ?? "");
     setNewComment("");
     api.getComments(task.id).then(setComments).catch(() => {});
   }, [task, api]);
@@ -95,7 +93,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         due_date: dueDate || null,
         start_date: startDate || null,
         estimate: estimate ? parseInt(estimate, 10) : null,
-        recurrence_rule: recurrenceRule || null,
       });
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
       onClose();
@@ -165,8 +162,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           onEstimateChange={setEstimate}
           startDate={startDate}
           onStartDateChange={setStartDate}
-          recurrenceRule={recurrenceRule}
-          onRecurrenceRuleChange={setRecurrenceRule}
         />
 
         {/* Tags */}

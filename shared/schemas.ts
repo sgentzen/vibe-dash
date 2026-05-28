@@ -57,7 +57,6 @@ export const createTaskSchema = z.object({
   due_date: z.string().nullable().optional(),
   start_date: z.string().nullable().optional(),
   estimate: z.number().int().min(0).nullable().optional(),
-  recurrence_rule: z.string().nullable().optional(),
   agent_name: z.string().optional(),
 });
 
@@ -73,7 +72,6 @@ export const updateTaskSchema = z.object({
   due_date: z.string().nullable().optional(),
   start_date: z.string().nullable().optional(),
   estimate: z.number().int().min(0).nullable().optional(),
-  recurrence_rule: z.string().nullable().optional(),
   agent_name: z.string().optional(),
 });
 

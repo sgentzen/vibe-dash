@@ -1,6 +1,5 @@
 import { inputStyle as sharedInputStyle } from "../../styles/shared.js";
 import { FormField } from "../ui/FormField";
-import { FormSelect } from "../ui/FormSelect";
 import { FormDateInput } from "../ui/FormDateInput";
 
 interface TaskDateFieldsProps {
@@ -10,8 +9,6 @@ interface TaskDateFieldsProps {
   onEstimateChange: (v: string) => void;
   startDate: string;
   onStartDateChange: (v: string) => void;
-  recurrenceRule: string;
-  onRecurrenceRuleChange: (v: string) => void;
 }
 
 export function TaskDateFields({
@@ -21,8 +18,6 @@ export function TaskDateFields({
   onEstimateChange,
   startDate,
   onStartDateChange,
-  recurrenceRule,
-  onRecurrenceRuleChange,
 }: TaskDateFieldsProps) {
   return (
     <>
@@ -54,19 +49,6 @@ export function TaskDateFields({
         />
       </FormField>
 
-      <FormField id="task-recurrence" label="Recurrence Rule">
-        <FormSelect
-          id="task-recurrence"
-          value={recurrenceRule}
-          onChange={(e) => onRecurrenceRuleChange(e.target.value)}
-        >
-          <option value="">None</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="yearly">Yearly</option>
-        </FormSelect>
-      </FormField>
     </>
   );
 }
