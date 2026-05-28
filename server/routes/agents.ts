@@ -28,6 +28,7 @@ export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
         ...a,
         health_status,
         active: health_status === "active",
+        completed_today: getAgentCompletedToday(db, a.id),
         current_task_title: getAgentCurrentTask(db, a.id),
         current_project_id: project?.project_id ?? null,
         current_project_name: project?.project_name ?? null,

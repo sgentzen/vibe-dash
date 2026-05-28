@@ -58,6 +58,9 @@ export interface Agent {
   current_task_title?: string | null;
   current_project_id?: string | null;
   current_project_name?: string | null;
+  health_status?: AgentHealthStatus;
+  active?: boolean;
+  completed_today?: number;
 }
 
 export interface ActivityEntry {
