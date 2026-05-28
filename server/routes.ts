@@ -84,7 +84,6 @@ import { logger } from "./logger.js";
 import type { WsEvent } from "./types.js";
 import rateLimit from "express-rate-limit";
 import { validateBody } from "./routes/validate.js";
-import { integrationRoutes } from "./routes/integrations.js";
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -114,8 +113,6 @@ function makeBroadcast(db: Database.Database) {
 export function createRouter(db: Database.Database): Router {
   const broadcast = makeBroadcast(db);
   const router = Router();
-
-  router.use(integrationRoutes(db, broadcast));
 
   const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
