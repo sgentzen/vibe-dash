@@ -34,17 +34,17 @@ describe("SET_FLEET_PRESET reducer", () => {
   });
 
   it("leaves activeView untouched when only preset changes", () => {
-    const next = setReducer(baseState, { type: "SET_FLEET_PRESET", payload: "timeline" });
+    const next = setReducer(baseState, { type: "SET_FLEET_PRESET", payload: "agents" });
     expect(next?.activeView).toBe("fleet");
-    expect(next?.fleetPreset).toBe("timeline");
+    expect(next?.fleetPreset).toBe("agents");
   });
 });
 
 describe("PresetSwitcher", () => {
-  it("renders 3 preset tabs", () => {
+  it("renders 2 preset tabs", () => {
     renderWithProviders(<PresetSwitcher active="overview" onChange={() => {}} />);
     const tablist = screen.getByRole("tablist", { name: /fleet view presets/i });
-    expect(within(tablist).getAllByRole("tab")).toHaveLength(3);
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(2);
   });
 
   it("marks the active preset with aria-selected=true", () => {

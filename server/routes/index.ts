@@ -16,7 +16,6 @@ import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
 import { bulkRoutes } from "./bulk.js";
 import { worktreeRoutes } from "./worktrees.js";
-import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
 import { userRoutes } from "./users.js";
 import { makeAuthMiddleware } from "../auth.js";
@@ -66,7 +65,6 @@ const routeFactories: RouteFactory[] = [
   costRoutes,
   bulkRoutes,
   worktreeRoutes,
-  executiveRoutes,
   milestoneRoutes,
   userRoutes,
 ];

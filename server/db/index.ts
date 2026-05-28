@@ -92,9 +92,6 @@ export {
   getTaskTypeBreakdown,
 } from "./metrics.js";
 export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
-
-export { getExecutiveSummary } from "./analytics.js";
-export type { ExecutiveSummary, MilestoneHealth, TeamUtilization, BlockersSummary, TaskVelocity, CostOverview } from "./analytics.js";
 export {
   createWorktree,
   getWorktreeById,

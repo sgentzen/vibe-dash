@@ -77,11 +77,11 @@ export function App() {
   // Uses SET_RIGHT_RAIL_COLLAPSED (not TOGGLE) so it doesn't write to localStorage
   // and doesn't permanently override the user's stored preference.
   useEffect(() => {
-    if (activeView === "fleet" && (fleetPreset === "timeline" || fleetPreset === "agents")) {
+    if (activeView === "fleet" && fleetPreset === "agents") {
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
     } else {
-      // Restore the user's persisted preference when leaving Timeline,
-      // so the rail doesn't stay hidden after a one-off visit.
+      // Restore the user's persisted preference when not on the agents
+      // preset, so the rail doesn't stay hidden after a one-off visit.
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: getInitialRightRailCollapsed() });
     }
   }, [activeView, fleetPreset, dispatch]);
@@ -127,10 +127,9 @@ export function App() {
           dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
           return;
         }
-        const presetMap: Record<string, "overview" | "agents" | "timeline"> = {
+        const presetMap: Record<string, "overview" | "agents"> = {
           o: "overview",
           a: "agents",
-          t: "timeline",
         };
         const preset = presetMap[e.key];
         if (preset) {

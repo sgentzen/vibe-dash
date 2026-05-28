@@ -1,9 +1,7 @@
 import { useNavigationState, useAppDispatch } from "../../store";
 import { DashboardView } from "../DashboardView";
-import { ExecutiveView } from "../ExecutiveView";
 import { AgentDashboard } from "../AgentDashboard";
 import { WorktreeView } from "../WorktreeView";
-import { TimelineView } from "../TimelineView";
 import { PresetSwitcher } from "./PresetSwitcher";
 
 export function FleetView() {
@@ -18,17 +16,12 @@ export function FleetView() {
       />
       <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
         {fleetPreset === "overview" ? (
-          <>
-            <DashboardView />
-            <ExecutiveView />
-          </>
-        ) : fleetPreset === "agents" ? (
+          <DashboardView />
+        ) : (
           <>
             <AgentDashboard />
             <WorktreeView />
           </>
-        ) : (
-          <TimelineView />
         )}
       </div>
     </div>

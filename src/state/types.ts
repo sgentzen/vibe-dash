@@ -18,7 +18,7 @@ export type SearchScope = "tasks" | "projects" | "agents" | "all";
 
 export type ActiveView = "fleet" | "board" | "feed";
 
-export type FleetPreset = "overview" | "agents" | "timeline";
+export type FleetPreset = "overview" | "agents";
 
 export interface AppState {
   projects: Project[];

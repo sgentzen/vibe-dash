@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
-import type { ExecutiveSummary } from "../../shared/types.js";
 
 const SESSION_KEY = "vibe-dash-api-key";
 
@@ -503,15 +502,6 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
   return res.json();
 }
 
-// ─── Executive Summary ────────────────────────────────────────────────
-export type { ExecutiveSummary } from "../../shared/types.js";
-
-async function getExecutiveSummary(projectId: string): Promise<ExecutiveSummary> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/executive-summary`);
-  if (!res.ok) await throwApiError(res, "getExecutiveSummary");
-  return res.json();
-}
-
 // ─── Worktrees ────────────────────────────────────────────────────────
 
 async function getWorktrees(): Promise<TaskWorktree[]> {
@@ -662,7 +652,6 @@ export function useApi() {
     getTaskTypeBreakdown,
     getWorktrees,
     updateWorktreeStatus,
-    getExecutiveSummary,
     getAuthStatus,
     validateApiKey,
     createUser: createUserApi,
