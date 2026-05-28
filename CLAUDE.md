@@ -36,7 +36,6 @@ server/
     dependencies.ts # task dependency graph
     comments.ts     # comments + @mentions
     notifications.ts # alert rules + notifications
-    webhooks.ts     # webhook CRUD + fireWebhooks
     costs.ts        # cost/token tracking per agent/milestone/project
   mcp/
     server.ts       # MCP server factory + tool registration
@@ -85,8 +84,7 @@ router.get("/api/resource", limiter, (req, res) => {
   // 1. Validate params — early return with 400/404
   // 2. Call db function
   // 3. broadcast() WebSocket event (on mutations)
-  // 4. fireWebhooks() (on mutations)
-  // 5. res.json(result)
+  // 4. res.json(result)
 });
 ```
 

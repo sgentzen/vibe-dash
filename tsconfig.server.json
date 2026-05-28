@@ -31,7 +31,6 @@
     "server/routes/tags.ts",
     "server/routes/tasks.ts",
     "server/routes/templates.ts",
-    "server/routes/webhooks.ts",
     "tests/metrics.test.ts"
   ]
 }
