@@ -92,9 +92,6 @@ export {
   getTaskTypeBreakdown,
 } from "./metrics.js";
 export type { CompletionMetrics, LogCompletionMetricsInput, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "./metrics.js";
-
-export { getExecutiveSummary } from "./analytics.js";
-export type { ExecutiveSummary, MilestoneHealth, TeamUtilization, BlockersSummary, TaskVelocity, CostOverview } from "./analytics.js";
 export {
   createWorktree,
   getWorktreeById,
@@ -104,13 +101,4 @@ export {
   updateWorktreeStatus,
 } from "./worktrees.js";
 export type { CreateWorktreeInput } from "./worktrees.js";
-export {
-  createUser,
-  getUserByKeyHash,
-  listUsers,
-  updateUserRole,
-  deleteUser,
-  rotateApiKey,
-  countUsers,
-} from "./users.js";
 export * from "./milestone_history.js";

@@ -8,7 +8,6 @@ import { resolveDbPath } from "./utils/resolveDbPath.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
 import { notFoundHandler, errorHandler } from "./routes/middleware.js";
-import { makeAuthMiddleware } from "./auth.js";
 import { logger } from "./logger.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -74,9 +73,8 @@ const spaLimiter = rateLimit({
 
 // MCP SSE transport
 const transports = new Map<string, SSEServerTransport>();
-const mcpAuth = makeAuthMiddleware(db);
 
-app.get("/sse", mcpLimiter, mcpAuth, async (req, res) => {
+app.get("/sse", mcpLimiter, async (req, res) => {
   const transport = new SSEServerTransport("/messages", res);
   const handle = createMcpServer(db, transport.sessionId);
   transports.set(transport.sessionId, transport);
@@ -87,7 +85,7 @@ app.get("/sse", mcpLimiter, mcpAuth, async (req, res) => {
   await handle.server.connect(transport);
 });
 
-app.post("/messages", messagesLimiter, mcpAuth, async (req, res) => {
+app.post("/messages", messagesLimiter, async (req, res) => {
   const sessionId = req.query.sessionId as string;
   const transport = transports.get(sessionId);
   if (!transport) { res.status(400).json({ error: "Unknown session" }); return; }
@@ -97,7 +95,7 @@ app.post("/messages", messagesLimiter, mcpAuth, async (req, res) => {
 // MCP Streamable HTTP transport (modern clients use this)
 const httpTransports = new Map<string, { transport: StreamableHTTPServerTransport; cleanup: () => void }>();
 
-app.all("/mcp", mcpLimiter, mcpAuth, async (req, res) => {
+app.all("/mcp", mcpLimiter, async (req, res) => {
   // Handle session-based routing for existing sessions
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
   if (sessionId && httpTransports.has(sessionId)) {
@@ -143,7 +141,7 @@ app.get("/{*splat}", spaLimiter, (_req, res) => {
 app.use(errorHandler);
 
 const server = createServer(app);
-initWebSocket(server, db);
+initWebSocket(server);
 
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "Vibe Dash running");

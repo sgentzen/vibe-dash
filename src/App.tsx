@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch } from "./store";
-import { useApi, getStoredApiKey, ApiError } from "./hooks/useApi";
+import { useApi, ApiError } from "./hooks/useApi";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -14,19 +14,17 @@ import { FleetView } from "./components/fleet/FleetView";
 import { AgentFeed } from "./components/AgentFeed";
 import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
-import { LoginView } from "./components/LoginView";
 import { ProjectContextChip } from "./components/ProjectContextChip";
 import { CommandPalette } from "./components/CommandPalette";
 
 export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
-  const { theme, activeView, fleetPreset, isAuthenticated, authEnabled, rightRailCollapsed } = useNavigationState();
+  const { theme, activeView, fleetPreset, rightRailCollapsed } = useNavigationState();
   const { fileConflicts, loadError } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gKeyPending = useRef(false);
@@ -40,48 +38,15 @@ export function App() {
   useWebSocket();
   usePolling();
 
-  // Check auth status on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const status = await api.getAuthStatus();
-        const teamMode = status.team_mode ?? false;
-        if (!status.auth_enabled) {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode } });
-          setAuthChecked(true);
-          return;
-        }
-        // Auth is enabled — validate stored key (if any)
-        const storedKey = getStoredApiKey();
-        if (storedKey) {
-          try {
-            const user = await api.validateApiKey(storedKey);
-            dispatch({ type: "SET_AUTH", payload: { currentUser: user, isAuthenticated: true, authEnabled: true, teamMode } });
-          } catch {
-            // Key invalid or expired — prompt login
-            dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
-          }
-        } else {
-          dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: false, authEnabled: true, teamMode } });
-        }
-      } catch {
-        // Server unreachable — treat as local-only; polling will retry data loading
-        dispatch({ type: "SET_AUTH", payload: { currentUser: null, isAuthenticated: true, authEnabled: false, teamMode: false } });
-      }
-      setAuthChecked(true);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Auto-collapse right rail on views where it would obscure content.
   // Uses SET_RIGHT_RAIL_COLLAPSED (not TOGGLE) so it doesn't write to localStorage
   // and doesn't permanently override the user's stored preference.
   useEffect(() => {
-    if (activeView === "fleet" && (fleetPreset === "timeline" || fleetPreset === "agents")) {
+    if (activeView === "fleet" && fleetPreset === "agents") {
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: true });
     } else {
-      // Restore the user's persisted preference when leaving Timeline,
-      // so the rail doesn't stay hidden after a one-off visit.
+      // Restore the user's persisted preference when not on the agents
+      // preset, so the rail doesn't stay hidden after a one-off visit.
       dispatch({ type: "SET_RIGHT_RAIL_COLLAPSED", payload: getInitialRightRailCollapsed() });
     }
   }, [activeView, fleetPreset, dispatch]);
@@ -127,10 +92,9 @@ export function App() {
           dispatch({ type: "SET_ACTIVE_VIEW", payload: view });
           return;
         }
-        const presetMap: Record<string, "overview" | "agents" | "timeline"> = {
+        const presetMap: Record<string, "overview" | "agents"> = {
           o: "overview",
           a: "agents",
-          t: "timeline",
         };
         const preset = presetMap[e.key];
         if (preset) {
@@ -276,12 +240,6 @@ export function App() {
       console.error("[handleOnboardingComplete] reload failed:", err);
     }
   }
-
-  // Show nothing until auth is resolved
-  if (!authChecked) return null;
-
-  // Show login when auth is enabled but user is not authenticated
-  if (authEnabled && !isAuthenticated) return <LoginView />;
 
   return (
     <div className="app">

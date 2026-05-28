@@ -1,34 +1,12 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus, IngestionSource, IngestionSourceKind } from "../types";
-import type { ExecutiveSummary } from "../../shared/types.js";
-
-const SESSION_KEY = "vibe-dash-api-key";
-
-export function getStoredApiKey(): string | null {
-  const v = sessionStorage.getItem(SESSION_KEY);
-  return v ? atob(v) : null;
-}
-
-export function setStoredApiKey(key: string | null): void {
-  if (key) sessionStorage.setItem(SESSION_KEY, btoa(key));
-  else sessionStorage.removeItem(SESSION_KEY);
-}
-
-function authHeaders(): Record<string, string> {
-  const key = getStoredApiKey();
-  if (!key) return {};
-  return { Authorization: `Bearer ${key}` };
-}
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
 
 function jsonHeaders(): Record<string, string> {
-  return { "Content-Type": "application/json", ...authHeaders() };
+  return { "Content-Type": "application/json" };
 }
 
 async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers as Record<string, string> | undefined) },
-  });
+  return fetch(url, init);
 }
 
 /**
@@ -503,15 +481,6 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
   return res.json();
 }
 
-// ─── Executive Summary ────────────────────────────────────────────────
-export type { ExecutiveSummary } from "../../shared/types.js";
-
-async function getExecutiveSummary(projectId: string): Promise<ExecutiveSummary> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/executive-summary`);
-  if (!res.ok) await throwApiError(res, "getExecutiveSummary");
-  return res.json();
-}
-
 // ─── Worktrees ────────────────────────────────────────────────────────
 
 async function getWorktrees(): Promise<TaskWorktree[]> {
@@ -527,110 +496,6 @@ async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise
     body: JSON.stringify({ status }),
   });
   if (!res.ok) await throwApiError(res, "updateWorktreeStatus");
-  return res.json();
-}
-
-// ─── WS Ticket ───────────────────────────────────────────────────────────────
-
-export async function getWsTicket(): Promise<string | null> {
-  try {
-    const res = await apiFetch("/api/ws-ticket", { method: "POST" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data as { ticket: string }).ticket ?? null;
-  } catch {
-    return null;
-  }
-}
-
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-import type { User } from "../types";
-
-interface AuthStatus {
-  auth_enabled: boolean;
-  team_mode: boolean;
-}
-
-async function getAuthStatus(): Promise<AuthStatus> {
-  const res = await fetch("/api/auth/status"); // no auth header — public endpoint
-  if (!res.ok) await throwApiError(res, "getAuthStatus");
-  return res.json();
-}
-
-async function validateApiKey(key: string): Promise<User> {
-  const res = await fetch("/api/auth/me", {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!res.ok) throw new Error("Invalid API key");
-  return res.json();
-}
-
-async function createUserApi(data: { name: string; email: string; role?: string }): Promise<{ user: User; api_key: string }> {
-  const res = await apiFetch("/api/users", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error((err as { error?: string }).error ?? "createUser failed");
-  }
-  return res.json();
-}
-
-async function listUsersApi(): Promise<User[]> {
-  const res = await apiFetch("/api/users");
-  if (!res.ok) await throwApiError(res, "listUsers");
-  return res.json();
-}
-
-async function updateUserRoleApi(id: string, role: string): Promise<User> {
-  const res = await apiFetch(`/api/users/${encodeURIComponent(id)}/role`, {
-    method: "PATCH",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ role }),
-  });
-  if (!res.ok) await throwApiError(res, "updateUserRole");
-  return res.json();
-}
-
-async function deleteUserApi(id: string): Promise<void> {
-  await apiFetch(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
-async function rotateKeyApi(id: string): Promise<{ user: User; api_key: string }> {
-  const res = await apiFetch(`/api/users/${encodeURIComponent(id)}/rotate-key`, {
-    method: "POST",
-    headers: jsonHeaders(),
-  });
-  if (!res.ok) await throwApiError(res, "rotateKey");
-  return res.json();
-}
-
-// ─── Ingestion ────────────────────────────────────────────────────────────────
-
-async function listIngestionSources(): Promise<IngestionSource[]> {
-  const res = await apiFetch("/api/ingest/sources");
-  if (!res.ok) await throwApiError(res, "listIngestionSources");
-  return res.json();
-}
-
-async function createIngestionSource(name: string, kind: IngestionSourceKind, project_id?: string | null): Promise<IngestionSource & { token: string }> {
-  const res = await apiFetch("/api/ingest/sources", { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ name, kind, project_id }) });
-  if (!res.ok) await throwApiError(res, "createIngestionSource");
-  return res.json();
-}
-
-async function deleteIngestionSource(id: string): Promise<void> {
-  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) await throwApiError(res, "deleteIngestionSource");
-}
-
-async function rotateIngestionToken(id: string): Promise<{ token: string }> {
-  const res = await apiFetch(`/api/ingest/sources/${encodeURIComponent(id)}/rotate`, { method: "POST" });
-  if (!res.ok) await throwApiError(res, "rotateIngestionToken");
   return res.json();
 }
 
@@ -687,18 +552,5 @@ export function useApi() {
     getTaskTypeBreakdown,
     getWorktrees,
     updateWorktreeStatus,
-    getExecutiveSummary,
-    getAuthStatus,
-    validateApiKey,
-    createUser: createUserApi,
-    listUsers: listUsersApi,
-    updateUserRole: updateUserRoleApi,
-    deleteUser: deleteUserApi,
-    rotateKey: rotateKeyApi,
-    listIngestionSources,
-    createIngestionSource: (name: string, kind: IngestionSourceKind, project_id?: string | null) => createIngestionSource(name, kind, project_id),
-    deleteIngestionSource,
-    rotateIngestionToken,
-    getWsTicket,
   }), []);
 }

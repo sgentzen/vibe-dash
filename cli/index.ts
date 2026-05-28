@@ -10,13 +10,9 @@
  *   npx ts-node cli/index.ts agents
  */
 
-import { resolve, join } from "path";
-import { homedir } from "os";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
 import { resolveDbPath } from "../server/utils/resolveDbPath.js";
-import { generateDigest, isAiConfigured } from "../server/intelligence.js";
 import {
   RESET,
   DIM,
@@ -56,18 +52,16 @@ const dbPath = resolveDbPath(flags.db);
 const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 
-// ─── Open DB (skipped for install-hooks which talks to the server via HTTP) ──
+// ─── Open DB ─────────────────────────────────────────────────────────────────
 
 let db!: Database.Database;
-if (command !== "install-hooks") {
-  try {
-    db = new Database(dbPath);
-    initDb(db);
-  } catch (e) {
-    console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
-    console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
-    process.exit(1);
-  }
+try {
+  db = new Database(dbPath);
+  initDb(db);
+} catch (e) {
+  console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
+  console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
+  process.exit(1);
 }
 
 // ─── Commands ────────────────────────────────────────────────────────────────
@@ -219,161 +213,6 @@ function cmdHelp() {
   console.log(formatHelp());
 }
 
-async function cmdDigest() {
-  const outputDir = resolve(flags["output-dir"] ?? "./digests");
-  const date = new Date().toISOString().slice(0, 10);
-  const outPath = join(outputDir, `${date}.md`);
-
-  mkdirSync(outputDir, { recursive: true });
-
-  let content: string;
-  if (isAiConfigured()) {
-    const projectName = flags.project;
-    const projectId = projectName
-      ? listProjects(db).find((p) => p.name.toLowerCase() === projectName.toLowerCase())?.id
-      : undefined;
-    process.stdout.write("Generating AI digest…");
-    content = await generateDigest(db, "daily", projectId);
-    process.stdout.write(" done.\n");
-  } else {
-    content = buildStaticDigest(db, date);
-  }
-  writeFileSync(outPath, content, "utf8");
-  console.log(`${GREEN}Digest written:${RESET} ${outPath}`);
-}
-
-function appendTaskSection(lines: string[], heading: string, tasks: { title: string }[], limit: number): void {
-  if (tasks.length === 0) return;
-  lines.push("", `### ${heading}`);
-  for (const t of tasks.slice(0, limit)) lines.push(`- ${t.title}`);
-}
-
-function appendProjectDigest(lines: string[], db: Database.Database, p: { id: string; name: string }, since: string): void {
-  const tasks = listTasks(db, { project_id: p.id }).filter((t) => !t.parent_task_id);
-  const inProgress = tasks.filter((t) => t.status === "in_progress");
-  const done24h = tasks.filter((t) => t.status === "done" && t.updated_at >= since);
-  const blocked = tasks.filter((t) => t.status === "blocked");
-  const openMilestone = listMilestones(db, p.id).find((m) => m.status === "open");
-  const pct = openMilestone ? getMilestoneProgress(db, openMilestone.id).completion_pct : null;
-
-  lines.push(`## ${p.name}`);
-  if (openMilestone) lines.push(`**Milestone:** ${openMilestone.name}${pct !== null ? ` (${pct}%)` : ""}`);
-  lines.push(`**In progress:** ${inProgress.length}  **Completed today:** ${done24h.length}  **Blocked:** ${blocked.length}`);
-  appendTaskSection(lines, "Completed today", done24h, 10);
-  appendTaskSection(lines, "In progress", inProgress, 10);
-  appendTaskSection(lines, "Blocked", blocked, 5);
-  lines.push("");
-}
-
-function buildStaticDigest(db: Database.Database, date: string): string {
-  const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
-  const lines: string[] = [`# Daily Digest — ${date}`, ""];
-
-  for (const p of listProjects(db)) appendProjectDigest(lines, db, p, since);
-
-  const activeBlockers = getActiveBlockers(db);
-  if (activeBlockers.length > 0) {
-    lines.push("## Active Blockers", "");
-    for (const b of activeBlockers.slice(0, 10)) lines.push(`- ${b.reason}`);
-    lines.push("");
-  }
-
-  const agents = listAgents(db);
-  const activeAgents = agents.filter((a) => getAgentHealthStatus(a.last_seen_at) === "active");
-  lines.push(`## Agents`, `${activeAgents.length} active / ${agents.length} total`, "");
-
-  return lines.join("\n");
-}
-
-// ─── install-hooks ───────────────────────────────────────────────────────────
-
-async function verifyServerReachable(serverUrl: string): Promise<void> {
-  try {
-    const check = await fetch(`${serverUrl}/api/auth/status`);
-    if (!check.ok) throw new Error(`server returned ${check.status}`);
-  } catch (e) {
-    throw new Error(`Cannot reach vibe-dash server at ${serverUrl}. Is it running?\n  ${(e as Error).message}`);
-  }
-}
-
-async function fetchOrCreateIngestToken(serverUrl: string, sourceName: string): Promise<{ token: string; existing: boolean }> {
-  const listRes = await fetch(`${serverUrl}/api/ingest/sources`);
-  if (!listRes.ok) throw new Error(`Failed to list ingestion sources: ${listRes.status}`);
-  const sources = (await listRes.json()) as { id: string; name: string }[];
-  const existing = sources.find((s) => s.name === sourceName);
-
-  if (existing) {
-    const rotateRes = await fetch(`${serverUrl}/api/ingest/sources/${existing.id}/rotate`, { method: "POST" });
-    if (!rotateRes.ok) throw new Error(`Failed to rotate token: ${rotateRes.status} ${await rotateRes.text()}`);
-    const rotated = (await rotateRes.json()) as { token: string };
-    return { token: rotated.token, existing: true };
-  }
-  const createRes = await fetch(`${serverUrl}/api/ingest/sources`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: sourceName, kind: "claude_code" }),
-  });
-  if (!createRes.ok) throw new Error(`Failed to create ingestion source: ${createRes.status} ${await createRes.text()}`);
-  const created = (await createRes.json()) as { token: string };
-  return { token: created.token, existing: false };
-}
-
-function readSettings(settingsPath: string, settingsDir: string): Record<string, unknown> {
-  if (existsSync(settingsPath)) {
-    try {
-      return JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
-    } catch {
-      throw new Error(`Cannot parse ${settingsPath} — fix the JSON first`);
-    }
-  }
-  mkdirSync(settingsDir, { recursive: true });
-  return {};
-}
-
-function upsertHookEntry<T extends { hooks: unknown[] }>(list: T[], newEntry: T, matchExisting: (e: T) => boolean): T[] {
-  const idx = list.findIndex(matchExisting);
-  if (idx >= 0) list[idx] = newEntry; else list.push(newEntry);
-  return list;
-}
-
-async function installHooks(): Promise<void> {
-  const serverUrl = (flags.server ?? "http://localhost:3001").replace(/\/$/, "");
-  await verifyServerReachable(serverUrl);
-
-  const sourceName = "claude-code-hooks";
-  const { token, existing } = await fetchOrCreateIngestToken(serverUrl, sourceName);
-
-  // Build hook command (inline node, works cross-platform, requires Node >=18)
-  const endpoint = `${serverUrl}/api/ingest/claude_code`;
-  const hookCmd = `node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{fetch('${endpoint}',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${token}'},body:d}).catch(()=>{})});"`;
-  const hookEntry = { type: "command", command: hookCmd };
-  const isVibeDashHook = (e: { hooks: unknown[] }) => JSON.stringify(e.hooks).includes("api/ingest/claude_code");
-
-  const settingsDir = join(homedir(), ".claude");
-  const settingsPath = join(settingsDir, "settings.json");
-  const settings = readSettings(settingsPath, settingsDir);
-  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-
-  hooks.PostToolUse = upsertHookEntry(
-    (hooks.PostToolUse ?? []) as { matcher?: string; hooks: unknown[] }[],
-    { matcher: ".*", hooks: [hookEntry] },
-    (e) => e.matcher === ".*" && isVibeDashHook(e),
-  );
-  hooks.Stop = upsertHookEntry(
-    (hooks.Stop ?? []) as { hooks: unknown[] }[],
-    { hooks: [hookEntry] },
-    isVibeDashHook,
-  );
-
-  settings.hooks = hooks;
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-
-  console.log(`${GREEN}✓ Hooks installed${RESET} → ${settingsPath}`);
-  console.log(`  Ingestion source: ${sourceName} ${existing ? DIM + "(token rotated)" + RESET : ""}`);
-  console.log(`  Endpoint: ${endpoint}`);
-  console.log(`  Every PostToolUse + Stop event will POST to vibe-dash.`);
-}
-
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -382,8 +221,6 @@ async function main() {
     case "add-task": cmdAddTask(); break;
     case "status": cmdStatus(); break;
     case "agents": cmdAgents(); break;
-    case "digest": await cmdDigest(); break;
-    case "install-hooks": await installHooks(); break;
     default: cmdHelp(); break;
   }
 }

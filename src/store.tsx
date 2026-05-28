@@ -16,7 +16,7 @@ export type DataState = Pick<
 export type NavigationState = Pick<
   AppState,
   "selectedProjectId" | "selectedMilestoneId" | "activeView" | "fleetPreset" | "searchQuery" | "searchScope" | "theme" |
-  "currentUser" | "isAuthenticated" | "authEnabled" | "teamMode" | "rightRailCollapsed" | "alertsOpen"
+  "rightRailCollapsed" | "alertsOpen"
 >;
 
 export type NotificationState = Pick<
@@ -61,10 +61,6 @@ const initialState: AppState = {
   selectedMilestoneId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
   pollGeneration: 0,
-  currentUser: null,
-  isAuthenticated: false,
-  authEnabled: false,
-  teamMode: false,
   loadError: null,
 };
 
@@ -109,16 +105,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       searchQuery: state.searchQuery,
       searchScope: state.searchScope,
       theme: state.theme,
-      currentUser: state.currentUser,
-      isAuthenticated: state.isAuthenticated,
-      authEnabled: state.authEnabled,
-      teamMode: state.teamMode,
       rightRailCollapsed: state.rightRailCollapsed,
       alertsOpen: state.alertsOpen,
     }),
     [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.fleetPreset, state.searchQuery,
-     state.searchScope, state.theme, state.currentUser, state.isAuthenticated, state.authEnabled,
-     state.teamMode, state.rightRailCollapsed, state.alertsOpen]
+     state.searchScope, state.theme, state.rightRailCollapsed, state.alertsOpen]
   );
 
   const notificationValue = useMemo<NotificationState>(

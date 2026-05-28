@@ -47,13 +47,9 @@ export function usePolling() {
         );
       }
 
-      // Agents needed everywhere except when looking at a pure timeline
-      const skipAgents = view === "fleet" && preset === "timeline";
-      if (!skipAgents) {
-        promises.push(
-          api.getAgents().then((v) => dispatch({ type: "SET_AGENTS", payload: v })),
-        );
-      }
+      promises.push(
+        api.getAgents().then((v) => dispatch({ type: "SET_AGENTS", payload: v })),
+      );
 
       // Activity needed for the feed view and the agents preset
       if (view === "feed" || (view === "fleet" && preset === "agents")) {

@@ -234,17 +234,6 @@ export interface TaskTypeBreakdown {
   avg_lines_added: number;
 }
 
-export type UserRole = "admin" | "developer" | "viewer";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  created_at: string;
-  updated_at: string;
-}
-
 export type WsEventType =
   | "project_created"
   | "project_updated"
@@ -276,9 +265,7 @@ export type WsEventType =
   | "metrics_logged"
   | "worktree_created"
   | "worktree_updated"
-  | "plugins_reloaded"
-  | "ingestion_source_created"
-  | "ingestion_event_received";
+  | "plugins_reloaded";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -313,57 +300,12 @@ export type WsEvent =
   | WsEventOf<"metrics_logged", CompletionMetrics>
   | WsEventOf<"worktree_created", TaskWorktree>
   | WsEventOf<"worktree_updated", TaskWorktree>
-  | WsEventOf<"ingestion_source_created", { id: string; name: string; kind: string }>
-  | WsEventOf<"ingestion_event_received", { source_id: string; source_kind: string; normalized_kind: string; agent_name: string | null; project_id: string | null }>
   | WsEventOf<"plugins_reloaded", { count: number }>;
-
-// ─── Ingestion ────────────────────────────────────────────────────────────────
-
-export type IngestionSourceKind = "claude_code" | "cursor" | "codex" | "copilot" | "aider" | "generic";
-
-export interface IngestionSource {
-  id: string;
-  name: string;
-  kind: IngestionSourceKind;
-  project_id: string | null;
-  active: boolean;
-  created_at: string;
-  last_event_at: string | null;
-}
 
 // ─── Agent Cost ───────────────────────────────────────────────────────────────
 
 export interface AgentCost {
   total_cost_usd: number;
   total_tokens: number;
-}
-
-// ─── Executive Summary ────────────────────────────────────────────────────────
-
-export interface MilestoneHealth {
-  id: string;
-  name: string;
-  target_date: string | null;
-  task_count: number;
-  completed_count: number;
-  completion_pct: number;
-  health: "on_track" | "at_risk" | "behind";
-}
-
-export interface TeamUtilization { total: number; active: number; idle: number; offline: number; }
-export interface BlockersSummary { open_count: number; avg_resolution_seconds: number | null; }
-export interface TaskVelocity { this_week: number; last_week: number; trend_pct: number | null; }
-export interface CostTrendEntry { date: string; cost_usd: number; }
-export interface CostOverview { total_cost_usd: number; last_7_days_cost_usd: number; daily_trend: CostTrendEntry[]; }
-
-export interface ExecutiveSummary {
-  project_id: string;
-  project_name: string;
-  milestone_health: MilestoneHealth[];
-  team_utilization: TeamUtilization;
-  blockers: BlockersSummary;
-  velocity: TaskVelocity;
-  costs: CostOverview;
-  generated_at: string;
 }
 

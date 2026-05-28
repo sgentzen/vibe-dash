@@ -82,8 +82,6 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       // Does NOT persist to localStorage — used for programmatic collapse (e.g. auto-collapse on Timeline)
       // so it doesn't override the user's stored preference.
       return { ...state, rightRailCollapsed: action.payload };
-    case "SET_AUTH":
-      return { ...state, ...action.payload };
     case "SET_LOAD_ERROR":
       return { ...state, loadError: action.payload };
     default:
