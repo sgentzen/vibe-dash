@@ -4,6 +4,7 @@ import { TaskCard } from "../../src/components/TaskCard";
 import {
   renderWithProviders,
   screen,
+  within,
   makeTask,
   makeAgent,
   resetIdSeq,
@@ -223,5 +224,50 @@ describe("TaskCard", () => {
       />,
     );
     expect(screen.getByText("Blocked by 3")).toBeInTheDocument();
+  });
+});
+
+describe("TaskCard agent badge", () => {
+  const onClick = vi.fn();
+  const onDragStart = vi.fn();
+
+  beforeEach(() => {
+    resetIdSeq();
+    onClick.mockClear();
+    onDragStart.mockClear();
+  });
+
+  it("renders the assigned agent with a freshness dot (active=green)", () => {
+    const agent = makeAgent({ id: "a1", name: "claude-coder", health_status: "active" });
+    const task = makeTask({ assigned_agent_id: "a1" });
+    renderWithProviders(
+      <TaskCard task={task} allTasks={[task]} activity={[]} agents={[agent]}
+        onClick={onClick} onDragStart={onDragStart} />,
+    );
+    const badge = screen.getByTestId("agent-badge");
+    expect(badge).toHaveTextContent("claude-coder");
+    const dot = within(badge).getByTestId("agent-fresh-dot");
+    expect(dot.style.background).toBe("var(--status-success)");
+  });
+
+  it("renders no agent badge when unassigned", () => {
+    const task = makeTask({ assigned_agent_id: null });
+    renderWithProviders(
+      <TaskCard task={task} allTasks={[task]} activity={[]} agents={[]}
+        onClick={onClick} onDragStart={onDragStart} />,
+    );
+    expect(screen.queryByTestId("agent-badge")).not.toBeInTheDocument();
+  });
+
+  it("places the agent badge before the priority badge", () => {
+    const agent = makeAgent({ id: "a1", name: "claude-coder" });
+    const task = makeTask({ assigned_agent_id: "a1", priority: "high" });
+    renderWithProviders(
+      <TaskCard task={task} allTasks={[task]} activity={[]} agents={[agent]}
+        onClick={onClick} onDragStart={onDragStart} />,
+    );
+    const badge = screen.getByTestId("agent-badge");
+    const pri = screen.getByText("high");
+    expect(badge.compareDocumentPosition(pri) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

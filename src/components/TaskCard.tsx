@@ -2,6 +2,7 @@ import { useState, useMemo, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
+import { HEALTH_COLORS } from "../constants/colors.js";
 import { StatusPill } from "./StatusPill.js";
 import type { StatusToken } from "../constants/statusTokens.js";
 import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
@@ -195,6 +196,25 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
         {/* Badges row: priority, due date, agent, tags */}
         <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
+          {/* Assigned agent badge (with freshness dot) */}
+          {assignedAgent && (
+            <span
+              data-testid="agent-badge"
+              style={{ ...badgeStyle(agentColor(assignedAgent.name)), display: "inline-flex", alignItems: "center", gap: "4px" }}
+            >
+              <span
+                data-testid="agent-fresh-dot"
+                aria-hidden="true"
+                style={{
+                  width: "6px", height: "6px", borderRadius: "50%",
+                  background: HEALTH_COLORS[assignedAgent.health_status ?? "offline"],
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.45)", flexShrink: 0,
+                }}
+              />
+              {assignedAgent.name}
+            </span>
+          )}
+
           {/* Priority badge */}
           {(task.priority === "urgent" || task.priority === "high") && (
             <StatusPill
@@ -222,15 +242,6 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
               }}
             >
               Due {task.due_date}
-            </span>
-          )}
-
-          {/* Assigned agent badge */}
-          {assignedAgent && (
-            <span
-              style={badgeStyle(agentColor(assignedAgent.name))}
-            >
-              {assignedAgent.name}
             </span>
           )}
 
