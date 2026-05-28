@@ -276,9 +276,7 @@ export type WsEventType =
   | "metrics_logged"
   | "worktree_created"
   | "worktree_updated"
-  | "plugins_reloaded"
-  | "ingestion_source_created"
-  | "ingestion_event_received";
+  | "plugins_reloaded";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
