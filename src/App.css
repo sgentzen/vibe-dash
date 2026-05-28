@@ -184,3 +184,7 @@ textarea:focus-visible {
 .highlight-pulse {
   animation: highlightPulse 0.8s ease-out;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .highlight-pulse { animation: none; }
+}

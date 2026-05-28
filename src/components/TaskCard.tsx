@@ -7,6 +7,7 @@ import { StatusPill } from "./StatusPill.js";
 import type { StatusToken } from "../constants/statusTokens.js";
 import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
 import { usePulseOnChange } from "../hooks/usePulseOnChange";
+import { prefersReducedMotion } from "../utils/reducedMotion.js";
 
 interface TaskCardProps {
   task: Task;
@@ -87,7 +88,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
   return (
     <div
-      className={(statusPulse || justAppeared) ? "highlight-pulse" : undefined}
+      className={(statusPulse || justAppeared) && !prefersReducedMotion() ? "highlight-pulse" : undefined}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);

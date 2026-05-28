@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined"
-    && typeof window.matchMedia === "function"
-    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
+import { prefersReducedMotion } from "../utils/reducedMotion.js";
 
 /**
  * Returns true for ~`durationMs` after `value` changes — never on first mount.

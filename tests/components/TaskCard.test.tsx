@@ -302,4 +302,14 @@ describe("TaskCard justAppeared pulse", () => {
     );
     expect((view.container.firstElementChild as HTMLElement).className).toContain("highlight-pulse");
   });
+
+  it("does NOT add highlight-pulse for a new card when reduced motion is preferred", () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }));
+    const t = makeTask({ id: "appear-rm" });
+    const view = renderWithProviders(
+      <TaskCard task={t} allTasks={[t]} activity={[]} agents={[makeAgent({})]} justAppeared onClick={() => {}} onDragStart={() => {}} />
+    );
+    expect((view.container.firstElementChild as HTMLElement).className).not.toContain("highlight-pulse");
+    vi.unstubAllGlobals();
+  });
 });
