@@ -30,17 +30,16 @@ function rebuildTasksIfFkStale(db: Database.Database): void {
         due_date TEXT,
         start_date TEXT,
         estimate INTEGER,
-        recurrence_rule TEXT,
         task_type TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       INSERT INTO tasks_new
         (id, project_id, parent_task_id, milestone_id, assigned_agent_id,
          title, description, status, priority, progress,
-         due_date, start_date, estimate, recurrence_rule, task_type, created_at, updated_at)
+         due_date, start_date, estimate, task_type, created_at, updated_at)
       SELECT id, project_id, parent_task_id, milestone_id, assigned_agent_id,
          title, description, status, priority, progress,
-         due_date, start_date, estimate, recurrence_rule, task_type, created_at, updated_at
+         due_date, start_date, estimate, task_type, created_at, updated_at
       FROM tasks;
       DROP TABLE tasks;
       ALTER TABLE tasks_new RENAME TO tasks;

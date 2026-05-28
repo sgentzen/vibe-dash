@@ -215,7 +215,15 @@ Part of Phase 1D schema sweep.
 
 **Files:**
 - Modify: `server/db/migrator.ts` (append migration `015`)
+- Modify: `server/db/schema.ts` (strip `recurrence_rule` from the `rebuildTasksIfFkStale` rebuild DDL — see Step 2.0, MANDATORY)
 - Modify: `tests/db-persistence.test.ts` (the migration-014 assertion now contradicts 015 — update it + add a 015 assertion)
+
+### Step 2.0 (MANDATORY — do BEFORE/with the migration): fix the legacy tasks-rebuild DDL
+`server/db/schema.ts` has `rebuildTasksIfFkStale(db)` — a guard that runs in `initDb` AFTER `runMigrations`, but ONLY on legacy DBs whose `tasks.milestone_id` still has a stale FK to the dropped `sprints` table (a no-op for healthy DBs). When it fires, it rebuilds `tasks` via a `tasks_new` table whose DDL currently includes `recurrence_rule` (lines ~33, 40, 43). Since migration 015 drops `recurrence_rule` from `tasks` and `rebuildTasksIfFkStale` runs *after* migrations, its `INSERT INTO tasks_new (... recurrence_rule ...) SELECT ... recurrence_rule ... FROM tasks` would reference a now-dropped column and **throw on legacy DBs**. Remove `recurrence_rule` from all three places in that function:
+- the `CREATE TABLE tasks_new (...)` column list (line ~33: `        recurrence_rule TEXT,`)
+- the `INSERT INTO tasks_new (...)` column list (line ~40)
+- the `SELECT ...` column list (line ~43)
+Keep every other column. After this, the rebuild produces a `recurrence_rule`-free `tasks` table, consistent with migration 015. (Healthy DBs never run this path, but the edit keeps the two schema sources consistent and prevents a latent legacy break.)
 
 ### Step 2.1: Append migration 015
 Edit `server/db/migrator.ts`. Find the end of the `MIGRATIONS` array — the `014_commits_and_milestone_history` entry followed by `];` (around line 521-522). Insert a new entry BEFORE the closing `];`, matching the existing entries' style. The body calls `db.exec(...)` with a SQL string (same as every other migration — match the exact `db.exec(` formatting used by migration 014 above it):
