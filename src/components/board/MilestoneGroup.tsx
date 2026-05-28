@@ -12,6 +12,7 @@ interface MilestoneGroupProps {
   tags: Tag[];
   taskTagMap: Record<string, string[]>;
   taskDepsMap: Record<string, string[]>;
+  justAppearedIds: Set<string>;
   grabbedTaskId: string | null;
   onClickTask: (task: Task) => void;
   onDragStart: (id: string) => void;
@@ -27,6 +28,7 @@ export function MilestoneGroup({
   tags,
   taskTagMap,
   taskDepsMap,
+  justAppearedIds,
   grabbedTaskId,
   onClickTask,
   onDragStart,
@@ -86,6 +88,7 @@ export function MilestoneGroup({
             taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
             blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
             grabbed={grabbedTaskId === task.id}
+            justAppeared={justAppearedIds.has(task.id)}
             onClick={() => onClickTask(task)}
             onDragStart={onDragStart}
             onGrab={onGrab}

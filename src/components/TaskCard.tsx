@@ -2,9 +2,12 @@ import { useState, useMemo, memo } from "react";
 import type { Task, ActivityEntry, Agent, Tag } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
+import { HEALTH_COLORS } from "../constants/colors.js";
 import { StatusPill } from "./StatusPill.js";
 import type { StatusToken } from "../constants/statusTokens.js";
 import { Sparkline, buildDailyActivityCounts } from "./Sparkline.js";
+import { usePulseOnChange } from "../hooks/usePulseOnChange";
+import { prefersReducedMotion } from "../utils/reducedMotion.js";
 
 interface TaskCardProps {
   task: Task;
@@ -14,6 +17,7 @@ interface TaskCardProps {
   taskTags?: Tag[];
   blockingCount?: number;
   grabbed?: boolean;
+  justAppeared?: boolean;
   onClick: () => void;
   onDragStart: (taskId: string) => void;
   onGrab?: (taskId: string) => void;
@@ -33,7 +37,7 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
-export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, onClick, onDragStart, onGrab }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -42,6 +46,8 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   const assignedAgent = task.assigned_agent_id
     ? agents.find((a) => a.id === task.assigned_agent_id)
     : null;
+
+  const statusPulse = usePulseOnChange(task.status);
 
   const dueUrgency = useMemo(
     () => (isDone ? null : getDueUrgency(task.due_date)),
@@ -82,6 +88,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
   return (
     <div
+      className={(statusPulse || justAppeared) && !prefersReducedMotion() ? "highlight-pulse" : undefined}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);
@@ -195,6 +202,25 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
         {/* Badges row: priority, due date, agent, tags */}
         <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
+          {/* Assigned agent badge (with freshness dot) */}
+          {assignedAgent && (
+            <span
+              data-testid="agent-badge"
+              style={{ ...badgeStyle(agentColor(assignedAgent.name)), display: "inline-flex", alignItems: "center", gap: "4px" }}
+            >
+              <span
+                data-testid="agent-fresh-dot"
+                aria-hidden="true"
+                style={{
+                  width: "6px", height: "6px", borderRadius: "50%",
+                  background: HEALTH_COLORS[assignedAgent.health_status ?? "offline"],
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.45)", flexShrink: 0,
+                }}
+              />
+              {assignedAgent.name}
+            </span>
+          )}
+
           {/* Priority badge */}
           {(task.priority === "urgent" || task.priority === "high") && (
             <StatusPill
@@ -222,15 +248,6 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
               }}
             >
               Due {task.due_date}
-            </span>
-          )}
-
-          {/* Assigned agent badge */}
-          {assignedAgent && (
-            <span
-              style={badgeStyle(agentColor(assignedAgent.name))}
-            >
-              {assignedAgent.name}
             </span>
           )}
 
