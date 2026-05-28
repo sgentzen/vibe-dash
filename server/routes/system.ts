@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import { ACTIVE_THRESHOLD_MINUTES } from "../db/index.js";
+import { ACTIVE_THRESHOLD_MINUTES, getSpendToday, getTasksCompletedToday } from "../db/index.js";
 import { firstRunLimiter, statsLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 
@@ -37,7 +37,14 @@ export function systemRoutes(db: Database.Database, _broadcast: BroadcastFn): Ro
     const alerts = (
       db.prepare("SELECT COUNT(*) AS count FROM blockers WHERE resolved_at IS NULL").get() as { count: number }
     ).count;
-    res.json({ projects, tasks, activeAgents, alerts });
+    res.json({
+      projects,
+      tasks,
+      activeAgents,
+      alerts,
+      spend_today: getSpendToday(db),
+      tasks_completed_today: getTasksCompletedToday(db),
+    });
   });
 
   return router;

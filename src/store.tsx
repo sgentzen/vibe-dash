@@ -59,7 +59,7 @@ const initialState: AppState = {
   rightRailCollapsed: getInitialRightRailCollapsed(),
   selectedProjectId: null,
   selectedMilestoneId: null,
-  stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0 },
+  stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0, spend_today: 0, tasks_completed_today: 0 },
   pollGeneration: 0,
   loadError: null,
 };

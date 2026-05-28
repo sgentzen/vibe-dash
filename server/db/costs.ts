@@ -76,6 +76,15 @@ function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, valu
   ).get(value) as CostSummary;
 }
 
+export function getSpendToday(db: Database.Database): number {
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const row = db
+    .prepare("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM cost_entries WHERE created_at >= ?")
+    .get(todayStart.toISOString()) as { total: number };
+  return row.total;
+}
+
 export function getGlobalCostSummary(db: Database.Database): CostSummary {
   return db.prepare(
     `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,

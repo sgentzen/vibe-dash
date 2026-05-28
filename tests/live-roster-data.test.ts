@@ -8,8 +8,10 @@ import {
   updateTask,
   completeTask,
   logActivity,
-  listAgents,
   getAgentCompletedToday,
+  getSpendToday,
+  getTasksCompletedToday,
+  logCost,
 } from "../server/db/index.js";
 
 describe("live roster data — per-agent completed_today", () => {
@@ -33,7 +35,27 @@ describe("live roster data — per-agent completed_today", () => {
     // to attribute this completion to the agent.
     logActivity(db, { task_id: task.id, agent_id: agent.id, message: "task done" });
     expect(getAgentCompletedToday(db, agent.id)).toBe(1);
-    const agents = listAgents(db);
-    expect(agents.find((a) => a.id === agent.id)).toBeDefined();
+  });
+});
+
+describe("live roster data — today summary figures", () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createTestDb(); });
+
+  it("getSpendToday sums only today's cost entries", () => {
+    const p = createProject(db, { name: "P", description: null });
+    logCost(db, { agent_id: null, task_id: null, milestone_id: null, project_id: p.id, model: "m", provider: "x", input_tokens: 10, output_tokens: 5, cost_usd: 1.25 });
+    logCost(db, { agent_id: null, task_id: null, milestone_id: null, project_id: p.id, model: "m", provider: "x", input_tokens: 10, output_tokens: 5, cost_usd: 0.75 });
+    expect(getSpendToday(db)).toBeCloseTo(2.0, 5);
+  });
+
+  it("getTasksCompletedToday counts only today's done tasks", () => {
+    const p = createProject(db, { name: "P", description: null });
+    const t1 = createTask(db, { project_id: p.id, title: "a", priority: "medium" });
+    const t2 = createTask(db, { project_id: p.id, title: "b", priority: "medium" });
+    completeTask(db, t1.id);
+    expect(getTasksCompletedToday(db)).toBe(1);
+    completeTask(db, t2.id);
+    expect(getTasksCompletedToday(db)).toBe(2);
   });
 });

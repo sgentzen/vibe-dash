@@ -24,6 +24,7 @@ export {
   listTasks,
   updateTask,
   completeTask,
+  getTasksCompletedToday,
   searchTasks,
   bulkUpdateTasks,
 } from "./tasks.js";
@@ -83,6 +84,7 @@ export {
   getCostByModel,
   getCostByAgent,
   getGlobalCostSummary,
+  getSpendToday,
 } from "./costs.js";
 export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
 export {

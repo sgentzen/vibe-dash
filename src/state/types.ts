@@ -46,6 +46,8 @@ export interface AppState {
     tasks: number;
     activeAgents: number;
     alerts: number;
+    spend_today: number;
+    tasks_completed_today: number;
   };
   pollGeneration: number;
   rightRailCollapsed: boolean;
