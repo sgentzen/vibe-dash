@@ -7,8 +7,6 @@ import {
   registerAgent,
   createBlocker,
   resolveBlocker,
-  createReview,
-  updateReview,
 } from "../server/db/index.js";
 import { runDetectors, _resetRegistry } from "../server/detectors/registry.js";
 import { registerTier1Detectors } from "../server/detectors/tier1.js";
@@ -189,75 +187,6 @@ describe("agent-silence detector", () => {
   });
 });
 
-// ─── failing-review ───────────────────────────────────────────────────────────
-
-describe("failing-review detector", () => {
-  it("ignores pending reviews", () => {
-    const p = createProject(db, { name: "P", description: null });
-    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "medium" });
-    createReview(db, { task_id: t.id, reviewer_name: "Reviewer" });
-
-    const matches = runWith().filter((m) => m.detectorId === "failing-review");
-    expect(matches).toHaveLength(0);
-  });
-
-  it("ignores failed reviews younger than 24 h", () => {
-    const p = createProject(db, { name: "P", description: null });
-    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "medium" });
-    const r = createReview(db, { task_id: t.id, reviewer_name: "Reviewer", status: "failed" });
-    // Review was just created — updated_at is now, well within 24 h.
-    expect(r.status).toBe("failed");
-
-    const matches = runWith().filter((m) => m.detectorId === "failing-review");
-    expect(matches).toHaveLength(0);
-  });
-
-  it("flags failed reviews older than 24 h", () => {
-    const p = createProject(db, { name: "P", description: null });
-    const t = createTask(db, { project_id: p.id, title: "Review me", description: null, priority: "medium" });
-    const r = createReview(db, { task_id: t.id, reviewer_name: "bot-reviewer", status: "failed" });
-    db.prepare("UPDATE task_reviews SET updated_at = ? WHERE id = ?").run(hoursAgo(30), r.id);
-
-    const matches = runWith().filter((m) => m.detectorId === "failing-review");
-    expect(matches).toHaveLength(1);
-    expect(matches[0].entityId).toBe(r.id);
-    expect(matches[0].entityType).toBe("review");
-    expect(matches[0].label).toContain("Review me");
-    expect(matches[0].detail).toContain("bot-reviewer");
-  });
-
-  it("does not flag approved reviews", () => {
-    const p = createProject(db, { name: "P", description: null });
-    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "medium" });
-    const r = createReview(db, { task_id: t.id, reviewer_name: "R" });
-    updateReview(db, r.id, { status: "approved" });
-    db.prepare("UPDATE task_reviews SET updated_at = ? WHERE id = ?").run(hoursAgo(48), r.id);
-
-    const matches = runWith().filter((m) => m.detectorId === "failing-review");
-    expect(matches).toHaveLength(0);
-  });
-
-  it("scores 55 for 24-47 h old failed reviews", () => {
-    const p = createProject(db, { name: "P", description: null });
-    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "medium" });
-    const r = createReview(db, { task_id: t.id, reviewer_name: "R", status: "failed" });
-    db.prepare("UPDATE task_reviews SET updated_at = ? WHERE id = ?").run(hoursAgo(30), r.id);
-
-    const match = runWith().find((m) => m.entityId === r.id);
-    expect(match?.score).toBe(55);
-  });
-
-  it("scores 90 for 72 h+ old failed reviews", () => {
-    const p = createProject(db, { name: "P", description: null });
-    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "medium" });
-    const r = createReview(db, { task_id: t.id, reviewer_name: "R", status: "failed" });
-    db.prepare("UPDATE task_reviews SET updated_at = ? WHERE id = ?").run(hoursAgo(80), r.id);
-
-    const match = runWith().find((m) => m.entityId === r.id);
-    expect(match?.score).toBe(90);
-  });
-});
-
 // ─── Integration — multiple detectors together ────────────────────────────────
 
 describe("all Tier 1 detectors together", () => {
@@ -270,9 +199,10 @@ describe("all Tier 1 detectors together", () => {
       "INSERT INTO blockers (id, task_id, reason, reported_at, resolved_at) VALUES (?, ?, ?, ?, NULL)"
     ).run("b-30h", t.id, "Reason", hoursAgo(30));
 
-    // 80 h old failed review → score 90
-    const r = createReview(db, { task_id: t.id, reviewer_name: "R", status: "failed" });
-    db.prepare("UPDATE task_reviews SET updated_at = ? WHERE id = ?").run(hoursAgo(80), r.id);
+    // 80 h old blocker → score 95
+    db.prepare(
+      "INSERT INTO blockers (id, task_id, reason, reported_at, resolved_at) VALUES (?, ?, ?, ?, NULL)"
+    ).run("b-80h", t.id, "Ancient", hoursAgo(80));
 
     const results = runWith();
     expect(results.length).toBeGreaterThanOrEqual(2);

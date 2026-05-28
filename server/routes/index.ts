@@ -18,7 +18,6 @@ import { webhookRoutes } from "./webhooks.js";
 import { costRoutes } from "./costs.js";
 import { metricRoutes } from "./metrics.js";
 import { bulkRoutes } from "./bulk.js";
-import { reviewRoutes } from "./reviews.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { executiveRoutes } from "./executive.js";
 import { milestoneRoutes } from "./milestones.js";
@@ -75,7 +74,6 @@ const routeFactories: RouteFactory[] = [
   webhookRoutes,
   costRoutes,
   bulkRoutes,
-  reviewRoutes,
   worktreeRoutes,
   executiveRoutes,
   milestoneRoutes,

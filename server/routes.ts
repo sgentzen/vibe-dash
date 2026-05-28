@@ -60,10 +60,6 @@ import {
   getAgentActivityHeatmap,
   addComment,
   listComments,
-  createReview,
-  getReview,
-  listReviewsForTask,
-  updateReview,
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -632,65 +628,6 @@ export function createRouter(db: Database.Database): Router {
     }
 
     res.status(201).json(comment);
-  });
-
-  // ─── 5.4: Code Review Integration ───────────────────────────────────
-
-  router.get("/api/tasks/:id/reviews", (req, res) => {
-    res.json(listReviewsForTask(db, req.params.id));
-  });
-
-  router.post("/api/tasks/:id/reviews", (req, res) => {
-    const task = getTask(db, req.params.id);
-    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
-    const { reviewer_name, reviewer_agent_id, status, comments, diff_summary } =
-      req.body as {
-        reviewer_name?: string;
-        reviewer_agent_id?: string | null;
-        status?: "pending" | "approved" | "changes_requested";
-        comments?: string | null;
-        diff_summary?: string | null;
-      };
-    if (!reviewer_name) {
-      res.status(400).json({ error: "reviewer_name is required" });
-      return;
-    }
-    if (reviewer_name.length > 200) {
-      res.status(400).json({ error: "reviewer_name too long" });
-      return;
-    }
-    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
-      res.status(400).json({ error: "invalid status" });
-      return;
-    }
-    const review = createReview(db, {
-      task_id: req.params.id,
-      reviewer_name,
-      reviewer_agent_id: reviewer_agent_id ?? null,
-      status,
-      comments: comments ?? null,
-      diff_summary: diff_summary ?? null,
-    });
-    broadcast({ type: "review_created", payload: review });
-    res.status(201).json(review);
-  });
-
-  router.patch("/api/reviews/:id", (req, res) => {
-    const existing = getReview(db, req.params.id);
-    if (!existing) { res.status(404).json({ error: "Review not found" }); return; }
-    const { status, comments, diff_summary } = req.body as {
-      status?: "pending" | "approved" | "changes_requested";
-      comments?: string | null;
-      diff_summary?: string | null;
-    };
-    if (status && !["pending", "approved", "changes_requested"].includes(status)) {
-      res.status(400).json({ error: "invalid status" });
-      return;
-    }
-    const updated = updateReview(db, req.params.id, { status, comments, diff_summary });
-    if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
-    broadcast({ type: "review_updated", payload: updated });
-    res.json(updated);
   });
 
   // ─── R3: Notifications ─────────────────────────────────────────────
