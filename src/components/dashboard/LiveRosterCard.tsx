@@ -105,11 +105,16 @@ export function LiveRosterCard({ agents, tasks }: LiveRosterCardProps) {
             <div
               style={{
                 marginTop: "6px",
-                color: a.current_task_title ? "var(--text-primary)" : "var(--text-muted)",
+                color: (a.current_status ?? a.current_task_title) ? "var(--text-primary)" : "var(--text-muted)",
                 fontSize: "13px",
               }}
             >
-              {a.current_task_title ?? "— idle, no active task —"}
+              {a.current_status ?? a.current_task_title ?? "— idle, no active task —"}
+              {a.current_status && a.current_status_at && (
+                <span style={{ color: "var(--text-muted)", fontSize: "11px", marginLeft: "6px" }}>
+                  · {relativeTime(a.current_status_at)}
+                </span>
+              )}
             </div>
 
             {task && (
