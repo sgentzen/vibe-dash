@@ -11,7 +11,7 @@
  */
 
 import { resolve, join } from "path";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
 import { resolveDbPath } from "../server/utils/resolveDbPath.js";
