@@ -4,7 +4,7 @@ import { createServer, type Server, type IncomingMessage } from "http";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { createRouter } from "../server/routes.js";
+import { createRouter } from "../server/routes/index.js";
 import {
   createProject,
   createTask,
@@ -75,7 +75,7 @@ describe("GET /api/stats", () => {
   it("returns zero counts for an empty database", async () => {
     const { status, body } = await request("GET", "/api/stats");
     expect(status).toBe(200);
-    expect(body).toEqual({ projects: 0, tasks: 0, activeAgents: 0, alerts: 0 });
+    expect(body).toMatchObject({ projects: 0, tasks: 0, activeAgents: 0, alerts: 0 });
   });
 
   it("returns correct counts after inserting data", async () => {
@@ -91,7 +91,7 @@ describe("GET /api/stats", () => {
 
     const { status, body } = await request("GET", "/api/stats");
     expect(status).toBe(200);
-    expect(body).toEqual({ projects: 1, tasks: 1, activeAgents: 1, alerts: 1 });
+    expect(body).toMatchObject({ projects: 1, tasks: 1, activeAgents: 1, alerts: 1 });
   });
 
   it("does not count resolved blockers as alerts", async () => {

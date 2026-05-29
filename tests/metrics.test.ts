@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage } from "http";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { createRouter } from "../server/routes.js";
+import { createRouter } from "../server/routes/index.js";
 import {
   createProject,
   createTask,

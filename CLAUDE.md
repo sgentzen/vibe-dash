@@ -19,9 +19,12 @@ Local-first real-time dashboard for monitoring AI-driven development projects vi
 ```
 server/
   index.ts          # Express app, MCP SSE, WebSocket setup (port 3001)
-  routes.ts         # All REST API endpoints (Express Router)
   types.ts          # Shared TypeScript interfaces/types
   websocket.ts      # WebSocket broadcast
+  routes/           # REST API — createRouter() composes per-resource route factories
+    index.ts        # createRouter(): mounts rate limiter + all route factories
+    middleware.ts   # asyncHandler, notFoundHandler, errorHandler
+    <resource>.ts   # one factory per resource (projects, tasks, agents, …)
   db/
     index.ts        # Barrel re-export (all consumers import from here)
     schema.ts       # DDL, migrations, initDb(), openDb()
