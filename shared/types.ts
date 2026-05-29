@@ -61,6 +61,8 @@ export interface Agent {
   health_status?: AgentHealthStatus;
   active?: boolean;
   completed_today?: number;
+  current_status?: string | null;
+  current_status_at?: string | null;
 }
 
 export interface ActivityEntry {

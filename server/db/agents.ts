@@ -80,6 +80,13 @@ export function getAgentById(db: Database.Database, id: string): Agent | null {
   return parseAgent(row);
 }
 
+export function setAgentStatus(db: Database.Database, agentName: string, status: string): void {
+  const normalized = normalizeAgentName(agentName);
+  db.prepare(
+    "UPDATE agents SET current_status = ?, current_status_at = ? WHERE name_normalized = ?"
+  ).run(status, now(), normalized);
+}
+
 export function touchAgent(db: Database.Database, name: string): Agent {
   const existing = getAgentByName(db, name);
   if (existing) {

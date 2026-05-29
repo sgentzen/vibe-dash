@@ -218,5 +218,19 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     call("log_cost")
   );
 
+  server.tool(
+    "heartbeat",
+    "Report what you're working on right now (a short freeform status)",
+    { status: z.string().min(1).max(280) },
+    call("heartbeat")
+  );
+
+  server.tool(
+    "get_project_context",
+    "Get a project's current state in one call: open milestones (with progress), in-progress tasks, active blockers, and recent activity",
+    { project_id: z.string().min(1) },
+    call("get_project_context")
+  );
+
   return { server, cleanup };
 }

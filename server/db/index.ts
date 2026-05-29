@@ -35,6 +35,7 @@ export {
   getAgentByName,
   getAgentById,
   touchAgent,
+  setAgentStatus,
   getAgentHealthStatus,
   getAgentActivity,
   getAgentCompletedToday,
@@ -103,3 +104,5 @@ export {
   updateWorktreeStatus,
 } from "./worktrees.js";
 export type { CreateWorktreeInput } from "./worktrees.js";
+export { getProjectContext } from "./projectContext.js";
+export type { ProjectContext } from "./projectContext.js";

@@ -44,4 +44,20 @@ describe("LiveRosterCard", () => {
     render(<LiveRosterCard agents={[]} tasks={[]} />);
     expect(screen.getByText(/No agents registered/i)).toBeInTheDocument();
   });
+
+  it("prefers current_status over the task title when present", () => {
+    render(
+      <LiveRosterCard
+        agents={[agent({ current_status: "running test suite", current_status_at: new Date().toISOString() })]}
+        tasks={[]}
+      />,
+    );
+    expect(screen.getByText("running test suite")).toBeInTheDocument();
+    expect(screen.queryByText("Implementing X")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the task title when there is no status", () => {
+    render(<LiveRosterCard agents={[agent({ current_status: null })]} tasks={[]} />);
+    expect(screen.getByText("Implementing X")).toBeInTheDocument();
+  });
 });
