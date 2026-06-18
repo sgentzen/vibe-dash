@@ -1,7 +1,14 @@
 # Vibe Dash — Program Review, April 2026
 
-**Status**: Active guiding document. This supersedes earlier roadmap notes
-and is the primary reference for R11+ planning until the next program review.
+> **⚠️ Historical — superseded by the mid-2026 Phase 1 cuts.** Several "next
+> bets" below (intelligence/digests, git host sync, self-hostable team mode)
+> were deliberately removed in Phases 1A–1D to refocus on a local-first
+> Dashboard + Kanban + MCP for a solo user. Read this for the earlier strategic
+> context, not as the current plan. Superseded task plans live in
+> [archive/superseded-plans/](archive/superseded-plans/).
+
+**Status**: Historical (April 2026). Superseded by the Phase 1 cuts; retained
+for context.
 
 ## Context
 
@@ -171,13 +178,13 @@ implementation plans live under [`docs/plans/R11/`](plans/R11),
 - [R11.4 — Feature deprecation audit](archive/completed-plans/R11.4-feature-deprecation-audit.md)
 
 **R12 tasks**
-- [R12.1 — AI-summarized digests + NL query](plans/R12/R12.1-nl-query-and-digests.md)
-- [R12.2 — Git host sync (GitHub/GitLab)](plans/R12/R12.2-git-host-sync.md)
-- [R12.3 — Information-density pass](plans/R12/R12.3-information-density-pass.md)
+- [R12.1 — AI-summarized digests + NL query](archive/superseded-plans/R12.1-nl-query-and-digests.md) _(superseded — cut in Phase 1C)_
+- [R12.2 — Git host sync (GitHub/GitLab)](archive/superseded-plans/R12.2-git-host-sync.md) _(superseded — cut in Phase 1B)_
+- [R12.3 — Information-density pass](plans/R12/R12.3-information-density-pass.md) _(partially shipped)_
 
 **R13 tasks**
-- [R13.1 — Self-hostable team mode](plans/R13/R13.1-self-hostable-team-mode.md)
-- [R13.2 — Docs + hero examples + homepage reposition](plans/R13/R13.2-docs-and-repositioning.md)
+- [R13.1 — Self-hostable team mode](archive/superseded-plans/R13.1-self-hostable-team-mode.md) _(superseded — cut in Phase 1C)_
+- [R13.2 — Docs + hero examples + homepage reposition](plans/R13/R13.2-docs-and-repositioning.md) _(largely shipped)_
 
 ---
 

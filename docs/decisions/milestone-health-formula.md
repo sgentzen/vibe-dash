@@ -1,8 +1,16 @@
 # Milestone Health Formula
 
-**Status**: Adopted
-**Date**: 2026-05-03
+**Status**: Not currently wired up — kept as a design reference.
+**Date**: 2026-05-03 (impl removed 2026-06-17)
 **Scope**: M6-T1 (Audit & fix milestone-health computation)
+
+> **2026-06-17 update:** the Executive view that consumed milestone health was
+> removed in the Phase 1 cuts, leaving the `computeMilestoneHealth()`
+> implementation (`server/db/milestone-health.ts`) with no callers. The dead
+> code was deleted; this document is retained because the formula below is the
+> intended basis for the health badges planned in
+> [R12.3](../plans/R12/R12.3-information-density-pass.md). Re-implement from here
+> if/when that work proceeds.
 
 ## Context
 
