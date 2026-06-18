@@ -7,6 +7,7 @@ services:
     volumes:
       - vibe-dash-data:/data
     environment:
+      - NODE_ENV=production
       - PORT=3001
       - VIBE_DASH_DB=/data/vibe-dash.db
     restart: unless-stopped

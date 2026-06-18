@@ -12,7 +12,7 @@
 
 import Database from "better-sqlite3";
 import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
-import { resolveDbPath } from "../server/utils/resolveDbPath.js";
+import { resolveDbPath } from "../server/db/path.js";
 import {
   RESET,
   DIM,
