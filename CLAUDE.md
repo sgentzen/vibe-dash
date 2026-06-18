@@ -27,19 +27,26 @@ server/
     <resource>.ts   # one factory per resource (projects, tasks, agents, …)
   db/
     index.ts        # Barrel re-export (all consumers import from here)
-    schema.ts       # DDL, migrations, initDb(), openDb()
+    schema.ts       # DDL, initDb(), openDb()
+    migrator.ts     # versioned migration runner (schema migrations live here)
+    path.ts         # resolveDbPath() — worktree-aware SQLite path resolution
     helpers.ts      # now(), genId(), parseAgent()
+    where.ts        # shared WHERE-clause builder
     projects.ts     # createProject, listProjects
     milestones.ts   # CRUD + progress, daily stats, completion tracking
-    tasks.ts        # CRUD + search, bulk update
-    agents.ts       # CRUD + health, sessions, stats, file locks
+    tasks.ts        # CRUD + search
+    bulk.ts         # bulk task update
+    agents.ts       # CRUD + health, sessions, stats
     activity.ts     # logActivity, activity stream, heatmap
     blockers.ts     # createBlocker, resolveBlocker
     tags.ts         # tag CRUD + task-tag associations
     dependencies.ts # task dependency graph
     comments.ts     # comments + @mentions
-    notifications.ts # alert rules + notifications
+    notifications.ts # notifications
     costs.ts        # cost/token tracking per agent/milestone/project
+    metrics.ts      # aggregate dashboard metrics
+    worktrees.ts    # git worktree tracking
+    projectContext.ts # get_project_context aggregation for MCP
   mcp/
     server.ts       # MCP server factory + tool registration
     tools.ts        # MCP tool handler implementations
@@ -124,5 +131,4 @@ router.get("/api/resource", limiter, (req, res) => {
 | Variable | Default | Used by |
 |----------|---------|---------|
 | `PORT` | `3001` | Express server (`server/index.ts`) |
-| `DB_PATH` | `./vibe-dash.db` | Server SQLite path |
-| `VIBE_DASH_DB` | `./vibe-dash.db` | Stdio MCP SQLite path — must match `DB_PATH` to share data with the server |
+| `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | SQLite path for the server, stdio MCP, and CLI alike (all go through `resolveDbPath()`). Set it once to share one DB across all three. |
