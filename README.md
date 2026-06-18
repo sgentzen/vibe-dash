@@ -15,7 +15,6 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 - **Task board** — agents claim tasks, log progress, and flag blockers through MCP tool calls
 - **Activity feed** — every agent action appears in real time; no polling needed
 - **Cost tracker** — per-agent and per-model token spend logged automatically
-- **Conflict detection** — agents declare which files they're editing; you see collisions before they happen
 - **Local-first** — SQLite on your machine, no cloud, no subscriptions
 
 ---
@@ -63,27 +62,29 @@ Full setup guide with task import, CLAUDE.md snippets, and troubleshooting: [doc
 
 ## Dashboard views
 
+- **Fleet** — multi-project status overview; switch the *Agents* preset for the live per-agent roster with health, session, and cost breakdown
 - **Board** — Kanban (Planned / In Progress / Done) with agent assignments, priority, tags, and progress bars
-- **List** — Filterable, sortable table with saved filters
-- **Analytics** — Burndown charts, sprint capacity, velocity trends
-- **Agent Dashboard** — Per-agent metrics, session history, cost breakdown by model
+- **Feed** — real-time activity stream of every agent action across projects
 
 ---
 
-## MCP tools (30+)
+## MCP tools
 
 Core tools your agents will use most:
 
 | Tool | Purpose |
 |------|---------|
 | `create_project` | Register a project |
-| `list_tasks` / `search_tasks` | Find work |
+| `list_tasks` / `search_tasks` / `get_task` | Find work |
 | `create_task` / `update_task` / `complete_task` | Manage tasks |
+| `create_milestone` / `complete_milestone` / `list_milestones` | Group work into milestones |
+| `register_agent` / `heartbeat` | Announce an agent and keep it live |
 | `log_activity` | Post a status update (auto-registers the agent) |
 | `report_blocker` / `resolve_blocker` | Flag and clear blockers |
-| `report_working_on` | Declare files being edited (conflict detection) |
 | `log_cost` | Record token spend |
-| `create_sprint` / `generate_report` | Sprint management |
+| `get_project_context` | Pull a project's current state in one call |
+
+See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 
 ---
 
@@ -144,15 +145,12 @@ See [docs/self-hosting.md](docs/self-hosting.md) for reverse proxy (Nginx/Caddy)
 
 ## Roadmap
 
-The current strategic direction and active milestones (R11–R13) are documented in
-[docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md). This is the
-primary guiding document for all roadmap decisions until the next program review.
-
-## Roadmap
-
-The current strategic direction and active milestones (R11–R13) are documented in
-[docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md). This is the
-primary guiding document for all roadmap decisions until the next program review.
+Vibe Dash narrowed in mid-2026 to its core — a local-first **Dashboard + Kanban +
+MCP** for a solo user — and cut the broader platform features (team mode, git
+ingestion, intelligence/digests, sprints, reports). The 2026-04 program review
+([docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md)) records the
+earlier, wider direction and is kept for context; superseded plans live under
+[docs/archive/superseded-plans/](docs/archive/superseded-plans/).
 
 ## Contributing
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import { createServer } from "http";
 import type Database from "better-sqlite3";
 import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
-import { resolveDbPath } from "./utils/resolveDbPath.js";
+import { resolveDbPath } from "./db/path.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
 import { notFoundHandler, errorHandler } from "./routes/middleware.js";
@@ -37,7 +37,7 @@ const messagesLimiter = rateLimit({
 });
 
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
-const DB_PATH = resolveDbPath(PROJECT_ROOT);
+const DB_PATH = resolveDbPath();
 
 const app = express();
 app.use(helmet({
