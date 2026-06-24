@@ -4,21 +4,27 @@ const THEME_STORAGE_KEY = "vibe-dash-theme";
 const RIGHT_RAIL_STORAGE_KEY = "vibe-dash-right-rail";
 const SEARCH_SCOPE_STORAGE_KEY = "vibe-dash-search-scope";
 
+// Allowlists of the only values ever read from / written to browser storage.
+// Persisting a value selected *from these constants* (rather than the raw,
+// possibly-tainted action payload) keeps untrusted data out of localStorage.
+const THEMES = ["light", "dark"] as const;
+const SEARCH_SCOPES = ["tasks", "projects", "agents", "all"] as const;
+
 export function getInitialRightRailCollapsed(): boolean {
   return localStorage.getItem(RIGHT_RAIL_STORAGE_KEY) === "true";
 }
 
 export function getInitialTheme(): Theme {
-  const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
+  const raw = localStorage.getItem(THEME_STORAGE_KEY);
+  const stored = THEMES.find((t) => t === raw);
+  if (stored) return stored;
   if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
 }
 
 export function getInitialSearchScope(): SearchScope {
-  const stored = localStorage.getItem(SEARCH_SCOPE_STORAGE_KEY);
-  if (stored === "tasks" || stored === "projects" || stored === "agents" || stored === "all") return stored;
-  return "all";
+  const raw = localStorage.getItem(SEARCH_SCOPE_STORAGE_KEY);
+  return SEARCH_SCOPES.find((s) => s === raw) ?? "all";
 }
 
 export function setReducer(state: AppState, action: AppAction): AppState | null {
@@ -43,11 +49,12 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, taskDepsMap: action.payload };
     case "SET_SEARCH_QUERY":
       return { ...state, searchQuery: action.payload };
-    case "SET_SEARCH_SCOPE":
-      if (action.payload === "tasks" || action.payload === "projects" || action.payload === "agents" || action.payload === "all") {
-        localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, action.payload);
-      }
+    case "SET_SEARCH_SCOPE": {
+      // Persist a value taken from the SEARCH_SCOPES constant, never the raw payload.
+      const scope = SEARCH_SCOPES.find((s) => s === action.payload);
+      if (scope) localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, scope);
       return { ...state, searchScope: action.payload };
+    }
     case "SET_ALERTS_OPEN":
       return { ...state, alertsOpen: action.payload };
     case "SET_ACTIVE_VIEW":
@@ -66,11 +73,12 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, selectedProjectId: action.payload, selectedMilestoneId: null };
     case "SELECT_MILESTONE":
       return { ...state, selectedMilestoneId: action.payload };
-    case "SET_THEME":
-      if (action.payload === "light" || action.payload === "dark") {
-        localStorage.setItem(THEME_STORAGE_KEY, action.payload);
-      }
+    case "SET_THEME": {
+      // Persist a value taken from the THEMES constant, never the raw payload.
+      const theme = THEMES.find((t) => t === action.payload);
+      if (theme) localStorage.setItem(THEME_STORAGE_KEY, theme);
       return { ...state, theme: action.payload };
+    }
     case "INCREMENT_POLL_GENERATION":
       return { ...state, pollGeneration: state.pollGeneration + 1 };
     case "TOGGLE_RIGHT_RAIL": {

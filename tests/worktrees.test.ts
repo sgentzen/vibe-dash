@@ -30,7 +30,7 @@ describe("Git Worktree DB", () => {
       task_id: task.id,
       repo_path: "/repo",
       branch_name: "feat/wt",
-      worktree_path: "/var/data/wt",
+      worktree_path: "/repo/wt",
     });
     expect(wt.status).toBe("active");
     expect(wt.task_id).toBe(task.id);

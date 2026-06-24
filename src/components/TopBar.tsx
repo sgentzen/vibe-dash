@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useDataState, useNavigationState, useNotificationState, useAppDispatch, type SearchScope } from "../store";
 import { useApi } from "../hooks/useApi";
+import { ACCENT_STORAGE_KEY, DEFAULT_ACCENT, readStoredAccentColor, sanitizeAccentColor } from "../utils/accent";
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
 import { NotificationBell } from "./topbar/NotificationBell";
@@ -20,9 +21,9 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   const [showAppearance, setShowAppearance] = useState(false);
   const appearanceRef = useRef<HTMLDivElement>(null);
 
-  // Initial accent color from localStorage
+  // Initial accent color from localStorage (validated; default when unset/invalid)
   const [accentColor, setAccentColor] = useState(
-    () => localStorage.getItem("vibe-dash-accent") ?? "#58a6ff"
+    () => readStoredAccentColor() ?? DEFAULT_ACCENT
   );
 
   // Close appearance popover on outside click
@@ -38,12 +39,13 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   }, [showAppearance]);
 
   function handleAccentChange(color: string) {
-    // Validate hex color format before persisting / applying — prevents tainted
-    // input from being written to storage or injected as a CSS value.
-    if (!/^#[0-9a-fA-F]{3,8}$/.test(color)) return;
-    setAccentColor(color);
-    localStorage.setItem("vibe-dash-accent", color);
-    document.documentElement.style.setProperty("--accent-user", color);
+    // Coerce to a known-safe hex value (never the raw, possibly-tainted input)
+    // before persisting to storage and applying as a CSS variable.
+    const safeColor = sanitizeAccentColor(color);
+    if (!safeColor) return;
+    setAccentColor(safeColor);
+    localStorage.setItem(ACCENT_STORAGE_KEY, safeColor);
+    document.documentElement.style.setProperty("--accent-user", safeColor);
     document.documentElement.setAttribute("data-accent", "true");
   }
 
