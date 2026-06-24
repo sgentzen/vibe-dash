@@ -101,6 +101,18 @@ describe("TopBar", () => {
     expect(screen.getByRole("button", { name: /switch to dark mode/i })).toBeInTheDocument();
   });
 
+  it("accent color change persists a normalized hex value and sets the CSS variable", () => {
+    localStorage.removeItem("vibe-dash-accent");
+    renderWithProviders(<TopBar />);
+    fireEvent.click(within(getHeader()).getByRole("button", { name: /appearance/i }));
+    const colorInput = screen.getByLabelText(/custom accent color/i);
+    fireEvent.change(colorInput, { target: { value: "#1A2B3C" } });
+    // Value is rebuilt from the validated hex digits (lowercased) before it
+    // reaches storage or the CSS variable — no raw input passes through.
+    expect(localStorage.getItem("vibe-dash-accent")).toBe("#1a2b3c");
+    expect(document.documentElement.style.getPropertyValue("--accent-user")).toBe("#1a2b3c");
+  });
+
   // ── M3-T5: Scope select dispatches SET_SEARCH_SCOPE ──────────────────
 
   it("scope select updates searchScope state", () => {

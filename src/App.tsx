@@ -6,6 +6,7 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import { usePolling } from "./hooks/usePolling";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { getInitialRightRailCollapsed } from "./state/setReducer";
+import { readStoredAccentColor } from "./utils/accent";
 import { TopBar } from "./components/TopBar";
 import { ProjectList } from "./components/ProjectList";
 import { TaskBoard } from "./components/TaskBoard";
@@ -116,8 +117,8 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    // Restore custom accent color
-    const accent = localStorage.getItem("vibe-dash-accent");
+    // Restore custom accent color (validated — corrupted/tainted storage is ignored)
+    const accent = readStoredAccentColor();
     if (accent) {
       document.documentElement.style.setProperty("--accent-user", accent);
       document.documentElement.setAttribute("data-accent", "true");
