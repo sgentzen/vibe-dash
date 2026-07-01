@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import FocusTrap from "focus-trap-react";
 import { useApi } from "../hooks/useApi";
 import { inputStyle, buttonPrimary, buttonSecondary, sectionHeader } from "../styles/shared.js";
@@ -35,6 +35,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (step === 0) nameInputRef.current?.focus();
+  }, [step]);
 
   async function handleCreateProject() {
     if (!projectName.trim()) return;
@@ -168,12 +173,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <div style={{ marginBottom: "12px" }}>
                 <label htmlFor="onboard-project-name" style={labelStyle}>Project Name</label>
                 <input
+                  ref={nameInputRef}
                   id="onboard-project-name"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleCreateProject(); }}
                   placeholder="My AI Project"
-                  autoFocus
                   style={inputStyle}
                 />
               </div>

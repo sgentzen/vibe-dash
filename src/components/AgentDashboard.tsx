@@ -240,6 +240,14 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
   return (
     <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       style={{
         ...cardStyle,
         cursor: "pointer",

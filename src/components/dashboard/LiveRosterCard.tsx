@@ -159,6 +159,14 @@ export function LiveRosterCard({ agents, tasks }: LiveRosterCardProps) {
         <div>
           <div
             onClick={() => setShowOffline((v) => !v)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setShowOffline((v) => !v);
+              }
+            }}
             style={{
               cursor: "pointer",
               textAlign: "center",

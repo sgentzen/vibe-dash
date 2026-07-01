@@ -2,6 +2,7 @@ import tseslint from "typescript-eslint";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
 import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
 import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
 
@@ -58,9 +59,13 @@ export default tseslint.config(
   // Accessibility rules for the React client (S6819, S6848, S1082, S6847, ...)
   {
     files: ["src/**/*.{ts,tsx}"],
-    plugins: { "jsx-a11y": jsxA11y },
+    plugins: { "jsx-a11y": jsxA11y, "react-hooks": reactHooks },
     languageOptions: { globals: { ...globals.browser } },
-    rules: { ...jsxA11y.flatConfigs.recommended.rules },
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
   },
   // Tests legitimately use the DOM `window` global and testing-library casts,
   // which these two auto-fixing rules mis-flag (and their autofix breaks the
