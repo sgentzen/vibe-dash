@@ -49,6 +49,19 @@ function dueBadge(urgency: "overdue" | "today" | "this-week"): { token: StatusTo
   return { token: "neutral", label: "Due soon" };
 }
 
+function cardAppearance(
+  isActive: boolean,
+  isBlocked: boolean,
+  dueUrgency: "overdue" | "today" | "this-week" | null,
+): { borderColor: string; background: string; boxShadow: string } {
+  const base = { borderColor: "var(--border)", background: "var(--bg-tertiary)", boxShadow: "none" };
+  if (isActive) return { borderColor: "var(--status-success)", background: "var(--green-bg)", boxShadow: "var(--shadow-glow-green)" };
+  if (isBlocked) return { ...base, borderColor: "var(--status-danger)" };
+  if (dueUrgency === "overdue") return { ...base, borderColor: "var(--status-danger)", boxShadow: "var(--shadow-glow-red)" };
+  if (dueUrgency === "today") return { ...base, borderColor: "var(--status-warning)" };
+  return base;
+}
+
 export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
@@ -79,22 +92,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
 
   const descSnippet = truncateDescription(task.description);
 
-  let borderColor = "var(--border)";
-  let background = "var(--bg-tertiary)";
-  let boxShadow = "none";
-
-  if (isActive) {
-    borderColor = "var(--status-success)";
-    background = "var(--green-bg)";
-    boxShadow = "var(--shadow-glow-green)";
-  } else if (isBlocked) {
-    borderColor = "var(--status-danger)";
-  } else if (dueUrgency === "overdue") {
-    borderColor = "var(--status-danger)";
-    boxShadow = "var(--shadow-glow-red)";
-  } else if (dueUrgency === "today") {
-    borderColor = "var(--status-warning)";
-  }
+  const { borderColor, background, boxShadow } = cardAppearance(isActive, isBlocked, dueUrgency);
 
   return (
     <div

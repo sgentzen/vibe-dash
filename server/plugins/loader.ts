@@ -29,57 +29,63 @@ export async function loadPluginsFromDir(dir: string, db: Database.Database): Pr
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const pluginDir = path.join(dir, entry.name);
-    const manifestPath = path.join(pluginDir, MANIFEST_FILE);
-
-    if (!fs.existsSync(manifestPath)) continue;
-
-    let manifest: PluginManifest;
-    try {
-      const raw = fs.readFileSync(manifestPath, "utf-8");
-      manifest = parseManifest(JSON.parse(raw));
-    } catch (err) {
-      logger.warn({ dir: pluginDir, err }, "plugin manifest invalid — skipping");
-      plugins.push({ manifest: { name: entry.name, version: "?", type: "widget" }, dir: pluginDir, error: String(err) });
-      continue;
-    }
-
-    let mod: PluginModule | undefined;
-    if (manifest.entrypoint) {
-      const entrypointPath = path.resolve(pluginDir, manifest.entrypoint);
-      const resolvedPluginDir = path.resolve(pluginDir);
-      if (!entrypointPath.startsWith(resolvedPluginDir + path.sep)) {
-        const err = `entrypoint escapes plugin directory: ${manifest.entrypoint}`;
-        logger.warn({ plugin: manifest.name }, err);
-        plugins.push({ manifest, dir: pluginDir, error: err });
-        continue;
-      }
-      try {
-        const url = pathToFileURL(entrypointPath).href;
-        mod = await import(url) as PluginModule;
-      } catch (err) {
-        logger.warn({ plugin: manifest.name, err }, "plugin entrypoint failed to load");
-        plugins.push({ manifest, dir: pluginDir, error: String(err) });
-        continue;
-      }
-    }
-
-    if (mod?.initialize) {
-      const ctx = createPluginContext(db, manifest.name);
-      try {
-        await mod.initialize(ctx);
-      } catch (err) {
-        logger.warn({ plugin: manifest.name, err }, "plugin initialize() threw");
-        plugins.push({ manifest, dir: pluginDir, module: mod, error: String(err) });
-        continue;
-      }
-    }
-
-    plugins.push({ manifest, dir: pluginDir, module: mod });
-    logger.info({ plugin: manifest.name, type: manifest.type }, "plugin loaded");
+    const loaded = await loadPluginFromEntry(path.join(dir, entry.name), entry.name, db);
+    if (loaded) plugins.push(loaded);
   }
 
   return plugins;
+}
+
+// Loads a single plugin directory. Returns null when the directory has no
+// manifest (not a plugin), or a LoadedPlugin — which carries an `error` field
+// when the manifest/entrypoint/initialize step failed.
+async function loadPluginFromEntry(
+  pluginDir: string,
+  fallbackName: string,
+  db: Database.Database,
+): Promise<LoadedPlugin | null> {
+  const manifestPath = path.join(pluginDir, MANIFEST_FILE);
+  if (!fs.existsSync(manifestPath)) return null;
+
+  let manifest: PluginManifest;
+  try {
+    const raw = fs.readFileSync(manifestPath, "utf-8");
+    manifest = parseManifest(JSON.parse(raw));
+  } catch (err) {
+    logger.warn({ dir: pluginDir, err }, "plugin manifest invalid — skipping");
+    return { manifest: { name: fallbackName, version: "?", type: "widget" }, dir: pluginDir, error: String(err) };
+  }
+
+  let mod: PluginModule | undefined;
+  if (manifest.entrypoint) {
+    const entrypointPath = path.resolve(pluginDir, manifest.entrypoint);
+    const resolvedPluginDir = path.resolve(pluginDir);
+    if (!entrypointPath.startsWith(resolvedPluginDir + path.sep)) {
+      const err = `entrypoint escapes plugin directory: ${manifest.entrypoint}`;
+      logger.warn({ plugin: manifest.name }, err);
+      return { manifest, dir: pluginDir, error: err };
+    }
+    try {
+      const url = pathToFileURL(entrypointPath).href;
+      mod = await import(url) as PluginModule;
+    } catch (err) {
+      logger.warn({ plugin: manifest.name, err }, "plugin entrypoint failed to load");
+      return { manifest, dir: pluginDir, error: String(err) };
+    }
+  }
+
+  if (mod?.initialize) {
+    const ctx = createPluginContext(db, manifest.name);
+    try {
+      await mod.initialize(ctx);
+    } catch (err) {
+      logger.warn({ plugin: manifest.name, err }, "plugin initialize() threw");
+      return { manifest, dir: pluginDir, module: mod, error: String(err) };
+    }
+  }
+
+  logger.info({ plugin: manifest.name, type: manifest.type }, "plugin loaded");
+  return { manifest, dir: pluginDir, module: mod };
 }
 
 function parseManifest(raw: unknown): PluginManifest {
