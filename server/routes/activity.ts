@@ -8,7 +8,7 @@ export function activityRoutes(db: Database.Database, _broadcast: BroadcastFn): 
 
   router.get("/api/activity", (req, res) => {
     const limit = Number.parseInt((req.query.limit as string) ?? "50", 10);
-    res.json(getRecentActivity(db, isNaN(limit) ? 50 : limit));
+    res.json(getRecentActivity(db, Number.isNaN(limit) ? 50 : limit));
   });
 
   router.get("/api/activity-stream", (req, res) => {

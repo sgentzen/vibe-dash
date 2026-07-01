@@ -19,7 +19,6 @@ export function NotificationBell({
   onAlertsOpenChange,
 }: NotificationBellProps) {
   const panelLabelId = useId();
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 

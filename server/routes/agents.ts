@@ -53,7 +53,7 @@ export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
 
   router.get("/api/agents/:id/activity", (req, res) => {
     const limit = Number.parseInt((req.query.limit as string) ?? "50", 10);
-    res.json(getAgentActivity(db, req.params.id, isNaN(limit) ? 50 : limit));
+    res.json(getAgentActivity(db, req.params.id, Number.isNaN(limit) ? 50 : limit));
   });
 
   router.get("/api/agents/:id/sessions", (req, res) => {

@@ -24,7 +24,8 @@ export function Sparkline({ values, width = 48, height = 14, color = "var(--acce
     })
     .join(" ");
 
-  const lastX = ((values.length - 1) / (values.length - 1)) * (width - pad * 2) + pad;
+  // Last point sits at the right edge (fraction 1 of the plot width).
+  const lastX = width - pad * 2 + pad;
   const lastY = height - pad - ((values.at(-1)! - min) / range) * (height - pad * 2);
 
   return (

@@ -156,7 +156,7 @@ export function getTimeSpent(db: Database.Database, taskId: string): number | nu
     .prepare("SELECT MIN(timestamp) AS ts FROM activity_log WHERE task_id = ?")
     .get(taskId) as { ts: string | null } | undefined;
   const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId) as { status: string; updated_at: string } | undefined;
-  if (!first?.ts || !task || task.status !== "done") return null;
+  if (!first?.ts || task?.status !== "done") return null;
   const start = new Date(first.ts).getTime();
   const end = new Date(task.updated_at).getTime();
   return Math.max(0, Math.round((end - start) / 1000));

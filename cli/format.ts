@@ -100,9 +100,16 @@ export interface StatusSummary {
 
 export function formatStatusSummary(s: StatusSummary): string {
   const lines: string[] = [];
-  lines.push(`${BOLD}${CYAN}Status: ${s.projectName}${RESET}`);
-  lines.push(`${DIM}${"─".repeat(40)}${RESET}`, `  ${DIM}Planned:     ${RESET}${s.byStatus.planned ?? 0}`, `  ${BLUE}In Progress: ${RESET}${s.byStatus.in_progress ?? 0}`, `  ${RED}Blocked:     ${RESET}${s.byStatus.blocked ?? 0}`, `  ${GREEN}Done:        ${RESET}${s.byStatus.done ?? 0}`);
-  lines.push(`  ${DIM}${"─".repeat(30)}${RESET}`, `  Total:       ${s.total}`);
+  lines.push(
+    `${BOLD}${CYAN}Status: ${s.projectName}${RESET}`,
+    `${DIM}${"─".repeat(40)}${RESET}`,
+    `  ${DIM}Planned:     ${RESET}${s.byStatus.planned ?? 0}`,
+    `  ${BLUE}In Progress: ${RESET}${s.byStatus.in_progress ?? 0}`,
+    `  ${RED}Blocked:     ${RESET}${s.byStatus.blocked ?? 0}`,
+    `  ${GREEN}Done:        ${RESET}${s.byStatus.done ?? 0}`,
+    `  ${DIM}${"─".repeat(30)}${RESET}`,
+    `  Total:       ${s.total}`,
+  );
 
   if (s.openMilestone) {
     lines.push("", `  ${BOLD}Open Milestone:${RESET} ${s.openMilestone.name}`, `  Tasks: ${s.openMilestone.completed_count}/${s.openMilestone.task_count} done`, `  Progress: ${s.openMilestone.completion_pct}% completed`);
@@ -140,8 +147,7 @@ export interface CompactStatusInput {
 export function formatCompactStatus(input: CompactStatusInput): string {
   const now = new Date().toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const lines: string[] = [];
-  lines.push(`${BOLD}${CYAN}vibe-dash${RESET}  ${DIM}·  ${now}${RESET}`);
-  lines.push(hr(56));
+  lines.push(`${BOLD}${CYAN}vibe-dash${RESET}  ${DIM}·  ${now}${RESET}`, hr(56));
 
   for (const p of input.projects) {
     const inProg = p.in_progress > 0 ? `${BLUE}▶${p.in_progress}${RESET}` : `${DIM}▶${p.in_progress}${RESET}`;

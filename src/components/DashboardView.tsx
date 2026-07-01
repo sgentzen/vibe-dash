@@ -86,7 +86,7 @@ function computeActivityLast7(heatmap: ActivityHeatmapEntry[]): number[] {
 }
 
 export function DashboardView() {
-  const { projects, milestones, blockers, tasks, agents, stats } = useDataState();
+  const { milestones, blockers, tasks, agents, stats } = useDataState();
   const { selectedProjectId } = useNavigationState();
   const { pollGeneration } = usePollingState();
   const api = useApi();

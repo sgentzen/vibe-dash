@@ -50,7 +50,7 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     let days: number | undefined;
     if (rawDays !== undefined) {
       days = Number.parseInt(rawDays, 10);
-      if (isNaN(days)) { res.status(400).json({ error: "days must be a number" }); return; }
+      if (Number.isNaN(days)) { res.status(400).json({ error: "days must be a number" }); return; }
     }
 
     switch (groupBy as GroupBy) {

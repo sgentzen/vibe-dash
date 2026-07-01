@@ -15,7 +15,7 @@ export function notificationRoutes(db: Database.Database, _broadcast: BroadcastF
 
   router.get("/api/notifications", (req, res) => {
     const limit = Number.parseInt((req.query.limit as string) ?? String(DEFAULT_NOTIFICATION_LIMIT), 10);
-    res.json(listNotifications(db, isNaN(limit) ? DEFAULT_NOTIFICATION_LIMIT : limit));
+    res.json(listNotifications(db, Number.isNaN(limit) ? DEFAULT_NOTIFICATION_LIMIT : limit));
   });
 
   router.get("/api/notifications/unread-count", (_req, res) => {
