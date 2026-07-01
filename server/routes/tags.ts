@@ -10,7 +10,7 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
   const router = Router();
 
   router.get("/api/projects/:projectId/tags", (req, res) => {
-    res.json(listTags(db, req.params.projectId as string));
+    res.json(listTags(db, req.params.projectId));
   });
 
   router.post("/api/projects/:projectId/tags", validateBody(createTagSchema), (req, res) => {
@@ -19,7 +19,7 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
   });
 
   router.get("/api/tasks/:id/tags", (req, res) => {
-    res.json(getTaskTags(db, req.params.id as string));
+    res.json(getTaskTags(db, req.params.id));
   });
 
   router.post("/api/tasks/:id/tags", validateBody(addTagToTaskSchema), (req, res) => {
@@ -28,7 +28,7 @@ export function tagRoutes(db: Database.Database, broadcast: BroadcastFn): Router
   });
 
   router.delete("/api/tasks/:id/tags/:tagId", (req, res) => {
-    const removed = removeTagFromTask(db, req.params.id as string, req.params.tagId as string);
+    const removed = removeTagFromTask(db, req.params.id, req.params.tagId);
     if (removed) {
       broadcast({ type: "tag_removed", payload: removed });
     }

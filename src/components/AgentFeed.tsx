@@ -5,6 +5,12 @@ import { HEALTH_COLORS, HEALTH_LABELS } from "../constants/colors.js";
 import type { Agent, AgentHealthStatus } from "../types";
 import { relativeTime } from "../utils/time";
 
+function feedNameColor(isActive: boolean, activeColor: string, health: AgentHealthStatus): string {
+  if (isActive) return activeColor;
+  if (health === "idle") return "var(--text-secondary)";
+  return "var(--text-muted)";
+}
+
 // Keep in sync with server/db.ts ACTIVE_THRESHOLD_MS / IDLE_THRESHOLD_MS
 const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
@@ -329,7 +335,7 @@ function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span
             style={{
-              color: isActive ? color : health === "idle" ? "var(--text-secondary)" : "var(--text-muted)",
+              color: feedNameColor(isActive, color, health),
               fontSize: indent ? "12px" : "13px",
               fontWeight: 500,
               overflow: "hidden",

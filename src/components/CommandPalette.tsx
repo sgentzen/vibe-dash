@@ -4,6 +4,12 @@ import type { AppState, FleetPreset } from "../store.js";
 
 type ViewId = AppState["activeView"];
 
+function taskStatusIcon(status: string): string {
+  if (status === "in_progress") return "●";
+  if (status === "blocked") return "⚠";
+  return "○";
+}
+
 interface Command {
   id: string;
   label: string;
@@ -81,7 +87,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       id: `task-${t.id}`,
       label: t.title,
       description: `${t.status} · ${t.priority}`,
-      icon: t.status === "in_progress" ? "●" : t.status === "blocked" ? "⚠" : "○",
+      icon: taskStatusIcon(t.status),
       action: () => {
         dispatch({ type: "SET_ACTIVE_VIEW", payload: "board" });
         dispatch({ type: "SET_SEARCH_QUERY", payload: t.title });
@@ -96,7 +102,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
     ? allCommands.filter(
         (c) =>
           c.label.toLowerCase().includes(q) ||
-          (c.description && c.description.toLowerCase().includes(q))
+          (c.description?.toLowerCase().includes(q))
       )
     : allCommands;
 
@@ -137,6 +143,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
 
   return (
     <div
+      role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed",
@@ -150,6 +157,9 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       }}
     >
       <div
+        role="dialog"
+        aria-modal
+        aria-label="Command palette"
         style={{
           background: "var(--bg-secondary)",
           border: "1px solid var(--border)",
@@ -161,7 +171,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
           overflow: "hidden",
           boxShadow: "var(--shadow-lg)",
         }}
-        onKeyDown={handleKeyDown}
       >
         {/* Input row */}
         <div
@@ -179,6 +188,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Search tasks, views, projects…"
             style={{
               flex: 1,
@@ -238,7 +248,16 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                     <div
                       key={cmd.id}
                       data-idx={myIdx}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={-1}
                       onClick={cmd.action}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          cmd.action();
+                        }
+                      }}
                       style={{
                         display: "flex",
                         alignItems: "center",

@@ -32,7 +32,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [milestoneId, setMilestoneId] = useState<string | null>(task.milestone_id);
   const [assignedAgentId, setAssignedAgentId] = useState<string | null>(task.assigned_agent_id);
   const [dueDate, setDueDate] = useState<string>(task.due_date ?? "");
-  const [estimate, setEstimate] = useState<string>(task.estimate != null ? String(task.estimate) : "");
+  const [estimate, setEstimate] = useState<string>(task.estimate == null ? "" : String(task.estimate));
   const [startDate, setStartDate] = useState<string>(task.start_date ?? "");
   const [saving, setSaving] = useState(false);
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -72,7 +72,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setMilestoneId(task.milestone_id);
     setAssignedAgentId(task.assigned_agent_id);
     setDueDate(task.due_date ?? "");
-    setEstimate(task.estimate != null ? String(task.estimate) : "");
+    setEstimate(task.estimate == null ? "" : String(task.estimate));
     setStartDate(task.start_date ?? "");
     setNewComment("");
     api.getComments(task.id).then(setComments).catch(() => {});
@@ -91,7 +91,7 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
         assigned_agent_id: assignedAgentId,
         due_date: dueDate || null,
         start_date: startDate || null,
-        estimate: estimate ? parseInt(estimate, 10) : null,
+        estimate: estimate ? Number.parseInt(estimate, 10) : null,
       });
       dispatch({ type: "WS_EVENT", payload: { type: "task_updated", payload: updated } });
       onClose();

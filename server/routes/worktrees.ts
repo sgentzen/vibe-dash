@@ -32,7 +32,7 @@ export function worktreeRoutes(db: Database.Database, broadcast: BroadcastFn): R
   });
 
   router.get("/api/tasks/:id/worktree", (req, res) => {
-    const worktree = getTaskWorktree(db, req.params.id as string);
+    const worktree = getTaskWorktree(db, req.params.id);
     if (!requireEntity(res, worktree, "Worktree")) return;
     res.json(worktree);
   });

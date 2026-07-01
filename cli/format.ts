@@ -100,25 +100,23 @@ export interface StatusSummary {
 
 export function formatStatusSummary(s: StatusSummary): string {
   const lines: string[] = [];
-  lines.push(`${BOLD}${CYAN}Status: ${s.projectName}${RESET}`);
-  lines.push(`${DIM}${"─".repeat(40)}${RESET}`);
-  lines.push(`  ${DIM}Planned:     ${RESET}${s.byStatus.planned ?? 0}`);
-  lines.push(`  ${BLUE}In Progress: ${RESET}${s.byStatus.in_progress ?? 0}`);
-  lines.push(`  ${RED}Blocked:     ${RESET}${s.byStatus.blocked ?? 0}`);
-  lines.push(`  ${GREEN}Done:        ${RESET}${s.byStatus.done ?? 0}`);
-  lines.push(`  ${DIM}${"─".repeat(30)}${RESET}`);
-  lines.push(`  Total:       ${s.total}`);
+  lines.push(
+    `${BOLD}${CYAN}Status: ${s.projectName}${RESET}`,
+    `${DIM}${"─".repeat(40)}${RESET}`,
+    `  ${DIM}Planned:     ${RESET}${s.byStatus.planned ?? 0}`,
+    `  ${BLUE}In Progress: ${RESET}${s.byStatus.in_progress ?? 0}`,
+    `  ${RED}Blocked:     ${RESET}${s.byStatus.blocked ?? 0}`,
+    `  ${GREEN}Done:        ${RESET}${s.byStatus.done ?? 0}`,
+    `  ${DIM}${"─".repeat(30)}${RESET}`,
+    `  Total:       ${s.total}`,
+  );
 
   if (s.openMilestone) {
-    lines.push("");
-    lines.push(`  ${BOLD}Open Milestone:${RESET} ${s.openMilestone.name}`);
-    lines.push(`  Tasks: ${s.openMilestone.completed_count}/${s.openMilestone.task_count} done`);
-    lines.push(`  Progress: ${s.openMilestone.completion_pct}% completed`);
+    lines.push("", `  ${BOLD}Open Milestone:${RESET} ${s.openMilestone.name}`, `  Tasks: ${s.openMilestone.completed_count}/${s.openMilestone.task_count} done`, `  Progress: ${s.openMilestone.completion_pct}% completed`);
   }
 
   if (s.blockers.length > 0) {
-    lines.push("");
-    lines.push(`  ${RED}${BOLD}Active Blockers (${s.blockers.length}):${RESET}`);
+    lines.push("", `  ${RED}${BOLD}Active Blockers (${s.blockers.length}):${RESET}`);
     for (const b of s.blockers.slice(0, 5)) {
       lines.push(`    ${RED}- ${b.reason}${RESET}`);
     }
@@ -149,8 +147,7 @@ export interface CompactStatusInput {
 export function formatCompactStatus(input: CompactStatusInput): string {
   const now = new Date().toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const lines: string[] = [];
-  lines.push(`${BOLD}${CYAN}vibe-dash${RESET}  ${DIM}·  ${now}${RESET}`);
-  lines.push(hr(56));
+  lines.push(`${BOLD}${CYAN}vibe-dash${RESET}  ${DIM}·  ${now}${RESET}`, hr(56));
 
   for (const p of input.projects) {
     const inProg = p.in_progress > 0 ? `${BLUE}▶${p.in_progress}${RESET}` : `${DIM}▶${p.in_progress}${RESET}`;
@@ -168,8 +165,9 @@ export function formatCompactStatus(input: CompactStatusInput): string {
   const agentStr = input.activeAgents > 0
     ? `${GREEN}${input.activeAgents} active${RESET}`
     : `${DIM}${input.activeAgents} active${RESET}`;
+  const blockerPlural = input.openBlockers === 1 ? "" : "s";
   const blockerStr = input.openBlockers > 0
-    ? `${RED}${input.openBlockers} blocker${input.openBlockers === 1 ? "" : "s"}${RESET}`
+    ? `${RED}${input.openBlockers} blocker${blockerPlural}${RESET}`
     : `${DIM}0 blockers${RESET}`;
   lines.push(`  Agents: ${agentStr}, ${DIM}${input.idleAgents} idle, ${input.offlineAgents} offline${RESET}  ·  ${blockerStr}`);
 
@@ -180,18 +178,6 @@ export function formatCompactStatus(input: CompactStatusInput): string {
 
 export function formatHelp(): string {
   const lines: string[] = [];
-  lines.push(`${BOLD}${CYAN}vibe-dash${RESET} — CLI companion for Vibe Dash`);
-  lines.push("");
-  lines.push("Commands:");
-  lines.push(`  ${BOLD}list${RESET} [projects|tasks|milestones]  List entities`);
-  lines.push(`  ${BOLD}add-task${RESET} --project <n> --title <t>  Create a task`);
-  lines.push(`  ${BOLD}status${RESET} [project-name]            Project status summary`);
-  lines.push(`  ${BOLD}agents${RESET}                           List agents with health`);
-  lines.push("");
-  lines.push("Flags:");
-  lines.push(`  --db <path>          Database file (default: ./vibe-dash.db)`);
-  lines.push(`  --project <n>        Filter by project name`);
-  lines.push(`  --priority <p>       Task priority (low|medium|high|urgent)`);
-  lines.push(`  --milestone <n>      Milestone name for add-task`);
+  lines.push(`${BOLD}${CYAN}vibe-dash${RESET} — CLI companion for Vibe Dash`, "", "Commands:", `  ${BOLD}list${RESET} [projects|tasks|milestones]  List entities`, `  ${BOLD}add-task${RESET} --project <n> --title <t>  Create a task`, `  ${BOLD}status${RESET} [project-name]            Project status summary`, `  ${BOLD}agents${RESET}                           List agents with health`, "", "Flags:", `  --db <path>          Database file (default: ./vibe-dash.db)`, `  --project <n>        Filter by project name`, `  --priority <p>       Task priority (low|medium|high|urgent)`, `  --milestone <n>      Milestone name for add-task`);
   return lines.join("\n");
 }

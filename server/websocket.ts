@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
-import type { Server, IncomingMessage } from "http";
-import { parse as parseUrl } from "url";
+import type { Server, IncomingMessage } from "node:http";
+import { parse as parseUrl } from "node:url";
 import type { WsEvent } from "./types.js";
 import { logger } from "./logger.js";
 

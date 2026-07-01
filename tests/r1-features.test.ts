@@ -4,7 +4,6 @@ import { createTestDb } from "./setup.js";
 import {
   createProject,
   createTask,
-  getTask,
   listTasks,
   updateTask,
   registerAgent,
@@ -147,7 +146,7 @@ describe("tags", () => {
   it("creates and lists tags for a project", () => {
     const project = createProject(db, { name: "P1", description: null });
     const tag1 = createTag(db, { project_id: project.id, name: "bug", color: "#ef4444" });
-    const tag2 = createTag(db, { project_id: project.id, name: "feature", color: "#3b82f6" });
+    createTag(db, { project_id: project.id, name: "feature", color: "#3b82f6" });
 
     expect(tag1.name).toBe("bug");
     expect(tag1.color).toBe("#ef4444");

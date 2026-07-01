@@ -85,8 +85,20 @@ function computeActivityLast7(heatmap: ActivityHeatmapEntry[]): number[] {
   return Array.from({ length: 7 }, (_, i) => buckets[todayDay - 6 + i] ?? 0);
 }
 
+// Stable dependency key that changes whenever a task's milestone/status pairing
+// within the open milestones changes, used to re-fetch chart data.
+function computeMilestoneStatusKey(
+  openMilestones: { id: string }[],
+  projectTasks: { id: string; milestone_id: string | null; status: string }[],
+): string {
+  if (openMilestones.length === 0) return "";
+  return openMilestones
+    .map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";"))
+    .join("|");
+}
+
 export function DashboardView() {
-  const { projects, milestones, blockers, tasks, agents, stats } = useDataState();
+  const { milestones, blockers, tasks, agents, stats } = useDataState();
   const { selectedProjectId } = useNavigationState();
   const { pollGeneration } = usePollingState();
   const api = useApi();
@@ -123,9 +135,7 @@ export function DashboardView() {
       (v) => v === 0
     ).length >= 2;
 
-  const milestoneTaskStatusKey = openMilestones.length > 0
-    ? openMilestones.map((m) => projectTasks.filter((t) => t.milestone_id === m.id).map((t) => `${t.id}:${t.status}`).join(";")).join("|")
-    : "";
+  const milestoneTaskStatusKey = computeMilestoneStatusKey(openMilestones, projectTasks);
 
   const firstOpenMilestoneId = openMilestones.length > 0 ? openMilestones[0]?.id : null;
 

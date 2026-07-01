@@ -37,6 +37,31 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
+function truncateDescription(description: string | null): string | null {
+  if (!description) return null;
+  const ellipsis = description.length > 80 ? "…" : "";
+  return description.slice(0, 80) + ellipsis;
+}
+
+function dueBadge(urgency: "overdue" | "today" | "this-week"): { token: StatusToken; label: string } {
+  if (urgency === "overdue") return { token: "danger", label: "Overdue" };
+  if (urgency === "today") return { token: "warning", label: "Due today" };
+  return { token: "neutral", label: "Due soon" };
+}
+
+function cardAppearance(
+  isActive: boolean,
+  isBlocked: boolean,
+  dueUrgency: "overdue" | "today" | "this-week" | null,
+): { borderColor: string; background: string; boxShadow: string } {
+  const base = { borderColor: "var(--border)", background: "var(--bg-tertiary)", boxShadow: "none" };
+  if (isActive) return { borderColor: "var(--status-success)", background: "var(--green-bg)", boxShadow: "var(--shadow-glow-green)" };
+  if (isBlocked) return { ...base, borderColor: "var(--status-danger)" };
+  if (dueUrgency === "overdue") return { ...base, borderColor: "var(--status-danger)", boxShadow: "var(--shadow-glow-red)" };
+  if (dueUrgency === "today") return { ...base, borderColor: "var(--status-warning)" };
+  return base;
+}
+
 export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
@@ -65,26 +90,9 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
     ? buildDailyActivityCounts(taskActivity.map((a) => a.timestamp), 7)
     : null;
 
-  const descSnippet = task.description
-    ? task.description.slice(0, 80) + (task.description.length > 80 ? "\u2026" : "")
-    : null;
+  const descSnippet = truncateDescription(task.description);
 
-  let borderColor = "var(--border)";
-  let background = "var(--bg-tertiary)";
-  let boxShadow = "none";
-
-  if (isActive) {
-    borderColor = "var(--status-success)";
-    background = "var(--green-bg)";
-    boxShadow = "var(--shadow-glow-green)";
-  } else if (isBlocked) {
-    borderColor = "var(--status-danger)";
-  } else if (dueUrgency === "overdue") {
-    borderColor = "var(--status-danger)";
-    boxShadow = "var(--shadow-glow-red)";
-  } else if (dueUrgency === "today") {
-    borderColor = "var(--status-warning)";
-  }
+  const { borderColor, background, boxShadow } = cardAppearance(isActive, isBlocked, dueUrgency);
 
   return (
     <div
@@ -230,13 +238,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           )}
 
           {/* Due date indicator */}
-          {dueUrgency && (() => {
-            const token: StatusToken = dueUrgency === "overdue" ? "danger"
-              : dueUrgency === "today" ? "warning" : "neutral";
-            const label = dueUrgency === "overdue" ? "Overdue"
-              : dueUrgency === "today" ? "Due today" : "Due soon";
-            return <StatusPill token={token} label={label} />;
-          })()}
+          {dueUrgency && <StatusPill {...dueBadge(dueUrgency)} />}
           {task.due_date && !dueUrgency && !isDone && (
             <span
               style={{
@@ -275,7 +277,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           )}
 
           {/* Tag pills */}
-          {taskTags && taskTags.map((tag) => (
+          {taskTags?.map((tag) => (
             <span
               key={tag.id}
               style={badgeStyle(tag.color)}
@@ -342,7 +344,10 @@ function SubTaskRow({ task }: { task: Task }) {
   if (isActive) color = "var(--status-success)";
   if (isBlocked) color = "var(--status-danger)";
 
-  const icon = isDone ? "\u2713" : isActive ? "\u25cf" : isBlocked ? "\u26a0" : "\u25cb";
+  let icon = "\u25cb";
+  if (isDone) icon = "\u2713";
+  else if (isActive) icon = "\u25cf";
+  else if (isBlocked) icon = "\u26a0";
 
   return (
     <div

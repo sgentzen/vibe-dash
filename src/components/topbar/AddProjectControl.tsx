@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { btnStyle } from "./styles";
 
 interface AddProjectControlProps {
@@ -9,6 +9,11 @@ export function AddProjectControl({ onAdd }: AddProjectControlProps) {
   const [showForm, setShowForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [creating, setCreating] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showForm) inputRef.current?.focus();
+  }, [showForm]);
 
   async function handleAdd() {
     const name = projectName.trim();
@@ -36,7 +41,7 @@ export function AddProjectControl({ onAdd }: AddProjectControlProps) {
   return (
     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
       <input
-        autoFocus
+        ref={inputRef}
         value={projectName}
         onChange={(e) => setProjectName(e.target.value)}
         onKeyDown={(e) => {

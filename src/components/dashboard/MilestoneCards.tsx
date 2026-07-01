@@ -9,8 +9,9 @@ interface MilestoneProgressCardProps {
 }
 
 export const MilestoneProgressCard = memo(function MilestoneProgressCard({ dailyStats, openMilestones }: MilestoneProgressCardProps) {
+  const milestoneLabel = openMilestones.length > 0 ? `(${openMilestones[0].name})` : "";
   return (
-    <CardWrapper title={`Milestone Progress ${openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}`}>
+    <CardWrapper title={`Milestone Progress ${milestoneLabel}`}>
       {dailyStats.length === 0 ? (
         <EmptyState
           message={openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}

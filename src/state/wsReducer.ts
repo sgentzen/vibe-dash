@@ -1,15 +1,4 @@
 import type {
-  Agent,
-  ActivityEntry,
-  Blocker,
-  Milestone,
-  Project,
-  Tag,
-  TaskTag,
-  TaskDependency,
-  Task,
-  AppNotification,
-  TaskWorktree,
   WsEvent,
 } from "../types";
 import type { AppState } from "./types";
@@ -19,11 +8,11 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
     case "project_created":
       return {
         ...state,
-        projects: [...state.projects, event.payload as Project],
+        projects: [...state.projects, event.payload],
         stats: { ...state.stats, projects: state.stats.projects + 1 },
       };
     case "task_created": {
-      const newTask = event.payload as Task;
+      const newTask = event.payload;
       return {
         ...state,
         tasks: [...state.tasks, newTask],
@@ -35,7 +24,7 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
     }
     case "task_updated":
     case "task_completed": {
-      const updated = event.payload as Task;
+      const updated = event.payload;
       const prev = state.tasks.find((t) => t.id === updated.id);
       const wasDone = prev?.status === "done";
       const nowDone = updated.status === "done";
@@ -49,7 +38,7 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
       };
     }
     case "agent_registered": {
-      const agent = event.payload as Agent;
+      const agent = event.payload;
       const exists = state.agents.some((a) => a.id === agent.id);
       return {
         ...state,
@@ -59,18 +48,18 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
       };
     }
     case "agent_activity": {
-      const entry = event.payload as ActivityEntry;
+      const entry = event.payload;
       const capped = [entry, ...state.activity].slice(0, 100);
       return { ...state, activity: capped };
     }
     case "blocker_reported":
       return {
         ...state,
-        blockers: [...state.blockers, event.payload as Blocker],
+        blockers: [...state.blockers, event.payload],
         stats: { ...state.stats, alerts: state.stats.alerts + 1 },
       };
     case "blocker_resolved": {
-      const resolved = event.payload as Blocker;
+      const resolved = event.payload;
       return {
         ...state,
         blockers: state.blockers.filter((b) => b.id !== resolved.id),
@@ -83,10 +72,10 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
     case "milestone_created":
       return {
         ...state,
-        milestones: [...state.milestones, event.payload as Milestone],
+        milestones: [...state.milestones, event.payload],
       };
     case "milestone_updated": {
-      const updatedMilestone = event.payload as Milestone;
+      const updatedMilestone = event.payload;
       return {
         ...state,
         milestones: state.milestones.map((m) =>
@@ -95,11 +84,11 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
       };
     }
     case "tag_created": {
-      const tag = event.payload as Tag;
+      const tag = event.payload;
       return { ...state, tags: [...state.tags, tag] };
     }
     case "tag_added": {
-      const tt = event.payload as TaskTag;
+      const tt = event.payload;
       const existing = state.taskTagMap[tt.task_id] ?? [];
       if (existing.includes(tt.tag_id)) return state;
       return {
@@ -108,7 +97,7 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
       };
     }
     case "tag_removed": {
-      const tt = event.payload as TaskTag;
+      const tt = event.payload;
       const current = state.taskTagMap[tt.task_id] ?? [];
       return {
         ...state,
@@ -116,7 +105,7 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
       };
     }
     case "dependency_added": {
-      const dep = event.payload as TaskDependency;
+      const dep = event.payload;
       const existing = state.taskDepsMap[dep.task_id] ?? [];
       if (existing.includes(dep.depends_on_task_id)) return state;
       return {
@@ -127,7 +116,7 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
     case "comment_added":
       return state;
     case "notification_created": {
-      const notif = event.payload as AppNotification;
+      const notif = event.payload;
       return {
         ...state,
         notifications: [notif, ...state.notifications],
@@ -137,18 +126,18 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
     case "daily_stats_recorded":
       return state;
     case "worktree_created": {
-      const wt = event.payload as TaskWorktree;
+      const wt = event.payload;
       return { ...state, worktrees: [wt, ...state.worktrees] };
     }
     case "worktree_updated": {
-      const updated = event.payload as TaskWorktree;
+      const updated = event.payload;
       return {
         ...state,
         worktrees: state.worktrees.map((w) => (w.id === updated.id ? updated : w)),
       };
     }
     case "dependency_removed": {
-      const dep = event.payload as TaskDependency;
+      const dep = event.payload;
       const deps = state.taskDepsMap[dep.task_id] ?? [];
       return {
         ...state,

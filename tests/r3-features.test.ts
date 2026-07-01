@@ -4,8 +4,6 @@ import {
   createProject,
   createTask,
   registerAgent,
-  completeTask,
-  updateTask,
   addComment,
   listComments,
   createNotification,

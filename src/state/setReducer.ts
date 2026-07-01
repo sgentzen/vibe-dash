@@ -18,7 +18,7 @@ export function getInitialTheme(): Theme {
   const raw = localStorage.getItem(THEME_STORAGE_KEY);
   const stored = THEMES.find((t) => t === raw);
   if (stored) return stored;
-  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  if (globalThis.matchMedia("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
 }
 

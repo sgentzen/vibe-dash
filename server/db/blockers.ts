@@ -37,7 +37,7 @@ export function resolveBlocker(
   const updated = db.prepare("UPDATE blockers SET resolved_at = ? WHERE id = ? RETURNING *").get(ts, id) as Blocker | undefined;
   // Only change status if task is currently blocked (don't overwrite "done")
   const task = db.prepare("SELECT status FROM tasks WHERE id = ?").get(blocker.task_id) as { status: string } | undefined;
-  if (task && task.status === "blocked") {
+  if (task?.status === "blocked") {
     updateTask(db, blocker.task_id, { status: "in_progress" });
   }
   return updated ?? null;

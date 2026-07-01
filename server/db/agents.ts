@@ -275,7 +275,7 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
       GROUP BY t.id
     )`
   ).get(agentId) as { avg_sec: number | null } | undefined;
-  const avgCompletionTime = avgRow?.avg_sec != null ? Math.round(avgRow.avg_sec) : null;
+  const avgCompletionTime = avgRow?.avg_sec == null ? null : Math.round(avgRow.avg_sec);
 
   // Session activity frequency via SQL aggregation
   const sessionRow = db.prepare(

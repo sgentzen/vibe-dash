@@ -121,9 +121,17 @@ function WorktreeCard({
                     key={s}
                     role="option"
                     aria-selected={worktree.status === s}
+                    tabIndex={0}
                     onClick={() => {
                       setOpen(false);
                       onStatusChange(worktree.id, s);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpen(false);
+                        onStatusChange(worktree.id, s);
+                      }
                     }}
                     style={{
                       padding: "6px 10px",

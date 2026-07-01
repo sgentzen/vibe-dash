@@ -90,7 +90,8 @@ function cmdList() {
     const tasks = listTasks(db, project ? { project_id: project.id } : undefined);
     const topLevel = tasks.filter((t) => !t.parent_task_id);
 
-    console.log(`${header(`Tasks (${topLevel.length})`)}${project ? ` — ${project.name}` : ""}`);
+    const tasksHeader = header(`Tasks (${topLevel.length})`);
+    console.log(project ? `${tasksHeader} — ${project.name}` : tasksHeader);
     console.log(hr(80));
     console.log(formatTaskHeaderRow());
 

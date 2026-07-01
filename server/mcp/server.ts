@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { handleTool } from "./tools.js";
@@ -23,7 +24,7 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   const server = new McpServer({ name: "vibe-dash", version: "0.1.0" });
 
   // Connection-unique suffix so each MCP client gets its own agent record
-  const suffix = connectionId ? connectionId.slice(0, 8) : Math.random().toString(36).slice(2, 10);
+  const suffix = connectionId ? connectionId.slice(0, 8) : randomUUID().slice(0, 8);
   let agentName: string | undefined;
   let agentId: string | undefined;
 

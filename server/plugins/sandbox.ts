@@ -59,7 +59,7 @@ export function createPluginContext(db: Database.Database, pluginName: string): 
     },
   });
 
-  return { db: sandboxedDb as Database.Database, namespace };
+  return { db: sandboxedDb, namespace };
 }
 
 /** Ensure namespace contains only safe identifier characters */

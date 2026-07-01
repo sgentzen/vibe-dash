@@ -4,7 +4,6 @@ import {
   createProject,
   createTask,
   updateTask,
-  getTask,
   logActivity,
   registerAgent,
   getTimeSpent,

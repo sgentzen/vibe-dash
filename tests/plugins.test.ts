@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createServer } from "http";
-import http from "http";
-import fs from "fs";
-import os from "os";
-import path from "path";
+import { createServer } from "node:http";
+import http from "node:http";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { createPluginContext } from "../server/plugins/sandbox.js";

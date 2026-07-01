@@ -389,7 +389,8 @@ async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEn
 
 async function getActivityStreamApi(params: Record<string, string | undefined> = {}): Promise<ActivityEntry[]> {
   const qs = buildQueryString(params);
-  const res = await apiFetch(`/api/activity-stream${qs ? `?${qs}` : ""}`);
+  const query = qs ? `?${qs}` : "";
+  const res = await apiFetch(`/api/activity-stream${query}`);
   if (!res.ok) await throwApiError(res, "getActivityStream");
   return res.json();
 }

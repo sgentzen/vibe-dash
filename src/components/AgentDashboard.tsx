@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
-import { cardStyle, badgeStyle, sectionHeader, typeScale } from "../styles/shared.js";
+import { cardStyle, typeScale } from "../styles/shared.js";
 import AgentComparisonView from "./AgentComparisonView";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
 
@@ -230,16 +230,29 @@ export function AgentDashboard() {
   );
 }
 
+function healthStatusColor(status: string | undefined): string {
+  if (status === "active") return "var(--status-success)";
+  if (status === "idle") return "var(--status-warning)";
+  return "var(--text-muted)";
+}
+
 function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDetail; onClick: () => void }) {
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = detail?.health_status === "active" ? "var(--status-success)"
-    : detail?.health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
+  const healthColor = healthStatusColor(detail?.health_status);
 
   return (
     <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       style={{
         ...cardStyle,
         cursor: "pointer",
@@ -342,8 +355,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = health_status === "active" ? "var(--status-success)"
-    : health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
+  const healthColor = healthStatusColor(health_status);
 
   return (
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>

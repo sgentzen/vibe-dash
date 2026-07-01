@@ -7,7 +7,6 @@ import {
   createNotification,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
-import { badRequest } from "./responses.js";
 import { createCommentSchema } from "../../shared/schemas.js";
 import { validateBody } from "./validate.js";
 
@@ -15,7 +14,7 @@ export function commentRoutes(db: Database.Database, broadcast: BroadcastFn): Ro
   const router = Router();
 
   router.get("/api/tasks/:id/comments", (req, res) => {
-    res.json(listComments(db, req.params.id as string));
+    res.json(listComments(db, req.params.id));
   });
 
   router.post("/api/tasks/:id/comments", validateBody(createCommentSchema), (req, res) => {
