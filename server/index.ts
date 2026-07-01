@@ -7,7 +7,7 @@ import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
 import { resolveDbPath } from "./db/path.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
-import { errorHandler } from "./routes/middleware.js";
+import { errorHandler, notFoundHandler } from "./routes/middleware.js";
 import { logger } from "./logger.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -129,6 +129,10 @@ app.all("/mcp", mcpLimiter, async (req, res) => {
   // GET/DELETE without a valid session
   res.status(400).json({ error: "No valid MCP session. Send an initialize request first." });
 });
+
+// Unknown /api/* routes return a JSON 404 instead of falling through to the
+// SPA catch-all (which would serve index.html). Non-API paths pass through.
+app.use(notFoundHandler);
 
 // Serve built frontend in production (npm start)
 const distDir = path.join(PROJECT_ROOT, "dist");
