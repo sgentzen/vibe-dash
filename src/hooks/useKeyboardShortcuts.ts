@@ -39,7 +39,7 @@ export function useKeyboardShortcuts({ searchInputRef, onClearSearch }: Options)
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => globalThis.removeEventListener("keydown", handleKeyDown);
   }, [searchInputRef, onClearSearch]);
 }

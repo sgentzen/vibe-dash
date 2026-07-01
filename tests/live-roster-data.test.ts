@@ -46,7 +46,7 @@ describe("live roster data — today summary figures", () => {
     const p = createProject(db, { name: "P", description: null });
     logCost(db, { agent_id: null, task_id: null, milestone_id: null, project_id: p.id, model: "m", provider: "x", input_tokens: 10, output_tokens: 5, cost_usd: 1.25 });
     logCost(db, { agent_id: null, task_id: null, milestone_id: null, project_id: p.id, model: "m", provider: "x", input_tokens: 10, output_tokens: 5, cost_usd: 0.75 });
-    expect(getSpendToday(db)).toBeCloseTo(2.0, 5);
+    expect(getSpendToday(db)).toBeCloseTo(2, 5);
   });
 
   it("getTasksCompletedToday counts only today's done tasks", () => {

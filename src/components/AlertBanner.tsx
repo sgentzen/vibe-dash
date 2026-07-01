@@ -4,7 +4,7 @@ export function AlertBanner() {
   const { blockers } = useDataState();
   if (blockers.length === 0) return null;
 
-  const latest = blockers.length > 0 ? blockers[blockers.length - 1] : null;
+  const latest = blockers.length > 0 ? blockers.at(-1) : null;
   const extra = blockers.length - 1;
 
   return (

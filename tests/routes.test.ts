@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import express from "express";
-import { createServer, type Server, type IncomingMessage } from "http";
+import { createServer, type IncomingMessage } from "node:http";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
@@ -12,7 +12,7 @@ import {
   createBlocker,
   resolveBlocker,
 } from "../server/db/index.js";
-import http from "http";
+import http from "node:http";
 
 let app: Express;
 let db: Database.Database;
@@ -27,7 +27,7 @@ function request(
     const server = createServer(app);
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address() as { port: number };
-      const payload = body !== undefined ? JSON.stringify(body) : undefined;
+      const payload = body === undefined ? undefined : JSON.stringify(body);
       const options: http.RequestOptions = {
         hostname: "127.0.0.1",
         port: addr.port,

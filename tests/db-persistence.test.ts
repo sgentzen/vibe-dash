@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import fs from "fs";
-import os from "os";
-import path from "path";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import Database from "better-sqlite3";
 import { initDb, createProject, listProjects, createTask, listTasks } from "../server/db/index.js";
 import { resolveDbPath } from "../server/db/path.js";

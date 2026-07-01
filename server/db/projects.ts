@@ -22,7 +22,7 @@ export function updateProject(
   if (!existing) return null;
 
   const name = input.name ?? existing.name;
-  const description = input.description !== undefined ? input.description : existing.description;
+  const description = input.description === undefined ? existing.description : input.description;
   const ts = now();
 
   const row = db.prepare(

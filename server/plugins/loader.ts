@@ -3,10 +3,10 @@
 // manifest-declared entrypoint — which is explicitly verified to stay under
 // resolvedPluginDir below. Not reachable from HTTP/MCP request data.
 // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
-import fs from "fs";
-import path from "path";
-import { pathToFileURL } from "url";
-import { homedir } from "os";
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { homedir } from "node:os";
 import type Database from "better-sqlite3";
 import type { PluginManifest, LoadedPlugin, PluginModule } from "./types.js";
 import { createPluginContext } from "./sandbox.js";
@@ -102,10 +102,10 @@ function parseManifest(raw: unknown): PluginManifest {
 }
 
 function requireString(obj: Record<string, unknown>, key: string): string {
-  if (typeof obj[key] !== "string" || !(obj[key] as string).trim()) {
+  if (typeof obj[key] !== "string" || !(obj[key]).trim()) {
     throw new Error(`plugin.json: "${key}" must be a non-empty string`);
   }
-  return obj[key] as string;
+  return obj[key];
 }
 
 function requirePluginType(obj: Record<string, unknown>): PluginManifest["type"] {

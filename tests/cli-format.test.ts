@@ -26,7 +26,7 @@ import {
 import type { Project, Milestone, Task, Agent, Blocker } from "../server/types.js";
 
 // Strip ANSI escape sequences for easier assertions on plain content.
-// eslint-disable-next-line no-control-regex
+ 
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("cli/format: primitives", () => {

@@ -105,9 +105,9 @@ export function App() {
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      globalThis.removeEventListener("keydown", handleKeyDown);
       if (gKeyTimer.current !== null) {
         clearTimeout(gKeyTimer.current);
         gKeyTimer.current = null;
@@ -186,7 +186,7 @@ export function App() {
       const apiErr = err instanceof ApiError ? err : null;
       const retryAfter = apiErr?.retryAfterMs ?? null;
       const backoff = Math.min(delayMs * 2 ** attempt, 5000);
-      return retryAfter !== null ? Math.max(retryAfter, backoff) : backoff;
+      return retryAfter === null ? backoff : Math.max(retryAfter, backoff);
     }
 
     async function loadInitialData(retries = 10, delayMs = 500) {
@@ -320,7 +320,7 @@ export function App() {
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Failed to load data</div>
           <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>{loadError}</div>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
             style={{
               background: "transparent",
               border: "1px solid var(--border)",

@@ -7,7 +7,7 @@ export function activityRoutes(db: Database.Database, _broadcast: BroadcastFn): 
   const router = Router();
 
   router.get("/api/activity", (req, res) => {
-    const limit = parseInt((req.query.limit as string) ?? "50", 10);
+    const limit = Number.parseInt((req.query.limit as string) ?? "50", 10);
     res.json(getRecentActivity(db, isNaN(limit) ? 50 : limit));
   });
 
@@ -17,7 +17,7 @@ export function activityRoutes(db: Database.Database, _broadcast: BroadcastFn): 
       agent_id: q.agent_id,
       project_id: q.project_id,
       since: q.since,
-      limit: q.limit ? parseInt(q.limit, 10) : undefined,
+      limit: q.limit ? Number.parseInt(q.limit, 10) : undefined,
     }));
   });
 

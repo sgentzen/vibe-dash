@@ -12,11 +12,11 @@ export function dependencyRoutes(db: Database.Database, broadcast: BroadcastFn):
   const router = Router();
 
   router.get("/api/tasks/:id/dependencies", (req, res) => {
-    res.json(listDependencies(db, req.params.id as string));
+    res.json(listDependencies(db, req.params.id));
   });
 
   router.get("/api/tasks/:id/blocking", (req, res) => {
-    res.json(getBlockingTasks(db, req.params.id as string));
+    res.json(getBlockingTasks(db, req.params.id));
   });
 
   router.post("/api/tasks/:id/dependencies", validateBody(createDependencySchema), (req, res) => {
@@ -25,8 +25,8 @@ export function dependencyRoutes(db: Database.Database, broadcast: BroadcastFn):
   });
 
   router.delete("/api/dependencies/:id", dependencyDeleteLimiter, (req, res) => {
-    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id as string) as TaskDependency | undefined;
-    const removed = removeDependency(db, req.params.id as string as string);
+    const dep = db.prepare("SELECT * FROM task_dependencies WHERE id = ?").get(req.params.id) as TaskDependency | undefined;
+    const removed = removeDependency(db, req.params.id as string);
     if (removed && dep) {
       broadcast({ type: "dependency_removed", payload: dep });
     }

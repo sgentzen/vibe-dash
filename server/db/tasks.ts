@@ -67,11 +67,11 @@ export function listTasks(
   filter?: ListTasksFilter
 ): Task[] {
   const { sql: where, params } = buildWhere([
-    filter?.project_id !== undefined ? ["project_id = ?", filter.project_id] : null,
-    filter?.status !== undefined ? ["status = ?", filter.status] : null,
-    filter?.parent_task_id !== undefined ? ["parent_task_id = ?", filter.parent_task_id] : null,
-    filter?.milestone_id !== undefined ? ["milestone_id = ?", filter.milestone_id] : null,
-    filter?.assigned_agent_id !== undefined ? ["assigned_agent_id = ?", filter.assigned_agent_id] : null,
+    filter?.project_id === undefined ? null : ["project_id = ?", filter.project_id],
+    filter?.status === undefined ? null : ["status = ?", filter.status],
+    filter?.parent_task_id === undefined ? null : ["parent_task_id = ?", filter.parent_task_id],
+    filter?.milestone_id === undefined ? null : ["milestone_id = ?", filter.milestone_id],
+    filter?.assigned_agent_id === undefined ? null : ["assigned_agent_id = ?", filter.assigned_agent_id],
   ]);
 
   // SQL fragments are hardcoded; values bound via ?
@@ -150,8 +150,7 @@ export function updateTask(
   if (sets.length === 0) return getTask(db, id);
 
   sets.push("updated_at = ?");
-  params.push(now());
-  params.push(id);
+  params.push(now(), id);
 
   // SQL fragments are hardcoded; values bound via ?
   const row = db.prepare("UPDATE tasks SET " + sets.join(", ") + " WHERE id = ? RETURNING *").get(

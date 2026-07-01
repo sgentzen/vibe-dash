@@ -8,13 +8,11 @@ import {
   logActivity,
   createBlocker,
   createMilestone,
-  updateMilestone,
   getAgentStats,
   getMilestoneAgentContributions,
   recordMilestoneDailyStats,
   getMilestoneDailyStats,
   getAgentActivityHeatmap,
-  getMilestoneProgress,
 } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
 

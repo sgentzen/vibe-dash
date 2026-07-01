@@ -128,7 +128,7 @@ export default function AgentComparisonView() {
   }
 
   const sorted = [...comparison.agents].sort((a, b) => {
-    const diff = (a[sortKey] as number) - (b[sortKey] as number);
+    const diff = (a[sortKey]) - (b[sortKey]);
     return sortAsc ? diff : -diff;
   });
 

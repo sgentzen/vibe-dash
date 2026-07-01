@@ -116,11 +116,11 @@ function ProjectCard({
       }}
       onMouseEnter={(e) => {
         if (!selected) {
-          (e.currentTarget as HTMLDivElement).style.background = "var(--bg-tertiary)";
+          (e.currentTarget).style.background = "var(--bg-tertiary)";
         }
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.background = selected
+        (e.currentTarget).style.background = selected
           ? "var(--green-bg)"
           : "transparent";
       }}

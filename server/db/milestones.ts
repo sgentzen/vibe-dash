@@ -66,8 +66,7 @@ export function updateMilestone(
   if (sets.length === 0) return getMilestone(db, id);
 
   sets.push("updated_at = ?");
-  params.push(now());
-  params.push(id);
+  params.push(now(), id);
 
   const row = db.prepare("UPDATE milestones SET " + sets.join(", ") + " WHERE id = ? RETURNING *").get(...params) as Milestone | undefined;
   return row ?? null;

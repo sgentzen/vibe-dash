@@ -1,19 +1,19 @@
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
-import { createServer } from "http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "node:http";
 import type Database from "better-sqlite3";
 import { openDb, backfillMilestoneDailyStats } from "./db/index.js";
 import { resolveDbPath } from "./db/path.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
-import { notFoundHandler, errorHandler } from "./routes/middleware.js";
+import { errorHandler } from "./routes/middleware.js";
 import { logger } from "./logger.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { initPlugins } from "./routes/plugins.js";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 

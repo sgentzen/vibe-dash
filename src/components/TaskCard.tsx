@@ -275,7 +275,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           )}
 
           {/* Tag pills */}
-          {taskTags && taskTags.map((tag) => (
+          {taskTags?.map((tag) => (
             <span
               key={tag.id}
               style={badgeStyle(tag.color)}

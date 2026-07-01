@@ -213,7 +213,7 @@ export function TaskBoard() {
             background: "var(--bg-tertiary)",
             border: "1px solid var(--border)",
             borderRadius: "6px",
-            color: sortBy !== "default" ? "var(--accent-blue)" : "var(--text-secondary)",
+            color: sortBy === "default" ? "var(--text-secondary)" : "var(--accent-blue)",
             padding: "4px 8px",
             fontSize: "12px",
             cursor: "pointer",

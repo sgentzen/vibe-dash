@@ -62,4 +62,16 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
     rules: { ...jsxA11y.flatConfigs.recommended.rules },
   },
+  // Tests legitimately use the DOM `window` global and testing-library casts,
+  // which these two auto-fixing rules mis-flag (and their autofix breaks the
+  // build's stricter type-check). Keep them off for tests only.
+  {
+    files: ["tests/**/*.{ts,tsx}"],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      "unicorn/prefer-global-this": "off",
+      "unicorn/prefer-at": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+    },
+  },
 );

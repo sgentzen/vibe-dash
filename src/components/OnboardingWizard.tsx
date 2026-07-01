@@ -100,7 +100,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           createdTasks.map((task, i) => {
             const updates: Record<string, unknown> = { status: DEMO_TASKS[i].status };
             if (dueDates[i]) updates.due_date = dueDates[i];
-            return api.updateTask(task.id, updates as Parameters<typeof api.updateTask>[1]);
+            return api.updateTask(task.id, updates);
           })
         );
       } catch {

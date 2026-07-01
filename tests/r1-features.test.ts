@@ -4,7 +4,6 @@ import { createTestDb } from "./setup.js";
 import {
   createProject,
   createTask,
-  getTask,
   listTasks,
   updateTask,
   registerAgent,

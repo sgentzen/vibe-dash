@@ -96,7 +96,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
     ? allCommands.filter(
         (c) =>
           c.label.toLowerCase().includes(q) ||
-          (c.description && c.description.toLowerCase().includes(q))
+          (c.description?.toLowerCase().includes(q))
       )
     : allCommands;
 

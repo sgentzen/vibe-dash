@@ -36,8 +36,8 @@ export function StatPill({ label, value, color, onClick }: StatPillProps) {
           borderRadius: "6px",
           gap: "2px",
         }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-tertiary)"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+        onMouseEnter={(e) => { (e.currentTarget).style.background = "var(--bg-tertiary)"; }}
+        onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
       >
         {inner}
       </button>

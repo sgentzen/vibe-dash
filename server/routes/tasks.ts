@@ -90,7 +90,7 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.get("/api/tasks/:id", (req, res) => {
-    const task = getTask(db, req.params.id as string);
+    const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
     res.json(task);
   });
@@ -128,11 +128,11 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.post("/api/tasks/:id/complete", (req, res) => {
-    const task = getTask(db, req.params.id as string);
+    const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
-    const completed = completeTask(db, req.params.id as string);
+    const completed = completeTask(db, req.params.id);
     broadcast({ type: "task_completed", payload: completed! });
-    for (const b of resolveBlockersForTask(db, req.params.id as string)) {
+    for (const b of resolveBlockersForTask(db, req.params.id)) {
       broadcast({ type: "blocker_resolved", payload: b });
     }
     if (completed?.milestone_id) {
@@ -152,9 +152,9 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
   });
 
   router.get("/api/tasks/:id/time-spent", (req, res) => {
-    const task = getTask(db, req.params.id as string);
+    const task = getTask(db, req.params.id);
     if (!requireEntity(res, task, "Task")) return;
-    res.json({ time_spent_seconds: getTimeSpent(db, req.params.id as string) });
+    res.json({ time_spent_seconds: getTimeSpent(db, req.params.id) });
   });
 
   return router;
