@@ -165,8 +165,9 @@ export function formatCompactStatus(input: CompactStatusInput): string {
   const agentStr = input.activeAgents > 0
     ? `${GREEN}${input.activeAgents} active${RESET}`
     : `${DIM}${input.activeAgents} active${RESET}`;
+  const blockerPlural = input.openBlockers === 1 ? "" : "s";
   const blockerStr = input.openBlockers > 0
-    ? `${RED}${input.openBlockers} blocker${input.openBlockers === 1 ? "" : "s"}${RESET}`
+    ? `${RED}${input.openBlockers} blocker${blockerPlural}${RESET}`
     : `${DIM}0 blockers${RESET}`;
   lines.push(`  Agents: ${agentStr}, ${DIM}${input.idleAgents} idle, ${input.offlineAgents} offline${RESET}  ·  ${blockerStr}`);
 

@@ -240,30 +240,38 @@ export function TaskBoard() {
             flexShrink: 0,
           }}
         >
-          {grabError ? (
-            <>
-              <span>{grabError}</span>
-              <button
-                onClick={() => setGrabError(null)}
-                aria-label="Dismiss error"
-                style={{ marginLeft: "auto", background: "rgba(0,0,0,0.2)", border: "none", color: "#fff", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
-              >
-                Dismiss
-              </button>
-            </>
-          ) : keyboardGrab ? (
-            <>
-              <span>Moving: <strong>{tasks.find((t) => t.id === keyboardGrab.taskId)?.title}</strong></span>
-              <span style={{ opacity: 0.85 }}>← → change column · 1 Planned · 2 In Progress · 3 Done · Esc cancel</span>
-              <button
-                onClick={() => setKeyboardGrab(null)}
-                aria-label="Cancel keyboard move"
-                style={{ marginLeft: "auto", background: "rgba(0,0,0,0.2)", border: "none", color: "#fff", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : null}
+          {(() => {
+            if (grabError) {
+              return (
+                <>
+                  <span>{grabError}</span>
+                  <button
+                    onClick={() => setGrabError(null)}
+                    aria-label="Dismiss error"
+                    style={{ marginLeft: "auto", background: "rgba(0,0,0,0.2)", border: "none", color: "#fff", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
+                  >
+                    Dismiss
+                  </button>
+                </>
+              );
+            }
+            if (keyboardGrab) {
+              return (
+                <>
+                  <span>Moving: <strong>{tasks.find((t) => t.id === keyboardGrab.taskId)?.title}</strong></span>
+                  <span style={{ opacity: 0.85 }}>← → change column · 1 Planned · 2 In Progress · 3 Done · Esc cancel</span>
+                  <button
+                    onClick={() => setKeyboardGrab(null)}
+                    aria-label="Cancel keyboard move"
+                    style={{ marginLeft: "auto", background: "rgba(0,0,0,0.2)", border: "none", color: "#fff", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px" }}
+                  >
+                    Cancel
+                  </button>
+                </>
+              );
+            }
+            return null;
+          })()}
         </div>
       )}
 

@@ -262,7 +262,11 @@ export function App() {
           >
             <ProjectContextChip />
           </div>
-          {activeView === "board" ? <TaskBoard /> : activeView === "feed" ? <ActivityStreamView /> : <FleetView />}
+          {(() => {
+            if (activeView === "board") return <TaskBoard />;
+            if (activeView === "feed") return <ActivityStreamView />;
+            return <FleetView />;
+          })()}
         </div>
         {rightRailCollapsed ? (
           <aside

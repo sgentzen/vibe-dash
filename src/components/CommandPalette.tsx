@@ -4,6 +4,12 @@ import type { AppState, FleetPreset } from "../store.js";
 
 type ViewId = AppState["activeView"];
 
+function taskStatusIcon(status: string): string {
+  if (status === "in_progress") return "●";
+  if (status === "blocked") return "⚠";
+  return "○";
+}
+
 interface Command {
   id: string;
   label: string;
@@ -81,7 +87,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       id: `task-${t.id}`,
       label: t.title,
       description: `${t.status} · ${t.priority}`,
-      icon: t.status === "in_progress" ? "●" : t.status === "blocked" ? "⚠" : "○",
+      icon: taskStatusIcon(t.status),
       action: () => {
         dispatch({ type: "SET_ACTIVE_VIEW", payload: "board" });
         dispatch({ type: "SET_SEARCH_QUERY", payload: t.title });

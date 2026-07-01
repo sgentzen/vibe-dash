@@ -9,8 +9,9 @@ interface AgentContributionsCardProps {
 }
 
 export const AgentContributionsCard = memo(function AgentContributionsCard({ contributions, openMilestones }: AgentContributionsCardProps) {
+  const milestoneLabel = openMilestones.length > 0 ? `(${openMilestones[0].name})` : "";
   return (
-    <CardWrapper title={`Agent Contributions ${openMilestones.length > 0 ? `(${openMilestones[0].name})` : ""}`}>
+    <CardWrapper title={`Agent Contributions ${milestoneLabel}`}>
       {contributions.length === 0 ? (
         <EmptyState
           message={openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}

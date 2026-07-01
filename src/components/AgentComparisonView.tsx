@@ -137,7 +137,10 @@ export default function AgentComparisonView() {
     else { setSortKey(key); setSortAsc(false); }
   }
 
-  const arrow = (key: SortKey) => sortKey === key ? (sortAsc ? " \u25B2" : " \u25BC") : "";
+  const arrow = (key: SortKey) => {
+    if (sortKey !== key) return "";
+    return sortAsc ? " \u25B2" : " \u25BC";
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

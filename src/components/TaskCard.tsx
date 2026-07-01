@@ -37,6 +37,18 @@ function getDueUrgency(dueDate: string | null): "overdue" | "today" | "this-week
   return null;
 }
 
+function truncateDescription(description: string | null): string | null {
+  if (!description) return null;
+  const ellipsis = description.length > 80 ? "…" : "";
+  return description.slice(0, 80) + ellipsis;
+}
+
+function dueBadge(urgency: "overdue" | "today" | "this-week"): { token: StatusToken; label: string } {
+  if (urgency === "overdue") return { token: "danger", label: "Overdue" };
+  if (urgency === "today") return { token: "warning", label: "Due today" };
+  return { token: "neutral", label: "Due soon" };
+}
+
 export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
@@ -65,9 +77,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
     ? buildDailyActivityCounts(taskActivity.map((a) => a.timestamp), 7)
     : null;
 
-  const descSnippet = task.description
-    ? task.description.slice(0, 80) + (task.description.length > 80 ? "\u2026" : "")
-    : null;
+  const descSnippet = truncateDescription(task.description);
 
   let borderColor = "var(--border)";
   let background = "var(--bg-tertiary)";
@@ -230,13 +240,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           )}
 
           {/* Due date indicator */}
-          {dueUrgency && (() => {
-            const token: StatusToken = dueUrgency === "overdue" ? "danger"
-              : dueUrgency === "today" ? "warning" : "neutral";
-            const label = dueUrgency === "overdue" ? "Overdue"
-              : dueUrgency === "today" ? "Due today" : "Due soon";
-            return <StatusPill token={token} label={label} />;
-          })()}
+          {dueUrgency && <StatusPill {...dueBadge(dueUrgency)} />}
           {task.due_date && !dueUrgency && !isDone && (
             <span
               style={{
@@ -342,7 +346,10 @@ function SubTaskRow({ task }: { task: Task }) {
   if (isActive) color = "var(--status-success)";
   if (isBlocked) color = "var(--status-danger)";
 
-  const icon = isDone ? "\u2713" : isActive ? "\u25cf" : isBlocked ? "\u26a0" : "\u25cb";
+  let icon = "\u25cb";
+  if (isDone) icon = "\u2713";
+  else if (isActive) icon = "\u25cf";
+  else if (isBlocked) icon = "\u26a0";
 
   return (
     <div

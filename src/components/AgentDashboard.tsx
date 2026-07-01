@@ -230,12 +230,17 @@ export function AgentDashboard() {
   );
 }
 
+function healthStatusColor(status: string | undefined): string {
+  if (status === "active") return "var(--status-success)";
+  if (status === "idle") return "var(--status-warning)";
+  return "var(--text-muted)";
+}
+
 function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDetail; onClick: () => void }) {
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = detail?.health_status === "active" ? "var(--status-success)"
-    : detail?.health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
+  const healthColor = healthStatusColor(detail?.health_status);
 
   return (
     <div
@@ -350,8 +355,7 @@ function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () =
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
-  const healthColor = health_status === "active" ? "var(--status-success)"
-    : health_status === "idle" ? "var(--status-warning)" : "var(--text-muted)";
+  const healthColor = healthStatusColor(health_status);
 
   return (
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
