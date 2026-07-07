@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
-import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentContribution, AgentComparison } from "../types";
+import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
-import { AgentContributionsCard, ActivityHeatmapCard } from "./dashboard/ActivityCards";
+import { ActivityHeatmapCard } from "./dashboard/ActivityCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
 import { TodayCard } from "./dashboard/TodayCard";
 
@@ -16,7 +16,6 @@ const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 type ChartSetters = {
   setHeatmap: (h: ActivityHeatmapEntry[]) => void;
   setDailyStats: (s: MilestoneDailyStats[]) => void;
-  setContributions: (c: AgentContribution[]) => void;
 };
 
 type CostSetters = {
@@ -37,15 +36,10 @@ async function loadChartData(
     setters.setHeatmap(heat);
 
     if (firstOpenMilestoneId) {
-      const [stats, contrib] = await Promise.all([
-        api.getMilestoneDailyStats(firstOpenMilestoneId),
-        api.getMilestoneContributions(firstOpenMilestoneId),
-      ]);
+      const stats = await api.getMilestoneDailyStats(firstOpenMilestoneId);
       setters.setDailyStats(stats);
-      setters.setContributions(contrib);
     } else {
       setters.setDailyStats([]);
-      setters.setContributions([]);
     }
   } catch (e) {
     console.warn("[DashboardView] failed to load chart data", e);
@@ -104,7 +98,6 @@ export function DashboardView() {
 
   const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
   const [heatmap, setHeatmap] = useState<ActivityHeatmapEntry[]>([]);
-  const [contributions, setContributions] = useState<AgentContribution[]>([]);
   const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
@@ -139,7 +132,7 @@ export function DashboardView() {
   const firstOpenMilestoneId = openMilestones.length > 0 ? openMilestones[0]?.id : null;
 
   useEffect(() => {
-    loadChartData(api, projectId, firstOpenMilestoneId, { setHeatmap, setDailyStats, setContributions });
+    loadChartData(api, projectId, firstOpenMilestoneId, { setHeatmap, setDailyStats });
   }, [api, firstOpenMilestoneId, projectId, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {
@@ -209,8 +202,7 @@ export function DashboardView() {
         <MilestoneOverviewCard openMilestones={openMilestones} projectTasks={projectTasks} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <AgentContributionsCard contributions={contributions} openMilestones={openMilestones} />
+      <div style={{ marginBottom: "var(--space-4)" }}>
         <ActivityHeatmapCard heatmap={heatmap} />
       </div>
 

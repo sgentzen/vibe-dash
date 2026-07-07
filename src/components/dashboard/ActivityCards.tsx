@@ -1,39 +1,7 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
 import { EmptyState } from "../EmptyState.js";
-import type { AgentContribution, ActivityHeatmapEntry, Milestone } from "../../types";
-
-interface AgentContributionsCardProps {
-  contributions: AgentContribution[];
-  openMilestones: Milestone[];
-}
-
-export const AgentContributionsCard = memo(function AgentContributionsCard({ contributions, openMilestones }: AgentContributionsCardProps) {
-  const milestoneLabel = openMilestones.length > 0 ? `(${openMilestones[0].name})` : "";
-  return (
-    <CardWrapper title={`Agent Contributions ${milestoneLabel}`}>
-      {contributions.length === 0 ? (
-        <EmptyState
-          message={openMilestones.length > 0 ? "No contributions yet." : "No open milestones — create a milestone to track agent contributions."}
-        />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          {contributions.map((c) => (
-            <div key={c.agent_id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-              <span
-                style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%", minWidth: 0 }}
-                title={c.agent_name}
-              >
-                {c.agent_name}
-              </span>
-              <span style={{ color: "var(--text-muted)" }}>{c.completed_count} tasks</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </CardWrapper>
-  );
-});
+import type { ActivityHeatmapEntry } from "../../types";
 
 interface ActivityHeatmapCardProps {
   heatmap: ActivityHeatmapEntry[];

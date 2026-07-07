@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
 
 function jsonHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -276,12 +276,6 @@ async function getAgentStats(agentId: string, milestoneId?: string): Promise<Age
   return res.json();
 }
 
-async function getMilestoneContributions(milestoneId: string): Promise<AgentContribution[]> {
-  const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/contributions`);
-  if (!res.ok) await throwApiError(res, "getMilestoneContributions");
-  return res.json();
-}
-
 // ─── R4: Milestone Daily Stats ───────────────────────────────────────────
 
 async function getMilestoneDailyStats(milestoneId: string): Promise<MilestoneDailyStats[]> {
@@ -443,7 +437,6 @@ export function useApi() {
     searchTasks,
     bulkUpdateTasks,
     getAgentStats,
-    getMilestoneContributions,
     getMilestoneDailyStats,
     getActivityHeatmap,
     getActivityStream: getActivityStreamApi,
