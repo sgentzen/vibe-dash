@@ -39,7 +39,6 @@ server/
     agents.ts       # CRUD + health, sessions, stats
     activity.ts     # logActivity, activity stream, heatmap
     blockers.ts     # createBlocker, resolveBlocker
-    tags.ts         # tag CRUD + task-tag associations
     dependencies.ts # task dependency graph
     comments.ts     # comments + @mentions
     notifications.ts # notifications

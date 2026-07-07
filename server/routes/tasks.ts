@@ -96,7 +96,6 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       status: q.status as TaskStatus | undefined,
       priority: q.priority as TaskPriority | undefined,
       assigned_agent_id: q.assigned_agent_id,
-      tag_id: q.tag_id,
       due_before: q.due_before,
       due_after: q.due_after,
     }));

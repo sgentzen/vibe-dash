@@ -18,14 +18,13 @@ const DONE_AGE_OFF_MS = 24 * 60 * 60 * 1000;
 type SortBy = "default" | "due_soonest";
 
 export function TaskBoard() {
-  const { tasks, projects, milestones, activity, agents, tags, taskTagMap, taskDepsMap } = useDataState();
+  const { tasks, projects, milestones, activity, agents, taskDepsMap } = useDataState();
   const { selectedProjectId, selectedMilestoneId, searchQuery, searchScope } = useNavigationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [keyboardGrab, setKeyboardGrab] = useState<{ taskId: string } | null>(null);
   const [grabError, setGrabError] = useState<string | null>(null);
-  const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const dragTaskId = useRef<string>("");
 
@@ -40,15 +39,6 @@ export function TaskBoard() {
     knownTaskIdsRef.current = new Set(tasks.map((t) => t.id));
   }, [tasks]);
 
-  useEffect(() => {
-    setFilterTagId(null);
-  }, [selectedProjectId]);
-
-  const projectTags = useMemo(
-    () => selectedProjectId ? tags.filter((t) => t.project_id === selectedProjectId) : tags,
-    [tags, selectedProjectId]
-  );
-
   const filteredTasks = useMemo(() => {
     const nowMs = Date.now();
     const lower = searchQuery.toLowerCase();
@@ -58,10 +48,6 @@ export function TaskBoard() {
         const completedAt = new Date(t.updated_at).getTime();
         if (nowMs - completedAt > DONE_AGE_OFF_MS) return false;
       }
-      if (filterTagId) {
-        const taskTags = taskTagMap[t.id] ?? [];
-        if (!taskTags.includes(filterTagId)) return false;
-      }
       return (
         t.parent_task_id === null &&
         (selectedProjectId === null || t.project_id === selectedProjectId) &&
@@ -70,7 +56,7 @@ export function TaskBoard() {
       );
     });
     return result;
-  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery, searchScope, filterTagId, taskTagMap]);
+  }, [tasks, selectedProjectId, selectedMilestoneId, searchQuery, searchScope]);
 
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
@@ -177,33 +163,6 @@ export function TaskBoard() {
           </>
         )}
 
-        {/* Tag filter */}
-        {projectTags.length > 0 && (
-          <>
-            <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
-            <select
-              value={filterTagId ?? ""}
-              onChange={(e) => setFilterTagId(e.target.value || null)}
-              style={{
-                background: "var(--bg-tertiary)",
-                border: "1px solid var(--border)",
-                borderRadius: "6px",
-                color: filterTagId ? "var(--accent-blue)" : "var(--text-secondary)",
-                padding: "4px 8px",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">All Tags</option>
-              {projectTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-
         {/* Sort */}
         <span style={{ color: "var(--border)", fontSize: "12px" }}>|</span>
         <select
@@ -294,8 +253,6 @@ export function TaskBoard() {
             milestones={projectMilestones}
             activity={activity}
             agents={agents}
-            tags={tags}
-            taskTagMap={taskTagMap}
             taskDepsMap={taskDepsMap}
             selectedProjectId={selectedProjectId}
             selectedMilestoneId={selectedMilestoneId}

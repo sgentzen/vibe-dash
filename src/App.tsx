@@ -138,21 +138,13 @@ export function App() {
       ]);
       if (cancelled) return true;
 
-      const [allTags, allMilestones, taskTagPairs, allDeps, notifs, unread, worktrees] = await Promise.all([
-        Promise.all(projects.map((p) => api.getTags(p.id))).then((r) => r.flat()),
+      const [allMilestones, allDeps, notifs, unread, worktrees] = await Promise.all([
         Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
-        Promise.all(projects.map((p) => api.getProjectTaskTags(p.id))).then((r) => r.flat()),
         Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
         api.getNotifications(50), api.getUnreadCount(), api.getWorktrees(),
       ]);
       if (cancelled) return true;
 
-      const tagMap: Record<string, string[]> = {};
-      for (const { task_id, tag } of taskTagPairs) {
-        const list = tagMap[task_id] ?? [];
-        list.push(tag.id);
-        tagMap[task_id] = list;
-      }
       const depsMap: Record<string, string[]> = {};
       for (const d of allDeps) {
         const list = depsMap[d.task_id] ?? [];
@@ -168,8 +160,6 @@ export function App() {
       dispatch({ type: "SET_AGENTS", payload: agents });
       dispatch({ type: "SET_ACTIVITY", payload: activity });
       dispatch({ type: "SET_BLOCKERS", payload: blockerList });
-      dispatch({ type: "SET_TAGS", payload: allTags });
-      dispatch({ type: "SET_TASK_TAG_MAP", payload: tagMap });
       dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
       dispatch({ type: "SET_NOTIFICATIONS", payload: notifs });
       dispatch({ type: "SET_UNREAD_COUNT", payload: unread });

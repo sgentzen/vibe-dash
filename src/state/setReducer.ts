@@ -41,10 +41,6 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, activity: action.payload };
     case "SET_BLOCKERS":
       return { ...state, blockers: action.payload };
-    case "SET_TAGS":
-      return { ...state, tags: action.payload };
-    case "SET_TASK_TAG_MAP":
-      return { ...state, taskTagMap: action.payload };
     case "SET_TASK_DEPS_MAP":
       return { ...state, taskDepsMap: action.payload };
     case "SET_SEARCH_QUERY":

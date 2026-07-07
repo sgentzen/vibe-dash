@@ -10,7 +10,7 @@ export type { AppState, AppAction, Theme, ActiveView, FleetPreset, SearchScope }
 export type DataState = Pick<
   AppState,
   "projects" | "milestones" | "tasks" | "agents" | "activity" | "blockers" |
-  "tags" | "taskTagMap" | "taskDepsMap" | "worktrees" | "stats"
+  "taskDepsMap" | "worktrees" | "stats"
 >;
 
 export type NavigationState = Pick<
@@ -43,8 +43,6 @@ const initialState: AppState = {
   agents: [],
   activity: [],
   blockers: [],
-  tags: [],
-  taskTagMap: {},
   taskDepsMap: {},
   notifications: [],
   unreadCount: 0,
@@ -83,15 +81,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       agents: state.agents,
       activity: state.activity,
       blockers: state.blockers,
-      tags: state.tags,
-      taskTagMap: state.taskTagMap,
       taskDepsMap: state.taskDepsMap,
       worktrees: state.worktrees,
       stats: state.stats,
     }),
     [
       state.projects, state.milestones, state.tasks, state.agents, state.activity,
-      state.blockers, state.tags, state.taskTagMap, state.taskDepsMap,
+      state.blockers, state.taskDepsMap,
       state.worktrees, state.stats,
     ]
   );

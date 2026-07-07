@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { render, type RenderOptions } from "@testing-library/react";
 import { AppProvider, useAppDispatch } from "../../src/store";
-import type { Project, Task, Agent, Milestone, Tag } from "../../src/types";
+import type { Project, Task, Agent, Milestone } from "../../src/types";
 
 // ─── Factories ──────────────────────────────────────────────────────────
 
@@ -76,18 +76,6 @@ export function makeMilestone(overrides: Partial<Milestone> = {}): Milestone {
   };
 }
 
-export function makeTag(overrides: Partial<Tag> = {}): Tag {
-  const id = uid();
-  return {
-    id,
-    project_id: "proj-1",
-    name: `tag-${id}`,
-    color: "#888888",
-    created_at: "2026-01-01T00:00:00.000Z",
-    ...overrides,
-  };
-}
-
 // ─── Seed Data ──────────────────────────────────────────────────────────
 
 export interface SeedData {
@@ -95,7 +83,6 @@ export interface SeedData {
   tasks?: Task[];
   agents?: Agent[];
   milestones?: Milestone[];
-  tags?: Tag[];
   selectedProjectId?: string | null;
   selectedMilestoneId?: string | null;
 }
@@ -108,7 +95,6 @@ function Seeder({ seed, children }: { seed: SeedData; children: React.ReactNode 
     if (seed.tasks) dispatch({ type: "SET_TASKS", payload: seed.tasks });
     if (seed.agents) dispatch({ type: "SET_AGENTS", payload: seed.agents });
     if (seed.milestones) dispatch({ type: "SET_MILESTONES", payload: seed.milestones });
-    if (seed.tags) dispatch({ type: "SET_TAGS", payload: seed.tags });
     if (seed.selectedProjectId !== undefined) {
       dispatch({ type: "SELECT_PROJECT", payload: seed.selectedProjectId });
     }

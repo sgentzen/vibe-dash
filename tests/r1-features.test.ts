@@ -8,12 +8,6 @@ import {
   updateTask,
   registerAgent,
   getAgentHealthStatus,
-  createTag,
-  listTags,
-  addTagToTask,
-  removeTagFromTask,
-  getTaskTags,
-  getTag,
 } from "../server/db/index.js";
 
 let db: Database.Database;
@@ -137,90 +131,5 @@ describe("due dates", () => {
 
     const cleared = updateTask(db, task.id, { due_date: null });
     expect(cleared?.due_date).toBeNull();
-  });
-});
-
-// ─── 2.3 Tags ───────────────────────────────────────────────────────────────
-
-describe("tags", () => {
-  it("creates and lists tags for a project", () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const tag1 = createTag(db, { project_id: project.id, name: "bug", color: "#ef4444" });
-    createTag(db, { project_id: project.id, name: "feature", color: "#3b82f6" });
-
-    expect(tag1.name).toBe("bug");
-    expect(tag1.color).toBe("#ef4444");
-    expect(tag1.project_id).toBe(project.id);
-
-    const tags = listTags(db, project.id);
-    expect(tags).toHaveLength(2);
-    expect(tags.map((t) => t.name)).toContain("bug");
-    expect(tags.map((t) => t.name)).toContain("feature");
-  });
-
-  it("uses default color when none provided", () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const tag = createTag(db, { project_id: project.id, name: "default-tag" });
-    expect(tag.color).toBe("#6366f1");
-  });
-
-  it("gets a tag by ID", () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const tag = createTag(db, { project_id: project.id, name: "test" });
-    const fetched = getTag(db, tag.id);
-    expect(fetched?.name).toBe("test");
-  });
-
-  it("adds and removes tags from tasks", () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
-    const tag1 = createTag(db, { project_id: project.id, name: "bug" });
-    const tag2 = createTag(db, { project_id: project.id, name: "feature" });
-
-    addTagToTask(db, task.id, tag1.id);
-    addTagToTask(db, task.id, tag2.id);
-
-    const taskTags = getTaskTags(db, task.id);
-    expect(taskTags).toHaveLength(2);
-    expect(taskTags.map((t) => t.name)).toContain("bug");
-    expect(taskTags.map((t) => t.name)).toContain("feature");
-
-    const removed = removeTagFromTask(db, task.id, tag1.id);
-    expect(removed).not.toBeNull();
-
-    const afterRemove = getTaskTags(db, task.id);
-    expect(afterRemove).toHaveLength(1);
-    expect(afterRemove[0].name).toBe("feature");
-  });
-
-  it("handles duplicate tag addition gracefully", () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
-    const tag = createTag(db, { project_id: project.id, name: "bug" });
-
-    addTagToTask(db, task.id, tag.id);
-    addTagToTask(db, task.id, tag.id); // duplicate
-
-    const taskTags = getTaskTags(db, task.id);
-    expect(taskTags).toHaveLength(1);
-  });
-
-  it("returns null when removing non-existent tag from task", () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T1", description: null, priority: "medium" });
-    const removed = removeTagFromTask(db, task.id, "nonexistent-id");
-    expect(removed).toBeNull();
-  });
-
-  it("isolates tags by project", () => {
-    const p1 = createProject(db, { name: "P1", description: null });
-    const p2 = createProject(db, { name: "P2", description: null });
-    createTag(db, { project_id: p1.id, name: "bug" });
-    createTag(db, { project_id: p2.id, name: "feature" });
-
-    expect(listTags(db, p1.id)).toHaveLength(1);
-    expect(listTags(db, p2.id)).toHaveLength(1);
-    expect(listTags(db, p1.id)[0].name).toBe("bug");
-    expect(listTags(db, p2.id)[0].name).toBe("feature");
   });
 });

@@ -5,7 +5,6 @@ import type {
   Agent,
   ActivityEntry,
   Blocker,
-  Tag,
   AppNotification,
   TaskWorktree,
   WsEvent,
@@ -26,8 +25,6 @@ export interface AppState {
   agents: Agent[];
   activity: ActivityEntry[];
   blockers: Blocker[];
-  tags: Tag[];
-  taskTagMap: Record<string, string[]>;
   taskDepsMap: Record<string, string[]>;
   notifications: AppNotification[];
   unreadCount: number;
@@ -61,8 +58,6 @@ export type AppAction =
   | { type: "SET_AGENTS"; payload: Agent[] }
   | { type: "SET_ACTIVITY"; payload: ActivityEntry[] }
   | { type: "SET_BLOCKERS"; payload: Blocker[] }
-  | { type: "SET_TAGS"; payload: Tag[] }
-  | { type: "SET_TASK_TAG_MAP"; payload: Record<string, string[]> }
   | { type: "SET_TASK_DEPS_MAP"; payload: Record<string, string[]> }
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "SET_SEARCH_SCOPE"; payload: SearchScope }

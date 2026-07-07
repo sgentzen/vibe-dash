@@ -8,7 +8,6 @@ import { taskRoutes } from "./tasks.js";
 import { agentRoutes } from "./agents.js";
 import { activityRoutes } from "./activity.js";
 import { blockerRoutes } from "./blockers.js";
-import { tagRoutes } from "./tags.js";
 import { dependencyRoutes } from "./dependencies.js";
 import { commentRoutes } from "./comments.js";
 import { notificationRoutes } from "./notifications.js";
@@ -47,7 +46,6 @@ const routeFactories: RouteFactory[] = [
   agentRoutes,
   activityRoutes,
   blockerRoutes,
-  tagRoutes,
   dependencyRoutes,
   commentRoutes,
   notificationRoutes,

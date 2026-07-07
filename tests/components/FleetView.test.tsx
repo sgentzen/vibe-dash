@@ -15,7 +15,7 @@ beforeEach(() => {
 
 const baseState: AppState = {
   projects: [], milestones: [], tasks: [], agents: [], activity: [], blockers: [],
-  tags: [], taskTagMap: {}, taskDepsMap: {}, notifications: [], unreadCount: 0,
+  taskDepsMap: {}, notifications: [], unreadCount: 0,
   fileConflicts: [], worktrees: [],
   searchQuery: "", searchScope: "all",
   activeView: "fleet", fleetPreset: "overview",

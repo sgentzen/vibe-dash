@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { TaskCard } from "../TaskCard";
 import { MilestoneGroup } from "./MilestoneGroup";
-import { groupByMilestone, getBlockingCount, resolveTaskTags } from "./boardHelpers";
+import { groupByMilestone, getBlockingCount } from "./boardHelpers";
 import { STATUS_COLORS } from "../../constants/colors.js";
 import type { DataState } from "../../store";
 import type { useApi } from "../../hooks/useApi";
-import type { Task, Milestone, TaskStatus, Agent, Tag } from "../../types";
+import type { Task, Milestone, TaskStatus, Agent } from "../../types";
 
 interface KanbanColumnProps {
   status: TaskStatus;
@@ -15,8 +15,6 @@ interface KanbanColumnProps {
   milestones: Milestone[];
   activity: DataState["activity"];
   agents: Agent[];
-  tags: Tag[];
-  taskTagMap: Record<string, string[]>;
   taskDepsMap: Record<string, string[]>;
   selectedProjectId: string | null;
   selectedMilestoneId: string | null;
@@ -38,8 +36,6 @@ export function KanbanColumn({
   milestones,
   activity,
   agents,
-  tags,
-  taskTagMap,
   taskDepsMap,
   selectedProjectId,
   selectedMilestoneId,
@@ -157,8 +153,6 @@ export function KanbanColumn({
               allTasks={allTasks}
               activity={activity}
               agents={agents}
-              tags={tags}
-              taskTagMap={taskTagMap}
               taskDepsMap={taskDepsMap}
               justAppearedIds={justAppearedIds}
               grabbedTaskId={grabbedTaskId}
@@ -175,7 +169,6 @@ export function KanbanColumn({
               allTasks={allTasks}
               activity={activity}
               agents={agents}
-              taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
               blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
               grabbed={grabbedTaskId === task.id}
               justAppeared={justAppearedIds.has(task.id)}

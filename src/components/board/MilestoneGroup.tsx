@@ -1,7 +1,7 @@
 import { TaskCard } from "../TaskCard";
-import { getBlockingCount, resolveTaskTags } from "./boardHelpers";
+import { getBlockingCount } from "./boardHelpers";
 import type { DataState } from "../../store";
-import type { Task, Milestone, Agent, Tag } from "../../types";
+import type { Task, Milestone, Agent } from "../../types";
 
 interface MilestoneGroupProps {
   milestone: Milestone | null;
@@ -9,8 +9,6 @@ interface MilestoneGroupProps {
   allTasks: Task[];
   activity: DataState["activity"];
   agents: Agent[];
-  tags: Tag[];
-  taskTagMap: Record<string, string[]>;
   taskDepsMap: Record<string, string[]>;
   justAppearedIds: Set<string>;
   grabbedTaskId: string | null;
@@ -25,8 +23,6 @@ export function MilestoneGroup({
   allTasks,
   activity,
   agents,
-  tags,
-  taskTagMap,
   taskDepsMap,
   justAppearedIds,
   grabbedTaskId,
@@ -85,7 +81,6 @@ export function MilestoneGroup({
             allTasks={allTasks}
             activity={activity}
             agents={agents}
-            taskTags={resolveTaskTags(task.id, taskTagMap, tags)}
             blockingCount={getBlockingCount(task.id, taskDepsMap, allTasks)}
             grabbed={grabbedTaskId === task.id}
             justAppeared={justAppearedIds.has(task.id)}

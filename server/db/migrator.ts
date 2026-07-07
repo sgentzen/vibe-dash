@@ -550,6 +550,20 @@ const MIGRATIONS: Migration[] = [
       if (!has("current_status_at")) db.prepare("ALTER TABLE agents ADD COLUMN current_status_at TEXT").run();
     },
   },
+  {
+    name: "017_drop_tags",
+    run(db) {
+      // Tags feature removed: it had REST endpoints + a human-only UI but no
+      // MCP tool, so no agent ever wrote tags — dead weight against the
+      // agent-first premise. Forward-only drop; existing tag rows are discarded.
+      // Drop task_tags first (it FKs to tags) so the drop succeeds under
+      // foreign_keys=ON. Dropping a table also drops its indexes.
+      db.exec(`
+        DROP TABLE IF EXISTS task_tags;
+        DROP TABLE IF EXISTS tags;
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

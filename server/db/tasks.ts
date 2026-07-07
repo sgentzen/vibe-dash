@@ -230,7 +230,6 @@ export interface SearchTasksFilter {
   status?: TaskStatus;
   priority?: TaskPriority;
   assigned_agent_id?: string;
-  tag_id?: string;
   due_before?: string;
   due_after?: string;
   limit?: number;
@@ -254,12 +253,7 @@ export function searchTasks(db: Database.Database, filter: SearchTasksFilter): T
   if (filter.due_before) { conditions.push("t.due_date <= ?"); params.push(filter.due_before); }
   if (filter.due_after) { conditions.push("t.due_date >= ?"); params.push(filter.due_after); }
 
-  let sql = "SELECT DISTINCT t.* FROM tasks t";
-  if (filter.tag_id) {
-    sql += " JOIN task_tags tt ON t.id = tt.task_id";
-    conditions.push("tt.tag_id = ?");
-    params.push(filter.tag_id);
-  }
+  let sql = "SELECT t.* FROM tasks t";
 
   if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
 

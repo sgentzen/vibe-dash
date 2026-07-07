@@ -3,9 +3,8 @@ import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle } from "../styles/shared.js";
-import type { Task, TaskStatus, TaskPriority, Tag, TaskComment } from "../types";
+import type { Task, TaskStatus, TaskPriority, TaskComment } from "../types";
 import { CommentsSection } from "./task/CommentsSection";
-import { TagPicker } from "./task/TagPicker";
 import { ModalBackdrop } from "./ui/ModalBackdrop";
 import { ModalDrawer } from "./ui/ModalDrawer";
 import { FormField } from "./ui/FormField";
@@ -20,7 +19,7 @@ interface TaskEditDrawerProps {
 }
 
 export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
-  const { milestones, agents, tags, taskTagMap } = useAppState();
+  const { milestones, agents } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();
 
@@ -47,10 +46,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   }
 
   const taskMilestones = milestones.filter((m) => m.project_id === task.project_id);
-  const projectTags = tags.filter((t) => t.project_id === task.project_id);
-  const currentTagIds = taskTagMap[task.id] ?? [];
-  const currentTags = currentTagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => !!t);
-  const availableTags = projectTags.filter((t) => !currentTagIds.includes(t.id));
 
   // Close on Escape (handled here so focus-trap's onDeactivate doesn't fire
   // during React StrictMode's dev mount-unmount-remount cycle and instantly close us)
@@ -161,14 +156,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
           onEstimateChange={setEstimate}
           startDate={startDate}
           onStartDateChange={setStartDate}
-        />
-
-        {/* Tags */}
-        <TagPicker
-          taskId={task.id}
-          currentTags={currentTags}
-          availableTags={availableTags}
-          projectTagCount={projectTags.length}
         />
 
         <FormField id="task-progress" label={`Progress — ${progress}%`}>

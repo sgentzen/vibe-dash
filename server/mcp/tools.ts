@@ -154,7 +154,6 @@ function handleSearchTasks(db: Database.Database, args: Args): ToolResult {
     status: args.status as Exclude<TaskStatus, "cancelled"> | undefined,
     priority: args.priority as Priority | undefined,
     assigned_agent_id: args.assigned_agent_id as string | undefined,
-    tag_id: args.tag_id as string | undefined,
     due_before: args.due_before as string | undefined,
     due_after: args.due_after as string | undefined,
   });

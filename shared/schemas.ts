@@ -17,10 +17,6 @@ export const agentRoleEnum = z.enum([
   "agent",
 ]);
 
-// ─── Helpers ────────────────────────────────────────────────────────────
-
-const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "color must be a hex color like #ff0000");
-
 // ─── Agents ─────────────────────────────────────────────────────────────
 
 export const registerAgentSchema = z.object({
@@ -92,17 +88,6 @@ export const updateMilestoneSchema = z.object({
   acceptance_criteria: z.string().nullable().optional(),
   target_date: z.string().nullable().optional(),
   status: milestoneStatusEnum.optional(),
-});
-
-// ─── Tags ───────────────────────────────────────────────────────────────
-
-export const createTagSchema = z.object({
-  name: z.string().min(1),
-  color: hexColor.optional(),
-});
-
-export const addTagToTaskSchema = z.object({
-  tag_id: z.string().min(1),
 });
 
 // ─── Comments ───────────────────────────────────────────────────────────

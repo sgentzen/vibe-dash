@@ -83,27 +83,6 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
         ),
       };
     }
-    case "tag_created": {
-      const tag = event.payload;
-      return { ...state, tags: [...state.tags, tag] };
-    }
-    case "tag_added": {
-      const tt = event.payload;
-      const existing = state.taskTagMap[tt.task_id] ?? [];
-      if (existing.includes(tt.tag_id)) return state;
-      return {
-        ...state,
-        taskTagMap: { ...state.taskTagMap, [tt.task_id]: [...existing, tt.tag_id] },
-      };
-    }
-    case "tag_removed": {
-      const tt = event.payload;
-      const current = state.taskTagMap[tt.task_id] ?? [];
-      return {
-        ...state,
-        taskTagMap: { ...state.taskTagMap, [tt.task_id]: current.filter((id) => id !== tt.tag_id) },
-      };
-    }
     case "dependency_added": {
       const dep = event.payload;
       const existing = state.taskDepsMap[dep.task_id] ?? [];

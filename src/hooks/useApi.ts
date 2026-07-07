@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
 
 function jsonHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -184,55 +184,10 @@ async function updateMilestone(
   return res.json();
 }
 
-async function getTags(projectId: string): Promise<Tag[]> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/tags`);
-  if (!res.ok) await throwApiError(res, "getTags");
-  return res.json();
-}
-
-async function createTag(projectId: string, data: { name: string; color?: string }): Promise<Tag> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/tags`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) await throwApiError(res, "createTag");
-  return res.json();
-}
-
-async function getTaskTags(taskId: string): Promise<Tag[]> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`);
-  if (!res.ok) await throwApiError(res, "getTaskTags");
-  return res.json();
-}
-
-async function getProjectTaskTags(projectId: string): Promise<Array<{ task_id: string; tag: Tag }>> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-tags`);
-  if (!res.ok) await throwApiError(res, "getProjectTaskTags");
-  return res.json();
-}
-
 async function getProjectTaskDependencies(projectId: string): Promise<TaskDependency[]> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-dependencies`);
   if (!res.ok) await throwApiError(res, "getProjectTaskDependencies");
   return res.json();
-}
-
-async function addTagToTask(taskId: string, tagId: string): Promise<TaskTag> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ tag_id: tagId }),
-  });
-  if (!res.ok) await throwApiError(res, "addTagToTask");
-  return res.json();
-}
-
-async function removeTagFromTask(taskId: string, tagId: string): Promise<void> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) await throwApiError(res, "removeTagFromTask");
 }
 
 // ─── R2: Milestone Progress ─────────────────────────────────────────────
@@ -517,13 +472,7 @@ export function useApi() {
     getMilestones,
     createMilestone,
     updateMilestone,
-    getTags,
-    createTag,
-    getTaskTags,
-    getProjectTaskTags,
     getProjectTaskDependencies,
-    addTagToTask,
-    removeTagFromTask,
     getMilestoneProgress,
     getDependencies,
     getBlockingTasks,

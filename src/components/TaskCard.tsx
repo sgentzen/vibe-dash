@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from "react";
-import type { Task, ActivityEntry, Agent, Tag } from "../types";
+import type { Task, ActivityEntry, Agent } from "../types";
 import { agentColor } from "../utils/agentColors";
 import { badgeStyle } from "../styles/shared.js";
 import { HEALTH_COLORS } from "../constants/colors.js";
@@ -14,7 +14,6 @@ interface TaskCardProps {
   allTasks: Task[];
   activity: ActivityEntry[];
   agents: Agent[];
-  taskTags?: Tag[];
   blockingCount?: number;
   grabbed?: boolean;
   justAppeared?: boolean;
@@ -62,7 +61,7 @@ function cardAppearance(
   return base;
 }
 
-export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, taskTags, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agents, blockingCount, grabbed, justAppeared, onClick, onDragStart, onGrab }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isActive = task.status === "in_progress";
   const isDone = task.status === "done";
@@ -208,7 +207,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           </>
         )}
 
-        {/* Badges row: priority, due date, agent, tags */}
+        {/* Badges row: priority, due date, agent */}
         <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center" }}>
           {/* Assigned agent badge (with freshness dot) */}
           {assignedAgent && (
@@ -275,16 +274,6 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
               <StatusPill token="danger" label={`Blocked by ${blockingCount}`} />
             </span>
           )}
-
-          {/* Tag pills */}
-          {taskTags?.map((tag) => (
-            <span
-              key={tag.id}
-              style={badgeStyle(tag.color)}
-            >
-              {tag.name}
-            </span>
-          ))}
         </div>
       </div>
 
