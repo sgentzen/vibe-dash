@@ -1,9 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+// The Agents view is the Fleet view's "Agents" preset (FleetView → <AgentDashboard/>
+// when fleetPreset === "agents"). It is reached via the PresetSwitcher tab, NOT a
+// top-level nav button. Note the topbar also renders a "View active agents" stat
+// pill, so button locators for "Active"/"Agents" must use exact matching to avoid
+// colliding with it (and with project cards in the always-mounted sidebar).
 test.describe("Agents view", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Agents" }).click();
+    // PresetSwitcher renders role="tab" buttons ("Overview preset …", "Agents preset …").
+    await page.getByRole("tab", { name: /agents/i }).click();
   });
 
   test("shows Agent Dashboard heading", async ({ page }) => {
@@ -13,17 +19,25 @@ test.describe("Agents view", () => {
   });
 
   test("shows Agents and Performance toggle buttons", async ({ page }) => {
-    // The nav "Agents" button is nth(0); the dashboard mode toggle is nth(1)
-    await expect(page.getByRole("button", { name: "Agents" }).nth(1)).toBeVisible();
+    // AgentDashboard renders <button>Agents</button> / <button>Performance</button>.
+    // exact: true avoids the topbar "View active agents" pill.
     await expect(
-      page.getByRole("button", { name: "Performance" })
+      page.getByRole("button", { name: "Agents", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Performance", exact: true })
     ).toBeVisible();
   });
 
   test("shows status filter buttons in agents mode", async ({ page }) => {
-    // FILTER_LABELS: "active+idle" → "Active", "all" → "All", "offline" → "Offline"
-    await expect(page.getByRole("button", { name: "Active" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "All" }).first()).toBeVisible();
+    // FILTER_LABELS: "active+idle" → "Active", "all" → "All", "offline" → "Offline".
+    // exact: true keeps "Active" from matching the topbar "View active agents" pill.
+    await expect(
+      page.getByRole("button", { name: "Active", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "All", exact: true })
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Offline", exact: true })
     ).toBeVisible();
@@ -32,9 +46,12 @@ test.describe("Agents view", () => {
   test("switches to Performance view when Performance button is clicked", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Performance" }).click();
-    // Status filter buttons are hidden in performance mode
-    await expect(page.getByRole("button", { name: "Active" })).not.toBeVisible();
+    await page.getByRole("button", { name: "Performance", exact: true }).click();
+    // Status filter buttons are hidden in performance mode. Without exact: true the
+    // locator would still match the persistent topbar "View active agents" pill.
+    await expect(
+      page.getByRole("button", { name: "Active", exact: true })
+    ).not.toBeVisible();
   });
 
   test("shows correct state: empty message or agent controls", async ({
@@ -49,12 +66,14 @@ test.describe("Agents view", () => {
       await expect(emptyMsg).toBeVisible();
     } else {
       // Agents are registered — filter controls should be present
-      await expect(page.getByRole("button", { name: "Active" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Active", exact: true })
+      ).toBeVisible();
     }
   });
 
   test("All filter shows all agent health states", async ({ page }) => {
-    await page.getByRole("button", { name: "All" }).first().click();
+    await page.getByRole("button", { name: "All", exact: true }).click();
     // Dashboard should still be functional after filter change
     await expect(
       page.getByRole("heading", { name: "Agent Dashboard" })

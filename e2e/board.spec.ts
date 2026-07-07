@@ -4,7 +4,7 @@ import { VibeDashApi } from "./helpers/api.js";
 test.describe("Board view", () => {
   test("shows three kanban columns", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Board" }).click();
+    await page.getByRole("button", { name: "Board", exact: true }).click();
     // exact: true avoids matching project sidebar stats like "1 planned"
     await expect(page.getByText("PLANNED", { exact: true })).toBeVisible();
     await expect(page.getByText("IN PROGRESS", { exact: true })).toBeVisible();
@@ -22,7 +22,7 @@ test.describe("Board view", () => {
     await api.createTask(project.id, taskTitle);
 
     await page.goto("/");
-    await page.getByRole("button", { name: "Board" }).click();
+    await page.getByRole("button", { name: "Board", exact: true }).click();
     await page.getByRole("button", { name: projectName }).click();
 
     // Verify task is inside the PLANNED column, not just anywhere on the page
@@ -41,7 +41,7 @@ test.describe("Board view", () => {
     const project = await api.createProject(projectName);
 
     await page.goto("/");
-    await page.getByRole("button", { name: "Board" }).click();
+    await page.getByRole("button", { name: "Board", exact: true }).click();
     await page.getByRole("button", { name: projectName }).click();
 
     const taskTitle = `UI Task ${Date.now()}`;
@@ -66,7 +66,7 @@ test.describe("Board view", () => {
 
     // Verify task starts in PLANNED
     await page.goto("/");
-    await page.getByRole("button", { name: "Board" }).click();
+    await page.getByRole("button", { name: "Board", exact: true }).click();
     await page.getByRole("button", { name: projectName }).click();
     const plannedColumn = page
       .getByText("PLANNED", { exact: true })
@@ -78,7 +78,7 @@ test.describe("Board view", () => {
 
     // Reload and verify task is now in the IN PROGRESS column (not PLANNED)
     await page.reload();
-    await page.getByRole("button", { name: "Board" }).click();
+    await page.getByRole("button", { name: "Board", exact: true }).click();
     await page.getByRole("button", { name: projectName }).click();
 
     const inProgressColumn = page
@@ -98,7 +98,7 @@ test.describe("Board view", () => {
     const task = await api.createTask(project.id, taskTitle);
 
     await page.goto("/");
-    await page.getByRole("button", { name: "Board" }).click();
+    await page.getByRole("button", { name: "Board", exact: true }).click();
     await page.getByRole("button", { name: projectName }).click();
 
     const taskCard = page.locator("[draggable]", { hasText: taskTitle });

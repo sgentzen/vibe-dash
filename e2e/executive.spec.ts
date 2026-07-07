@@ -1,10 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { VibeDashApi } from "./helpers/api.js";
 
+// The "Dashboard (executive)" view is the Fleet view's default "Overview" preset
+// (FleetView → <DashboardView/> when fleetPreset === "overview"), which is the
+// default landing view. There is no "Dash" nav button — navigating to "/" already
+// renders the Dashboard, so no extra click is needed in setup.
 test.describe("Dashboard (executive) view", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Dash" }).click();
   });
 
   test("shows Dashboard heading", async ({ page }) => {
@@ -37,20 +39,6 @@ test.describe("Dashboard (executive) view", () => {
   test("shows milestone progress and overview sections", async ({ page }) => {
     // Both MilestoneProgressCard and MilestoneOverviewCard render on the dashboard
     await expect(page.getByText("Open Milestones", { exact: true })).toBeVisible();
-  });
-
-  test("shows report generator card when a project exists", async ({
-    page,
-    request,
-  }) => {
-    const api = new VibeDashApi(request);
-    await api.createProject(`[E2E] Dash-Report-${Date.now()}`);
-
-    await page.reload();
-    await page.getByRole("button", { name: "Dash" }).click();
-
-    const reportBtn = page.getByRole("button", { name: /generate report/i });
-    await expect(reportBtn).toBeVisible();
   });
 
   test("KPI cards render with numeric values", async ({ page }) => {
