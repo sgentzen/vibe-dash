@@ -8,6 +8,7 @@ import {
   createTask,
   getTask,
   listTasks,
+  countTasks,
   updateTask,
   completeTask,
   registerAgent,
@@ -18,6 +19,7 @@ import {
   resolveBlocker,
   getActiveBlockers,
 } from "../server/db/index.js";
+import type { ListTasksFilter } from "../server/db/index.js";
 
 let db: Database.Database;
 
@@ -207,6 +209,45 @@ describe("tasks", () => {
     createTask(db, { project_id: projectId, title: "C", description: null, priority: "low" });
 
     expect(listTasks(db)).toHaveLength(3);
+  });
+
+  it("returns every row when no limit is given, but paginates when one is", () => {
+    for (let i = 0; i < 5; i++) {
+      createTask(db, { project_id: projectId, title: `T${i}`, description: null, priority: "low" });
+    }
+    expect(listTasks(db, { project_id: projectId })).toHaveLength(5);
+
+    const page = listTasks(db, { project_id: projectId, limit: 2, offset: 2 });
+    expect(page).toHaveLength(2);
+    // created_at ASC ordering, so offset 2 is the third task
+    expect(page[0].title).toBe("T2");
+  });
+
+  it("clamps non-finite/garbage limit & offset instead of throwing", () => {
+    for (let i = 0; i < 3; i++) {
+      createTask(db, { project_id: projectId, title: `T${i}`, description: null, priority: "low" });
+    }
+    // Infinity offset must not reach SQLite as a bound Infinity (would throw a datatype error);
+    // it clamps back to the default offset (0), so the first page is returned rather than a 500.
+    expect(() => listTasks(db, { project_id: projectId, limit: 2, offset: Infinity })).not.toThrow();
+    expect(listTasks(db, { project_id: projectId, limit: 2, offset: Infinity })).toHaveLength(2);
+    // NaN limit falls back to the default (all 3 fit under it)
+    expect(listTasks(db, { project_id: projectId, limit: NaN })).toHaveLength(3);
+  });
+
+  it("excludes statuses via exclude_statuses, and countTasks matches the filter", () => {
+    const t1 = createTask(db, { project_id: projectId, title: "open", description: null, priority: "low" });
+    const t2 = createTask(db, { project_id: projectId, title: "shipped", description: null, priority: "low" });
+    createTask(db, { project_id: projectId, title: "planned", description: null, priority: "low" });
+    updateTask(db, t1.id, { status: "in_progress" });
+    completeTask(db, t2.id);
+
+    const filter: ListTasksFilter = { project_id: projectId, exclude_statuses: ["done", "cancelled"] };
+    const rows = listTasks(db, filter);
+    expect(rows.map((t) => t.status).sort()).toEqual(["in_progress", "planned"]);
+    expect(countTasks(db, filter)).toBe(2);
+    // exclude_statuses is ignored when an explicit status is set
+    expect(countTasks(db, { project_id: projectId, status: "done" })).toBe(1);
   });
 });
 

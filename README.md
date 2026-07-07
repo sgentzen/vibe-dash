@@ -40,15 +40,19 @@ npm run dev        # Frontend :3000, backend :3001
 
 ## Connect your agents (60-second guides)
 
-| Agent | Guide |
-|-------|-------|
-| Claude Code | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) |
-| Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) |
-| OpenAI Codex | [docs/integrations/codex.md](docs/integrations/codex.md) |
-| GitHub Copilot | [docs/integrations/copilot.md](docs/integrations/copilot.md) |
-| Aider | [docs/integrations/aider.md](docs/integrations/aider.md) |
+Every agent connects the same way — over **MCP**. Pick your agent, follow its guide (each is a copy-paste `.mcp.json`/settings snippet plus a CLAUDE.md reporting block), and it starts reporting to the dashboard.
 
-All agents connect over MCP. Three transports are available:
+| Agent | Guide | Maturity |
+|-------|-------|----------|
+| Claude Code | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) | ✅ Tested |
+| Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) | 🧪 Preview |
+| OpenAI Codex | [docs/integrations/codex.md](docs/integrations/codex.md) | 🧪 Preview |
+| GitHub Copilot | [docs/integrations/copilot.md](docs/integrations/copilot.md) | 🧪 Preview |
+| Aider | [docs/integrations/aider.md](docs/integrations/aider.md) | 🧪 Preview |
+
+> **Maturity:** ✅ **Tested** — verified end-to-end. 🧪 **Preview** — a standard MCP setup that should work, but the Vibe Dash integration hasn't been independently verified (and some clients' MCP support is still stabilizing).
+
+Three MCP transports are available:
 
 | Transport | URL / Command | Best for |
 |-----------|--------------|---------|
@@ -151,6 +155,20 @@ ingestion, intelligence/digests, sprints, reports). The 2026-04 program review
 ([docs/PROGRAM-REVIEW-2026-04.md](docs/PROGRAM-REVIEW-2026-04.md)) records the
 earlier, wider direction and is kept for context; superseded plans live under
 [docs/archive/superseded-plans/](docs/archive/superseded-plans/).
+
+## What Vibe Dash is *not*
+
+Vibe Dash is a **portfolio piece** — a polished, local-first, single-user dashboard, not a SaaS or a team platform. That scope is deliberate; see the [strategic-positioning decision](docs/decisions/2026-05-strategic-positioning.md) and the [R11.4 deprecation audit](docs/archive/completed-plans/R11.4-feature-deprecation-audit.md). It intentionally does **not** include:
+
+- **Multi-user accounts / team mode** — single-user by design. An optional team flag exists but is not promoted to real auth/RBAC.
+- **A cloud or hosted service** — it runs on your machine against local SQLite. No accounts, nothing to sign up for.
+- **Passive cross-platform ingestion** (webhooks, log scraping) — agents report over MCP, not by POSTing to an ingest endpoint. That ingestion path was removed as dead code.
+- **Git-host sync** (GitHub/GitLab issues, PR mirroring) — Vibe Dash tracks agent work, not your issue tracker.
+- **AI digests or natural-language querying** — no LLM summarization layer; the data is yours to query directly over SQLite.
+- **Sprints, auto-generated reports, and plugin/template/alert-rule systems** — cut as unused complexity.
+- **A desktop tray app (Tauri)** — deferred; the browser tab is the interface.
+
+If you need any of these, Vibe Dash is probably the wrong tool — and that's fine. It optimizes for one thing: giving your local AI agents a shared, real-time task board over MCP.
 
 ## Contributing
 

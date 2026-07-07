@@ -274,12 +274,78 @@ describe("onboarding wizard flow", () => {
     await handleTool(db, "update_task", { task_id: taskIds[0], status: "done", progress: 100 });
     await handleTool(db, "update_task", { task_id: taskIds[1], status: "in_progress", progress: 50 });
 
+    // Default list_tasks hides finished work so an agent sees only actionable tasks.
     const listed = parse(await handleTool(db, "list_tasks", { project_id }));
-    expect(listed.tasks).toHaveLength(3);
+    expect(listed.tasks).toHaveLength(2);
     const statuses = listed.tasks.map((t: { status: string }) => t.status);
-    expect(statuses).toContain("done");
     expect(statuses).toContain("in_progress");
     expect(statuses).toContain("planned");
+    expect(statuses).not.toContain("done");
+
+    // An explicit status filter still surfaces completed tasks.
+    const doneList = parse(await handleTool(db, "list_tasks", { project_id, status: "done" }));
+    expect(doneList.tasks).toHaveLength(1);
+    expect(doneList.tasks[0].status).toBe("done");
+  });
+});
+
+// ─── list_tasks pagination + default status filter ────────────────────────────
+
+describe("list_tasks pagination + defaults", () => {
+  async function seed(count: number) {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "Big" }));
+    for (let i = 0; i < count; i++) {
+      await handleTool(db, "create_task", { project_id, title: `Task ${i}`, priority: "low" });
+    }
+    return project_id;
+  }
+
+  it("caps the response at the default limit (200) and reports has_more", async () => {
+    const project_id = await seed(250);
+    const data = parse(await handleTool(db, "list_tasks", { project_id }));
+    expect(data.tasks).toHaveLength(200);
+    expect(data.total).toBe(250);
+    expect(data.has_more).toBe(true);
+    expect(data.next_offset).toBe(200);
+  });
+
+  it("honors limit + offset and clears has_more on the last page", async () => {
+    const project_id = await seed(10);
+    const page1 = parse(await handleTool(db, "list_tasks", { project_id, limit: 4 }));
+    expect(page1.tasks).toHaveLength(4);
+    expect(page1.has_more).toBe(true);
+    expect(page1.next_offset).toBe(4);
+
+    const lastPage = parse(await handleTool(db, "list_tasks", { project_id, limit: 4, offset: 8 }));
+    expect(lastPage.tasks).toHaveLength(2);
+    expect(lastPage.has_more).toBe(false);
+    expect(lastPage.next_offset).toBeNull();
+  });
+
+  it("clamps an oversized limit to the maximum (500)", async () => {
+    const project_id = await seed(50);
+    const data = parse(await handleTool(db, "list_tasks", { project_id, limit: 100000 }));
+    // Only 50 exist, but the clamp means an absurd limit never returns unbounded rows.
+    expect(data.tasks).toHaveLength(50);
+    expect(data.has_more).toBe(false);
+  });
+
+  it("excludes done/cancelled by default but includes them on explicit status", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "Mixed" }));
+    const ids: string[] = [];
+    for (const s of ["planned", "in_progress", "done", "cancelled"]) {
+      const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: s, priority: "low" }));
+      ids.push(task_id);
+      if (s !== "planned") await handleTool(db, "update_task", { task_id, status: s });
+    }
+
+    const def = parse(await handleTool(db, "list_tasks", { project_id }));
+    expect(def.total).toBe(2);
+    expect(def.tasks.map((t: { status: string }) => t.status).sort()).toEqual(["in_progress", "planned"]);
+
+    const cancelled = parse(await handleTool(db, "list_tasks", { project_id, status: "cancelled" }));
+    expect(cancelled.tasks).toHaveLength(1);
+    expect(cancelled.tasks[0].status).toBe("cancelled");
   });
 });
 

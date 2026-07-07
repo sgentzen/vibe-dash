@@ -1,5 +1,7 @@
 # Vibe Dash + Cursor
 
+**Maturity: Preview** — Cursor's MCP support is GA (0.43+), but this integration hasn't been independently verified end-to-end.
+
 Connect Cursor's agent to Vibe Dash so task progress, activity, and cost appear on your dashboard in real time.
 
 Requires **Cursor 0.43+** (MCP support was added in 0.43).

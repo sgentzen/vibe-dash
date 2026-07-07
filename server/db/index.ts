@@ -22,6 +22,7 @@ export {
   createTask,
   getTask,
   listTasks,
+  countTasks,
   updateTask,
   completeTask,
   getTasksCompletedToday,

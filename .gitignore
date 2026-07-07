@@ -4,6 +4,12 @@ node_modules/
 # Build output
 dist/
 
+# npm pack tarballs
+*.tgz
+
+# Coverage
+coverage/
+
 # Database
 *.db
 *.db-shm

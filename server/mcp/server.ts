@@ -125,12 +125,14 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
 
   server.tool(
     "list_tasks",
-    "List tasks with optional filters",
+    "List tasks with optional filters. Excludes done/cancelled by default (pass an explicit status to include them). Paginated: returns up to `limit` (default 200, max 500) tasks from `offset`; check `has_more`/`next_offset` to page.",
     {
       project_id: z.string().optional(),
       status: taskStatusEnum.optional(),
       parent_task_id: z.string().optional(),
       assigned_agent_id: z.string().optional(),
+      limit: z.number().int().positive().optional(),
+      offset: z.number().int().nonnegative().optional(),
     },
     call("list_tasks")
   );

@@ -14,6 +14,7 @@ import {
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { requireEntity } from "./handlers.js";
+import { MAX_ACTIVITY_LIMIT, clampLimit } from "../constants.js";
 
 export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
@@ -52,8 +53,7 @@ export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
   });
 
   router.get("/api/agents/:id/activity", (req, res) => {
-    const limit = Number.parseInt((req.query.limit as string) ?? "50", 10);
-    res.json(getAgentActivity(db, req.params.id, Number.isNaN(limit) ? 50 : limit));
+    res.json(getAgentActivity(db, req.params.id, clampLimit(req.query.limit, 50, MAX_ACTIVITY_LIMIT)));
   });
 
   router.get("/api/agents/:id/sessions", (req, res) => {

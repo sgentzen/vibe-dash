@@ -46,6 +46,12 @@ Per-task ROI, cost-per-milestone scorecards, anomaly detection, cross-project le
 
 ### R11.3: Cross-platform agent ingestion
 
+> **Removed (mid-2026 narrowing).** The ingestion feature below was cut as
+> unreachable dead code — the `/api/ingest/*` endpoints, `ingestion_sources`/
+> `ingestion_events` tables, and the `*_ingestion_*` MCP tools no longer exist.
+> All agents now connect over MCP; see [the integration guides](integrations/).
+> This section is retained as a historical record of R11.
+
 New ingestion endpoints for automatic agent activity without MCP opt-in:
 
 ```

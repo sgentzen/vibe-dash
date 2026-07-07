@@ -1,14 +1,14 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
 import { getRecentActivity, getActivityStream, getAgentActivityHeatmap } from "../db/index.js";
+import { DEFAULT_ACTIVITY_LIMIT, MAX_ACTIVITY_LIMIT, clampLimit } from "../constants.js";
 import type { BroadcastFn } from "./types.js";
 
 export function activityRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
 
   router.get("/api/activity", (req, res) => {
-    const limit = Number.parseInt((req.query.limit as string) ?? "50", 10);
-    res.json(getRecentActivity(db, Number.isNaN(limit) ? 50 : limit));
+    res.json(getRecentActivity(db, clampLimit(req.query.limit, 50, MAX_ACTIVITY_LIMIT)));
   });
 
   router.get("/api/activity-stream", (req, res) => {
@@ -17,7 +17,7 @@ export function activityRoutes(db: Database.Database, _broadcast: BroadcastFn): 
       agent_id: q.agent_id,
       project_id: q.project_id,
       since: q.since,
-      limit: q.limit ? Number.parseInt(q.limit, 10) : undefined,
+      limit: clampLimit(q.limit, DEFAULT_ACTIVITY_LIMIT, MAX_ACTIVITY_LIMIT),
     }));
   });
 
