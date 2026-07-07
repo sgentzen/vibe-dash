@@ -11,7 +11,9 @@ import {
   registerAgent,
   createBlocker,
   resolveBlocker,
+  logActivity,
 } from "../server/db/index.js";
+import { MAX_ACTIVITY_LIMIT } from "../server/constants.js";
 import http from "node:http";
 
 let app: Express;
@@ -107,6 +109,27 @@ describe("GET /api/stats", () => {
 
     const { body } = await request("GET", "/api/stats");
     expect((body as { alerts: number }).alerts).toBe(0);
+  });
+});
+
+describe("GET /api/activity limit clamping", () => {
+  it("caps an oversized ?limit at MAX_ACTIVITY_LIMIT instead of returning all rows", async () => {
+    const p = createProject(db, { name: "P", description: null });
+    const t = createTask(db, { project_id: p.id, title: "T", description: null, priority: "low" });
+    for (let i = 0; i < MAX_ACTIVITY_LIMIT + 25; i++) {
+      logActivity(db, { task_id: t.id, agent_id: null, message: `event ${i}` });
+    }
+
+    const { status, body } = await request("GET", "/api/activity?limit=999999");
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    expect((body as unknown[]).length).toBe(MAX_ACTIVITY_LIMIT);
+
+    // Regression guard: a negative limit used to reach SQLite as `LIMIT -1`,
+    // which SQLite treats as unbounded. It must now fall back to the default (50).
+    const neg = await request("GET", "/api/activity?limit=-1");
+    expect(neg.status).toBe(200);
+    expect((neg.body as unknown[]).length).toBe(50);
   });
 });
 

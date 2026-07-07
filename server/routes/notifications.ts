@@ -8,14 +8,13 @@ import {
   listMentions,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
-import { DEFAULT_NOTIFICATION_LIMIT } from "../constants.js";
+import { DEFAULT_NOTIFICATION_LIMIT, MAX_NOTIFICATION_LIMIT, clampLimit } from "../constants.js";
 
 export function notificationRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
   const router = Router();
 
   router.get("/api/notifications", (req, res) => {
-    const limit = Number.parseInt((req.query.limit as string) ?? String(DEFAULT_NOTIFICATION_LIMIT), 10);
-    res.json(listNotifications(db, Number.isNaN(limit) ? DEFAULT_NOTIFICATION_LIMIT : limit));
+    res.json(listNotifications(db, clampLimit(req.query.limit, DEFAULT_NOTIFICATION_LIMIT, MAX_NOTIFICATION_LIMIT)));
   });
 
   router.get("/api/notifications/unread-count", (_req, res) => {
