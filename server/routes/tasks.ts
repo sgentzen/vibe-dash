@@ -24,8 +24,8 @@ import { createTaskSchema, updateTaskSchema, bulkUpdateTasksSchema } from "../..
 // every row (the UI renders a full board); when present they are clamped in db/tasks.
 function parsePaging(query: Record<string, unknown>): { limit?: number; offset?: number } {
   return {
-    limit: query.limit !== undefined ? Number(query.limit) : undefined,
-    offset: query.offset !== undefined ? Number(query.offset) : undefined,
+    limit: query.limit === undefined ? undefined : Number(query.limit),
+    offset: query.offset === undefined ? undefined : Number(query.offset),
   };
 }
 
