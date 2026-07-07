@@ -37,9 +37,6 @@ describe("runMigrations", () => {
       "activity_log",
       "cost_entries",
       "blockers",
-      "tags",
-      "task_comments",
-      "notifications",
       "milestone_daily_stats",
       "_migrations",
     ]) {
@@ -63,6 +60,10 @@ describe("runMigrations", () => {
       "ingestion_events",
       "ingestion_sources",
       "users",
+      "tags",
+      "task_tags",
+      "task_comments",
+      "notifications",
     ]) {
       expect(tables, `orphan table "${t}" should be gone`).not.toContain(t);
     }

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, Tag, TaskTag, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
 
 function jsonHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -184,55 +184,10 @@ async function updateMilestone(
   return res.json();
 }
 
-async function getTags(projectId: string): Promise<Tag[]> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/tags`);
-  if (!res.ok) await throwApiError(res, "getTags");
-  return res.json();
-}
-
-async function createTag(projectId: string, data: { name: string; color?: string }): Promise<Tag> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/tags`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) await throwApiError(res, "createTag");
-  return res.json();
-}
-
-async function getTaskTags(taskId: string): Promise<Tag[]> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`);
-  if (!res.ok) await throwApiError(res, "getTaskTags");
-  return res.json();
-}
-
-async function getProjectTaskTags(projectId: string): Promise<Array<{ task_id: string; tag: Tag }>> {
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-tags`);
-  if (!res.ok) await throwApiError(res, "getProjectTaskTags");
-  return res.json();
-}
-
 async function getProjectTaskDependencies(projectId: string): Promise<TaskDependency[]> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-dependencies`);
   if (!res.ok) await throwApiError(res, "getProjectTaskDependencies");
   return res.json();
-}
-
-async function addTagToTask(taskId: string, tagId: string): Promise<TaskTag> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ tag_id: tagId }),
-  });
-  if (!res.ok) await throwApiError(res, "addTagToTask");
-  return res.json();
-}
-
-async function removeTagFromTask(taskId: string, tagId: string): Promise<void> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) await throwApiError(res, "removeTagFromTask");
 }
 
 // ─── R2: Milestone Progress ─────────────────────────────────────────────
@@ -300,47 +255,6 @@ async function searchTasks(params: Record<string, string | undefined>): Promise<
   return res.json();
 }
 
-// ─── R3: Comments ────────────────────────────────────────────────────
-
-async function getComments(taskId: string): Promise<TaskComment[]> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`);
-  if (!res.ok) await throwApiError(res, "getComments");
-  return res.json();
-}
-
-async function addCommentApi(taskId: string, message: string, authorName: string): Promise<TaskComment> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ message, author_name: authorName }),
-  });
-  if (!res.ok) await throwApiError(res, "addComment");
-  return res.json();
-}
-
-// ─── R3: Notifications ──────────────────────────────────────────────
-
-async function getNotifications(limit = 50): Promise<AppNotification[]> {
-  const res = await apiFetch(`/api/notifications?limit=${limit}`);
-  if (!res.ok) await throwApiError(res, "getNotifications");
-  return res.json();
-}
-
-async function getUnreadCount(): Promise<number> {
-  const res = await apiFetch("/api/notifications/unread-count");
-  if (!res.ok) await throwApiError(res, "getUnreadCount");
-  const data = await res.json();
-  return data.count;
-}
-
-async function markNotificationReadApi(id: string): Promise<void> {
-  await apiFetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
-}
-
-async function markAllRead(): Promise<void> {
-  await apiFetch("/api/notifications/mark-all-read", { method: "POST" });
-}
-
 // ─── R3: Bulk Update ────────────────────────────────────────────────
 
 async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknown>): Promise<{ updated: number; tasks: Task[] }> {
@@ -359,12 +273,6 @@ async function getAgentStats(agentId: string, milestoneId?: string): Promise<Age
   const qs = milestoneId ? `?milestone_id=${encodeURIComponent(milestoneId)}` : "";
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/stats${qs}`);
   if (!res.ok) await throwApiError(res, "getAgentStats");
-  return res.json();
-}
-
-async function getMilestoneContributions(milestoneId: string): Promise<AgentContribution[]> {
-  const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/contributions`);
-  if (!res.ok) await throwApiError(res, "getMilestoneContributions");
   return res.json();
 }
 
@@ -517,13 +425,7 @@ export function useApi() {
     getMilestones,
     createMilestone,
     updateMilestone,
-    getTags,
-    createTag,
-    getTaskTags,
-    getProjectTaskTags,
     getProjectTaskDependencies,
-    addTagToTask,
-    removeTagFromTask,
     getMilestoneProgress,
     getDependencies,
     getBlockingTasks,
@@ -533,15 +435,8 @@ export function useApi() {
     getAgentActivity,
     getAgentSessions,
     searchTasks,
-    getComments,
-    addComment: addCommentApi,
-    getNotifications,
-    getUnreadCount,
-    markNotificationRead: markNotificationReadApi,
-    markAllRead,
     bulkUpdateTasks,
     getAgentStats,
-    getMilestoneContributions,
     getMilestoneDailyStats,
     getActivityHeatmap,
     getActivityStream: getActivityStreamApi,

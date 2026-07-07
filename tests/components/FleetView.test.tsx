@@ -15,11 +15,11 @@ beforeEach(() => {
 
 const baseState: AppState = {
   projects: [], milestones: [], tasks: [], agents: [], activity: [], blockers: [],
-  tags: [], taskTagMap: {}, taskDepsMap: {}, notifications: [], unreadCount: 0,
+  taskDepsMap: {},
   fileConflicts: [], worktrees: [],
   searchQuery: "", searchScope: "all",
   activeView: "fleet", fleetPreset: "overview",
-  theme: "dark", alertsOpen: false,
+  theme: "dark",
   selectedProjectId: null, selectedMilestoneId: null,
   stats: { projects: 0, tasks: 0, activeAgents: 0, alerts: 0, spend_today: 0, tasks_completed_today: 0 },
   pollGeneration: 0, rightRailCollapsed: false,

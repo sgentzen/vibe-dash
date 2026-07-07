@@ -81,20 +81,6 @@ export interface ActivityEntry {
 
 export type AgentHealthStatus = "active" | "idle" | "offline";
 
-export interface Tag {
-  id: string;
-  project_id: string;
-  name: string;
-  color: string;
-  created_at: string;
-}
-
-export interface TaskTag {
-  id: string;
-  task_id: string;
-  tag_id: string;
-}
-
 export interface AgentSession {
   id: string;
   agent_id: string;
@@ -116,23 +102,6 @@ export interface MilestoneProgress {
   task_count: number;
   completed_count: number;
   completion_pct: number;
-}
-
-export interface TaskComment {
-  id: string;
-  task_id: string;
-  agent_id: string | null;
-  author_name: string;
-  message: string;
-  created_at: string;
-}
-
-export interface AppNotification {
-  id: string;
-  rule_id: string | null;
-  message: string;
-  read: boolean;
-  created_at: string;
 }
 
 export interface AgentStats {
@@ -256,15 +225,10 @@ export type WsEventType =
   | "milestone_achieved"
   | "milestone_completed"
   | "milestone_deleted"
-  | "tag_created"
-  | "tag_added"
-  | "tag_removed"
   | "dependency_added"
   | "dependency_removed"
   | "session_started"
   | "session_ended"
-  | "comment_added"
-  | "notification_created"
   | "daily_stats_recorded"
   | "cost_logged"
   | "metrics_logged"
@@ -291,15 +255,10 @@ export type WsEvent =
   | WsEventOf<"milestone_achieved", Milestone>
   | WsEventOf<"milestone_completed", Milestone>
   | WsEventOf<"milestone_deleted", Milestone>
-  | WsEventOf<"tag_created", Tag>
-  | WsEventOf<"tag_added", TaskTag>
-  | WsEventOf<"tag_removed", TaskTag>
   | WsEventOf<"dependency_added", TaskDependency>
   | WsEventOf<"dependency_removed", TaskDependency>
   | WsEventOf<"session_started", AgentSession>
   | WsEventOf<"session_ended", AgentSession>
-  | WsEventOf<"comment_added", TaskComment>
-  | WsEventOf<"notification_created", AppNotification>
   | WsEventOf<"daily_stats_recorded", MilestoneDailyStats>
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>

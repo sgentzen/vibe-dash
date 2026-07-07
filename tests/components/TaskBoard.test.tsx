@@ -15,8 +15,6 @@ vi.mock("../../src/hooks/useApi", () => ({
     createTask: vi.fn().mockResolvedValue(null),
     updateTask: vi.fn().mockResolvedValue(null),
     completeTask: vi.fn().mockResolvedValue(null),
-    addComment: vi.fn().mockResolvedValue(null),
-    getComments: vi.fn().mockResolvedValue([]),
     getSuggestedAgent: vi.fn().mockResolvedValue(null),
   }),
 }));

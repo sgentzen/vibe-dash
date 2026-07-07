@@ -14,11 +14,9 @@ import {
 
 const updateTask = vi.fn();
 const completeTask = vi.fn();
-const addComment = vi.fn();
-const getComments = vi.fn();
 const getSuggestedAgent = vi.fn().mockResolvedValue(null);
 
-const stableApi = { updateTask, completeTask, addComment, getComments, getSuggestedAgent };
+const stableApi = { updateTask, completeTask, getSuggestedAgent };
 vi.mock("../../src/hooks/useApi", () => ({
   useApi: () => stableApi,
 }));
@@ -50,11 +48,6 @@ describe("TaskEditDrawer", () => {
     onClose.mockClear();
     updateTask.mockReset().mockResolvedValue({ ...makeTask(), title: "Updated" });
     completeTask.mockReset().mockResolvedValue({ ...makeTask(), status: "done" });
-    addComment.mockReset().mockResolvedValue({
-      id: "c1", task_id: "t1", author_name: "User",
-      message: "hi", created_at: new Date().toISOString(),
-    });
-    getComments.mockReset().mockResolvedValue([]);
   });
 
   it("renders Edit Task heading and form fields", async () => {
@@ -167,32 +160,6 @@ describe("TaskEditDrawer", () => {
     });
     expect(screen.getByLabelText("Assigned Agent")).toBeInTheDocument();
     expect(screen.getByText("Claude")).toBeInTheDocument();
-  });
-
-  it("disables comment Send button when input is empty", () => {
-    const task = makeTask();
-    renderWithProviders(<TaskEditDrawer task={task} onClose={onClose} />);
-    const sendBtn = screen.getByText("Send") as HTMLButtonElement;
-    expect(sendBtn.disabled).toBe(true);
-  });
-
-  it("calls addComment when comment is submitted", async () => {
-    const task = makeTask({ id: "t1" });
-    renderWithProviders(<TaskEditDrawer task={task} onClose={onClose} />);
-    const commentInput = screen.getByLabelText("Add a comment");
-    fireEvent.change(commentInput, { target: { value: "Looks good" } });
-    fireEvent.click(screen.getByText("Send"));
-    await waitFor(() => {
-      expect(addComment).toHaveBeenCalledWith("t1", "Looks good", "User");
-    });
-  });
-
-  it("loads existing comments on mount", async () => {
-    const task = makeTask({ id: "t1" });
-    renderWithProviders(<TaskEditDrawer task={task} onClose={onClose} />);
-    await waitFor(() => {
-      expect(getComments).toHaveBeenCalledWith("t1");
-    });
   });
 
   // Regression: clickOutsideDeactivates=true caused the open-click to bubble

@@ -41,10 +41,6 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       return { ...state, activity: action.payload };
     case "SET_BLOCKERS":
       return { ...state, blockers: action.payload };
-    case "SET_TAGS":
-      return { ...state, tags: action.payload };
-    case "SET_TASK_TAG_MAP":
-      return { ...state, taskTagMap: action.payload };
     case "SET_TASK_DEPS_MAP":
       return { ...state, taskDepsMap: action.payload };
     case "SET_SEARCH_QUERY":
@@ -55,16 +51,10 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       if (scope) localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, scope);
       return { ...state, searchScope: action.payload };
     }
-    case "SET_ALERTS_OPEN":
-      return { ...state, alertsOpen: action.payload };
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
     case "SET_FLEET_PRESET":
       return { ...state, fleetPreset: action.payload };
-    case "SET_NOTIFICATIONS":
-      return { ...state, notifications: action.payload };
-    case "SET_UNREAD_COUNT":
-      return { ...state, unreadCount: action.payload };
     case "SET_WORKTREES":
       return { ...state, worktrees: action.payload };
     case "SET_STATS":

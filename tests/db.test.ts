@@ -232,7 +232,7 @@ describe("tasks", () => {
     expect(() => listTasks(db, { project_id: projectId, limit: 2, offset: Infinity })).not.toThrow();
     expect(listTasks(db, { project_id: projectId, limit: 2, offset: Infinity })).toHaveLength(2);
     // NaN limit falls back to the default (all 3 fit under it)
-    expect(listTasks(db, { project_id: projectId, limit: NaN })).toHaveLength(3);
+    expect(listTasks(db, { project_id: projectId, limit: Number.NaN })).toHaveLength(3);
   });
 
   it("excludes statuses via exclude_statuses, and countTasks matches the filter", () => {
@@ -413,13 +413,10 @@ describe("schema indexes", () => {
     "idx_activity_log_task_id",
     "idx_activity_log_timestamp",
     "idx_activity_log_source",
-    "idx_task_tags_tag_id",
     "idx_task_dependencies_depends_on",
     "idx_blockers_task_id",
     "idx_agent_sessions_agent_id",
-    "idx_tags_project_id",
     "idx_milestones_project_id",
-    "idx_task_comments_task_id",
     "idx_cost_entries_agent_id",
     "idx_cost_entries_project_id",
     "idx_cost_entries_milestone_id",

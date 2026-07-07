@@ -10,18 +10,18 @@ export type { AppState, AppAction, Theme, ActiveView, FleetPreset, SearchScope }
 export type DataState = Pick<
   AppState,
   "projects" | "milestones" | "tasks" | "agents" | "activity" | "blockers" |
-  "tags" | "taskTagMap" | "taskDepsMap" | "worktrees" | "stats"
+  "taskDepsMap" | "worktrees" | "stats"
 >;
 
 export type NavigationState = Pick<
   AppState,
   "selectedProjectId" | "selectedMilestoneId" | "activeView" | "fleetPreset" | "searchQuery" | "searchScope" | "theme" |
-  "rightRailCollapsed" | "alertsOpen"
+  "rightRailCollapsed"
 >;
 
 export type NotificationState = Pick<
   AppState,
-  "notifications" | "unreadCount" | "fileConflicts" | "loadError"
+  "fileConflicts" | "loadError"
 >;
 
 export type PollingState = Pick<AppState, "pollGeneration">;
@@ -43,11 +43,7 @@ const initialState: AppState = {
   agents: [],
   activity: [],
   blockers: [],
-  tags: [],
-  taskTagMap: {},
   taskDepsMap: {},
-  notifications: [],
-  unreadCount: 0,
   fileConflicts: [],
   worktrees: [],
   searchQuery: "",
@@ -55,7 +51,6 @@ const initialState: AppState = {
   activeView: "fleet",
   fleetPreset: "overview",
   theme: getInitialTheme(),
-  alertsOpen: false,
   rightRailCollapsed: getInitialRightRailCollapsed(),
   selectedProjectId: null,
   selectedMilestoneId: null,
@@ -83,15 +78,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       agents: state.agents,
       activity: state.activity,
       blockers: state.blockers,
-      tags: state.tags,
-      taskTagMap: state.taskTagMap,
       taskDepsMap: state.taskDepsMap,
       worktrees: state.worktrees,
       stats: state.stats,
     }),
     [
       state.projects, state.milestones, state.tasks, state.agents, state.activity,
-      state.blockers, state.tags, state.taskTagMap, state.taskDepsMap,
+      state.blockers, state.taskDepsMap,
       state.worktrees, state.stats,
     ]
   );
@@ -106,20 +99,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       searchScope: state.searchScope,
       theme: state.theme,
       rightRailCollapsed: state.rightRailCollapsed,
-      alertsOpen: state.alertsOpen,
     }),
     [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.fleetPreset, state.searchQuery,
-     state.searchScope, state.theme, state.rightRailCollapsed, state.alertsOpen]
+     state.searchScope, state.theme, state.rightRailCollapsed]
   );
 
   const notificationValue = useMemo<NotificationState>(
     () => ({
-      notifications: state.notifications,
-      unreadCount: state.unreadCount,
       fileConflicts: state.fileConflicts,
       loadError: state.loadError,
     }),
-    [state.notifications, state.unreadCount, state.fileConflicts, state.loadError]
+    [state.fileConflicts, state.loadError]
   );
 
   const pollingValue = useMemo<PollingState>(

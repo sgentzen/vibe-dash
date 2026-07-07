@@ -63,3 +63,15 @@ export function agentGlyph(agent: { name: string; model?: string | null }): stri
   if (m.includes("haiku")) return "○";
   return agent.name.charAt(0).toUpperCase();
 }
+
+/**
+ * Health-dot color for the agent grid card and the detail view. Intentionally
+ * distinct from the sidebar/roster `HEALTH_COLORS` map (which uses
+ * --text-secondary for offline): this uses --text-muted for offline/unknown
+ * and tolerates an undefined status (the card's initial "loading" state).
+ */
+export function healthStatusColor(status: string | undefined): string {
+  if (status === "active") return "var(--status-success)";
+  if (status === "idle") return "var(--status-warning)";
+  return "var(--text-muted)";
+}

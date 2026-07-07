@@ -147,7 +147,6 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
       status: taskStatusEnum.optional(),
       priority: taskPrioritySchema.optional(),
       assigned_agent_id: z.string().optional(),
-      tag_id: z.string().optional(),
       due_before: z.string().optional(),
       due_after: z.string().optional(),
     },

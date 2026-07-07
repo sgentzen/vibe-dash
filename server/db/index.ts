@@ -64,19 +64,8 @@ export {
 export type { LogActivityInput, ActivityStreamFilter } from "./activity.js";
 export { createBlocker, resolveBlocker, resolveBlockersForTask, getActiveBlockers } from "./blockers.js";
 export type { CreateBlockerInput } from "./blockers.js";
-export { createTag, listTags, addTagToTask, removeTagFromTask, getTaskTags, getTag } from "./tags.js";
-export type { CreateTagInput } from "./tags.js";
 export { addDependency, removeDependency, listDependencies, getBlockingTasks } from "./dependencies.js";
-export { getTaskTagsForProject, getDependenciesForProject } from "./bulk.js";
-export type { TaskTagPair } from "./bulk.js";
-export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
-export {
-  createNotification,
-  listNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  getUnreadNotificationCount,
-} from "./notifications.js";
+export { getDependenciesForProject } from "./bulk.js";
 export {
   logCost,
   getAgentCostSummary,

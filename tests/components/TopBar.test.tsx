@@ -18,8 +18,6 @@ import {
 vi.mock("../../src/hooks/useApi", () => ({
   useApi: () => ({
     createProject: vi.fn().mockResolvedValue({ id: "p1", name: "New Project" }),
-    markNotificationRead: vi.fn().mockResolvedValue({}),
-    markAllRead: vi.fn().mockResolvedValue({}),
   }),
 }));
 
@@ -81,11 +79,6 @@ describe("TopBar", () => {
     expect(within(getHeader()).getByRole("button", { name: /new project/i })).toBeInTheDocument();
   });
 
-  it("renders notification bell button", () => {
-    renderWithProviders(<TopBar />);
-    expect(within(getHeader()).getByRole("button", { name: /notifications/i })).toBeInTheDocument();
-  });
-
   // ── M3-T5: Appearance popover ──────────────────────────────────────────
 
   it("renders Appearance button", () => {
@@ -143,15 +136,6 @@ describe("TopBar", () => {
     await waitFor(() => {
       const boardBtn = within(getHeader()).getByRole("button", { name: "Board" });
       expect(boardBtn).toBeInTheDocument();
-    });
-  });
-
-  it("Alerts stat tile opens notification panel", async () => {
-    renderWithProviders(<TopBar />);
-    const alertsBtn = within(getHeader()).getByRole("button", { name: /view alerts/i });
-    fireEvent.click(alertsBtn);
-    await waitFor(() => {
-      expect(screen.getByText("Notifications")).toBeInTheDocument();
     });
   });
 

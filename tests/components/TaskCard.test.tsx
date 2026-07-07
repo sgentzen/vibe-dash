@@ -163,22 +163,6 @@ describe("TaskCard", () => {
     expect(progressBar).toBeInTheDocument();
   });
 
-  it("shows tags when provided", () => {
-    const task = makeTask();
-    renderWithProviders(
-      <TaskCard
-        task={task}
-        allTasks={[task]}
-        activity={[]}
-        agents={[]}
-        taskTags={[{ id: "tag-1", project_id: "p1", name: "frontend", color: "#ff0000", created_at: "" }]}
-        onClick={onClick}
-        onDragStart={onDragStart}
-      />,
-    );
-    expect(screen.getByText("frontend")).toBeInTheDocument();
-  });
-
   it("shows due date when set", () => {
     const task = makeTask({ due_date: "2026-12-25" });
     renderWithProviders(

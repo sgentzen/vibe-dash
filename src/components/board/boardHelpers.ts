@@ -1,4 +1,4 @@
-import type { Task, Milestone, Tag } from "../../types";
+import type { Task, Milestone } from "../../types";
 
 export interface MilestoneGroupData {
   milestone: Milestone | null;
@@ -41,10 +41,4 @@ export function getBlockingCount(taskId: string, taskDepsMap: Record<string, str
     const t = allTasks.find((task) => task.id === depId);
     return t && t.status !== "done";
   }).length;
-}
-
-export function resolveTaskTags(taskId: string, taskTagMap: Record<string, string[]>, tags: Tag[]): Tag[] {
-  const tagIds = taskTagMap[taskId];
-  if (!tagIds || tagIds.length === 0) return [];
-  return tagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is Tag => t !== undefined);
 }
