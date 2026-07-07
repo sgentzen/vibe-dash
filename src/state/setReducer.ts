@@ -51,16 +51,10 @@ export function setReducer(state: AppState, action: AppAction): AppState | null 
       if (scope) localStorage.setItem(SEARCH_SCOPE_STORAGE_KEY, scope);
       return { ...state, searchScope: action.payload };
     }
-    case "SET_ALERTS_OPEN":
-      return { ...state, alertsOpen: action.payload };
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
     case "SET_FLEET_PRESET":
       return { ...state, fleetPreset: action.payload };
-    case "SET_NOTIFICATIONS":
-      return { ...state, notifications: action.payload };
-    case "SET_UNREAD_COUNT":
-      return { ...state, unreadCount: action.payload };
     case "SET_WORKTREES":
       return { ...state, worktrees: action.payload };
     case "SET_STATS":

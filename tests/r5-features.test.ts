@@ -6,9 +6,6 @@ import {
   registerAgent,
   updateTask,
   logActivity,
-  addComment,
-  extractMentions,
-  listMentions,
   getActivityStream,
 } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
@@ -17,40 +14,6 @@ let db: Database.Database;
 
 beforeEach(() => {
   db = createTestDb();
-});
-
-// ─── 4.3 @Mentions ──────────────────────────────────────────────────────────
-
-describe("4.3 @Mentions", () => {
-  it("extracts @mentions from text", () => {
-    const mentions = extractMentions("Hey @alice and @bob-agent, check this out");
-    expect(mentions).toContain("alice");
-    expect(mentions).toContain("bob-agent");
-    expect(mentions).toHaveLength(2);
-  });
-
-  it("deduplicates mentions", () => {
-    const mentions = extractMentions("@alice said @alice should review");
-    expect(mentions).toHaveLength(1);
-    expect(mentions[0]).toBe("alice");
-  });
-
-  it("returns empty for no mentions", () => {
-    expect(extractMentions("no mentions here")).toHaveLength(0);
-  });
-
-  it("lists mentions for an agent", () => {
-    const project = createProject(db, { name: "P", description: null });
-    const task = createTask(db, { project_id: project.id, title: "T", description: null, priority: "medium" });
-
-    addComment(db, task.id, "Hey @bot-1 check this", "User");
-    addComment(db, task.id, "Also @bot-2 review please", "User");
-    addComment(db, task.id, "No mentions here", "User");
-
-    const mentions = listMentions(db, "bot-1");
-    expect(mentions).toHaveLength(1);
-    expect(mentions[0].message).toContain("@bot-1");
-  });
 });
 
 // ─── 3.3 Timeline — start_date ──────────────────────────────────────────────

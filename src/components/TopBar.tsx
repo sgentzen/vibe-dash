@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { useDataState, useNavigationState, useNotificationState, useAppDispatch, type SearchScope } from "../store";
+import { useDataState, useNavigationState, useAppDispatch, type SearchScope } from "../store";
 import { useApi } from "../hooks/useApi";
 import { ACCENT_STORAGE_KEY, DEFAULT_ACCENT, readStoredAccentColor, sanitizeAccentColor } from "../utils/accent";
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
-import { NotificationBell } from "./topbar/NotificationBell";
 import { AddProjectControl } from "./topbar/AddProjectControl";
 
 interface TopBarProps {
@@ -14,8 +13,7 @@ interface TopBarProps {
 
 export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   const { stats } = useDataState();
-  const { theme, activeView, searchQuery, searchScope, alertsOpen } = useNavigationState();
-  const { unreadCount, notifications } = useNotificationState();
+  const { theme, activeView, searchQuery, searchScope } = useNavigationState();
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showAppearance, setShowAppearance] = useState(false);
@@ -52,21 +50,6 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
   async function handleAddProject(name: string) {
     const project = await api.createProject({ name });
     dispatch({ type: "WS_EVENT", payload: { type: "project_created", payload: project } });
-  }
-
-  async function handleMarkAllRead() {
-    await api.markAllRead();
-    dispatch({ type: "SET_UNREAD_COUNT", payload: 0 });
-    dispatch({ type: "SET_NOTIFICATIONS", payload: notifications.map((n) => ({ ...n, read: true })) });
-  }
-
-  async function handleMarkRead(id: string) {
-    await api.markNotificationRead(id);
-    dispatch({ type: "SET_UNREAD_COUNT", payload: Math.max(0, unreadCount - 1) });
-    dispatch({
-      type: "SET_NOTIFICATIONS",
-      payload: notifications.map((x) => (x.id === id ? { ...x, read: true } : x)),
-    });
   }
 
   // Determine if search scope matches the active view's domain
@@ -139,7 +122,6 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           label="ALERTS"
           value={stats.alerts}
           color="var(--status-warning)"
-          onClick={() => dispatch({ type: "SET_ALERTS_OPEN", payload: true })}
         />
         <StatPill
           label="TASKS"
@@ -336,16 +318,6 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           </div>
         )}
       </div>
-
-      {/* Notification Bell */}
-      <NotificationBell
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkAllRead={handleMarkAllRead}
-        onMarkRead={handleMarkRead}
-        alertsOpen={alertsOpen}
-        onAlertsOpenChange={(open) => dispatch({ type: "SET_ALERTS_OPEN", payload: open })}
-      />
 
       {/* Add Project */}
       <AddProjectControl onAdd={handleAddProject} />

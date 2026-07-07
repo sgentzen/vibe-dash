@@ -92,16 +92,6 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
         taskDepsMap: { ...state.taskDepsMap, [dep.task_id]: [...existing, dep.depends_on_task_id] },
       };
     }
-    case "comment_added":
-      return state;
-    case "notification_created": {
-      const notif = event.payload;
-      return {
-        ...state,
-        notifications: [notif, ...state.notifications],
-        unreadCount: state.unreadCount + 1,
-      };
-    }
     case "daily_stats_recorded":
       return state;
     case "worktree_created": {

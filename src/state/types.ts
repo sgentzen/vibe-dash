@@ -5,7 +5,6 @@ import type {
   Agent,
   ActivityEntry,
   Blocker,
-  AppNotification,
   TaskWorktree,
   WsEvent,
 } from "../types";
@@ -26,8 +25,6 @@ export interface AppState {
   activity: ActivityEntry[];
   blockers: Blocker[];
   taskDepsMap: Record<string, string[]>;
-  notifications: AppNotification[];
-  unreadCount: number;
   fileConflicts: unknown[];
   worktrees: TaskWorktree[];
   searchQuery: string;
@@ -35,7 +32,6 @@ export interface AppState {
   activeView: ActiveView;
   fleetPreset: FleetPreset;
   theme: Theme;
-  alertsOpen: boolean;
   selectedProjectId: string | null;
   selectedMilestoneId: string | null;
   stats: {
@@ -61,11 +57,8 @@ export type AppAction =
   | { type: "SET_TASK_DEPS_MAP"; payload: Record<string, string[]> }
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "SET_SEARCH_SCOPE"; payload: SearchScope }
-  | { type: "SET_ALERTS_OPEN"; payload: boolean }
   | { type: "SET_ACTIVE_VIEW"; payload: ActiveView }
   | { type: "SET_FLEET_PRESET"; payload: FleetPreset }
-  | { type: "SET_NOTIFICATIONS"; payload: AppNotification[] }
-  | { type: "SET_UNREAD_COUNT"; payload: number }
   | { type: "SET_WORKTREES"; payload: TaskWorktree[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }

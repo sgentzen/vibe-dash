@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, TaskComment, AppNotification, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, AgentContribution, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
 
 function jsonHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -255,47 +255,6 @@ async function searchTasks(params: Record<string, string | undefined>): Promise<
   return res.json();
 }
 
-// ─── R3: Comments ────────────────────────────────────────────────────
-
-async function getComments(taskId: string): Promise<TaskComment[]> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`);
-  if (!res.ok) await throwApiError(res, "getComments");
-  return res.json();
-}
-
-async function addCommentApi(taskId: string, message: string, authorName: string): Promise<TaskComment> {
-  const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ message, author_name: authorName }),
-  });
-  if (!res.ok) await throwApiError(res, "addComment");
-  return res.json();
-}
-
-// ─── R3: Notifications ──────────────────────────────────────────────
-
-async function getNotifications(limit = 50): Promise<AppNotification[]> {
-  const res = await apiFetch(`/api/notifications?limit=${limit}`);
-  if (!res.ok) await throwApiError(res, "getNotifications");
-  return res.json();
-}
-
-async function getUnreadCount(): Promise<number> {
-  const res = await apiFetch("/api/notifications/unread-count");
-  if (!res.ok) await throwApiError(res, "getUnreadCount");
-  const data = await res.json();
-  return data.count;
-}
-
-async function markNotificationReadApi(id: string): Promise<void> {
-  await apiFetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
-}
-
-async function markAllRead(): Promise<void> {
-  await apiFetch("/api/notifications/mark-all-read", { method: "POST" });
-}
-
 // ─── R3: Bulk Update ────────────────────────────────────────────────
 
 async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknown>): Promise<{ updated: number; tasks: Task[] }> {
@@ -482,12 +441,6 @@ export function useApi() {
     getAgentActivity,
     getAgentSessions,
     searchTasks,
-    getComments,
-    addComment: addCommentApi,
-    getNotifications,
-    getUnreadCount,
-    markNotificationRead: markNotificationReadApi,
-    markAllRead,
     bulkUpdateTasks,
     getAgentStats,
     getMilestoneContributions,

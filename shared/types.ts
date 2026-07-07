@@ -104,23 +104,6 @@ export interface MilestoneProgress {
   completion_pct: number;
 }
 
-export interface TaskComment {
-  id: string;
-  task_id: string;
-  agent_id: string | null;
-  author_name: string;
-  message: string;
-  created_at: string;
-}
-
-export interface AppNotification {
-  id: string;
-  rule_id: string | null;
-  message: string;
-  read: boolean;
-  created_at: string;
-}
-
 export interface AgentStats {
   agent_id: string;
   tasks_completed_total: number;
@@ -246,8 +229,6 @@ export type WsEventType =
   | "dependency_removed"
   | "session_started"
   | "session_ended"
-  | "comment_added"
-  | "notification_created"
   | "daily_stats_recorded"
   | "cost_logged"
   | "metrics_logged"
@@ -278,8 +259,6 @@ export type WsEvent =
   | WsEventOf<"dependency_removed", TaskDependency>
   | WsEventOf<"session_started", AgentSession>
   | WsEventOf<"session_ended", AgentSession>
-  | WsEventOf<"comment_added", TaskComment>
-  | WsEventOf<"notification_created", AppNotification>
   | WsEventOf<"daily_stats_recorded", MilestoneDailyStats>
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>

@@ -417,7 +417,6 @@ describe("schema indexes", () => {
     "idx_blockers_task_id",
     "idx_agent_sessions_agent_id",
     "idx_milestones_project_id",
-    "idx_task_comments_task_id",
     "idx_cost_entries_agent_id",
     "idx_cost_entries_project_id",
     "idx_cost_entries_milestone_id",

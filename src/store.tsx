@@ -16,12 +16,12 @@ export type DataState = Pick<
 export type NavigationState = Pick<
   AppState,
   "selectedProjectId" | "selectedMilestoneId" | "activeView" | "fleetPreset" | "searchQuery" | "searchScope" | "theme" |
-  "rightRailCollapsed" | "alertsOpen"
+  "rightRailCollapsed"
 >;
 
 export type NotificationState = Pick<
   AppState,
-  "notifications" | "unreadCount" | "fileConflicts" | "loadError"
+  "fileConflicts" | "loadError"
 >;
 
 export type PollingState = Pick<AppState, "pollGeneration">;
@@ -44,8 +44,6 @@ const initialState: AppState = {
   activity: [],
   blockers: [],
   taskDepsMap: {},
-  notifications: [],
-  unreadCount: 0,
   fileConflicts: [],
   worktrees: [],
   searchQuery: "",
@@ -53,7 +51,6 @@ const initialState: AppState = {
   activeView: "fleet",
   fleetPreset: "overview",
   theme: getInitialTheme(),
-  alertsOpen: false,
   rightRailCollapsed: getInitialRightRailCollapsed(),
   selectedProjectId: null,
   selectedMilestoneId: null,
@@ -102,20 +99,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       searchScope: state.searchScope,
       theme: state.theme,
       rightRailCollapsed: state.rightRailCollapsed,
-      alertsOpen: state.alertsOpen,
     }),
     [state.selectedProjectId, state.selectedMilestoneId, state.activeView, state.fleetPreset, state.searchQuery,
-     state.searchScope, state.theme, state.rightRailCollapsed, state.alertsOpen]
+     state.searchScope, state.theme, state.rightRailCollapsed]
   );
 
   const notificationValue = useMemo<NotificationState>(
     () => ({
-      notifications: state.notifications,
-      unreadCount: state.unreadCount,
       fileConflicts: state.fileConflicts,
       loadError: state.loadError,
     }),
-    [state.notifications, state.unreadCount, state.fileConflicts, state.loadError]
+    [state.fileConflicts, state.loadError]
   );
 
   const pollingValue = useMemo<PollingState>(

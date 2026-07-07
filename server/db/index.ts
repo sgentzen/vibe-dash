@@ -66,14 +66,6 @@ export { createBlocker, resolveBlocker, resolveBlockersForTask, getActiveBlocker
 export type { CreateBlockerInput } from "./blockers.js";
 export { addDependency, removeDependency, listDependencies, getBlockingTasks } from "./dependencies.js";
 export { getDependenciesForProject } from "./bulk.js";
-export { addComment, listComments, extractMentions, listMentions } from "./comments.js";
-export {
-  createNotification,
-  listNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  getUnreadNotificationCount,
-} from "./notifications.js";
 export {
   logCost,
   getAgentCostSummary,

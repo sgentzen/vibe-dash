@@ -90,14 +90,6 @@ export const updateMilestoneSchema = z.object({
   status: milestoneStatusEnum.optional(),
 });
 
-// ─── Comments ───────────────────────────────────────────────────────────
-
-export const createCommentSchema = z.object({
-  agent_id: z.string().nullable().optional(),
-  author_name: z.string().min(1),
-  message: z.string().min(1),
-});
-
 // ─── Bulk operations ────────────────────────────────────────────────────
 
 export const BULK_UPDATE_MAX = 200;

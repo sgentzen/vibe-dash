@@ -3,8 +3,7 @@ import FocusTrap from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle } from "../styles/shared.js";
-import type { Task, TaskStatus, TaskPriority, TaskComment } from "../types";
-import { CommentsSection } from "./task/CommentsSection";
+import type { Task, TaskStatus, TaskPriority } from "../types";
 import { ModalBackdrop } from "./ui/ModalBackdrop";
 import { ModalDrawer } from "./ui/ModalDrawer";
 import { FormField } from "./ui/FormField";
@@ -34,16 +33,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
   const [estimate, setEstimate] = useState<string>(task.estimate == null ? "" : String(task.estimate));
   const [startDate, setStartDate] = useState<string>(task.start_date ?? "");
   const [saving, setSaving] = useState(false);
-  const [comments, setComments] = useState<TaskComment[]>([]);
-  const [newComment, setNewComment] = useState("");
-  function submitComment() {
-    const text = newComment.trim();
-    if (!text) return;
-    api.addComment(task.id, text, "User").then((c) => {
-      setComments((prev) => [...prev, c]);
-      setNewComment("");
-    }).catch(() => {});
-  }
 
   const taskMilestones = milestones.filter((m) => m.project_id === task.project_id);
 
@@ -69,8 +58,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
     setDueDate(task.due_date ?? "");
     setEstimate(task.estimate == null ? "" : String(task.estimate));
     setStartDate(task.start_date ?? "");
-    setNewComment("");
-    api.getComments(task.id).then(setComments).catch(() => {});
   }, [task, api]);
 
   async function handleSave() {
@@ -169,14 +156,6 @@ export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
             style={{ width: "100%", accentColor: "var(--status-success)" }}
           />
         </FormField>
-
-        {/* Comments */}
-        <CommentsSection
-          comments={comments}
-          newComment={newComment}
-          onNewCommentChange={setNewComment}
-          onSubmitComment={submitComment}
-        />
 
         <TaskDrawerActions
           saving={saving}
