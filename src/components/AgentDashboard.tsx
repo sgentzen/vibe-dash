@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
-import { agentColor, ROLE_COLORS, groupAgents } from "../utils/agentColors";
+import { agentColor, ROLE_COLORS, groupAgents, healthStatusColor } from "../utils/agentColors";
 import { cardStyle, typeScale } from "../styles/shared.js";
 import AgentComparisonView from "./AgentComparisonView";
 import type { Agent, ActivityEntry, AgentSession } from "../types";
@@ -228,12 +228,6 @@ export function AgentDashboard() {
       )}
     </div>
   );
-}
-
-function healthStatusColor(status: string | undefined): string {
-  if (status === "active") return "var(--status-success)";
-  if (status === "idle") return "var(--status-warning)";
-  return "var(--text-muted)";
 }
 
 function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDetail; onClick: () => void }) {

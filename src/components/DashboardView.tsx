@@ -9,7 +9,6 @@ import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { AgentContributionsCard, ActivityHeatmapCard } from "./dashboard/ActivityCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
-import { LiveRosterCard } from "./dashboard/LiveRosterCard";
 import { TodayCard } from "./dashboard/TodayCard";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
@@ -157,8 +156,7 @@ export function DashboardView() {
         Dashboard
       </h2>
 
-      <div style={{ display: "grid", gridTemplateColumns: "65fr 35fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <LiveRosterCard agents={agents} tasks={tasks} />
+      <div style={{ marginBottom: "var(--space-4)" }}>
         <TodayCard
           spendToday={stats.spend_today}
           tasksCompletedToday={stats.tasks_completed_today}
