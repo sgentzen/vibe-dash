@@ -5,7 +5,10 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - vibe-dash-data:/data
+      # Bind-mount the real project DB so the container serves actual data
+      # (not an isolated empty named volume). Single-writer only — do not run
+      # the direct file-based server/MCP against this file while the container runs.
+      - ./vibe-dash.db:/data/vibe-dash.db
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -17,6 +20,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-volumes:
-  vibe-dash-data:
