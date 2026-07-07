@@ -1,5 +1,7 @@
 # Vibe Dash + Aider
 
+**Maturity: Preview** — Aider's MCP support is recent (~0.67) and still stabilizing.
+
 Connect Aider to Vibe Dash so task progress and activity appear on your dashboard.
 
 Requires **Aider 0.67+** (MCP support was introduced around 0.67; check `aider --help | grep mcp` to confirm your version supports it).

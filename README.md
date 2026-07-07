@@ -40,15 +40,19 @@ npm run dev        # Frontend :3000, backend :3001
 
 ## Connect your agents (60-second guides)
 
-| Agent | Guide |
-|-------|-------|
-| Claude Code | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) |
-| Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) |
-| OpenAI Codex | [docs/integrations/codex.md](docs/integrations/codex.md) |
-| GitHub Copilot | [docs/integrations/copilot.md](docs/integrations/copilot.md) |
-| Aider | [docs/integrations/aider.md](docs/integrations/aider.md) |
+Every agent connects the same way — over **MCP**. Pick your agent, follow its guide (each is a copy-paste `.mcp.json`/settings snippet plus a CLAUDE.md reporting block), and it starts reporting to the dashboard.
 
-All agents connect over MCP. Three transports are available:
+| Agent | Guide | Maturity |
+|-------|-------|----------|
+| Claude Code | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) | ✅ Tested |
+| Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) | 🧪 Preview |
+| OpenAI Codex | [docs/integrations/codex.md](docs/integrations/codex.md) | 🧪 Preview |
+| GitHub Copilot | [docs/integrations/copilot.md](docs/integrations/copilot.md) | 🧪 Preview |
+| Aider | [docs/integrations/aider.md](docs/integrations/aider.md) | 🧪 Preview |
+
+> **Maturity:** ✅ **Tested** — verified end-to-end. 🧪 **Preview** — a standard MCP setup that should work, but the Vibe Dash integration hasn't been independently verified (and some clients' MCP support is still stabilizing).
+
+Three MCP transports are available:
 
 | Transport | URL / Command | Best for |
 |-----------|--------------|---------|

@@ -1,5 +1,7 @@
 # Vibe Dash + GitHub Copilot
 
+**Maturity: Preview** — relies on VS Code's newer MCP support (1.99+); still stabilizing.
+
 Connect GitHub Copilot (VS Code) to Vibe Dash so task progress and activity appear on your dashboard.
 
 Requires **VS Code 1.99+** and **GitHub Copilot Chat** with MCP support enabled.

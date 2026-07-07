@@ -1,5 +1,7 @@
 # Vibe Dash + OpenAI Codex
 
+**Maturity: Preview** — depends on your Codex CLI version's MCP support (still stabilizing).
+
 Connect the OpenAI Codex CLI agent to Vibe Dash so task progress, activity, and cost appear on your dashboard.
 
 Requires **Codex CLI** with MCP support enabled. Run `codex --help | grep mcp` to confirm your version supports it.
