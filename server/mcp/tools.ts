@@ -6,6 +6,7 @@ import {
   createTask,
   getTask,
   listTasks,
+  countTasks,
   updateTask,
   completeTask,
   logActivity,
@@ -22,7 +23,9 @@ import {
   setAgentStatus,
   getProjectContext,
 } from "../db/index.js";
+import type { ListTasksFilter } from "../db/index.js";
 import { registerAgentSchema } from "../../shared/schemas.js";
+import { DEFAULT_TASK_LIST_LIMIT } from "../constants.js";
 import { broadcast } from "../websocket.js";
 
 /** Auto-log activity and broadcast it for any mutation */
@@ -116,13 +119,31 @@ function handleCreateTask(db: Database.Database, args: Args, agentName?: string)
 }
 
 function handleListTasks(db: Database.Database, args: Args): ToolResult {
-  const tasks = listTasks(db, {
+  // Agent-facing default: hide finished work unless a status is explicitly asked
+  // for, and always paginate so a large project can't blow up the agent's context.
+  const explicitStatus = args.status as TaskStatus | undefined;
+  const filter: ListTasksFilter = {
     project_id: args.project_id as string | undefined,
-    status: args.status as TaskStatus | undefined,
+    status: explicitStatus,
+    exclude_statuses: explicitStatus ? undefined : ["done", "cancelled"],
     parent_task_id: args.parent_task_id as string | undefined,
     assigned_agent_id: args.assigned_agent_id as string | undefined,
+  };
+
+  const offset = Math.max(0, Math.floor(Number(args.offset) || 0));
+  const limit = (args.limit as number | undefined) ?? DEFAULT_TASK_LIST_LIMIT;
+  const total = countTasks(db, filter);
+  const tasks = listTasks(db, { ...filter, limit, offset });
+  const has_more = offset + tasks.length < total;
+
+  return ok({
+    tasks,
+    total,
+    returned: tasks.length,
+    offset,
+    has_more,
+    next_offset: has_more ? offset + tasks.length : null,
   });
-  return ok({ tasks });
 }
 
 function handleSearchTasks(db: Database.Database, args: Args): ToolResult {

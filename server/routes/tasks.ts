@@ -20,11 +20,21 @@ import { requireEntity, handleMutation } from "./handlers.js";
 import { validateBody } from "./validate.js";
 import { createTaskSchema, updateTaskSchema, bulkUpdateTasksSchema } from "../../shared/schemas.js";
 
+// Parse optional ?limit / ?offset. Left undefined when absent so listTasks returns
+// every row (the UI renders a full board); when present they are clamped in db/tasks.
+function parsePaging(query: Record<string, unknown>): { limit?: number; offset?: number } {
+  return {
+    limit: query.limit !== undefined ? Number(query.limit) : undefined,
+    offset: query.offset !== undefined ? Number(query.offset) : undefined,
+  };
+}
+
 export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
 
   router.get("/api/projects/:projectId/tasks", (req, res) => {
-    res.json(listTasks(db, { project_id: req.params.projectId }));
+    const { limit, offset } = parsePaging(req.query);
+    res.json(listTasks(db, { project_id: req.params.projectId, limit, offset }));
   });
 
   router.get("/api/tasks", (req, res) => {
@@ -34,12 +44,15 @@ export function taskRoutes(db: Database.Database, broadcast: BroadcastFn): Route
       parent_task_id?: string;
       assigned_agent_id?: string;
     };
+    const { limit, offset } = parsePaging(req.query);
     res.json(
       listTasks(db, {
         project_id,
         status: status as TaskStatus | undefined,
         parent_task_id,
         assigned_agent_id,
+        limit,
+        offset,
       })
     );
   });

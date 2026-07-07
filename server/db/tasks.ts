@@ -2,7 +2,19 @@ import type Database from "better-sqlite3";
 import type { Task, TaskStatus, TaskPriority } from "../types.js";
 import { now, genId } from "./helpers.js";
 import { DEFAULT_TASK_LIST_LIMIT, MAX_TASK_LIST_LIMIT } from "../constants.js";
-import { buildWhere } from "./where.js";
+
+/** Clamp a caller-supplied limit to [1, MAX_TASK_LIST_LIMIT], defaulting when absent/invalid. */
+function clampListLimit(raw: unknown): number {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_TASK_LIST_LIMIT;
+  return Math.min(n, MAX_TASK_LIST_LIMIT);
+}
+
+/** Clamp a caller-supplied offset to a non-negative, finite integer (guards NaN/Infinity). */
+function clampListOffset(raw: unknown): number {
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 
 export interface CreateTaskInput {
   project_id: string;
@@ -57,27 +69,64 @@ export function getTask(db: Database.Database, id: string): Task | null {
 export interface ListTasksFilter {
   project_id?: string;
   status?: TaskStatus;
+  /**
+   * When `status` is not set, exclude tasks in these statuses (e.g. done/cancelled).
+   * Ignored when `status` is set to an explicit value.
+   */
+  exclude_statuses?: TaskStatus[];
   parent_task_id?: string;
   milestone_id?: string;
   assigned_agent_id?: string;
+  /**
+   * When provided, results are paginated: LIMIT is clamped to
+   * [1, MAX_TASK_LIST_LIMIT] (default DEFAULT_TASK_LIST_LIMIT), OFFSET to >= 0.
+   * Omit `limit` entirely to return every matching row (used by REST/CLI callers
+   * that render a full board and manage volume themselves).
+   */
+  limit?: number;
+  offset?: number;
+}
+
+/** Shared WHERE builder for listTasks/countTasks so both filter identically. */
+function taskListConditions(filter?: ListTasksFilter): { where: string; params: unknown[] } {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filter?.project_id !== undefined) { conditions.push("project_id = ?"); params.push(filter.project_id); }
+  if (filter?.status !== undefined) {
+    conditions.push("status = ?");
+    params.push(filter.status);
+  } else if (filter?.exclude_statuses && filter.exclude_statuses.length > 0) {
+    conditions.push(`status NOT IN (${filter.exclude_statuses.map(() => "?").join(", ")})`);
+    params.push(...filter.exclude_statuses);
+  }
+  if (filter?.parent_task_id !== undefined) { conditions.push("parent_task_id = ?"); params.push(filter.parent_task_id); }
+  if (filter?.milestone_id !== undefined) { conditions.push("milestone_id = ?"); params.push(filter.milestone_id); }
+  if (filter?.assigned_agent_id !== undefined) { conditions.push("assigned_agent_id = ?"); params.push(filter.assigned_agent_id); }
+
+  const where = conditions.length > 0 ? " WHERE " + conditions.join(" AND ") : "";
+  return { where, params };
 }
 
 export function listTasks(
   db: Database.Database,
   filter?: ListTasksFilter
 ): Task[] {
-  const { sql: where, params } = buildWhere([
-    filter?.project_id === undefined ? null : ["project_id = ?", filter.project_id],
-    filter?.status === undefined ? null : ["status = ?", filter.status],
-    filter?.parent_task_id === undefined ? null : ["parent_task_id = ?", filter.parent_task_id],
-    filter?.milestone_id === undefined ? null : ["milestone_id = ?", filter.milestone_id],
-    filter?.assigned_agent_id === undefined ? null : ["assigned_agent_id = ?", filter.assigned_agent_id],
-  ]);
-
+  const { where, params } = taskListConditions(filter);
+  let sql = "SELECT * FROM tasks" + where + " ORDER BY created_at ASC";
+  if (filter?.limit !== undefined) {
+    sql += " LIMIT ? OFFSET ?";
+    params.push(clampListLimit(filter.limit), clampListOffset(filter.offset));
+  }
   // SQL fragments are hardcoded; values bound via ?
-  return db
-    .prepare("SELECT * FROM tasks " + where + " ORDER BY created_at ASC")
-    .all(...params) as Task[];
+  return db.prepare(sql).all(...params) as Task[];
+}
+
+/** Total matching rows for a filter, ignoring limit/offset — used for has_more hints. */
+export function countTasks(db: Database.Database, filter?: ListTasksFilter): number {
+  const { where, params } = taskListConditions(filter);
+  const row = db.prepare("SELECT COUNT(*) AS n FROM tasks" + where).get(...params) as { n: number };
+  return row.n;
 }
 
 export interface UpdateTaskInput {
@@ -214,13 +263,8 @@ export function searchTasks(db: Database.Database, filter: SearchTasksFilter): T
 
   if (conditions.length > 0) sql += " WHERE " + conditions.join(" AND ");
 
-  const limit = Math.min(
-    Math.max(0, Math.floor(Number(filter.limit) || DEFAULT_TASK_LIST_LIMIT)),
-    MAX_TASK_LIST_LIMIT
-  );
-  const offset = Math.max(0, Math.floor(Number(filter.offset) || 0));
   sql += " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
-  params.push(limit, offset);
+  params.push(clampListLimit(filter.limit), clampListOffset(filter.offset));
 
   return db.prepare(sql).all(...params) as Task[];
 }
