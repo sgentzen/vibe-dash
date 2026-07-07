@@ -1,5 +1,6 @@
 import express from "express";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 import type Database from "better-sqlite3";
@@ -18,7 +19,18 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, "..");
+
+// The built frontend (vite output) always lives in the package's top-level `dist/`.
+// Under tsx (dev) this file is <root>/server/index.ts → dist is ../dist; once compiled
+// it is <pkg>/dist/server/index.js → dist is the parent dir. Probe both layouts so the
+// static SPA is served correctly whether run via `npm start` or `node dist/server/index.js`.
+function resolveDistDir(): string {
+  const candidates = [
+    path.resolve(__dirname, "..", "dist"), // dev/tsx: <root>/server → <root>/dist
+    path.resolve(__dirname, ".."),         // compiled: <pkg>/dist/server → <pkg>/dist
+  ];
+  return candidates.find((dir) => fs.existsSync(path.join(dir, "index.html"))) ?? candidates[0];
+}
 
 // Rate limiters for MCP/SSE endpoints (CodeQL js/missing-rate-limiting)
 const mcpLimiter = rateLimit({
@@ -134,8 +146,8 @@ app.all("/mcp", mcpLimiter, async (req, res) => {
 // SPA catch-all (which would serve index.html). Non-API paths pass through.
 app.use(notFoundHandler);
 
-// Serve built frontend in production (npm start)
-const distDir = path.join(PROJECT_ROOT, "dist");
+// Serve built frontend in production (`npm start` or compiled `node dist/server/index.js`)
+const distDir = resolveDistDir();
 app.use(express.static(distDir));
 app.get("/{*splat}", spaLimiter, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));

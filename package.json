@@ -2,7 +2,7 @@
   "name": "vibe-dash",
   "version": "1.0.0",
   "description": "Local-first real-time dashboard for monitoring AI-driven development projects via MCP",
-  "main": "server/index.ts",
+  "main": "dist/server/index.js",
   "directories": {
     "doc": "docs"
   },
@@ -11,7 +11,8 @@
     "dev": "concurrently \"tsx watch server/index.ts\" \"vite\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
-    "build": "vite build && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "build": "vite build && npm run typecheck && npm run build:server",
+    "build:server": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -21,11 +22,18 @@
     "mcp:stdio": "tsx server/mcp/stdio.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "prepublishOnly": "npm run build"
   },
   "bin": {
-    "vibe-dash": "./server/mcp/stdio.ts"
+    "vibe-dash": "./dist/server/mcp/stdio.js"
   },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "mcp",
     "dashboard",
