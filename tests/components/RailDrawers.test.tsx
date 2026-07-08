@@ -52,7 +52,7 @@ describe("RailDrawers", () => {
     expect(document.querySelector(".drawer-backdrop")).toBeFalsy();
   });
 
-  it("calls onClose when Escape is pressed via the provided handler", () => {
+  it("backdrop click invokes onClose", () => {
     const onClose = vi.fn();
     render(
       <RailDrawers
@@ -71,5 +71,25 @@ describe("RailDrawers", () => {
     // but clicking the backdrop should invoke the same onClose callback.
     fireEvent.click(document.querySelector(".drawer-backdrop")!);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("reflects open state via aria-expanded on the edge toggle buttons", () => {
+    render(<Harness />);
+
+    const leftToggle = screen.getByLabelText("Open projects");
+    const rightToggle = screen.getByLabelText("Open agent feed");
+
+    expect(leftToggle).toHaveAttribute("aria-expanded", "false");
+    expect(rightToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(leftToggle);
+    expect(leftToggle).toHaveAttribute("aria-expanded", "true");
+    expect(rightToggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("resolves the edge toggle button's fontSize to 12px", () => {
+    render(<Harness />);
+    const leftToggle = screen.getByLabelText("Open projects");
+    expect(leftToggle.style.fontSize).toBe("12px");
   });
 });

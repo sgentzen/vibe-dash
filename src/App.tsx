@@ -32,6 +32,7 @@ export function App() {
   const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gKeyPending = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   const clearSearch = useCallback(() => {
     dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
@@ -117,6 +118,33 @@ export function App() {
       }
     };
   }, [dispatch]);
+
+  // Measure the header's rendered height and publish it as a CSS custom
+  // property so the narrow-width drawer/backdrop offsets (App.css) can
+  // track it instead of relying on a hardcoded pixel value that breaks
+  // when the header wraps to a second row.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+
+    // Intentionally left on documentElement for the app's lifetime — App
+    // never unmounts in practice, so there's no cleanup to do here.
+    function applyHeight(height: number) {
+      document.documentElement.style.setProperty("--header-height", `${height}px`);
+    }
+
+    // Set an initial value synchronously so first paint is correct.
+    applyHeight(el.getBoundingClientRect().height);
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) applyHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -235,7 +263,9 @@ export function App() {
 
   return (
     <div className="app">
-      <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} searchInputRef={searchInputRef} />
+      <div ref={headerRef}>
+        <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} searchInputRef={searchInputRef} />
+      </div>
       <div className={`main-content${rightRailCollapsed ? " rail-collapsed" : ""}`}>
         <RailDrawers
           drawer={drawer}

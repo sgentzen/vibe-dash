@@ -80,6 +80,8 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
         minWidth: 0,
         overflow: "hidden",
         flexShrink: 0,
+        position: "relative",
+        zIndex: 300,
       }}
     >
       {/* Logo */}

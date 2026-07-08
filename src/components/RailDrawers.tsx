@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { typeScale } from "../styles/shared.js";
 
 const edgeToggleStyle: CSSProperties = {
   background: "var(--bg-tertiary)",
@@ -6,7 +7,7 @@ const edgeToggleStyle: CSSProperties = {
   borderRadius: "6px",
   color: "var(--text-secondary)",
   padding: "4px 10px",
-  fontSize: "var(--type-caption)",
+  ...typeScale.caption,
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
@@ -69,6 +70,7 @@ export function RailDrawers({
           <button
             className="rail-toggle"
             aria-label="Open projects"
+            aria-expanded={drawer === "left"}
             onClick={onOpenLeft}
             style={edgeToggleStyle}
           >
@@ -78,6 +80,7 @@ export function RailDrawers({
           <button
             className="rail-toggle"
             aria-label="Open agent feed"
+            aria-expanded={drawer === "right"}
             onClick={onOpenRight}
             style={edgeToggleStyle}
           >
