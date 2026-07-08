@@ -123,12 +123,21 @@ textarea:focus-visible {
   grid-template-rows: auto 1fr auto;
   height: 100vh;
   overflow: hidden;
+  min-width: 0; /* NEW: children may shrink below their content width */
 }
 
 .main-content {
   display: grid;
   grid-template-columns: 200px 1fr 240px;
   overflow: hidden;
+  min-width: 0; /* NEW */
+}
+
+/* Every direct grid child must be allowed to shrink, or the 1fr center
+   column will be pushed and clip the rails. */
+.main-content > * {
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Scrollable panels */
@@ -187,4 +196,48 @@ textarea:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .highlight-pulse { animation: none; }
+}
+
+/* ---- Responsive: mid width — tighten rails ---- */
+@media (max-width: 1199px) {
+  .main-content {
+    grid-template-columns: 180px 1fr 220px;
+  }
+}
+
+/* Edge toggle buttons are hidden at wide widths (drawers don't exist there).
+   This unconditional rule must be declared BEFORE the narrow media query below —
+   an unconditional rule declared after a media query wins ties by source order
+   regardless of viewport, which would keep the toggles hidden everywhere. */
+.rail-toggle { display: none; }
+
+/* ---- Responsive: narrow — rails leave flow, become overlay drawers ---- */
+@media (max-width: 1023px) {
+  .main-content {
+    grid-template-columns: 1fr; /* center column fills the viewport */
+  }
+  /* Take the two rails out of the grid; position them as slide-in overlays. */
+  .main-content > .rail-drawer {
+    position: fixed;
+    top: var(--header-height, 52px); /* below the header (measured; falls back to 52px) */
+    bottom: 0;
+    width: min(80vw, 300px);
+    z-index: 200;
+    transform: translateX(var(--rail-hidden-x));
+    transition: transform 0.2s ease-out;
+    box-shadow: var(--shadow-lg);
+  }
+  .rail-drawer.rail-left  { left: 0;  --rail-hidden-x: -100%; }
+  .rail-drawer.rail-right { right: 0; --rail-hidden-x: 100%; }
+  .rail-drawer.rail-open  { transform: translateX(0); }
+
+  .rail-toggle { display: inline-flex; } /* edge buttons visible only here */
+  .drawer-backdrop {
+    position: fixed; inset: var(--header-height, 52px) 0 0 0;
+    background: rgba(0,0,0,0.5); z-index: 150;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-content > .rail-drawer { transition: none; }
 }

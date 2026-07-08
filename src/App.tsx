@@ -17,6 +17,7 @@ import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { ProjectContextChip } from "./components/ProjectContextChip";
 import { CommandPalette } from "./components/CommandPalette";
+import { RailDrawers } from "./components/RailDrawers";
 
 export function App() {
   const dispatch = useAppDispatch();
@@ -27,9 +28,11 @@ export function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [drawer, setDrawer] = useState<null | "left" | "right">(null);
   const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gKeyPending = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   const clearSearch = useCallback(() => {
     dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
@@ -71,6 +74,7 @@ export function App() {
 
       if (e.key === "Escape") {
         setCommandPaletteOpen(false);
+        setDrawer(null);
         return;
       }
 
@@ -114,6 +118,33 @@ export function App() {
       }
     };
   }, [dispatch]);
+
+  // Measure the header's rendered height and publish it as a CSS custom
+  // property so the narrow-width drawer/backdrop offsets (App.css) can
+  // track it instead of relying on a hardcoded pixel value that breaks
+  // when the header wraps to a second row.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+
+    // Intentionally left on documentElement for the app's lifetime — App
+    // never unmounts in practice, so there's no cleanup to do here.
+    function applyHeight(height: number) {
+      document.documentElement.style.setProperty("--header-height", `${height}px`);
+    }
+
+    // Set an initial value synchronously so first paint is correct.
+    applyHeight(el.getBoundingClientRect().height);
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) applyHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -232,63 +263,59 @@ export function App() {
 
   return (
     <div className="app">
-      <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} searchInputRef={searchInputRef} />
+      <div ref={headerRef}>
+        <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} searchInputRef={searchInputRef} />
+      </div>
       <div className={`main-content${rightRailCollapsed ? " rail-collapsed" : ""}`}>
-        <ProjectList />
-        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              padding: "6px 16px",
-              borderBottom: "1px solid var(--border)",
-              flexShrink: 0,
-              gap: "8px",
-              minHeight: "32px",
-            }}
-          >
-            <ProjectContextChip />
-          </div>
+        <RailDrawers
+          drawer={drawer}
+          onOpenLeft={() => setDrawer("left")}
+          onOpenRight={() => setDrawer("right")}
+          onClose={() => setDrawer(null)}
+          left={<ProjectList />}
+          topRow={<ProjectContextChip />}
+          right={
+            rightRailCollapsed ? (
+              <aside
+                style={{
+                  background: "var(--bg-secondary)",
+                  borderLeft: "1px solid var(--border)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  paddingTop: "10px",
+                  overflow: "hidden",
+                }}
+              >
+                <button
+                  onClick={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })}
+                  title="Expand agent feed"
+                  aria-label="Expand agent feed"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: "pointer",
+                    color: "var(--text-muted)",
+                    fontSize: "14px",
+                    lineHeight: 1,
+                    borderRadius: "3px",
+                  }}
+                >
+                  ‹
+                </button>
+              </aside>
+            ) : (
+              <AgentFeed onCollapse={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })} />
+            )
+          }
+        >
           {(() => {
             if (activeView === "board") return <TaskBoard />;
             if (activeView === "feed") return <ActivityStreamView />;
             return <FleetView />;
           })()}
-        </div>
-        {rightRailCollapsed ? (
-          <aside
-            style={{
-              background: "var(--bg-secondary)",
-              borderLeft: "1px solid var(--border)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              paddingTop: "10px",
-              overflow: "hidden",
-            }}
-          >
-            <button
-              onClick={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })}
-              title="Expand agent feed"
-              aria-label="Expand agent feed"
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                cursor: "pointer",
-                color: "var(--text-muted)",
-                fontSize: "14px",
-                lineHeight: 1,
-                borderRadius: "3px",
-              }}
-            >
-              ‹
-            </button>
-          </aside>
-        ) : (
-          <AgentFeed onCollapse={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })} />
-        )}
+        </RailDrawers>
       </div>
       {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
       {loadError && (
