@@ -71,10 +71,14 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
         background: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border)",
         padding: "0 var(--space-4)",
-        height: "52px",
+        minHeight: "52px",
         display: "flex",
         alignItems: "center",
-        gap: "var(--space-5)",
+        flexWrap: "wrap",
+        rowGap: "var(--space-2)",
+        gap: "var(--space-4)",
+        minWidth: 0,
+        overflow: "hidden",
         flexShrink: 0,
       }}
     >
@@ -94,7 +98,7 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
       </span>
 
       {/* Stats */}
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", minWidth: 0, flexShrink: 1 }}>
         <StatPill
           label="PROJECTS"
           value={stats.projects}
@@ -138,7 +142,7 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
       />
 
       {/* Search: scope + input + kbd hint */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0", position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0", position: "relative", minWidth: 0, flexShrink: 1 }}>
         <select
           value={searchScope}
           onChange={(e) => dispatch({ type: "SET_SEARCH_SCOPE", payload: e.target.value as SearchScope })}

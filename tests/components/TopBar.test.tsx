@@ -181,4 +181,15 @@ describe("TopBar", () => {
       expect(searchInput.value).toBe("");
     });
   });
+
+  // ── Responsive layout pass (Task 1): header shrinks/wraps ─────────────
+
+  it("header is allowed to wrap so it never clips controls off-screen", () => {
+    const { container } = renderWithProviders(<TopBar />);
+    const header = container.querySelector("header")!;
+    expect(header).toBeTruthy();
+    // Inline style is the source of truth for this component.
+    expect(header.style.flexWrap).toBe("wrap");
+    expect(header.style.minWidth).toBe("0px");
+  });
 });
