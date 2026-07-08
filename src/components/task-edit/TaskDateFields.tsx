@@ -18,7 +18,7 @@ export function TaskDateFields({
   onEstimateChange,
   startDate,
   onStartDateChange,
-}: TaskDateFieldsProps) {
+}: Readonly<TaskDateFieldsProps>) {
   return (
     <>
       <FormField id="task-due-date" label="Due Date">

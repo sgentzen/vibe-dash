@@ -67,170 +67,204 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     }
   }
 
-  server.tool(
+  server.registerTool(
     "register_agent",
-    "Register or update an AI agent",
-    registerAgentSchema.shape,
+    {
+      description: "Register or update an AI agent",
+      inputSchema: registerAgentSchema.shape,
+    },
     call("register_agent")
   );
 
-  server.tool(
+  server.registerTool(
     "list_projects",
-    "List all projects",
-    {},
+    {
+      description: "List all projects",
+      inputSchema: {},
+    },
     call("list_projects")
   );
 
-  server.tool(
+  server.registerTool(
     "create_milestone",
-    "Create a milestone for a project",
-    createMilestoneSchema.shape,
+    {
+      description: "Create a milestone for a project",
+      inputSchema: createMilestoneSchema.shape,
+    },
     call("create_milestone")
   );
 
-  server.tool(
+  server.registerTool(
     "list_milestones",
-    "List milestones, optionally filtered by project",
     {
-      project_id: z.string().optional(),
+      description: "List milestones, optionally filtered by project",
+      inputSchema: {
+        project_id: z.string().optional(),
+      },
     },
     call("list_milestones")
   );
 
-  server.tool(
+  server.registerTool(
     "complete_milestone",
-    "Mark a milestone as achieved",
     {
-      milestone_id: z.string(),
+      description: "Mark a milestone as achieved",
+      inputSchema: {
+        milestone_id: z.string(),
+      },
     },
     call("complete_milestone")
   );
 
-  server.tool(
+  server.registerTool(
     "create_task",
-    "Create a new task in a project",
-    // Shared schema is stricter (priority required); allow optional here for back-compat
-    { ...createTaskSchema.shape, priority: taskPrioritySchema.optional() },
+    {
+      description: "Create a new task in a project",
+      inputSchema: // Shared schema is stricter (priority required); allow optional here for back-compat
+      { ...createTaskSchema.shape, priority: taskPrioritySchema.optional() },
+    },
     call("create_task")
   );
 
-  server.tool(
+  server.registerTool(
     "get_task",
-    "Get a task by ID",
     {
-      task_id: z.string(),
+      description: "Get a task by ID",
+      inputSchema: {
+        task_id: z.string(),
+      },
     },
     call("get_task")
   );
 
-  server.tool(
+  server.registerTool(
     "list_tasks",
-    "List tasks with optional filters. Excludes done/cancelled by default (pass an explicit status to include them). Paginated: returns up to `limit` (default 200, max 500) tasks from `offset`; check `has_more`/`next_offset` to page.",
     {
-      project_id: z.string().optional(),
-      status: taskStatusEnum.optional(),
-      parent_task_id: z.string().optional(),
-      assigned_agent_id: z.string().optional(),
-      limit: z.number().int().positive().optional(),
-      offset: z.number().int().nonnegative().optional(),
+      description: "List tasks with optional filters. Excludes done/cancelled by default (pass an explicit status to include them). Paginated: returns up to `limit` (default 200, max 500) tasks from `offset`; check `has_more`/`next_offset` to page.",
+      inputSchema: {
+        project_id: z.string().optional(),
+        status: taskStatusEnum.optional(),
+        parent_task_id: z.string().optional(),
+        assigned_agent_id: z.string().optional(),
+        limit: z.number().int().positive().optional(),
+        offset: z.number().int().nonnegative().optional(),
+      },
     },
     call("list_tasks")
   );
 
-  server.tool(
+  server.registerTool(
     "search_tasks",
-    "Search tasks with filters",
     {
-      query: z.string().optional(),
-      project_id: z.string().optional(),
-      milestone_id: z.string().optional(),
-      status: taskStatusEnum.optional(),
-      priority: taskPrioritySchema.optional(),
-      assigned_agent_id: z.string().optional(),
-      due_before: z.string().optional(),
-      due_after: z.string().optional(),
+      description: "Search tasks with filters",
+      inputSchema: {
+        query: z.string().optional(),
+        project_id: z.string().optional(),
+        milestone_id: z.string().optional(),
+        status: taskStatusEnum.optional(),
+        priority: taskPrioritySchema.optional(),
+        assigned_agent_id: z.string().optional(),
+        due_before: z.string().optional(),
+        due_after: z.string().optional(),
+      },
     },
     call("search_tasks")
   );
 
-  server.tool(
+  server.registerTool(
     "update_task",
-    "Update task fields",
     {
-      task_id: z.string(),
-      ...updateTaskSchema.shape,
+      description: "Update task fields",
+      inputSchema: {
+        task_id: z.string(),
+        ...updateTaskSchema.shape,
+      },
     },
     call("update_task")
   );
 
-  server.tool(
+  server.registerTool(
     "complete_task",
-    "Mark a task as done with 100% progress",
     {
-      task_id: z.string(),
-      agent_name: z.string().optional(),
+      description: "Mark a task as done with 100% progress",
+      inputSchema: {
+        task_id: z.string(),
+        agent_name: z.string().optional(),
+      },
     },
     call("complete_task")
   );
 
-  server.tool(
+  server.registerTool(
     "log_activity",
-    "Log an activity entry for a task",
     {
-      task_id: z.string(),
-      agent_name: z.string().optional(),
-      message: z.string(),
+      description: "Log an activity entry for a task",
+      inputSchema: {
+        task_id: z.string(),
+        agent_name: z.string().optional(),
+        message: z.string(),
+      },
     },
     call("log_activity")
   );
 
-  server.tool(
+  server.registerTool(
     "report_blocker",
-    "Report a blocker on a task",
     {
-      task_id: z.string(),
-      reason: z.string(),
+      description: "Report a blocker on a task",
+      inputSchema: {
+        task_id: z.string(),
+        reason: z.string(),
+      },
     },
     call("report_blocker")
   );
 
-  server.tool(
+  server.registerTool(
     "resolve_blocker",
-    "Resolve a blocker",
     {
-      blocker_id: z.string(),
+      description: "Resolve a blocker",
+      inputSchema: {
+        blocker_id: z.string(),
+      },
     },
     call("resolve_blocker")
   );
 
-  server.tool(
+  server.registerTool(
     "log_cost",
-    "Log a cost/token usage entry for an LLM call",
     {
-      model: z.string(),
-      provider: z.string(),
-      input_tokens: z.number(),
-      output_tokens: z.number(),
-      cost_usd: z.number(),
-      agent_id: z.string().optional(),
-      task_id: z.string().optional(),
-      milestone_id: z.string().optional(),
-      project_id: z.string().optional(),
+      description: "Log a cost/token usage entry for an LLM call",
+      inputSchema: {
+        model: z.string(),
+        provider: z.string(),
+        input_tokens: z.number(),
+        output_tokens: z.number(),
+        cost_usd: z.number(),
+        agent_id: z.string().optional(),
+        task_id: z.string().optional(),
+        milestone_id: z.string().optional(),
+        project_id: z.string().optional(),
+      },
     },
     call("log_cost")
   );
 
-  server.tool(
+  server.registerTool(
     "heartbeat",
-    "Report what you're working on right now (a short freeform status)",
-    { status: z.string().min(1).max(280) },
+    {
+      description: "Report what you're working on right now (a short freeform status)",
+      inputSchema: { status: z.string().min(1).max(280) },
+    },
     call("heartbeat")
   );
 
-  server.tool(
+  server.registerTool(
     "get_project_context",
-    "Get a project's current state in one call: open milestones (with progress), in-progress tasks, active blockers, and recent activity",
-    { project_id: z.string().min(1) },
+    {
+      description: "Get a project's current state in one call: open milestones (with progress), in-progress tasks, active blockers, and recent activity",
+      inputSchema: { project_id: z.string().min(1) },
+    },
     call("get_project_context")
   );
 

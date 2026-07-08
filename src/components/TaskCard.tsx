@@ -323,7 +323,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   );
 });
 
-function SubTaskRow({ task }: { task: Task }) {
+function SubTaskRow({ task }: Readonly<{ task: Task }>) {
   const isDone = task.status === "done";
   const isActive = task.status === "in_progress";
   const isBlocked = task.status === "blocked";

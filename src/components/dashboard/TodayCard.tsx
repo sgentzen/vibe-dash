@@ -26,7 +26,7 @@ const labelStyle: CSSProperties = {
   fontSize: "12px",
 };
 
-export function TodayCard({ spendToday, tasksCompletedToday, activeAgents }: TodayCardProps) {
+export function TodayCard({ spendToday, tasksCompletedToday, activeAgents }: Readonly<TodayCardProps>) {
   return (
     <div style={cardStyle}>
       <div style={{ ...sectionHeader, display: "flex", justifyContent: "space-between" }}>

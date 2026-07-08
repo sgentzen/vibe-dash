@@ -5,7 +5,7 @@ interface TaskDrawerActionsProps {
   onMarkDone: () => void;
 }
 
-export function TaskDrawerActions({ saving, showMarkDone, onSave, onMarkDone }: TaskDrawerActionsProps) {
+export function TaskDrawerActions({ saving, showMarkDone, onSave, onMarkDone }: Readonly<TaskDrawerActionsProps>) {
   return (
     <div style={{ marginTop: "auto", display: "flex", gap: "10px" }}>
       <button

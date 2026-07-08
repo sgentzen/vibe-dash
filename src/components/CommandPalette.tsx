@@ -33,7 +33,7 @@ const PRESET_COMMANDS: { id: FleetPreset; label: string; icon: string }[] = [
   { id: "agents", label: "Fleet · Agents", icon: "◎" },
 ];
 
-export function CommandPalette({ onClose }: CommandPaletteProps) {
+export function CommandPalette({ onClose }: Readonly<CommandPaletteProps>) {
   const { tasks, projects } = useAppState();
   const dispatch = useAppDispatch();
   const [query, setQuery] = useState("");

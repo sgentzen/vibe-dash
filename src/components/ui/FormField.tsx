@@ -17,7 +17,7 @@ interface FormFieldProps {
  * Label + input wrapper. Keeps field markup consistent across forms.
  * Children should be the actual input/select/textarea with matching id.
  */
-export function FormField({ id, label, children }: FormFieldProps) {
+export function FormField({ id, label, children }: Readonly<FormFieldProps>) {
   return (
     <div>
       <label htmlFor={id} style={formLabelStyle}>{label}</label>

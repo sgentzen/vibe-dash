@@ -26,7 +26,7 @@ export function TaskMetadataFields({
   onAgentChange,
   taskMilestones,
   agents,
-}: TaskMetadataFieldsProps) {
+}: Readonly<TaskMetadataFieldsProps>) {
   return (
     <>
       <FormField id="task-status" label="Status">

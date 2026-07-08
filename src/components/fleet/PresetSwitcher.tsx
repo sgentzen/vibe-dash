@@ -10,7 +10,7 @@ interface PresetSwitcherProps {
   onChange: (p: FleetPreset) => void;
 }
 
-export function PresetSwitcher({ active, onChange }: PresetSwitcherProps) {
+export function PresetSwitcher({ active, onChange }: Readonly<PresetSwitcherProps>) {
   return (
     <div
       role="tablist"

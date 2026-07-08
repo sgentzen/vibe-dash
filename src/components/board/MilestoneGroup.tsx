@@ -29,7 +29,7 @@ export function MilestoneGroup({
   onClickTask,
   onDragStart,
   onGrab,
-}: MilestoneGroupProps) {
+}: Readonly<MilestoneGroupProps>) {
   const statusIcon = milestone?.status === "achieved" ? "\u2713" : "\u25cf";
   const statusColor =
     milestone?.status === "open"

@@ -18,7 +18,7 @@ const STATUS_LABELS: Record<WorktreeStatus, string> = {
   removed: "Removed",
 };
 
-function StatusBadge({ status }: { status: WorktreeStatus }) {
+function StatusBadge({ status }: Readonly<{ status: WorktreeStatus }>) {
   const color = STATUS_COLORS[status];
   return (
     <span
@@ -42,11 +42,11 @@ function WorktreeCard({
   worktree,
   taskTitle,
   onStatusChange,
-}: {
+}: Readonly<{
   worktree: TaskWorktree;
   taskTitle: string | undefined;
   onStatusChange: (id: string, status: WorktreeStatus) => void;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const TRANSITIONS: WorktreeStatus[] = worktree.status === "active"
     ? ["merged", "abandoned", "removed"]

@@ -10,7 +10,7 @@ interface ModalBackdropProps {
  * Full-viewport dark backdrop for modals/drawers.
  * Default zIndex: 10. Click-through closes via onClick.
  */
-export function ModalBackdrop({ onClick, zIndex = 10, style }: ModalBackdropProps) {
+export function ModalBackdrop({ onClick, zIndex = 10, style }: Readonly<ModalBackdropProps>) {
   return (
     <div
       onClick={onClick}

@@ -20,7 +20,7 @@ export function ModalDrawer({
   zIndex = 20,
   className = "drawer",
   style,
-}: ModalDrawerProps) {
+}: Readonly<ModalDrawerProps>) {
   return (
     <div
       className={className}

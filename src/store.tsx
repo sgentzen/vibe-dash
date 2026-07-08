@@ -67,7 +67,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+export function AppProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   const dataValue = useMemo<DataState>(

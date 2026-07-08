@@ -5,7 +5,7 @@ interface AddProjectControlProps {
   onAdd: (name: string) => Promise<void> | void;
 }
 
-export function AddProjectControl({ onAdd }: AddProjectControlProps) {
+export function AddProjectControl({ onAdd }: Readonly<AddProjectControlProps>) {
   const [showForm, setShowForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [creating, setCreating] = useState(false);

@@ -8,7 +8,7 @@ interface EmptyStateProps {
   action?: { label: string; onClick: () => void };
 }
 
-export function EmptyState({ message, compact = false, icon, color = "var(--text-muted)", action }: EmptyStateProps) {
+export function EmptyState({ message, compact = false, icon, color = "var(--text-muted)", action }: Readonly<EmptyStateProps>) {
   if (compact) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "32px", fontSize: "12px", color }}>

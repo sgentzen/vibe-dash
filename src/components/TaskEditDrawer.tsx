@@ -17,7 +17,7 @@ interface TaskEditDrawerProps {
   onClose: () => void;
 }
 
-export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
+export function TaskEditDrawer({ task, onClose }: Readonly<TaskEditDrawerProps>) {
   const { milestones, agents } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();

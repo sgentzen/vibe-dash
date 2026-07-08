@@ -20,7 +20,7 @@ function formatDuration(seconds: number): string {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
-function StatBox({ label, value }: { label: string; value: string | number }) {
+function StatBox({ label, value }: Readonly<{ label: string; value: string | number }>) {
   return (
     <div style={{ textAlign: "center", flex: 1, minWidth: 80 }}>
       <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>{value}</div>
@@ -29,7 +29,7 @@ function StatBox({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function AgentPerformanceCard({ perf, breakdown }: { perf: AgentPerformance; breakdown: TaskTypeBreakdown[] }) {
+function AgentPerformanceCard({ perf, breakdown }: Readonly<{ perf: AgentPerformance; breakdown: TaskTypeBreakdown[] }>) {
   const color = agentColor(perf.agent_name);
   const maxLines = Math.max(...breakdown.map((b) => b.avg_lines_added), 1);
 

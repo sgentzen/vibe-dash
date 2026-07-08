@@ -230,7 +230,7 @@ export function AgentDashboard() {
   );
 }
 
-function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDetail; onClick: () => void }) {
+function AgentCard({ agent, detail, onClick }: Readonly<{ agent: Agent; detail?: AgentDetail; onClick: () => void }>) {
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
@@ -344,7 +344,7 @@ function AgentCard({ agent, detail, onClick }: { agent: Agent; detail?: AgentDet
   );
 }
 
-function AgentDetailView({ detail, onBack }: { detail: AgentDetail; onBack: () => void }) {
+function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onBack: () => void }>) {
   const { agent, health_status, completed_today, current_task_title, activity, sessions } = detail;
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";

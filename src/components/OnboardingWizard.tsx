@@ -26,7 +26,7 @@ const DEMO_TASKS = [
   { title: "Add sprint velocity chart", description: "Plot story points per sprint over time", priority: "low" as const, status: "planned" as const },
 ];
 
-export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>) {
   const api = useApi();
   const [step, setStep] = useState(0);
   const [projectName, setProjectName] = useState("");

@@ -8,7 +8,7 @@ interface SparklineProps {
   style?: CSSProperties;
 }
 
-export function Sparkline({ values, width = 48, height = 14, color = "var(--accent-green)", style }: SparklineProps) {
+export function Sparkline({ values, width = 48, height = 14, color = "var(--accent-green)", style }: Readonly<SparklineProps>) {
   if (values.length < 2) return null;
 
   const max = Math.max(...values);
