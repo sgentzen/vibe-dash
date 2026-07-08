@@ -162,19 +162,19 @@ export function App() {
     // Atomic load: gather everything first, dispatch only once on success.
     // This prevents partially-failed retries from clobbering previously-good
     // state with empty arrays while the server is mid-restart.
-    async function attemptLoad(): Promise<boolean> {
+    async function attemptLoad(): Promise<void> {
       const [stats, projects, tasks, agents, activity, blockerList] = await Promise.all([
         api.getStats(), api.getProjects(), api.getTasks(),
         api.getAgents(), api.getActivity(), api.getBlockers(),
       ]);
-      if (cancelled) return true;
+      if (cancelled) return;
 
       const [allMilestones, allDeps, worktrees] = await Promise.all([
         Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
         Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
         api.getWorktrees(),
       ]);
-      if (cancelled) return true;
+      if (cancelled) return;
 
       const depsMap: Record<string, string[]> = {};
       for (const d of allDeps) {
@@ -197,7 +197,6 @@ export function App() {
 
       if (projects.length === 0) setShowOnboarding(true);
       setLoaded(true);
-      return true;
     }
 
     function computeRetryDelay(attempt: number, err: unknown, delayMs: number): number {
@@ -213,7 +212,10 @@ export function App() {
       for (let i = 0; i < retries; i++) {
         if (cancelled) return;
         try {
-          if (await attemptLoad()) return;
+          // attemptLoad resolves only on success or cancellation, and throws on
+          // failure — so a normal return means we're done and should stop retrying.
+          await attemptLoad();
+          return;
         } catch (err) {
           lastError = err;
           // Template literal is interpolated before console.error is called, so no

@@ -10,7 +10,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Resolve a worktree `.git` pointer (`gitdir: <path>`) back to the main repo root.
 function resolveWorktreePointer(dir: string, gitFileContent: string): string | null {
-  const match = gitFileContent.match(/^gitdir:\s*(.+)$/m);
+  // Anchor the capture on a non-whitespace char (\S) so `\s*` and the capture
+  // group can't both match the leading spaces — that overlap is what makes the
+  // naive `\s*(.+)` form backtrack super-linearly (S8786). exec() over match()
+  // for a single non-global lookup (S6594).
+  const match = /^gitdir:\s*(\S.*)$/m.exec(gitFileContent);
   if (!match) return null;
 
   const gitdir = path.resolve(dir, match[1].trim());
