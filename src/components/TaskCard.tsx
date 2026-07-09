@@ -83,7 +83,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
   const childDone = childTasks.filter((t) => t.status === "done").length;
 
   const taskActivity = activity.filter((a) => a.task_id === task.id);
-  const latestActivity = taskActivity
+  const latestActivity = [...taskActivity]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
   const activitySparkValues = isActive
     ? buildDailyActivityCounts(taskActivity.map((a) => a.timestamp), 7)

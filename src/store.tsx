@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useReducer, useMemo } from "react";
-import type { AppState, AppAction, Theme, ActiveView, FleetPreset, SearchScope } from "./state/types";
+import type { AppState, AppAction } from "./state/types";
 import { setReducer, getInitialTheme, getInitialRightRailCollapsed, getInitialSearchScope } from "./state/setReducer";
 import { wsReducer } from "./state/wsReducer";
 
-export type { AppState, AppAction, Theme, ActiveView, FleetPreset, SearchScope };
+export type { AppState, AppAction };
+export type { Theme, ActiveView, FleetPreset, SearchScope } from "./state/types";
 
 // ─── Domain slices ────────────────────────────────────────────────────────────
 

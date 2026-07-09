@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
-import { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS, ACTIVE_THRESHOLD_MINUTES, SESSION_TIMEOUT_MS } from "../constants.js";
-export { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS, ACTIVE_THRESHOLD_MINUTES };
+import { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS, SESSION_TIMEOUT_MS } from "../constants.js";
+export { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS };
+export { ACTIVE_THRESHOLD_MINUTES } from "../constants.js";
 import type {
   Agent,
   AgentSession,

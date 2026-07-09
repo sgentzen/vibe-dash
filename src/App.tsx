@@ -147,12 +147,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.dataset.theme = theme;
     // Restore custom accent color (validated — corrupted/tainted storage is ignored)
     const accent = readStoredAccentColor();
     if (accent) {
       document.documentElement.style.setProperty("--accent-user", accent);
-      document.documentElement.setAttribute("data-accent", "true");
+      document.documentElement.dataset.accent = "true";
     }
   }, [theme]);
 
@@ -228,7 +228,12 @@ export function App() {
         }
       }
       if (cancelled) return;
-      const message = lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
+      const message =
+        lastError instanceof Error
+          ? lastError.message
+          : typeof lastError === "object" && lastError !== null
+            ? "unknown error"
+            : String(lastError ?? "unknown error");
       dispatch({ type: "SET_LOAD_ERROR", payload: `Could not load data after ${retries} attempts: ${message}` });
     }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import FocusTrap from "focus-trap-react";
+import { FocusTrap } from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle } from "../styles/shared.js";

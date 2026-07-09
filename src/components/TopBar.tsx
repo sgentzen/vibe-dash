@@ -44,7 +44,7 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
     setAccentColor(safeColor);
     localStorage.setItem(ACCENT_STORAGE_KEY, safeColor);
     document.documentElement.style.setProperty("--accent-user", safeColor);
-    document.documentElement.setAttribute("data-accent", "true");
+    document.documentElement.dataset.accent = "true";
   }
 
   async function handleAddProject(name: string) {

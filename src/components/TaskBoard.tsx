@@ -78,8 +78,7 @@ export function TaskBoard() {
   }, [tasks, api, dispatch]);
 
   const handleGrab = useCallback((taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
+    if (!tasks.some((t) => t.id === taskId)) return;
     setKeyboardGrab({ taskId });
   }, [tasks]);
 

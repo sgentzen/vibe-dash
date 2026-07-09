@@ -54,7 +54,7 @@ export function buildDailyActivityCounts(
   days = 7
 ): number[] {
   const now = Date.now();
-  const counts = Array(days).fill(0);
+  const counts = new Array(days).fill(0);
   for (const ts of timestamps) {
     const age = now - new Date(ts).getTime();
     const dayIndex = Math.floor(age / 86_400_000);

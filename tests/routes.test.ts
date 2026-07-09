@@ -123,13 +123,13 @@ describe("GET /api/activity limit clamping", () => {
     const { status, body } = await request("GET", "/api/activity?limit=999999");
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
-    expect((body as unknown[]).length).toBe(MAX_ACTIVITY_LIMIT);
+    expect(body as unknown[]).toHaveLength(MAX_ACTIVITY_LIMIT);
 
     // Regression guard: a negative limit used to reach SQLite as `LIMIT -1`,
     // which SQLite treats as unbounded. It must now fall back to the default (50).
     const neg = await request("GET", "/api/activity?limit=-1");
     expect(neg.status).toBe(200);
-    expect((neg.body as unknown[]).length).toBe(50);
+    expect(neg.body as unknown[]).toHaveLength(50);
   });
 });
 
@@ -141,7 +141,7 @@ describe("GET /api/projects", () => {
     const { status, body } = await request("GET", "/api/projects");
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
-    expect((body as unknown[]).length).toBe(2);
+    expect(body as unknown[]).toHaveLength(2);
   });
 });
 
@@ -178,7 +178,7 @@ describe("GET /api/tasks", () => {
     });
 
     const { body } = await request("GET", `/api/tasks?project_id=${p1.id}`);
-    expect((body as unknown[]).length).toBe(1);
+    expect(body as unknown[]).toHaveLength(1);
     expect((body as Array<{ title: string }>)[0].title).toBe("T1");
   });
 });
@@ -252,7 +252,7 @@ describe("GET /api/blockers", () => {
     createBlocker(db, { task_id: t.id, reason: "blocked" });
 
     const { body } = await request("GET", "/api/blockers");
-    expect((body as unknown[]).length).toBe(1);
+    expect(body as unknown[]).toHaveLength(1);
   });
 });
 
@@ -300,7 +300,7 @@ describe("agent assignment via routes", () => {
     createTask(db, { project_id: p.id, title: "Unassigned", description: null, priority: "low" });
 
     const { body } = await request("GET", `/api/tasks?assigned_agent_id=${agent.id}`);
-    expect((body as unknown[]).length).toBe(1);
+    expect(body as unknown[]).toHaveLength(1);
     expect((body as Array<{ title: string }>)[0].title).toBe("Assigned");
   });
 
