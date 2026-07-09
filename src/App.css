@@ -235,6 +235,7 @@ textarea:focus-visible {
   .drawer-backdrop {
     position: fixed; inset: var(--header-height, 52px) 0 0 0;
     background: rgba(0,0,0,0.5); z-index: 150;
+    appearance: none; border: 0; padding: 0; cursor: pointer;
   }
 }
 

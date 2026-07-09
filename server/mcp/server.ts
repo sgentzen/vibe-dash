@@ -9,6 +9,7 @@ import {
   taskStatusEnum,
   taskPrioritySchema,
   registerAgentSchema,
+  createProjectSchema,
   createTaskSchema,
   updateTaskSchema,
   createMilestoneSchema,
@@ -72,6 +73,13 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
     "Register or update an AI agent",
     registerAgentSchema.shape,
     call("register_agent")
+  );
+
+  server.tool(
+    "create_project",
+    "Create a new project",
+    createProjectSchema.shape,
+    call("create_project")
   );
 
   server.tool(
