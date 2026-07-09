@@ -94,7 +94,14 @@ export function RailDrawers({
         {right}
       </div>
 
-      {drawer && <div className="drawer-backdrop" onClick={onClose} />}
+      {drawer && (
+        <button
+          type="button"
+          className="drawer-backdrop"
+          aria-label="Close drawer"
+          onClick={onClose}
+        />
+      )}
     </>
   );
 }
