@@ -24,7 +24,7 @@ function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
 }
 
 
-export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
+export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) {
   const { agents, activity } = useAppState();
   const groups = groupAgents(agents);
   const [showOffline, setShowOffline] = useState(false);
@@ -279,7 +279,7 @@ export function AgentFeed({ onCollapse }: { onCollapse: () => void }) {
   );
 }
 
-function AgentRow({ agent, indent }: { agent: Agent; indent: boolean }) {
+function AgentRow({ agent, indent }: Readonly<{ agent: Agent; indent: boolean }>) {
   const health = getHealthStatus(agent.last_seen_at);
   const healthColor = HEALTH_COLORS[health];
   const color = agentColor(agent.name);

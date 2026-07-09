@@ -46,7 +46,7 @@ export function RailDrawers({
   right,
   topRow,
   children,
-}: RailDrawersProps) {
+}: Readonly<RailDrawersProps>) {
   return (
     <>
       <div className={`rail-drawer rail-left${drawer === "left" ? " rail-open" : ""}`}>

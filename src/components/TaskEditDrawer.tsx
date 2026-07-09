@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import FocusTrap from "focus-trap-react";
+import { FocusTrap } from "focus-trap-react";
 import { useAppState, useAppDispatch } from "../store";
 import { useApi } from "../hooks/useApi";
 import { inputStyle as sharedInputStyle } from "../styles/shared.js";
@@ -17,7 +17,7 @@ interface TaskEditDrawerProps {
   onClose: () => void;
 }
 
-export function TaskEditDrawer({ task, onClose }: TaskEditDrawerProps) {
+export function TaskEditDrawer({ task, onClose }: Readonly<TaskEditDrawerProps>) {
   const { milestones, agents } = useAppState();
   const dispatch = useAppDispatch();
   const api = useApi();

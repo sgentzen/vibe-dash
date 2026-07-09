@@ -9,7 +9,7 @@ interface FormDateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 /**
  * Themed date input that uses the shared inputStyle by default.
  */
-export function FormDateInput({ id, style, ...rest }: FormDateInputProps) {
+export function FormDateInput({ id, style, ...rest }: Readonly<FormDateInputProps>) {
   return (
     <input
       id={id}

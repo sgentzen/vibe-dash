@@ -12,7 +12,7 @@ interface ViewToggleProps {
   onChange: (view: ActiveView) => void;
 }
 
-export function ViewToggle({ activeView, onChange }: ViewToggleProps) {
+export function ViewToggle({ activeView, onChange }: Readonly<ViewToggleProps>) {
   return (
     <div style={{ display: "flex", gap: "2px", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "2px" }}>
       {VIEWS.map((v) => (

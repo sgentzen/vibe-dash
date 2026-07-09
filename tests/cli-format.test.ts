@@ -31,7 +31,7 @@ const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 describe("cli/format: primitives", () => {
   it("pad: pads shorter strings to target length", () => {
     expect(pad("abc", 6)).toBe("abc   ");
-    expect(pad("abc", 6).length).toBe(6);
+    expect(pad("abc", 6)).toHaveLength(6);
   });
 
   it("pad: truncates longer strings to target length", () => {

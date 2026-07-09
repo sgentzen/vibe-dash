@@ -7,7 +7,7 @@ interface StatPillProps {
   onClick?: () => void;
 }
 
-export function StatPill({ label, value, color, onClick }: StatPillProps) {
+export function StatPill({ label, value, color, onClick }: Readonly<StatPillProps>) {
   const inner = (
     <>
       <span style={{ color, fontSize: "20px", fontWeight: 700, fontFamily: "monospace" }}>

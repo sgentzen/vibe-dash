@@ -6,7 +6,7 @@ interface MilestoneFilterProps {
   onSelect: (id: string | null) => void;
 }
 
-export function MilestoneFilter({ milestones, selectedMilestoneId, onSelect }: MilestoneFilterProps) {
+export function MilestoneFilter({ milestones, selectedMilestoneId, onSelect }: Readonly<MilestoneFilterProps>) {
   const statusOrder: Record<string, number> = { open: 0, achieved: 1 };
   const sorted = [...milestones].sort(
     (a, b) => (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1)

@@ -85,12 +85,12 @@ function ProjectCard({
   tasks,
   selected,
   onSelect,
-}: {
+}: Readonly<{
   project: Project;
   tasks: Task[];
   selected: boolean;
   onSelect: () => void;
-}) {
+}>) {
   const status = getProjectStatus(tasks);
   const borderColor = getBorderColor(status);
   const counts = {

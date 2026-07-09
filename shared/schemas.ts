@@ -106,7 +106,7 @@ export const logCostSchema = z.object({
   provider: z.string().min(1),
   input_tokens: z.number().int().nonnegative(),
   output_tokens: z.number().int().nonnegative(),
-  cost_usd: z.number().finite().nonnegative(),
+  cost_usd: z.number().nonnegative(),
   agent_id: z.string().optional(),
   task_id: z.string().optional(),
   milestone_id: z.string().optional(),

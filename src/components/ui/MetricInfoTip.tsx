@@ -4,7 +4,7 @@ interface Props {
   text: string;
 }
 
-export function MetricInfoTip({ text }: Props) {
+export function MetricInfoTip({ text }: Readonly<Props>) {
   const [visible, setVisible] = useState(false);
   const tipId = useId();
 

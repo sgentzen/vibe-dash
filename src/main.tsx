@@ -12,7 +12,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 
 if (import.meta.env.DEV) {
-  import("@axe-core/react").then(({ default: axe }) => {
-    axe(React, ReactDOM, 1000);
-  });
+  const { default: axe } = await import("@axe-core/react");
+  axe(React, ReactDOM, 1000);
 }

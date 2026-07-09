@@ -47,7 +47,7 @@ export function KanbanColumn({
   onClickTask,
   onTaskCreated,
   api,
-}: KanbanColumnProps) {
+}: Readonly<KanbanColumnProps>) {
   const columnRef = useRef<HTMLDivElement | null>(null);
   const setDragOver = (on: boolean) => {
     const el = columnRef.current;

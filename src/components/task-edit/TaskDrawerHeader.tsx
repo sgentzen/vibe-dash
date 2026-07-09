@@ -2,7 +2,7 @@ interface TaskDrawerHeaderProps {
   onClose: () => void;
 }
 
-export function TaskDrawerHeader({ onClose }: TaskDrawerHeaderProps) {
+export function TaskDrawerHeader({ onClose }: Readonly<TaskDrawerHeaderProps>) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <span

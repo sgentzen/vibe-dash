@@ -10,7 +10,7 @@ interface FormSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 /**
  * Themed <select> that uses the shared inputStyle by default.
  */
-export function FormSelect({ id, children, style, ...rest }: FormSelectProps) {
+export function FormSelect({ id, children, style, ...rest }: Readonly<FormSelectProps>) {
   return (
     <select id={id} style={style ?? sharedInputStyle} {...rest}>
       {children}

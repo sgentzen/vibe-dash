@@ -14,7 +14,7 @@ interface CardWrapperProps {
  * Shared dashboard card shell — bg-secondary, 1px border, 8px radius, 16px padding.
  * Optionally renders a section header. Pass `style` to override/extend the base.
  */
-export function CardWrapper({ children, title, style, headerStyle }: CardWrapperProps) {
+export function CardWrapper({ children, title, style, headerStyle }: Readonly<CardWrapperProps>) {
   const merged: CSSProperties = style ? { ...cardStyle, ...style } : cardStyle;
   return (
     <div style={merged}>

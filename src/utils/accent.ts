@@ -9,7 +9,7 @@ export const DEFAULT_ACCENT = "#58a6ff";
  */
 export function sanitizeAccentColor(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const match = raw.match(/^#([0-9a-fA-F]{3,8})$/);
+  const match = /^#([0-9a-fA-F]{3,8})$/.exec(raw);
   return match ? `#${match[1].toLowerCase()}` : null;
 }
 

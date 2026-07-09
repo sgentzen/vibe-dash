@@ -8,7 +8,7 @@ interface SparklineProps {
   style?: CSSProperties;
 }
 
-export function Sparkline({ values, width = 48, height = 14, color = "var(--accent-green)", style }: SparklineProps) {
+export function Sparkline({ values, width = 48, height = 14, color = "var(--accent-green)", style }: Readonly<SparklineProps>) {
   if (values.length < 2) return null;
 
   const max = Math.max(...values);
@@ -54,7 +54,7 @@ export function buildDailyActivityCounts(
   days = 7
 ): number[] {
   const now = Date.now();
-  const counts = Array(days).fill(0);
+  const counts = new Array(days).fill(0);
   for (const ts of timestamps) {
     const age = now - new Date(ts).getTime();
     const dayIndex = Math.floor(age / 86_400_000);
