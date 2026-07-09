@@ -9,7 +9,7 @@ Local-first real-time dashboard for monitoring AI-driven development projects vi
 - **Runtime**: Node.js >=20, ESM (`"type": "module"`)
 - **Backend**: Express 5, better-sqlite3, WebSocket (ws)
 - **Frontend**: React 19, Vite 8, CSS variables (no UI library)
-- **MCP**: @modelcontextprotocol/sdk for tool registration + SSE/stdio transports
+- **MCP**: @modelcontextprotocol/sdk for tool registration + Streamable HTTP/stdio transports
 - **Language**: TypeScript 6 (strict mode, ES2022 target)
 - **Testing**: Vitest with in-memory SQLite (`createTestDb()`)
 - **Validation**: Zod (MCP tool schemas)
@@ -18,7 +18,7 @@ Local-first real-time dashboard for monitoring AI-driven development projects vi
 
 ```
 server/
-  index.ts          # Express app, MCP SSE, WebSocket setup (port 3001)
+  index.ts          # Express app, MCP Streamable HTTP, WebSocket setup (port 3001)
   types.ts          # Shared TypeScript interfaces/types
   websocket.ts      # WebSocket broadcast
   routes/           # REST API — createRouter() composes per-resource route factories

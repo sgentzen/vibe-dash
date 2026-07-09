@@ -28,13 +28,12 @@ Leave this running in a terminal.
 
 ## Step 2: Configure Claude Code to use the MCP server
 
-Three transports are available. Choose based on your setup:
+Two transports are available. Choose based on your setup:
 
 | Transport | When to use |
 |-----------|------------|
 | **Stdio** | Single machine, offline-first. Each agent writes directly to SQLite. |
 | **Streamable HTTP** | Multi-agent or remote. Modern MCP clients. Requires server running. |
-| **SSE (legacy)** | Older MCP clients that don't support Streamable HTTP. |
 
 ### Option A: Stdio (recommended for local use)
 
@@ -83,38 +82,6 @@ Streamable HTTP is the modern MCP transport. All communication goes through the 
 ```
 
 Requires the Vibe Dash server to be running. The server logs `MCP (Streamable HTTP) at http://localhost:3001/mcp` on startup to confirm the endpoint is live.
-
-### Option C: SSE (legacy)
-
-SSE is the older HTTP transport. Use it only if your MCP client does not support Streamable HTTP.
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "url": "http://localhost:3001/sse"
-    }
-  }
-}
-```
-
-Requires the Vibe Dash server to be running.
-
-### Option C: Streamable HTTP
-
-The server also exposes the newer Streamable HTTP transport at `/mcp` for clients that support it.
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "url": "http://localhost:3001/mcp"
-    }
-  }
-}
-```
-
-Requires the Vibe Dash server to be running.
 
 ---
 
@@ -231,6 +198,6 @@ Watch the dashboard — you should see each action appear in real time.
 - Override: set `VIBE_DASH_DB` environment variable (for stdio) or `DB_PATH` (for server)
 - Both the stdio MCP and the server must use the same database file
 
-**SSE connection refused:**
+**Streamable HTTP connection refused:**
 - Make sure the Vibe Dash server is running before starting Claude Code
 - Check port 3001 is not blocked

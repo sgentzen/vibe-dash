@@ -52,13 +52,12 @@ Every agent connects the same way — over **MCP**. Pick your agent, follow its 
 
 > **Maturity:** ✅ **Tested** — verified end-to-end. 🧪 **Preview** — a standard MCP setup that should work, but the Vibe Dash integration hasn't been independently verified (and some clients' MCP support is still stabilizing).
 
-Three MCP transports are available:
+Two MCP transports are available:
 
 | Transport | URL / Command | Best for |
 |-----------|--------------|---------|
 | **Stdio** | `npx tsx /path/to/vibe-dash/server/mcp/stdio.ts` | Single-machine, offline-first |
 | **Streamable HTTP** | `http://localhost:3001/mcp` | Multi-agent, remote, modern clients |
-| **SSE (legacy)** | `http://localhost:3001/sse` | Older MCP clients |
 
 Full setup guide with task import, CLAUDE.md snippets, and troubleshooting: [docs/MCP-SETUP.md](docs/MCP-SETUP.md).
 
@@ -102,7 +101,7 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 └─────────────────┘     └──────────────────┘            ▲
                                ▲                        │
                         ┌──────┴───────────┐     ┌─────┴────────┐
-                        │  HTTP/SSE Agent  │     │  Stdio Agent  │
+                        │  HTTP MCP Agent  │     │  Stdio Agent  │
                         │  (remote MCP)    │     │  (local MCP)  │
                         └──────────────────┘     └──────────────┘
 ```
@@ -110,7 +109,7 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 - **Frontend**: React 19 + TypeScript, Vite, Context API
 - **Backend**: Express 5 + TypeScript, REST + WebSocket
 - **Database**: SQLite via better-sqlite3 (zero config)
-- **MCP**: Stdio, Streamable HTTP, and SSE transports
+- **MCP**: Stdio and Streamable HTTP transports
 
 ---
 

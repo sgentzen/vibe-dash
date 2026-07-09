@@ -19,6 +19,14 @@ import { ProjectContextChip } from "./components/ProjectContextChip";
 import { CommandPalette } from "./components/CommandPalette";
 import { RailDrawers } from "./components/RailDrawers";
 
+/** Human-readable description of a caught value, avoiding "[object Object]". */
+function describeLoadError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err === null || err === undefined) return "unknown error";
+  if (typeof err === "object") return "unknown error";
+  return String(err);
+}
+
 export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
@@ -228,12 +236,7 @@ export function App() {
         }
       }
       if (cancelled) return;
-      const message =
-        lastError instanceof Error
-          ? lastError.message
-          : typeof lastError === "object" && lastError !== null
-            ? "unknown error"
-            : String(lastError ?? "unknown error");
+      const message = describeLoadError(lastError);
       dispatch({ type: "SET_LOAD_ERROR", payload: `Could not load data after ${retries} attempts: ${message}` });
     }
 
