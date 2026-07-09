@@ -52,7 +52,6 @@ Vibe Dash is a single Node.js process. It serves:
 - `/api/*` — REST endpoints for the UI
 - `/ws` — WebSocket for real-time push to browsers
 - `/mcp` — Streamable HTTP MCP transport (agents)
-- `/sse` — Legacy SSE MCP transport
 
 All four entry points share the same SQLite database file.
 
