@@ -60,6 +60,7 @@ try {
   initDb(db);
 } catch (e) {
   console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
+  console.error(e instanceof Error ? e.message : String(e));
   console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
   process.exit(1);
 }
@@ -226,7 +227,9 @@ async function main() {
   }
 }
 
-main().catch((err: Error) => {
-  console.error(`${RED}Error:${RESET} ${err.message}`);
+try {
+  await main();
+} catch (err) {
+  console.error(`${RED}Error:${RESET} ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
-});
+}
