@@ -119,15 +119,15 @@ export function DashboardView() {
       ? selectedMilestoneId
       : firstOpenMilestoneId;
 
-  useEffect(() => {
-    loadChartData(api, effectiveMilestoneId, setDailyStats);
-  }, [api, effectiveMilestoneId, milestoneTaskStatusKey, pollGeneration]);
-
   const reloadCosts = useCallback(async () => {
     setCostError(false);
     const ok = await loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
     if (!ok) setCostError(true);
   }, [api, projectId]);
+
+  useEffect(() => {
+    loadChartData(api, effectiveMilestoneId, setDailyStats);
+  }, [api, effectiveMilestoneId, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {
     reloadCosts();
