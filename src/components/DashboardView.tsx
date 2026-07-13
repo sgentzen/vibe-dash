@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
@@ -9,6 +9,7 @@ import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
 import { TodayCard } from "./dashboard/TodayCard";
+import { GettingStartedChecklist } from "./GettingStartedChecklist";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
@@ -49,7 +50,7 @@ async function loadCostData(
   api: ReturnType<typeof useApi>,
   projectId: string | null,
   setters: CostSetters,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const [summary, ts, byModel, byAgent] = await Promise.all([
       api.getCostSummary(projectId ?? undefined),
@@ -61,8 +62,10 @@ async function loadCostData(
     setters.setCostTimeseries(ts);
     setters.setCostByModel(byModel);
     setters.setCostByAgent(byAgent);
+    return true;
   } catch (e) {
     console.warn("[DashboardView] failed to load cost data", e);
+    return false;
   }
 }
 
@@ -102,6 +105,7 @@ export function DashboardView() {
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
+  const [costError, setCostError] = useState(false);
 
   const projectId = selectedProjectId ?? null;
   const projectMilestones = projectId ? milestones.filter((m) => m.project_id === projectId) : milestones;
@@ -134,9 +138,15 @@ export function DashboardView() {
     loadChartData(api, projectId, firstOpenMilestoneId, { setHeatmap, setDailyStats });
   }, [api, firstOpenMilestoneId, projectId, milestoneTaskStatusKey, pollGeneration]);
 
+  const reloadCosts = useCallback(async () => {
+    setCostError(false);
+    const ok = await loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
+    if (!ok) setCostError(true);
+  }, [api, projectId]);
+
   useEffect(() => {
-    loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
-  }, [api, projectId, milestoneTaskStatusKey, pollGeneration]);
+    reloadCosts();
+  }, [reloadCosts, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {
     api.getAgentComparison().then(setAgentComparison).catch(() => {});
@@ -147,6 +157,8 @@ export function DashboardView() {
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
         Dashboard
       </h2>
+
+      <GettingStartedChecklist />
 
       <div style={{ marginBottom: "var(--space-4)" }}>
         <TodayCard
@@ -206,35 +218,59 @@ export function DashboardView() {
         <OverdueTasksCard tasks={overdueTasks} />
       </div>
 
-      {costSummary && costSummary.entry_count > 0 ? (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-            <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" />
-            <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
-            <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
-            <KpiCard
-              label="Avg Cost/Task"
-              value={doneTaskCount > 0 ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}` : "$0.00"}
-              color="var(--status-success)"
-              tooltip="Total spend divided by number of done tasks. Reflects all-time data, not just the current period."
-            />
-          </div>
+      {(() => {
+        if (costError) {
+          return (
+            <div style={{ ...cardStyle, marginBottom: "var(--space-4)" }}>
+              <div style={headerStyle}>Cost & Token Tracking</div>
+              <div style={{ color: "var(--status-danger)", fontSize: "12px", marginBottom: "8px" }}>
+                Couldn&apos;t load cost data. The dashboard will retry automatically, or retry now.
+              </div>
+              <button
+                onClick={() => reloadCosts()}
+                style={{
+                  background: "transparent", border: "1px solid var(--border)", color: "var(--text-primary)",
+                  padding: "4px 12px", borderRadius: "4px", cursor: "pointer", fontSize: "12px",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          );
+        }
+        if (costSummary && costSummary.entry_count > 0) {
+          return (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" />
+                <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
+                <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
+                <KpiCard
+                  label="Avg Cost/Task"
+                  value={doneTaskCount > 0 ? `$${(costSummary.total_cost_usd / doneTaskCount).toFixed(3)}` : "$0.00"}
+                  color="var(--status-success)"
+                  tooltip="Total spend divided by number of done tasks. Reflects all-time data, not just the current period."
+                />
+              </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-            <CostTimeseriesCard data={costTimeseries} />
-            <CostByModelCard data={costByModel} />
-          </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                <CostTimeseriesCard data={costTimeseries} />
+                <CostByModelCard data={costByModel} />
+              </div>
 
-          <CostByAgentCard data={costByAgent} />
-        </>
-      ) : (
-        <div style={{ ...cardStyle, marginBottom: "var(--space-4)" }}>
-          <div style={headerStyle}>Cost & Token Tracking</div>
-          <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-            No cost data recorded yet. Agents report costs via the <code style={{ color: "var(--accent-blue)" }}>log_cost</code> MCP tool after completing work. Cost cards will appear here once data is available.
+              <CostByAgentCard data={costByAgent} />
+            </>
+          );
+        }
+        return (
+          <div style={{ ...cardStyle, marginBottom: "var(--space-4)" }}>
+            <div style={headerStyle}>Cost & Token Tracking</div>
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+              No cost data recorded yet. Agents report costs via the <code style={{ color: "var(--accent-blue)" }}>log_cost</code> MCP tool after completing work. Cost cards will appear here once data is available.
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
     </div>

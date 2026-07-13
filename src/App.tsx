@@ -17,6 +17,7 @@ import { AlertBanner } from "./components/AlertBanner";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { ProjectContextChip } from "./components/ProjectContextChip";
 import { CommandPalette } from "./components/CommandPalette";
+import { HelpOverlay } from "./components/HelpOverlay";
 import { RailDrawers } from "./components/RailDrawers";
 
 /** Human-readable description of a caught value, avoiding "[object Object]". */
@@ -36,6 +37,7 @@ export function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [drawer, setDrawer] = useState<null | "left" | "right">(null);
   const gKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gKeyPending = useRef(false);
@@ -82,7 +84,14 @@ export function App() {
 
       if (e.key === "Escape") {
         setCommandPaletteOpen(false);
+        setShowHelp(false);
         setDrawer(null);
+        return;
+      }
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowHelp(true);
         return;
       }
 
@@ -272,7 +281,7 @@ export function App() {
   return (
     <div className="app">
       <div ref={headerRef}>
-        <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} searchInputRef={searchInputRef} />
+        <TopBar onCommandPalette={() => setCommandPaletteOpen(true)} onHelp={() => setShowHelp(true)} searchInputRef={searchInputRef} />
       </div>
       <div className={`main-content${rightRailCollapsed ? " rail-collapsed" : ""}`}>
         <RailDrawers
@@ -368,6 +377,7 @@ export function App() {
       {commandPaletteOpen && (
         <CommandPalette onClose={() => setCommandPaletteOpen(false)} />
       )}
+      {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
