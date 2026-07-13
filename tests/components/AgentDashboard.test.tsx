@@ -63,6 +63,14 @@ describe("AgentDashboard", () => {
     expect(screen.getAllByText("No agents registered yet").length).toBeGreaterThan(0);
   });
 
+  it("dashboard scroll region is keyboard-focusable and labelled", () => {
+    const { container } = renderWithProviders(<AgentDashboard />);
+    const region = container.querySelector('[aria-label="Agent dashboard"]')!;
+    expect(region).not.toBeNull();
+    expect(region.getAttribute("tabindex")).toBe("0");
+    expect(region.getAttribute("role")).toBe("region");
+  });
+
   it("folds per-agent Performance metrics into the agent detail view", async () => {
     const agent = makeAgent({ name: "perf-agent" });
     renderWithProviders(<AgentDashboard />, { seed: { agents: [agent] } });

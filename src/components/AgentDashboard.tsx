@@ -112,7 +112,7 @@ export function AgentDashboard() {
   });
 
   return (
-    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+    <div tabIndex={0} role="region" aria-label="Agent dashboard" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
           Agent Dashboard
@@ -333,7 +333,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
   const maxBreakdownLines = Math.max(...breakdown.map((b) => b.avg_lines_added), 1);
 
   return (
-    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+    <div tabIndex={0} role="region" aria-label="Agent detail" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <button onClick={onBack} style={{
         background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
         borderRadius: "6px", padding: "4px 12px", fontSize: "12px", cursor: "pointer", marginBottom: "var(--space-4)",

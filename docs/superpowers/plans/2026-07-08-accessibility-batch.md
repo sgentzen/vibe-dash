@@ -240,8 +240,10 @@ git commit -m "a11y: raise view-toggle and top-bar targets to the 24px minimum"
 
 ## Self-review checklist
 
-- [ ] Exactly one `<main>` in the DOM on every view (Board included — TaskBoard demoted).
-- [ ] Sidebar is `navigation` "Projects"; feed is `complementary` "Agent feed"; no duplicate unlabelled asides.
-- [ ] Every large scroll panel has `tabIndex={0}` + a label; axe scroll-region violation cleared.
-- [ ] Fleet/Board/Feed toggles + palette + appearance buttons measure ≥24px tall.
-- [ ] axe console shows no new landmark/label/target violations across Fleet, Board, Feed.
+- [x] Exactly one `<main>` in the DOM on every view (Board included — TaskBoard demoted). *(verified live: 1 main on Fleet/Board/Feed)*
+- [x] Sidebar is `navigation` "Projects"; feed is `complementary` "Agent feed"; no duplicate unlabelled asides. *(collapsed rail aside also labelled)*
+- [x] Every large scroll panel has `tabIndex={0}` + a label; axe scroll-region violation cleared.
+- [x] Fleet/Board/Feed toggles + palette + appearance buttons measure ≥24px tall. *(measured 24/24/24, palette 25, appearance 26)*
+- [x] axe console shows no new landmark/label/target violations across Fleet, Board, Feed. *(axe-core run against the built app: 0 violations on all three views)*
+
+> **Status: COMPLETE** (2026-07-13). Adapted to post-plan refactors — the center column is now the `<main>` inside `RailDrawers` (App.tsx was restructured around `RailDrawers`), and `ActivityStreamView`/`AgentDashboard` remained the scroll-region owners. 394 tests pass; tsc clean; semgrep 0 findings.

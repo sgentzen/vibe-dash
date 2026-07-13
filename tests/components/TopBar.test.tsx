@@ -69,6 +69,15 @@ describe("TopBar", () => {
     expect(within(header).getByRole("button", { name: "Feed" })).toBeInTheDocument();
   });
 
+  it("view-toggle buttons meet the 24px minimum target height (WCAG 2.5.8)", () => {
+    renderWithProviders(<TopBar />);
+    const header = getHeader();
+    for (const name of ["Fleet", "Board", "Feed"]) {
+      const btn = within(header).getByRole("button", { name });
+      expect(btn.style.minHeight).toBe("24px");
+    }
+  });
+
   it("renders search input", () => {
     renderWithProviders(<TopBar />);
     expect(within(getHeader()).getByRole("textbox", { name: /search/i })).toBeInTheDocument();

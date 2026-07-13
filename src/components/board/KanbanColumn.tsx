@@ -136,6 +136,8 @@ export function KanbanColumn({
 
       <div
         className="panel-scroll"
+        tabIndex={0}
+        aria-label={`${label} column`}
         style={{
           flex: 1,
           padding: "10px",

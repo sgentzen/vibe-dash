@@ -255,6 +255,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
             borderRadius: "6px",
             color: "var(--text-muted)",
             padding: "4px 8px",
+            minHeight: "24px", // WCAG 2.5.8 minimum target size
             fontSize: "11px",
             cursor: "pointer",
             display: "flex",
@@ -305,6 +306,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
             border: "1px solid var(--border)",
             borderRadius: "6px",
             padding: "4px 8px",
+            minHeight: "24px", // WCAG 2.5.8 minimum target size
             cursor: "pointer",
             color: "var(--text-secondary)",
             fontSize: "16px",

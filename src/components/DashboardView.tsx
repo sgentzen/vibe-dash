@@ -153,7 +153,7 @@ export function DashboardView() {
   }, [api, pollGeneration]);
 
   return (
-    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+    <div tabIndex={0} role="region" aria-label="Dashboard" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
         Dashboard
       </h2>

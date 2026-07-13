@@ -294,6 +294,7 @@ export function App() {
           right={
             rightRailCollapsed ? (
               <aside
+                aria-label="Agent feed (collapsed)"
                 style={{
                   background: "var(--bg-secondary)",
                   borderLeft: "1px solid var(--border)",

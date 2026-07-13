@@ -49,6 +49,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
 
   return (
     <aside
+      aria-label="Agent feed"
       className="panel-scroll"
       style={{
         background: "var(--bg-secondary)",
@@ -61,6 +62,9 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
       {/* Active Agents roster — "who's active now" (full timeline lives in the Feed tab) */}
       <div
         className="panel-scroll"
+        tabIndex={0}
+        role="region"
+        aria-label="Agent activity"
         style={{
           padding: "var(--space-3)",
           flex: 1,
