@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // Seed a project before any test so the first-run OnboardingWizard overlay
+  // never blocks the board/agents views on a fresh CI database.
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 30_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 2 : 0,

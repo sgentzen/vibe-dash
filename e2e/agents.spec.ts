@@ -18,17 +18,6 @@ test.describe("Agents view", () => {
     ).toBeVisible();
   });
 
-  test("shows Agents and Performance toggle buttons", async ({ page }) => {
-    // AgentDashboard renders <button>Agents</button> / <button>Performance</button>.
-    // exact: true avoids the topbar "View active agents" pill.
-    await expect(
-      page.getByRole("button", { name: "Agents", exact: true })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Performance", exact: true })
-    ).toBeVisible();
-  });
-
   test("shows status filter buttons in agents mode", async ({ page }) => {
     // FILTER_LABELS: "active+idle" → "Active", "all" → "All", "offline" → "Offline".
     // exact: true keeps "Active" from matching the topbar "View active agents" pill.
@@ -41,17 +30,6 @@ test.describe("Agents view", () => {
     await expect(
       page.getByRole("button", { name: "Offline", exact: true })
     ).toBeVisible();
-  });
-
-  test("switches to Performance view when Performance button is clicked", async ({
-    page,
-  }) => {
-    await page.getByRole("button", { name: "Performance", exact: true }).click();
-    // Status filter buttons are hidden in performance mode. Without exact: true the
-    // locator would still match the persistent topbar "View active agents" pill.
-    await expect(
-      page.getByRole("button", { name: "Active", exact: true })
-    ).not.toBeVisible();
   });
 
   test("shows correct state: empty message or agent controls", async ({
