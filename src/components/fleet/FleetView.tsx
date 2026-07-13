@@ -1,7 +1,6 @@
 import { useNavigationState, useAppDispatch } from "../../store";
 import { DashboardView } from "../DashboardView";
 import { AgentDashboard } from "../AgentDashboard";
-import { WorktreeView } from "../WorktreeView";
 import { PresetSwitcher } from "./PresetSwitcher";
 
 export function FleetView() {
@@ -15,14 +14,7 @@ export function FleetView() {
         onChange={(p) => dispatch({ type: "SET_FLEET_PRESET", payload: p })}
       />
       <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
-        {fleetPreset === "overview" ? (
-          <DashboardView />
-        ) : (
-          <>
-            <AgentDashboard />
-            <WorktreeView />
-          </>
-        )}
+        {fleetPreset === "overview" ? <DashboardView /> : <AgentDashboard />}
       </div>
     </div>
   );

@@ -94,17 +94,6 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
     }
     case "daily_stats_recorded":
       return state;
-    case "worktree_created": {
-      const wt = event.payload;
-      return { ...state, worktrees: [wt, ...state.worktrees] };
-    }
-    case "worktree_updated": {
-      const updated = event.payload;
-      return {
-        ...state,
-        worktrees: state.worktrees.map((w) => (w.id === updated.id ? updated : w)),
-      };
-    }
     case "dependency_removed": {
       const dep = event.payload;
       const deps = state.taskDepsMap[dep.task_id] ?? [];

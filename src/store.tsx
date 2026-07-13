@@ -11,7 +11,7 @@ export type { Theme, ActiveView, FleetPreset, SearchScope } from "./state/types"
 export type DataState = Pick<
   AppState,
   "projects" | "milestones" | "tasks" | "agents" | "activity" | "blockers" |
-  "taskDepsMap" | "worktrees" | "stats"
+  "taskDepsMap" | "stats"
 >;
 
 export type NavigationState = Pick<
@@ -46,7 +46,6 @@ const initialState: AppState = {
   blockers: [],
   taskDepsMap: {},
   fileConflicts: [],
-  worktrees: [],
   searchQuery: "",
   searchScope: getInitialSearchScope(),
   activeView: "fleet",
@@ -80,13 +79,12 @@ export function AppProvider({ children }: Readonly<{ children: React.ReactNode }
       activity: state.activity,
       blockers: state.blockers,
       taskDepsMap: state.taskDepsMap,
-      worktrees: state.worktrees,
       stats: state.stats,
     }),
     [
       state.projects, state.milestones, state.tasks, state.agents, state.activity,
       state.blockers, state.taskDepsMap,
-      state.worktrees, state.stats,
+      state.stats,
     ]
   );
 
