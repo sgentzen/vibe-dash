@@ -371,8 +371,10 @@ git commit -m "feat(dashboard): add milestone selector to progress chart"
 
 ## Self-review checklist
 
-- [ ] No `<svg>` sparkline renders in the KPI row; `computeActivityLast7` fully removed with no dangling importers.
-- [ ] `KpiCard` prop type no longer has `sparkline`; all callers updated; `tsc --noEmit` clean.
-- [ ] Milestone bars are proportionally positioned; single/empty date inputs don't throw.
-- [ ] Selector appears only with ≥2 open milestones; changing it refetches + redraws.
-- [ ] All new labels ≥11px.
+- [x] No `<svg>` sparkline renders in the KPI row; `computeActivityLast7` fully removed with no dangling importers. *(verified live: 0 KPI SVGs)*
+- [x] `KpiCard` prop type no longer has `sparkline`; all callers updated; `tsc --noEmit` clean.
+- [x] Milestone bars are proportionally positioned; single/empty date inputs don't throw. *(35 bars, 5 distinct gap sizes, span 0→96%; unit-tested guards)*
+- [x] Selector appears only with ≥2 open milestones; changing it refetches + redraws. *(17-option selector; verified refetch on change)*
+- [x] All new labels ≥11px. *(axis labels measured 11px)*
+
+> **Status: COMPLETE** (2026-07-13). Deviation from plan: `heatmap` state was assumed to remain for `ActivityHeatmapCard`, but that card was removed in an earlier commit (a64ed4c), leaving `heatmap` write-only. Removed the dead `heatmap` state + `getActivityHeatmap` fetch and simplified `loadChartData` to `(api, milestoneId, setDailyStats)`. 402 tests pass; tsc clean; semgrep 0; jscpd 0.
