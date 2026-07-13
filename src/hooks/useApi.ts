@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, TaskWorktree, WorktreeStatus } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "../types";
 
 function jsonHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -392,24 +392,6 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
   return res.json();
 }
 
-// ─── Worktrees ────────────────────────────────────────────────────────
-
-async function getWorktrees(): Promise<TaskWorktree[]> {
-  const res = await apiFetch("/api/worktrees");
-  if (!res.ok) await throwApiError(res, "getWorktrees");
-  return res.json();
-}
-
-async function updateWorktreeStatus(id: string, status: WorktreeStatus): Promise<TaskWorktree> {
-  const res = await apiFetch(`/api/worktrees/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: jsonHeaders(),
-    body: JSON.stringify({ status }),
-  });
-  if (!res.ok) await throwApiError(res, "updateWorktreeStatus");
-  return res.json();
-}
-
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -448,7 +430,5 @@ export function useApi() {
     getAgentPerformance,
     getAgentComparison,
     getTaskTypeBreakdown,
-    getWorktrees,
-    updateWorktreeStatus,
   }), []);
 }

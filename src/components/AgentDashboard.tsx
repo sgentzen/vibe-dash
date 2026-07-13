@@ -3,8 +3,7 @@ import { useAppState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { agentColor, ROLE_COLORS, groupAgents, healthStatusColor } from "../utils/agentColors";
 import { cardStyle, typeScale } from "../styles/shared.js";
-import AgentComparisonView from "./AgentComparisonView";
-import type { Agent, ActivityEntry, AgentSession } from "../types";
+import type { Agent, ActivityEntry, AgentSession, AgentPerformance, TaskTypeBreakdown } from "../types";
 
 interface AgentDetail {
   agent: Agent;
@@ -15,7 +14,6 @@ interface AgentDetail {
   sessions: AgentSession[];
 }
 
-type DashboardView = "agents" | "performance";
 type StatusFilter = "active+idle" | "all" | "offline";
 
 const FILTER_LABELS: Record<StatusFilter, string> = {
@@ -24,13 +22,18 @@ const FILTER_LABELS: Record<StatusFilter, string> = {
   offline: "Offline",
 };
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  return `${(seconds / 3600).toFixed(1)}h`;
+}
+
 export function AgentDashboard() {
   const { agents, searchQuery, searchScope } = useAppState();
   const api = useApi();
   const [details, setDetails] = useState<Record<string, AgentDetail>>({});
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active+idle");
-  const [dashboardView, setDashboardView] = useState<DashboardView>("agents");
 
   useEffect(() => {
     async function loadDetails() {
@@ -108,39 +111,6 @@ export function AgentDashboard() {
     return (statusOrder[aStatus] ?? 2) - (statusOrder[bStatus] ?? 2);
   });
 
-  if (dashboardView === "performance") {
-    return (
-      <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-          <h2 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, margin: 0 }}>
-            Agent Dashboard
-          </h2>
-          <div style={{ display: "flex", gap: "4px" }}>
-            {(["agents", "performance"] as DashboardView[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => setDashboardView(v)}
-                style={{
-                  background: dashboardView === v ? "var(--accent-blue)" : "transparent",
-                  border: `1px solid ${dashboardView === v ? "var(--accent-blue)" : "var(--border)"}`,
-                  color: dashboardView === v ? "var(--text-on-accent)" : "var(--text-muted)",
-                  borderRadius: "4px",
-                  padding: "2px 8px",
-                  fontSize: "11px",
-                  cursor: "pointer",
-                  textTransform: "capitalize",
-                }}
-              >
-                {v.charAt(0).toUpperCase() + v.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <AgentComparisonView />
-      </div>
-    );
-  }
-
   return (
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
@@ -148,24 +118,6 @@ export function AgentDashboard() {
           Agent Dashboard
         </h2>
         <div style={{ display: "flex", gap: "4px" }}>
-          {(["agents", "performance"] as DashboardView[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setDashboardView(v)}
-              style={{
-                background: dashboardView === v ? "var(--accent-blue)" : "transparent",
-                border: `1px solid ${dashboardView === v ? "var(--accent-blue)" : "var(--border)"}`,
-                color: dashboardView === v ? "var(--text-on-accent)" : "var(--text-muted)",
-                borderRadius: "4px",
-                padding: "2px 8px",
-                fontSize: "11px",
-                cursor: "pointer",
-                textTransform: "capitalize",
-              }}
-            >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
           {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((f) => (
             <button
               key={f}
@@ -344,12 +296,41 @@ function AgentCard({ agent, detail, onClick }: Readonly<{ agent: Agent; detail?:
   );
 }
 
+function PerfStat({ label, value }: Readonly<{ label: string; value: string | number }>) {
+  return (
+    <div style={{ textAlign: "center", flex: 1, minWidth: 70 }}>
+      <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>{value}</div>
+      <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+    </div>
+  );
+}
+
 function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onBack: () => void }>) {
   const { agent, health_status, completed_today, current_task_title, activity, sessions } = detail;
   const color = agentColor(agent.name);
   const role = agent.role ?? "agent";
   const roleColor = ROLE_COLORS[role];
   const healthColor = healthStatusColor(health_status);
+
+  const api = useApi();
+  const [perf, setPerf] = useState<AgentPerformance | null>(null);
+  const [breakdown, setBreakdown] = useState<TaskTypeBreakdown[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [p, bd] = await Promise.all([
+          api.getAgentPerformance(agent.id),
+          api.getTaskTypeBreakdown(agent.id),
+        ]);
+        if (!cancelled) { setPerf(p); setBreakdown(bd); }
+      } catch { /* no completion metrics recorded for this agent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [api, agent.id]);
+
+  const maxBreakdownLines = Math.max(...breakdown.map((b) => b.avg_lines_added), 1);
 
   return (
     <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
@@ -398,6 +379,37 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
         <div style={{ ...cardStyle, padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>Currently working on</div>
           <div style={{ color: "var(--text-primary)", fontSize: "14px" }}>{current_task_title}</div>
+        </div>
+      )}
+
+      {/* Performance metrics (folded in from the former Performance tab) */}
+      {perf && perf.tasks_completed > 0 && (
+        <div style={{ marginBottom: "var(--space-5)" }}>
+          <h3 style={{ color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>Performance</h3>
+          <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              <PerfStat label="Tasks" value={perf.tasks_completed} />
+              <PerfStat label="Lines +" value={perf.total_lines_added.toLocaleString()} />
+              <PerfStat label="Lines -" value={perf.total_lines_removed.toLocaleString()} />
+              <PerfStat label="Files" value={perf.total_files_changed} />
+              <PerfStat label="Tests" value={perf.total_tests_added} />
+              <PerfStat label="Avg Time" value={formatDuration(perf.avg_duration_seconds)} />
+            </div>
+            {breakdown.length > 0 && (
+              <div>
+                <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase" }}>By Priority</div>
+                {breakdown.map((b) => (
+                  <div key={b.priority} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: "11px", width: 55, color: "var(--text-secondary)" }}>{b.priority}</span>
+                    <div style={{ flex: 1, height: 6, background: "var(--bg-tertiary)", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${(b.avg_lines_added / maxBreakdownLines) * 100}%`, height: "100%", background: color, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: "10px", color: "var(--text-muted)", width: 30, textAlign: "right" }}>{b.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

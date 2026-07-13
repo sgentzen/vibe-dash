@@ -58,14 +58,6 @@ export function usePolling() {
         );
       }
 
-      // Worktrees needed when the agents preset is showing them (stdio MCP writes
-      // bypass WebSocket, so polling is the only path that reflects worktree CRUD).
-      if (view === "fleet" && preset === "agents") {
-        promises.push(
-          api.getWorktrees().then((v) => dispatch({ type: "SET_WORKTREES", payload: v })),
-        );
-      }
-
       const results = await Promise.allSettled(promises);
       const failures = results.filter((r) => r.status === "rejected");
       if (failures.length > 0) {

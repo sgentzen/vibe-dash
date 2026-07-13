@@ -5,7 +5,6 @@ import type {
   Agent,
   ActivityEntry,
   Blocker,
-  TaskWorktree,
   WsEvent,
 } from "../types";
 
@@ -26,7 +25,6 @@ export interface AppState {
   blockers: Blocker[];
   taskDepsMap: Record<string, string[]>;
   fileConflicts: unknown[];
-  worktrees: TaskWorktree[];
   searchQuery: string;
   searchScope: SearchScope;
   activeView: ActiveView;
@@ -59,7 +57,6 @@ export type AppAction =
   | { type: "SET_SEARCH_SCOPE"; payload: SearchScope }
   | { type: "SET_ACTIVE_VIEW"; payload: ActiveView }
   | { type: "SET_FLEET_PRESET"; payload: FleetPreset }
-  | { type: "SET_WORKTREES"; payload: TaskWorktree[] }
   | { type: "SET_STATS"; payload: AppState["stats"] }
   | { type: "SELECT_PROJECT"; payload: string | null }
   | { type: "SELECT_MILESTONE"; payload: string | null }

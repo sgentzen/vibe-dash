@@ -177,10 +177,9 @@ export function App() {
       ]);
       if (cancelled) return;
 
-      const [allMilestones, allDeps, worktrees] = await Promise.all([
+      const [allMilestones, allDeps] = await Promise.all([
         Promise.all(projects.map((p) => api.getMilestones(p.id))).then((r) => r.flat()),
         Promise.all(projects.map((p) => api.getProjectTaskDependencies(p.id))).then((r) => r.flat()),
-        api.getWorktrees(),
       ]);
       if (cancelled) return;
 
@@ -200,7 +199,6 @@ export function App() {
       dispatch({ type: "SET_ACTIVITY", payload: activity });
       dispatch({ type: "SET_BLOCKERS", payload: blockerList });
       dispatch({ type: "SET_TASK_DEPS_MAP", payload: depsMap });
-      dispatch({ type: "SET_WORKTREES", payload: worktrees });
       dispatch({ type: "SET_LOAD_ERROR", payload: null });
 
       if (projects.length === 0) setShowOnboarding(true);
