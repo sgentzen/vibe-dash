@@ -8,10 +8,14 @@ import { AddProjectControl } from "./topbar/AddProjectControl";
 
 interface TopBarProps {
   onCommandPalette?: () => void;
+  onHelp?: () => void;
   searchInputRef?: RefObject<HTMLInputElement | null>;
 }
 
-export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
+// Where each mismatchable search scope's results actually live, for the quick-fix.
+const SCOPE_FIX_LABEL: Record<string, string> = { tasks: "Board", agents: "Agents" };
+
+export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps = {}) {
   const { stats } = useDataState();
   const { theme, activeView, searchQuery, searchScope } = useNavigationState();
   const dispatch = useAppDispatch();
@@ -52,10 +56,11 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
     dispatch({ type: "WS_EVENT", payload: { type: "project_created", payload: project } });
   }
 
-  // Determine if search scope matches the active view's domain
+  // Determine if the search scope's results are visible from the active view.
+  // "projects"/"all" results always show in the always-visible sidebar, so only
+  // task and agent scopes can be genuinely out of view.
   const scopeMismatch =
     (searchScope === "tasks" && activeView !== "board") ||
-    (searchScope === "projects" && activeView !== "fleet") ||
     (searchScope === "agents" && activeView !== "fleet");
 
   const scopeHintLabel: Record<SearchScope, string> = {
@@ -64,6 +69,16 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
     agents: "agents",
     all: "everything",
   };
+
+  // Jump to the view where the current search scope's results are shown.
+  function handleScopeFix() {
+    if (searchScope === "tasks") {
+      dispatch({ type: "SET_ACTIVE_VIEW", payload: "board" });
+      return;
+    }
+    dispatch({ type: "SET_ACTIVE_VIEW", payload: "fleet" });
+    if (searchScope === "agents") dispatch({ type: "SET_FLEET_PRESET", payload: "agents" });
+  }
 
   return (
     <header
@@ -208,6 +223,26 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
         </kbd>
       </div>
 
+      {/* Scope-mismatch quick-fix: jump to the view that shows this scope's results */}
+      {scopeMismatch && (
+        <button
+          onClick={handleScopeFix}
+          title={`${scopeHintLabel[searchScope]} appear in ${SCOPE_FIX_LABEL[searchScope]}`}
+          style={{
+            background: "transparent",
+            border: "1px solid var(--accent-blue)",
+            borderRadius: "6px",
+            color: "var(--accent-blue)",
+            padding: "4px 8px",
+            fontSize: "11px",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Show in {SCOPE_FIX_LABEL[searchScope]}
+        </button>
+      )}
+
       {/* Command palette trigger */}
       {onCommandPalette && (
         <button
@@ -229,6 +264,30 @@ export function TopBar({ onCommandPalette, searchInputRef }: TopBarProps = {}) {
           }}
         >
           <span style={{ fontSize: "12px" }}>⌘⇧K</span>
+        </button>
+      )}
+
+      {/* Keyboard shortcuts / help */}
+      {onHelp && (
+        <button
+          onClick={onHelp}
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            color: "var(--text-muted)",
+            width: "28px",
+            height: "28px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "13px",
+          }}
+        >
+          ?
         </button>
       )}
 
