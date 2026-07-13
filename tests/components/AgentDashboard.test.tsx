@@ -63,12 +63,14 @@ describe("AgentDashboard", () => {
     expect(screen.getAllByText("No agents registered yet").length).toBeGreaterThan(0);
   });
 
-  it("dashboard scroll region is keyboard-focusable and labelled", () => {
+  it("dashboard scroll region is keyboard-focusable and a labelled region landmark", () => {
     const { container } = renderWithProviders(<AgentDashboard />);
     const region = container.querySelector('[aria-label="Agent dashboard"]')!;
     expect(region).not.toBeNull();
     expect(region.getAttribute("tabindex")).toBe("0");
-    expect(region.getAttribute("role")).toBe("region");
+    // Native <section> with an accessible name is a region landmark (no explicit role).
+    expect(region.tagName.toLowerCase()).toBe("section");
+    expect(screen.getByRole("region", { name: "Agent dashboard" })).toBe(region);
   });
 
   it("folds per-agent Performance metrics into the agent detail view", async () => {

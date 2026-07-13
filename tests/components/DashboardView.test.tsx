@@ -32,7 +32,7 @@ describe("DashboardView", () => {
     // Let the async chart/cost effects settle.
     await waitFor(() => {
       // Sparkline was the only inline <svg> the KPI row emitted.
-      expect(container.querySelectorAll("svg").length).toBe(0);
+      expect(container.querySelectorAll("svg")).toHaveLength(0);
     });
   });
 });
