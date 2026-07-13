@@ -7,7 +7,6 @@ import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
-import { ActivityHeatmapCard } from "./dashboard/ActivityCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
 import { TodayCard } from "./dashboard/TodayCard";
 
@@ -200,10 +199,6 @@ export function DashboardView() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <MilestoneProgressCard dailyStats={dailyStats} openMilestones={openMilestones} />
         <MilestoneOverviewCard openMilestones={openMilestones} projectTasks={projectTasks} />
-      </div>
-
-      <div style={{ marginBottom: "var(--space-4)" }}>
-        <ActivityHeatmapCard heatmap={heatmap} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>

@@ -14,7 +14,6 @@ function feedNameColor(isActive: boolean, activeColor: string, health: AgentHeal
 // Keep in sync with server/db.ts ACTIVE_THRESHOLD_MS / IDLE_THRESHOLD_MS
 const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
-const EVENT_AGE_OUT_MS = 10 * 60 * 1000; // 10 minutes
 
 function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
   const elapsed = Date.now() - new Date(lastSeenAt).getTime();
@@ -25,7 +24,7 @@ function getHealthStatus(lastSeenAt: string): AgentHealthStatus {
 
 
 export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) {
-  const { agents, activity } = useAppState();
+  const { agents } = useAppState();
   const groups = groupAgents(agents);
   const [showOffline, setShowOffline] = useState(false);
 
@@ -48,11 +47,6 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
     (n, g) => n + 1 + g.children.length, 0
   );
 
-  const now = Date.now();
-  const recentActivity = activity.filter(
-    (e) => now - new Date(e.timestamp).getTime() < EVENT_AGE_OUT_MS
-  ).slice(0, 30);
-
   return (
     <aside
       className="panel-scroll"
@@ -64,12 +58,13 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
         overflow: "hidden",
       }}
     >
-      {/* Active Agents section */}
+      {/* Active Agents roster — "who's active now" (full timeline lives in the Feed tab) */}
       <div
+        className="panel-scroll"
         style={{
           padding: "var(--space-3)",
-          borderBottom: "1px solid var(--border)",
-          flexShrink: 0,
+          flex: 1,
+          overflowY: "auto",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
@@ -189,91 +184,6 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
             )}
           </div>
         )}
-      </div>
-
-      {/* Recent Events section */}
-      <div
-        style={{
-          flex: 1,
-          padding: "var(--space-3)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            color: "var(--text-muted)",
-            fontSize: "11px",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            marginBottom: "var(--space-2)",
-            flexShrink: 0,
-          }}
-        >
-          Recent Events
-        </div>
-
-        <div className="panel-scroll" style={{ flex: 1 }}>
-          {recentActivity.length === 0 ? (
-            <div
-              style={{
-                color: "var(--text-muted)",
-                fontSize: "12px",
-                fontStyle: "italic",
-              }}
-            >
-              No recent events
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-              {recentActivity.map((entry) => {
-                const entryColor = entry.agent_name ? agentColor(entry.agent_name) : null;
-                return (
-                  <div key={entry.id} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                    <div
-                      style={{
-                        width: "6px",
-                        height: "6px",
-                        borderRadius: "50%",
-                        background: entryColor ?? "var(--border)",
-                        flexShrink: 0,
-                        marginTop: "5px",
-                      }}
-                    />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      {entry.agent_name && (
-                        <div
-                          style={{
-                            color: entryColor ?? "var(--text-muted)",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            marginBottom: "1px",
-                          }}
-                        >
-                          {entry.agent_name}
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          color: "var(--text-primary)",
-                          fontSize: "12px",
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {entry.message}
-                      </div>
-                      <div style={{ color: "var(--text-muted)", fontSize: "10px", marginTop: "2px" }}>
-                        {relativeTime(entry.timestamp)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
     </aside>
   );
