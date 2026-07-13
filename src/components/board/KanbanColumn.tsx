@@ -136,6 +136,7 @@ export function KanbanColumn({
 
       <div
         className="panel-scroll"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
         tabIndex={0}
         aria-label={`${label} column`}
         style={{

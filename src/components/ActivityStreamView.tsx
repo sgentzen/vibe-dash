@@ -76,6 +76,7 @@ export function ActivityStreamView() {
   const selectStyle: React.CSSProperties = { ...inputStyle, width: "auto", borderRadius: "4px", padding: "4px 8px", fontSize: "12px" };
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
     <div tabIndex={0} role="region" aria-label="Activity feed" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-3) 0" }}>
         Activity Stream

@@ -62,6 +62,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
       {/* Active Agents roster — "who's active now" (full timeline lives in the Feed tab) */}
       <div
         className="panel-scroll"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
         tabIndex={0}
         role="region"
         aria-label="Agent activity"

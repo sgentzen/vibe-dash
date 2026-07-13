@@ -22,13 +22,13 @@ export function CardWrapper({ children, title, action, style, headerStyle }: Rea
   return (
     <div style={merged}>
       {title !== undefined && (
-        action !== undefined ? (
+        action === undefined ? (
+          <div style={resolvedHeaderStyle}>{title}</div>
+        ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)" }}>
             <div style={resolvedHeaderStyle}>{title}</div>
             {action}
           </div>
-        ) : (
-          <div style={resolvedHeaderStyle}>{title}</div>
         )
       )}
       {children}

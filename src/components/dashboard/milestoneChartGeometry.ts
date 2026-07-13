@@ -13,7 +13,7 @@ export function computeBarLayout(dates: string[], opts?: { minPct?: number }): B
   const barW = opts?.minPct ?? 4; // visual width of each bar, in % of the axis
   const times = dates.map((d) => new Date(d).getTime());
   const first = times[0];
-  const last = times[times.length - 1];
+  const last = times.at(-1) ?? first; // length>0 guaranteed above; ?? narrows to number
   const span = last - first || 1; // 1ms avoids /0 for a single date
   return dates.map((date, i) => {
     const frac = (times[i] - first) / span; // 0..1

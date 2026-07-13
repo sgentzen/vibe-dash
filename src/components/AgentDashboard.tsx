@@ -112,6 +112,7 @@ export function AgentDashboard() {
   });
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
     <div tabIndex={0} role="region" aria-label="Agent dashboard" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
@@ -333,6 +334,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
   const maxBreakdownLines = Math.max(...breakdown.map((b) => b.avg_lines_added), 1);
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
     <div tabIndex={0} role="region" aria-label="Agent detail" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <button onClick={onBack} style={{
         background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",

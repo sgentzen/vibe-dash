@@ -53,6 +53,7 @@ const kbdStyle: React.CSSProperties = {
 export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
   return (
     <FocusTrap focusTrapOptions={{ escapeDeactivates: true, onDeactivate: onClose, clickOutsideDeactivates: true, tabbableOptions: { displayCheck: "none" } }}>
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop click-to-dismiss; Escape is handled by FocusTrap's escapeDeactivates */}
       <div
         role="dialog"
         aria-modal="true"

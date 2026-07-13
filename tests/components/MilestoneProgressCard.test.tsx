@@ -66,7 +66,7 @@ describe("MilestoneProgressCard", () => {
     const bars = [...container.querySelectorAll('div[style*="position: absolute"]')] as HTMLElement[];
     expect(bars).toHaveLength(3);
     // The 2-day gap bar sits far closer to the first than to the last.
-    const left = (el: HTMLElement) => parseFloat(el.style.left);
+    const left = (el: HTMLElement) => Number.parseFloat(el.style.left);
     expect(left(bars[1])).toBeLessThan(5);
     expect(left(bars[2])).toBeGreaterThan(90);
   });

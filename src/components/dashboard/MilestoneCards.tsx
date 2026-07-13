@@ -54,7 +54,12 @@ export const MilestoneProgressCard = memo(function MilestoneProgressCard({
     </select>
   ) : undefined;
 
-  const title = openMilestones.length > 1 ? "Milestone Progress" : `Milestone Progress ${selectedName ? `(${selectedName})` : ""}`;
+  // With multiple open milestones the selector disambiguates; with one (or none)
+  // the title names it inline.
+  let title = "Milestone Progress";
+  if (openMilestones.length <= 1 && selectedName) {
+    title = `Milestone Progress (${selectedName})`;
+  }
 
   return (
     <CardWrapper title={title} action={selector}>
@@ -90,7 +95,7 @@ export const MilestoneProgressCard = memo(function MilestoneProgressCard({
               {/* First / last date labels mark the true axis extent. */}
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-1)" }}>
                 <span style={axisLabelStyle}>{dailyStats[0]?.date.slice(5)}</span>
-                <span style={axisLabelStyle}>{dailyStats[dailyStats.length - 1]?.date.slice(5)}</span>
+                <span style={axisLabelStyle}>{dailyStats.at(-1)?.date.slice(5)}</span>
               </div>
             </div>
           );
