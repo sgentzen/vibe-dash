@@ -5,6 +5,7 @@ import { ACCENT_STORAGE_KEY, DEFAULT_ACCENT, readStoredAccentColor, sanitizeAcce
 import { StatPill } from "./topbar/StatPill";
 import { ViewToggle } from "./topbar/ViewToggle";
 import { AddProjectControl } from "./topbar/AddProjectControl";
+import { Icon } from "./icons/Icon";
 
 interface TopBarProps {
   onCommandPalette?: () => void;
@@ -21,6 +22,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
   const dispatch = useAppDispatch();
   const api = useApi();
   const [showAppearance, setShowAppearance] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const appearanceRef = useRef<HTMLDivElement>(null);
 
   // Initial accent color from localStorage (validated; default when unset/invalid)
@@ -99,10 +101,11 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
         zIndex: 300,
       }}
     >
-      {/* Logo */}
+      {/* Logo — accent-blue (tracks the user's custom accent); danger-red is
+          reserved for alerts, so the wordmark must not claim it. */}
       <span
         style={{
-          color: "var(--accent-red)",
+          color: "var(--accent-blue)",
           fontWeight: 700,
           fontSize: "16px",
           letterSpacing: "0.1em",
@@ -143,6 +146,18 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
           label="ALERTS"
           value={stats.alerts}
           color="var(--status-warning)"
+          onClick={() => {
+            // Surface the alert banner if one is showing; pulse it into view.
+            const banner = document.querySelector<HTMLElement>('[role="alert"]');
+            if (banner) {
+              banner.scrollIntoView({ behavior: "smooth", block: "center" });
+              banner.classList.add("highlight-pulse");
+              setTimeout(() => banner.classList.remove("highlight-pulse"), 800);
+            } else {
+              // No active banner — take the user to the board where blockers live.
+              dispatch({ type: "SET_ACTIVE_VIEW", payload: "board" });
+            }
+          }}
         />
         <StatPill
           label="TASKS"
@@ -188,6 +203,8 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
           onChange={(e) => dispatch({ type: "SET_SEARCH_QUERY", payload: e.target.value })}
           placeholder={scopeMismatch ? `Searching ${scopeHintLabel[searchScope]}…` : "Search…"}
           aria-label="Search"
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
           style={{
             background: "var(--bg-tertiary)",
             border: "1px solid var(--border)",
@@ -196,7 +213,8 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
             color: "var(--text-primary)",
             padding: "4px 8px",
             fontSize: "13px",
-            width: "140px",
+            width: searchFocused ? "240px" : "140px",
+            transition: "width 0.15s ease-out",
             height: "28px",
             opacity: scopeMismatch && searchQuery === "" ? 0.6 : 1,
           }}
@@ -255,6 +273,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
             borderRadius: "6px",
             color: "var(--text-muted)",
             padding: "4px 8px",
+            minHeight: "24px", // WCAG 2.5.8 minimum target size
             fontSize: "11px",
             cursor: "pointer",
             display: "flex",
@@ -305,6 +324,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
             border: "1px solid var(--border)",
             borderRadius: "6px",
             padding: "4px 8px",
+            minHeight: "24px", // WCAG 2.5.8 minimum target size
             cursor: "pointer",
             color: "var(--text-secondary)",
             fontSize: "16px",
@@ -313,7 +333,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
             alignItems: "center",
           }}
         >
-          🎨
+          <Icon name="palette" size={16} />
         </button>
         {showAppearance && (
           <div
@@ -351,9 +371,13 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
                       fontSize: "12px",
                       cursor: "pointer",
                       textTransform: "capitalize",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
                     }}
                   >
-                    {t === "light" ? "☀️ Light" : "🌙 Dark"}
+                    {t === "light" ? <Icon name="sun" size={14} /> : <Icon name="moon" size={14} />}
+                    {t === "light" ? "Light" : "Dark"}
                   </button>
                 ))}
               </div>

@@ -76,7 +76,8 @@ export function ActivityStreamView() {
   const selectStyle: React.CSSProperties = { ...inputStyle, width: "auto", borderRadius: "4px", padding: "4px 8px", fontSize: "12px" };
 
   return (
-    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
+    <section tabIndex={0} aria-label="Activity feed" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-3) 0" }}>
         Activity Stream
       </h2>
@@ -100,7 +101,7 @@ export function ActivityStreamView() {
             onChange={(e) => setShowSince(e.target.checked)}
           />
           Since last visit
-          {lastVisit && <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>({new Date(lastVisit).toLocaleString()})</span>}
+          {lastVisit && <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>({new Date(lastVisit).toLocaleString()})</span>}
         </label>
 
         <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
@@ -129,20 +130,20 @@ export function ActivityStreamView() {
                   padding: "6px 0", borderBottom: "1px solid var(--border)",
                   display: "flex", gap: "8px", fontSize: "12px",
                 }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "10px", minWidth: "60px", flexShrink: 0 }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "11px", minWidth: "60px", flexShrink: 0 }}>
                     {new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
                   <span style={{ color: "var(--accent-blue)", fontWeight: 500, minWidth: "80px", flexShrink: 0 }}>
                     {entry.agent_name ?? "System"}
                     {entry.parent_agent_name && (
-                      <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: "10px" }}>
+                      <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: "11px" }}>
                         {" "}&rarr; {entry.parent_agent_name}
                       </span>
                     )}
                   </span>
                   {entry.project_name && (
                     <span style={{
-                      fontSize: "10px", padding: "0 4px", borderRadius: "3px",
+                      fontSize: "11px", padding: "0 4px", borderRadius: "3px",
                       background: "rgba(139, 92, 246, 0.1)", color: "var(--accent-purple)",
                       alignSelf: "center", flexShrink: 0, lineHeight: "16px",
                     }}>
@@ -153,7 +154,7 @@ export function ActivityStreamView() {
                     {entry.message}
                   </span>
                   {entry.task_title && (
-                    <span style={{ color: "var(--text-muted)", fontSize: "10px", flexShrink: 0 }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: "11px", flexShrink: 0 }}>
                       on {entry.task_title}
                     </span>
                   )}
@@ -163,6 +164,6 @@ export function ActivityStreamView() {
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

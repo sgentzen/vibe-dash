@@ -241,7 +241,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           {task.due_date && !dueUrgency && !isDone && (
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 padding: "1px 6px",
                 borderRadius: "4px",
                 color: "var(--text-muted)",
@@ -256,7 +256,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
           {task.estimate != null && (
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 padding: "1px 6px",
                 borderRadius: "4px",
                 background: "rgba(99,102,241,0.1)",
@@ -297,7 +297,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
               gap: "4px",
             }}
           >
-            <span style={{ fontSize: "9px" }}>{expanded ? "\u25BC" : "\u25B6"}</span>
+            <span style={{ fontSize: "11px" }}>{expanded ? "\u25BC" : "\u25B6"}</span>
             {childDone}/{childTasks.length} sub-tasks
           </button>
 
@@ -351,7 +351,7 @@ function SubTaskRow({ task }: Readonly<{ task: Task }>) {
         opacity: isDone ? 0.6 : 1,
       }}
     >
-      <span style={{ flexShrink: 0, fontSize: "9px" }}>{icon}</span>
+      <span style={{ flexShrink: 0, fontSize: "11px" }}>{icon}</span>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {task.title}
       </span>

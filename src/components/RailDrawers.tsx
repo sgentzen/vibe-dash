@@ -53,7 +53,7 @@ export function RailDrawers({
         {left}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
+      <main aria-label="Main content" style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
         {/* edge toggles — only rendered/visible under 1024px via .rail-toggle */}
         <div
           style={{
@@ -88,7 +88,7 @@ export function RailDrawers({
           </button>
         </div>
         {children}
-      </div>
+      </main>
 
       <div className={`rail-drawer rail-right${drawer === "right" ? " rail-open" : ""}`}>
         {right}

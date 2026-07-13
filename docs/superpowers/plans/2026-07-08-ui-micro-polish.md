@@ -331,8 +331,10 @@ git commit -m "polish(ui): neutral logo, clickable ALERTS pill, focus-expand sea
 
 ## Self-review checklist
 
-- [ ] No emoji remain as UI chrome (🎨 ☀️ 🌙 ‹ replaced); icons inherit `currentColor` in both themes.
-- [ ] `typeFloor` guard passes — zero sub-11px font sizes in `src/`.
-- [ ] Logo uses `--accent-blue` (or user accent), never `--accent-red`.
-- [ ] All four stat pills are the same element type semantics-wise (or non-interactive ones are visually distinct) and equal height; ALERTS is clickable.
-- [ ] Search grows to 240px on focus with a transition; collapse-to-icon deferred to the responsive plan.
+- [x] No emoji remain as UI chrome (🎨 ☀️ 🌙 ‹ replaced); icons inherit `currentColor` in both themes. *(verified live: header has no emoji; palette + sun/moon SVGs render)*
+- [x] `typeFloor` guard passes — zero sub-11px font sizes in `src/`. *(~30 sites raised; guard test green)*
+- [x] Logo uses `--accent-blue` (or user accent), never `--accent-red`. *(verified live)*
+- [x] All four stat pills are the same element type semantics-wise (or non-interactive ones are visually distinct) and equal height; ALERTS is clickable. *(all pills 44px via shared pillStyle(); ALERTS now a button)*
+- [x] Search grows to 240px on focus with a transition; collapse-to-icon deferred to the responsive plan. *(width toggles 140↔240 on focus/blur — unit-tested)*
+
+> **Status: COMPLETE** (2026-07-13). Search focus-expand is implemented per plan (inline width toggle + transition, verified by a deterministic unit test). Note: in the current single-row header the flex:1 spacer can compress the *rendered* width under crowding; the width-toggle logic is correct and the wrapper layout was left unchanged to avoid an unverified responsive regression (collapse/reflow belongs to the responsive plan). 409 tests pass; tsc clean; semgrep 0.

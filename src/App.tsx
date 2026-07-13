@@ -19,6 +19,7 @@ import { ProjectContextChip } from "./components/ProjectContextChip";
 import { CommandPalette } from "./components/CommandPalette";
 import { HelpOverlay } from "./components/HelpOverlay";
 import { RailDrawers } from "./components/RailDrawers";
+import { Icon } from "./components/icons/Icon";
 
 /** Human-readable description of a caught value, avoiding "[object Object]". */
 function describeLoadError(err: unknown): string {
@@ -294,6 +295,7 @@ export function App() {
           right={
             rightRailCollapsed ? (
               <aside
+                aria-label="Agent feed (collapsed)"
                 style={{
                   background: "var(--bg-secondary)",
                   borderLeft: "1px solid var(--border)",
@@ -317,9 +319,11 @@ export function App() {
                     fontSize: "14px",
                     lineHeight: 1,
                     borderRadius: "3px",
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
-                  ‹
+                  <Icon name="chevronLeft" size={16} />
                 </button>
               </aside>
             ) : (

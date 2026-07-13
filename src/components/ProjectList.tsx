@@ -36,7 +36,8 @@ export function ProjectList() {
     : projects;
 
   return (
-    <aside
+    <nav
+      aria-label="Projects"
       className={`panel-scroll ${SIDEBAR_CLASS}`}
       style={{
         background: "var(--bg-secondary)",
@@ -76,7 +77,7 @@ export function ProjectList() {
           onSelect={() => handleSelect(project.id)}
         />
       ))}
-    </aside>
+    </nav>
   );
 }
 

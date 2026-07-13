@@ -30,7 +30,7 @@ export const cardStyle: CSSProperties = {
 
 export function badgeStyle(color: string): CSSProperties {
   return {
-    fontSize: "10px",
+    fontSize: "11px",
     padding: "1px 6px",
     borderRadius: "4px",
     background: `${color}15`,
@@ -49,6 +49,31 @@ export const inputStyle: CSSProperties = {
   padding: "var(--space-2) var(--space-3)",
   fontSize: "13px",
 };
+
+// Uppercase micro caption at the 11px floor — the single home for small labels
+// (stat pills, metric captions) so they never drift below 11px.
+export const microLabel: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 500,
+  lineHeight: 1.3,
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  color: "var(--text-muted)",
+};
+
+// Stat/metric pill container — single source for min-height + tracking so pills
+// don't drift (e.g. 44px vs 59px) when one label wraps and another doesn't.
+export function pillStyle(): CSSProperties {
+  return {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "44px",
+    lineHeight: 1,
+    gap: "2px",
+  };
+}
 
 export const sectionHeader: CSSProperties = {
   fontSize: "11px",

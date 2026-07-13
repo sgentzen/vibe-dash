@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
 import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
-import type { MilestoneDailyStats, ActivityHeatmapEntry, AgentComparison } from "../types";
+import type { MilestoneDailyStats, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
@@ -13,11 +13,6 @@ import { GettingStartedChecklist } from "./GettingStartedChecklist";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
-type ChartSetters = {
-  setHeatmap: (h: ActivityHeatmapEntry[]) => void;
-  setDailyStats: (s: MilestoneDailyStats[]) => void;
-};
-
 type CostSetters = {
   setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null) => void;
   setCostTimeseries: (ts: { date: string; total_cost_usd: number }[]) => void;
@@ -27,19 +22,15 @@ type CostSetters = {
 
 async function loadChartData(
   api: ReturnType<typeof useApi>,
-  projectId: string | null,
-  firstOpenMilestoneId: string | null | undefined,
-  setters: ChartSetters,
+  milestoneId: string | null | undefined,
+  setDailyStats: (s: MilestoneDailyStats[]) => void,
 ): Promise<void> {
   try {
-    const heat = await api.getActivityHeatmap(projectId ?? undefined);
-    setters.setHeatmap(heat);
-
-    if (firstOpenMilestoneId) {
-      const stats = await api.getMilestoneDailyStats(firstOpenMilestoneId);
-      setters.setDailyStats(stats);
+    if (milestoneId) {
+      const stats = await api.getMilestoneDailyStats(milestoneId);
+      setDailyStats(stats);
     } else {
-      setters.setDailyStats([]);
+      setDailyStats([]);
     }
   } catch (e) {
     console.warn("[DashboardView] failed to load chart data", e);
@@ -69,17 +60,6 @@ async function loadCostData(
   }
 }
 
-// Bucket the heatmap entries (Unix-hour timestamps) into a 7-element day-count array.
-function computeActivityLast7(heatmap: ActivityHeatmapEntry[]): number[] {
-  const todayDay = Math.floor(Date.now() / 86_400_000);
-  const buckets: Record<number, number> = {};
-  for (const e of heatmap) {
-    const day = Math.floor((e.hour * 3_600_000) / 86_400_000);
-    if (day >= todayDay - 6) buckets[day] = (buckets[day] ?? 0) + e.count;
-  }
-  return Array.from({ length: 7 }, (_, i) => buckets[todayDay - 6 + i] ?? 0);
-}
-
 // Stable dependency key that changes whenever a task's milestone/status pairing
 // within the open milestones changes, used to re-fetch chart data.
 function computeMilestoneStatusKey(
@@ -99,7 +79,7 @@ export function DashboardView() {
   const api = useApi();
 
   const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
-  const [heatmap, setHeatmap] = useState<ActivityHeatmapEntry[]>([]);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
@@ -120,9 +100,6 @@ export function DashboardView() {
   const unresolvedBlockers = projectBlockers.filter((b) => !b.resolved_at);
   const doneTaskCount = projectTasks.filter((t) => t.status === "done").length;
 
-  // Last-7-days activity sparkline derived from heatmap (ActivityHeatmapEntry.hour is Unix hour number)
-  const activityLast7 = computeActivityLast7(heatmap);
-
   // Compact tile layout when ≥2 of the 4 KPI values are zero
   const activeTasks = projectTasks.filter((t) => t.status !== "done").length;
   const isCompact =
@@ -134,15 +111,23 @@ export function DashboardView() {
 
   const firstOpenMilestoneId = openMilestones.length > 0 ? openMilestones[0]?.id : null;
 
-  useEffect(() => {
-    loadChartData(api, projectId, firstOpenMilestoneId, { setHeatmap, setDailyStats });
-  }, [api, firstOpenMilestoneId, projectId, milestoneTaskStatusKey, pollGeneration]);
+  // The chart follows the user's selection when it still points at an open
+  // milestone; otherwise it falls back to the first open one (e.g. after the
+  // selected milestone closes or the project changes).
+  const effectiveMilestoneId =
+    selectedMilestoneId && openMilestones.some((m) => m.id === selectedMilestoneId)
+      ? selectedMilestoneId
+      : firstOpenMilestoneId;
 
   const reloadCosts = useCallback(async () => {
     setCostError(false);
     const ok = await loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
     if (!ok) setCostError(true);
   }, [api, projectId]);
+
+  useEffect(() => {
+    loadChartData(api, effectiveMilestoneId, setDailyStats);
+  }, [api, effectiveMilestoneId, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {
     reloadCosts();
@@ -153,7 +138,8 @@ export function DashboardView() {
   }, [api, pollGeneration]);
 
   return (
-    <div style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
+    <section tabIndex={0} aria-label="Dashboard" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
       <h2 style={{ ...typeScale.body, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-4) 0" }}>
         Dashboard
       </h2>
@@ -182,34 +168,35 @@ export function DashboardView() {
           label="Open Milestones"
           value={String(openMilestones.length)}
           color="var(--accent-blue)"
-          sparkline={isCompact ? undefined : activityLast7}
           compact={isCompact}
         />
         <KpiCard
           label="Overdue Tasks"
           value={String(overdueTasks.length)}
           color={overdueTasks.length > 0 ? "var(--status-danger)" : "var(--status-success)"}
-          sparkline={isCompact ? undefined : activityLast7}
           compact={isCompact}
         />
         <KpiCard
           label="Active Blockers"
           value={String(unresolvedBlockers.length)}
           color={unresolvedBlockers.length > 0 ? "var(--status-warning)" : "var(--status-success)"}
-          sparkline={isCompact ? undefined : activityLast7}
           compact={isCompact}
         />
         <KpiCard
           label="Active Tasks"
           value={String(activeTasks)}
           color="var(--text-secondary)"
-          sparkline={isCompact ? undefined : activityLast7}
           compact={isCompact}
         />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <MilestoneProgressCard dailyStats={dailyStats} openMilestones={openMilestones} />
+        <MilestoneProgressCard
+          dailyStats={dailyStats}
+          openMilestones={openMilestones}
+          selectedMilestoneId={effectiveMilestoneId ?? null}
+          onSelectMilestone={setSelectedMilestoneId}
+        />
         <MilestoneOverviewCard openMilestones={openMilestones} projectTasks={projectTasks} />
       </div>
 
@@ -273,6 +260,6 @@ export function DashboardView() {
       })()}
 
       {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
-    </div>
+    </section>
   );
 }

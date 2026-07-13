@@ -49,6 +49,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
 
   return (
     <aside
+      aria-label="Agent feed"
       className="panel-scroll"
       style={{
         background: "var(--bg-secondary)",
@@ -59,8 +60,11 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
       }}
     >
       {/* Active Agents roster — "who's active now" (full timeline lives in the Feed tab) */}
-      <div
+      <section
         className="panel-scroll"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
+        tabIndex={0}
+        aria-label="Agent activity"
         style={{
           padding: "var(--space-3)",
           flex: 1,
@@ -145,7 +149,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
                 background: "transparent",
                 border: "none",
                 padding: 0,
-                fontSize: "10px",
+                fontSize: "11px",
                 color: "var(--text-muted)",
                 cursor: "pointer",
                 display: "flex",
@@ -184,7 +188,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
             )}
           </div>
         )}
-      </div>
+      </section>
     </aside>
   );
 }
@@ -217,7 +221,7 @@ function AgentRow({ agent, indent }: Readonly<{ agent: Agent; indent: boolean }>
           justifyContent: "center",
           color: "var(--text-on-accent)",
           fontWeight: 700,
-          fontSize: indent ? "10px" : "11px",
+          fontSize: "11px",
           flexShrink: 0,
           position: "relative",
         }}
@@ -259,7 +263,7 @@ function AgentRow({ agent, indent }: Readonly<{ agent: Agent; indent: boolean }>
           {agent.role && agent.role !== "agent" && (
             <span
               style={{
-                fontSize: "9px",
+                fontSize: "11px",
                 padding: "0 4px",
                 borderRadius: "3px",
                 background: `color-mix(in srgb, ${roleColor} 15%, transparent)`,
@@ -291,7 +295,7 @@ function AgentRow({ agent, indent }: Readonly<{ agent: Agent; indent: boolean }>
         {agent.current_project_name && (
           <div
             style={{
-              fontSize: "10px",
+              fontSize: "11px",
               color: "var(--accent-purple)",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -317,7 +321,7 @@ function AgentRow({ agent, indent }: Readonly<{ agent: Agent; indent: boolean }>
             <span style={{ color: "var(--text-primary)" }}>{agent.current_task_title}</span>
           </div>
         )}
-        <div style={{ color: "var(--text-muted)", fontSize: "10px" }}>
+        <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>
           {HEALTH_LABELS[health]} · {relativeTime(agent.last_seen_at)}
         </div>
       </div>

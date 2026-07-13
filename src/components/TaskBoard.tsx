@@ -120,7 +120,7 @@ export function TaskBoard() {
   }, [keyboardGrab, api, dispatch, setGrabError]);
 
   return (
-    <main
+    <div
       style={{
         display: "flex",
         flexDirection: "column",
@@ -275,6 +275,6 @@ export function TaskBoard() {
           onClose={() => setEditingTask(null)}
         />
       )}
-    </main>
+    </div>
   );
 }

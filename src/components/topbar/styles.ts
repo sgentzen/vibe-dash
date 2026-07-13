@@ -3,7 +3,8 @@ import type { CSSProperties } from "react";
 export const viewBtnStyle: CSSProperties = {
   border: "none",
   borderRadius: "4px",
-  padding: "4px 10px",
+  padding: "5px 12px",
+  minHeight: "24px", // WCAG 2.5.8 minimum target size
   fontSize: "12px",
   cursor: "pointer",
   fontWeight: 500,

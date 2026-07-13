@@ -1,48 +1,105 @@
 import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
 import { EmptyState } from "../EmptyState.js";
+import { typeScale } from "../../styles/shared.js";
+import { computeBarLayout } from "./milestoneChartGeometry.js";
 import type { MilestoneDailyStats, Milestone, Task } from "../../types";
+
+// Axis-extent labels sit at the 11px floor; strip micro's uppercase/tracking
+// since these are plain dates, not section labels.
+const axisLabelStyle: React.CSSProperties = {
+  ...typeScale.micro,
+  textTransform: "none",
+  letterSpacing: 0,
+  color: "var(--text-muted)",
+};
 
 interface MilestoneProgressCardProps {
   dailyStats: MilestoneDailyStats[];
   openMilestones: Milestone[];
+  selectedMilestoneId: string | null;
+  onSelectMilestone: (id: string) => void;
 }
 
-export const MilestoneProgressCard = memo(function MilestoneProgressCard({ dailyStats, openMilestones }: MilestoneProgressCardProps) {
-  const milestoneLabel = openMilestones.length > 0 ? `(${openMilestones[0].name})` : "";
+export const MilestoneProgressCard = memo(function MilestoneProgressCard({
+  dailyStats,
+  openMilestones,
+  selectedMilestoneId,
+  onSelectMilestone,
+}: MilestoneProgressCardProps) {
+  const effectiveId = selectedMilestoneId ?? openMilestones[0]?.id ?? null;
+  const selectedName = openMilestones.find((m) => m.id === effectiveId)?.name ?? openMilestones[0]?.name ?? "";
+
+  // With one open milestone the title already names it; the selector only
+  // appears when there's an actual choice to make.
+  const selector = openMilestones.length > 1 ? (
+    <select
+      aria-label="Milestone"
+      value={effectiveId ?? ""}
+      onChange={(e) => onSelectMilestone(e.target.value)}
+      style={{
+        background: "var(--bg-tertiary)",
+        border: "1px solid var(--border)",
+        borderRadius: "6px",
+        color: "var(--text-primary)",
+        fontSize: "12px",
+        padding: "2px 6px",
+        height: "26px",
+        cursor: "pointer",
+      }}
+    >
+      {openMilestones.map((m) => (
+        <option key={m.id} value={m.id}>{m.name}</option>
+      ))}
+    </select>
+  ) : undefined;
+
+  // With multiple open milestones the selector disambiguates; with one (or none)
+  // the title names it inline.
+  let title = "Milestone Progress";
+  if (openMilestones.length <= 1 && selectedName) {
+    title = `Milestone Progress (${selectedName})`;
+  }
+
   return (
-    <CardWrapper title={`Milestone Progress ${milestoneLabel}`}>
+    <CardWrapper title={title} action={selector}>
       {dailyStats.length === 0 ? (
         <EmptyState
           message={openMilestones.length > 0 ? "No progress data yet. Complete tasks to see progress." : "No open milestones — create a milestone to see progress."}
         />
       ) : (
-        <div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "120px" }}>
-            {dailyStats.map((d) => (
-              <div
-                key={d.date}
-                style={{
-                  flex: 1,
-                  background: "var(--accent-blue)",
-                  borderRadius: "2px",
-                  height: `${d.completion_pct}%`,
-                  minHeight: "2px",
-                }}
-              />
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: "4px", marginTop: "var(--space-1)" }}>
-            {dailyStats.map((d) => (
-              <span
-                key={d.date}
-                style={{ flex: 1, fontSize: "9px", color: "var(--text-muted)", textAlign: "center" }}
-              >
-                {d.date.slice(5)}
-              </span>
-            ))}
-          </div>
-        </div>
+        (() => {
+          const layout = computeBarLayout(dailyStats.map((d) => d.date));
+          const byDate = new Map(dailyStats.map((d) => [d.date, d]));
+          return (
+            <div>
+              {/* True proportional time axis: bars gap/cluster by real date span. */}
+              <div style={{ position: "relative", height: "120px" }}>
+                {layout.map((b) => (
+                  <div
+                    key={b.date}
+                    title={`${b.date}: ${byDate.get(b.date)!.completion_pct}%`}
+                    style={{
+                      position: "absolute",
+                      left: `${b.leftPct}%`,
+                      width: `${b.widthPct}%`,
+                      bottom: 0,
+                      background: "var(--accent-blue)",
+                      borderRadius: "2px",
+                      height: `${byDate.get(b.date)!.completion_pct}%`,
+                      minHeight: "2px",
+                    }}
+                  />
+                ))}
+              </div>
+              {/* First / last date labels mark the true axis extent. */}
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-1)" }}>
+                <span style={axisLabelStyle}>{dailyStats[0]?.date.slice(5)}</span>
+                <span style={axisLabelStyle}>{dailyStats.at(-1)?.date.slice(5)}</span>
+              </div>
+            </div>
+          );
+        })()
       )}
     </CardWrapper>
   );
