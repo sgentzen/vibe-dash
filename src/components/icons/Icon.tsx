@@ -26,15 +26,15 @@ interface IconProps {
   name: IconName;
   size?: number;
   color?: string;
-  title?: string;
 }
 
 /**
- * Inline-SVG icon set — no dependency. Decorative uses omit `title` and get
- * `aria-hidden`; meaningful uses pass `title` → `role="img"` + `<title>`.
- * `stroke` inherits `currentColor` by default so icons follow theme/accent.
+ * Decorative inline-SVG icon set — no dependency. Always `aria-hidden`: every
+ * usage sits inside an interactive control (button/link) that already carries
+ * the accessible label, so the icon must not add a duplicate one. `stroke`
+ * inherits `currentColor` by default so icons follow theme/accent.
  */
-export function Icon({ name, size = 16, color = "currentColor", title }: Readonly<IconProps>) {
+export function Icon({ name, size = 16, color = "currentColor" }: Readonly<IconProps>) {
   return (
     <svg
       width={size}
@@ -45,10 +45,8 @@ export function Icon({ name, size = 16, color = "currentColor", title }: Readonl
       strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
-      role={title ? "img" : undefined}
-      aria-hidden={title ? undefined : true}
+      aria-hidden={true}
     >
-      {title && <title>{title}</title>}
       {PATHS[name].map((d) => (
         <path key={d} d={d} />
       ))}
