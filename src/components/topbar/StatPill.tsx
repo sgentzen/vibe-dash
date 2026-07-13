@@ -1,4 +1,4 @@
-import { typeScale } from "../../styles/shared.js";
+import { microLabel, pillStyle } from "../../styles/shared.js";
 
 interface StatPillProps {
   label: string;
@@ -13,7 +13,7 @@ export function StatPill({ label, value, color, onClick }: Readonly<StatPillProp
       <span style={{ color, fontSize: "20px", fontWeight: 700, fontFamily: "monospace" }}>
         {value}
       </span>
-      <span style={{ ...typeScale.micro, color: "var(--text-muted)" }}>
+      <span style={microLabel}>
         {label}
       </span>
     </>
@@ -25,16 +25,12 @@ export function StatPill({ label, value, color, onClick }: Readonly<StatPillProp
         onClick={onClick}
         aria-label={`View ${label.toLowerCase()}`}
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          lineHeight: 1,
+          ...pillStyle(),
           background: "transparent",
           border: "none",
           cursor: "pointer",
           padding: "4px 6px",
           borderRadius: "6px",
-          gap: "2px",
         }}
         onMouseEnter={(e) => { (e.currentTarget).style.background = "var(--bg-tertiary)"; }}
         onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
@@ -45,7 +41,7 @@ export function StatPill({ label, value, color, onClick }: Readonly<StatPillProp
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
+    <div style={pillStyle()}>
       {inner}
     </div>
   );

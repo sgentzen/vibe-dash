@@ -53,7 +53,7 @@ export function MilestoneGroup({
       >
         <span>{milestone ? statusIcon : ""}</span>
         <span>{milestone ? milestone.name : "No Milestone"}</span>
-        <span style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: 400 }}>
+        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 400 }}>
           ({tasks.length})
         </span>
       </div>
@@ -61,7 +61,7 @@ export function MilestoneGroup({
       {milestone?.description && (
         <div
           style={{
-            fontSize: "10px",
+            fontSize: "11px",
             color: "var(--text-muted)",
             padding: "0 8px 6px",
             overflow: "hidden",

@@ -78,6 +78,29 @@ describe("TopBar", () => {
     }
   });
 
+  it("brand wordmark is not the danger-red color", () => {
+    renderWithProviders(<TopBar />);
+    const logo = within(getHeader()).getByText("VIBE DASH");
+    expect(logo.style.color).not.toContain("--accent-red");
+    expect(logo.style.color).toContain("--accent-blue");
+  });
+
+  it("ALERTS pill is interactive (renders a button)", () => {
+    renderWithProviders(<TopBar />);
+    const alerts = within(getHeader()).getByText("ALERTS");
+    expect(alerts.closest("button")).not.toBeNull();
+  });
+
+  it("search input expands from 140px to 240px on focus", () => {
+    renderWithProviders(<TopBar />);
+    const input = within(getHeader()).getByRole("textbox", { name: "Search" });
+    expect(input.style.width).toBe("140px");
+    fireEvent.focus(input);
+    expect(input.style.width).toBe("240px");
+    fireEvent.blur(input);
+    expect(input.style.width).toBe("140px");
+  });
+
   it("renders search input", () => {
     renderWithProviders(<TopBar />);
     expect(within(getHeader()).getByRole("textbox", { name: /search/i })).toBeInTheDocument();

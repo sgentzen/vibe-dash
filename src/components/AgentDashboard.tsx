@@ -230,7 +230,7 @@ function AgentCard({ agent, detail, onClick }: Readonly<{ agent: Agent; detail?:
             {role !== "agent" && (
               <span
                 style={{
-                  fontSize: "9px",
+                  fontSize: "11px",
                   padding: "0 4px",
                   borderRadius: "3px",
                   background: `color-mix(in srgb, ${roleColor} 15%, transparent)`,
@@ -253,7 +253,7 @@ function AgentCard({ agent, detail, onClick }: Readonly<{ agent: Agent; detail?:
       {agent.current_project_name && (
         <div style={{ marginBottom: "8px" }}>
           <span style={{
-            fontSize: "10px", padding: "1px 6px", borderRadius: "3px",
+            fontSize: "11px", padding: "1px 6px", borderRadius: "3px",
             background: "rgba(139, 92, 246, 0.1)", color: "var(--accent-purple)",
             border: "1px solid rgba(139, 92, 246, 0.3)",
           }}>
@@ -274,7 +274,7 @@ function AgentCard({ agent, detail, onClick }: Readonly<{ agent: Agent; detail?:
       </div>
 
       {agent.model && (
-        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "8px" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
           Model: {agent.model}
         </div>
       )}
@@ -283,7 +283,7 @@ function AgentCard({ agent, detail, onClick }: Readonly<{ agent: Agent; detail?:
         <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
           {agent.capabilities.map((cap) => (
             <span key={cap} style={{
-              fontSize: "10px", padding: "1px 6px", borderRadius: "4px",
+              fontSize: "11px", padding: "1px 6px", borderRadius: "4px",
               background: "rgba(99,102,241,0.1)", color: "var(--accent-purple)",
               border: "1px solid rgba(99,102,241,0.3)",
             }}>
@@ -300,7 +300,7 @@ function PerfStat({ label, value }: Readonly<{ label: string; value: string | nu
   return (
     <div style={{ textAlign: "center", flex: 1, minWidth: 70 }}>
       <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>{value}</div>
-      <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
     </div>
   );
 }
@@ -351,7 +351,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
             {role !== "agent" && (
               <span
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   padding: "1px 6px",
                   borderRadius: "3px",
                   background: `color-mix(in srgb, ${roleColor} 15%, transparent)`,
@@ -371,7 +371,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
         </div>
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
           <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--status-success)", fontFamily: "monospace" }}>{completed_today}</div>
-          <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>COMPLETED TODAY</div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>COMPLETED TODAY</div>
         </div>
       </div>
 
@@ -397,14 +397,14 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
             </div>
             {breakdown.length > 0 && (
               <div>
-                <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase" }}>By Priority</div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase" }}>By Priority</div>
                 {breakdown.map((b) => (
                   <div key={b.priority} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: "11px", width: 55, color: "var(--text-secondary)" }}>{b.priority}</span>
                     <div style={{ flex: 1, height: 6, background: "var(--bg-tertiary)", borderRadius: 3, overflow: "hidden" }}>
                       <div style={{ width: `${(b.avg_lines_added / maxBreakdownLines) * 100}%`, height: "100%", background: color, borderRadius: 3 }} />
                     </div>
-                    <span style={{ fontSize: "10px", color: "var(--text-muted)", width: 30, textAlign: "right" }}>{b.count}</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", width: 30, textAlign: "right" }}>{b.count}</span>
                   </div>
                 ))}
               </div>
@@ -459,7 +459,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
                 fontSize: "12px", color: "var(--text-secondary)", padding: "6px 0",
                 borderBottom: "1px solid var(--border)",
               }}>
-                <span style={{ color: "var(--text-muted)", fontSize: "10px", marginRight: "8px" }}>
+                <span style={{ color: "var(--text-muted)", fontSize: "11px", marginRight: "8px" }}>
                   {new Date(a.timestamp).toLocaleTimeString()}
                 </span>
                 {a.message}

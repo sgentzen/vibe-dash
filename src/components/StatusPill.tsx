@@ -17,8 +17,8 @@ interface StatusPillProps {
 
 export function StatusPill({ token, label, size = "sm" }: Readonly<StatusPillProps>) {
   const color = tokenToColor(token);
-  const fontSize = size === "md" ? "12px" : "10px";
-  const iconSize = size === "md" ? "10px" : "9px";
+  const fontSize = size === "md" ? "12px" : "11px";
+  const iconSize = size === "md" ? "12px" : "11px";
 
   return (
     <span

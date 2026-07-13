@@ -202,7 +202,7 @@ export function CommandPalette({ onClose }: Readonly<CommandPaletteProps>) {
           <kbd
             style={{
               color: "var(--text-muted)",
-              fontSize: "10px",
+              fontSize: "11px",
               background: "var(--bg-tertiary)",
               padding: "2px 6px",
               borderRadius: "4px",
@@ -232,7 +232,7 @@ export function CommandPalette({ onClose }: Readonly<CommandPaletteProps>) {
                 <div
                   style={{
                     padding: "8px 16px 2px",
-                    fontSize: "10px",
+                    fontSize: "11px",
                     fontWeight: 600,
                     color: "var(--text-muted)",
                     letterSpacing: "0.08em",

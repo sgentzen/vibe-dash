@@ -51,7 +51,7 @@ export function PresetSwitcher({ active, onChange }: Readonly<PresetSwitcherProp
             <kbd
               aria-hidden
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 color: "var(--text-muted)",
                 fontFamily: "inherit",
                 background: isActive ? "var(--bg-tertiary)" : "transparent",

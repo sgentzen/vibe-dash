@@ -62,7 +62,7 @@ export const OverdueTasksCard = memo(function OverdueTasksCard({ tasks }: Overdu
               >
                 {t.title}
               </span>
-              <span style={{ color: "var(--status-danger)", fontSize: "10px" }}>{t.due_date}</span>
+              <span style={{ color: "var(--status-danger)", fontSize: "11px" }}>{t.due_date}</span>
             </div>
           ))}
         </div>
