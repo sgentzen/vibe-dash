@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "vibe-dash": {
-      "command": "npx",
-      "args": ["tsx", "C:/Users/sgent/projects/vibe-dash/server/mcp/stdio.ts"]
+      "type": "http",
+      "url": "http://localhost:3001/mcp"
     }
   }
 }
