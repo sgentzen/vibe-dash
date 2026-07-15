@@ -15,7 +15,7 @@ export interface Task {
 }
 
 export class VibeDashApi {
-  constructor(private request: APIRequestContext) {}
+  constructor(private readonly request: APIRequestContext) {}
 
   async createProject(name: string): Promise<Project> {
     const res = await this.request.post(`${API_BASE}/api/projects`, {
