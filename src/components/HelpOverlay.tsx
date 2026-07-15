@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { FocusTrap } from "focus-trap-react";
 import { sectionHeader } from "../styles/shared.js";
 
@@ -51,16 +52,34 @@ const kbdStyle: React.CSSProperties = {
 };
 
 export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  // Native <dialog> (rather than a div with role="dialog") for built-in modal
+  // semantics/backdrop. showModal() isn't implemented in jsdom, so fall back to
+  // the open attribute there — tests still render the content either way.
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }, []);
+
   return (
     <FocusTrap focusTrapOptions={{ escapeDeactivates: true, onDeactivate: onClose, clickOutsideDeactivates: true, tabbableOptions: { displayCheck: "none" } }}>
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop click-to-dismiss; Escape is handled by FocusTrap's escapeDeactivates */}
-      <div
-        role="dialog"
-        aria-modal="true"
+      <dialog
+        ref={dialogRef}
         aria-label="Keyboard shortcuts"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        onClose={onClose}
+        onCancel={onClose}
         style={{
           position: "fixed", inset: 0,
+          margin: 0, padding: 0, border: "none",
+          width: "100%", height: "100%", maxWidth: "none", maxHeight: "none",
           background: "rgba(0,0,0,0.6)",
           zIndex: 400,
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -114,7 +133,7 @@ export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
             </div>
           ))}
         </div>
-      </div>
+      </dialog>
     </FocusTrap>
   );
 }
