@@ -10,6 +10,7 @@ import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/Milest
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
 import { TodayCard } from "./dashboard/TodayCard";
 import { GettingStartedChecklist } from "./GettingStartedChecklist";
+import { CardError } from "./dashboard/CardError";
 
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
@@ -24,7 +25,7 @@ async function loadChartData(
   api: ReturnType<typeof useApi>,
   milestoneId: string | null | undefined,
   setDailyStats: (s: MilestoneDailyStats[]) => void,
-): Promise<void> {
+): Promise<boolean> {
   try {
     if (milestoneId) {
       const stats = await api.getMilestoneDailyStats(milestoneId);
@@ -32,8 +33,10 @@ async function loadChartData(
     } else {
       setDailyStats([]);
     }
+    return true;
   } catch (e) {
     console.warn("[DashboardView] failed to load chart data", e);
+    return false;
   }
 }
 
@@ -86,6 +89,8 @@ export function DashboardView() {
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
   const [costError, setCostError] = useState(false);
+  const [chartError, setChartError] = useState(false);
+  const [agentComparisonError, setAgentComparisonError] = useState(false);
 
   const projectId = selectedProjectId ?? null;
   const projectMilestones = projectId ? milestones.filter((m) => m.project_id === projectId) : milestones;
@@ -125,17 +130,32 @@ export function DashboardView() {
     if (!ok) setCostError(true);
   }, [api, projectId]);
 
+  const reloadChart = useCallback(async () => {
+    setChartError(false);
+    const ok = await loadChartData(api, effectiveMilestoneId, setDailyStats);
+    if (!ok) setChartError(true);
+  }, [api, effectiveMilestoneId]);
+
+  const reloadAgentComparison = useCallback(async () => {
+    setAgentComparisonError(false);
+    try {
+      setAgentComparison(await api.getAgentComparison());
+    } catch {
+      setAgentComparisonError(true);
+    }
+  }, [api]);
+
   useEffect(() => {
-    loadChartData(api, effectiveMilestoneId, setDailyStats);
-  }, [api, effectiveMilestoneId, milestoneTaskStatusKey, pollGeneration]);
+    reloadChart();
+  }, [reloadChart, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {
     reloadCosts();
   }, [reloadCosts, milestoneTaskStatusKey, pollGeneration]);
 
   useEffect(() => {
-    api.getAgentComparison().then(setAgentComparison).catch(() => {});
-  }, [api, pollGeneration]);
+    reloadAgentComparison();
+  }, [reloadAgentComparison, pollGeneration]);
 
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
@@ -191,12 +211,16 @@ export function DashboardView() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <MilestoneProgressCard
-          dailyStats={dailyStats}
-          openMilestones={openMilestones}
-          selectedMilestoneId={effectiveMilestoneId ?? null}
-          onSelectMilestone={setSelectedMilestoneId}
-        />
+        {chartError ? (
+          <CardError title="Milestone Progress" lead="Couldn't load milestone progress." onRetry={reloadChart} />
+        ) : (
+          <MilestoneProgressCard
+            dailyStats={dailyStats}
+            openMilestones={openMilestones}
+            selectedMilestoneId={effectiveMilestoneId ?? null}
+            onSelectMilestone={setSelectedMilestoneId}
+          />
+        )}
         <MilestoneOverviewCard openMilestones={openMilestones} projectTasks={projectTasks} />
       </div>
 
@@ -208,21 +232,12 @@ export function DashboardView() {
       {(() => {
         if (costError) {
           return (
-            <div style={{ ...cardStyle, marginBottom: "var(--space-4)" }}>
-              <div style={headerStyle}>Cost & Token Tracking</div>
-              <div style={{ color: "var(--status-danger)", fontSize: "12px", marginBottom: "8px" }}>
-                Couldn&apos;t load cost data. The dashboard will retry automatically, or retry now.
-              </div>
-              <button
-                onClick={() => reloadCosts()}
-                style={{
-                  background: "transparent", border: "1px solid var(--border)", color: "var(--text-primary)",
-                  padding: "4px 12px", borderRadius: "4px", cursor: "pointer", fontSize: "12px",
-                }}
-              >
-                Retry
-              </button>
-            </div>
+            <CardError
+              title="Cost & Token Tracking"
+              lead="Couldn't load cost data."
+              onRetry={reloadCosts}
+              style={{ marginBottom: "var(--space-4)" }}
+            />
           );
         }
         if (costSummary && costSummary.entry_count > 0) {
@@ -259,7 +274,16 @@ export function DashboardView() {
         );
       })()}
 
-      {agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />}
+      {agentComparisonError ? (
+        <CardError
+          title="Agent Efficiency"
+          lead="Couldn't load agent efficiency."
+          onRetry={reloadAgentComparison}
+          style={{ marginBottom: "var(--space-4)" }}
+        />
+      ) : (
+        agentComparison && <AgentEfficiencyCard agentComparison={agentComparison} />
+      )}
     </section>
   );
 }
