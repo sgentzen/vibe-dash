@@ -26,6 +26,7 @@ export function CardError({ title, onRetry, lead = "Couldn't load this data.", s
         {lead} {RETRY_HINT}
       </div>
       <button
+        type="button"
         onClick={onRetry}
         style={{
           background: "transparent",
