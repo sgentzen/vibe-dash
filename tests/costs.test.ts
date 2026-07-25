@@ -35,10 +35,10 @@ describe("cost tracking", () => {
     expect(entry.id).toBeTruthy();
     expect(entry.model).toBe("claude-opus-4-6");
     expect(entry.input_tokens).toBe(1000);
-    expect(entry.cost_usd).toBe(0.045);
+    expect(entry.cost_usd).toBeCloseTo(0.045, 10);
 
     const summary = getAgentCostSummary(db, agent.id);
-    expect(summary.total_cost_usd).toBe(0.045);
+    expect(summary.total_cost_usd).toBeCloseTo(0.045, 10);
     expect(summary.total_input_tokens).toBe(1000);
     expect(summary.total_output_tokens).toBe(500);
     expect(summary.entry_count).toBe(1);
@@ -52,7 +52,7 @@ describe("cost tracking", () => {
     logCost(db, { milestone_id: milestone.id, model: "gpt-4", provider: "openai", input_tokens: 300, output_tokens: 150, cost_usd: 0.02 });
 
     const summary = getMilestoneCostSummary(db, milestone.id);
-    expect(summary.total_cost_usd).toBe(0.03);
+    expect(summary.total_cost_usd).toBeCloseTo(0.03, 10);
     expect(summary.total_input_tokens).toBe(500);
     expect(summary.entry_count).toBe(2);
   });
@@ -63,7 +63,7 @@ describe("cost tracking", () => {
     logCost(db, { project_id: project.id, model: "claude-sonnet-4-6", provider: "anthropic", input_tokens: 500, output_tokens: 250, cost_usd: 0.005 });
 
     const summary = getProjectCostSummary(db, project.id);
-    expect(summary.total_cost_usd).toBe(0.005);
+    expect(summary.total_cost_usd).toBeCloseTo(0.005, 10);
     expect(summary.entry_count).toBe(1);
   });
 
@@ -77,7 +77,7 @@ describe("cost tracking", () => {
     const today = new Date().toISOString().slice(0, 10);
     expect(ts[ts.length - 1].date).toBe(today);
     const todays = ts.find((r) => r.date === today)!;
-    expect(todays.total_cost_usd).toBe(0.03);
+    expect(todays.total_cost_usd).toBeCloseTo(0.03, 10);
     expect(todays.entry_count).toBe(2);
   });
 
@@ -100,7 +100,7 @@ describe("cost tracking", () => {
 
     const backdatedDate = fiveDaysAgo.slice(0, 10);
     const backdatedRow = ts.find((r) => r.date === backdatedDate)!;
-    expect(backdatedRow.total_cost_usd).toBe(0.07);
+    expect(backdatedRow.total_cost_usd).toBeCloseTo(0.07, 10);
     expect(backdatedRow.entry_count).toBe(1);
 
     // Dates are strictly contiguous ascending
@@ -132,7 +132,7 @@ describe("cost tracking", () => {
     const byAgent = getCostByAgent(db, { project_id: project.id });
     expect(byAgent).toHaveLength(2);
     expect(byAgent[0].agent_name).toBe("agent-2");
-    expect(byAgent[0].total_cost_usd).toBe(0.03);
+    expect(byAgent[0].total_cost_usd).toBeCloseTo(0.03, 10);
   });
 
   it("returns zero summary for unknown agent", () => {

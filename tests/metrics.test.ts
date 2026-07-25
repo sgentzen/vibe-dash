@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import express from "express";
-import { createServer, type IncomingMessage } from "node:http";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
+import { requestApp } from "./http-helper.js";
 import { createRouter } from "../server/routes/index.js";
 import {
   createProject,
@@ -14,7 +14,6 @@ import {
   getAgentComparison,
   getTaskTypeBreakdown,
 } from "../server/db/index.js";
-import http from "node:http";
 
 let app: Express;
 let db: Database.Database;
@@ -24,38 +23,7 @@ function request(
   path: string,
   body?: unknown
 ): Promise<{ status: number; body: any }> {
-  return new Promise((resolve, reject) => {
-    const server = createServer(app);
-    server.listen(0, "127.0.0.1", () => {
-      const addr = server.address() as { port: number };
-      const payload = body === undefined ? undefined : JSON.stringify(body);
-      const options: http.RequestOptions = {
-        hostname: "127.0.0.1",
-        port: addr.port,
-        path,
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(payload ? { "Content-Length": String(Buffer.byteLength(payload)) } : {}),
-        },
-      };
-      const req = http.request(options, (res: IncomingMessage) => {
-        let data = "";
-        res.on("data", (chunk: Buffer) => { data += chunk; });
-        res.on("end", () => {
-          server.close();
-          try {
-            resolve({ status: res.statusCode ?? 0, body: JSON.parse(data) });
-          } catch {
-            resolve({ status: res.statusCode ?? 0, body: data });
-          }
-        });
-      });
-      req.on("error", (err: Error) => { server.close(); reject(err); });
-      if (payload) req.write(payload);
-      req.end();
-    });
-  });
+  return requestApp(app, method, path, body);
 }
 
 beforeEach(() => {

@@ -244,7 +244,10 @@ describe("tasks", () => {
 
     const filter: ListTasksFilter = { project_id: projectId, exclude_statuses: ["done", "cancelled"] };
     const rows = listTasks(db, filter);
-    expect(rows.map((t) => t.status).sort()).toEqual(["in_progress", "planned"]);
+    expect(rows.map((t) => t.status).sort((a, b) => a.localeCompare(b))).toEqual([
+      "in_progress",
+      "planned",
+    ]);
     expect(countTasks(db, filter)).toBe(2);
     // exclude_statuses is ignored when an explicit status is set
     expect(countTasks(db, { project_id: projectId, status: "done" })).toBe(1);
