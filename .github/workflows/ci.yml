@@ -35,8 +35,13 @@ jobs:
 
       - run: npm ci
 
+      # Gate on the shipped dependency tree. Dev-only advisories are excluded
+      # because the ESLint toolchain currently pins a vulnerable brace-expansion
+      # via minimatch@3 and no in-range fix exists — the only npm-suggested
+      # remedy is downgrading the plugins. Dependabot still reports dev
+      # advisories, so they stay visible without blocking every build.
       - name: Security audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Type-check
         run: npx tsc -p tsconfig.json --noEmit
