@@ -2,80 +2,7 @@
 
 Local-first real-time dashboard for monitoring AI-driven development projects via MCP (Model Context Protocol).
 
-> **Source of truth** for architecture, project structure, and code patterns. README.md and CONTRIBUTING.md link here instead of duplicating these details. MCP integration (transports, tools, setup) lives in [docs/MCP-SETUP.md](docs/MCP-SETUP.md).
-
-## Tech Stack
-
-- **Runtime**: Node.js >=20, ESM (`"type": "module"`)
-- **Backend**: Express 5, better-sqlite3, WebSocket (ws)
-- **Frontend**: React 19, Vite 8, CSS variables (no UI library)
-- **MCP**: @modelcontextprotocol/sdk for tool registration + Streamable HTTP/stdio transports
-- **Language**: TypeScript 6 (strict mode, ES2022 target)
-- **Testing**: Vitest with in-memory SQLite (`createTestDb()`)
-- **Validation**: Zod (MCP tool schemas)
-
-## Project Structure
-
-```
-server/
-  index.ts          # Express app, MCP Streamable HTTP, WebSocket setup (port 3001)
-  types.ts          # Shared TypeScript interfaces/types
-  websocket.ts      # WebSocket broadcast
-  routes/           # REST API — createRouter() composes per-resource route factories
-    index.ts        # createRouter(): mounts rate limiter + all route factories
-    middleware.ts   # asyncHandler, notFoundHandler, errorHandler
-    <resource>.ts   # one factory per resource (projects, tasks, agents, …)
-  db/
-    index.ts        # Barrel re-export (all consumers import from here)
-    schema.ts       # DDL, initDb(), openDb()
-    migrator.ts     # versioned migration runner (schema migrations live here)
-    path.ts         # resolveDbPath() — worktree-aware SQLite path resolution
-    helpers.ts      # now(), genId(), parseAgent()
-    where.ts        # shared WHERE-clause builder
-    projects.ts     # createProject, listProjects
-    milestones.ts   # CRUD + progress, daily stats, completion tracking
-    tasks.ts        # CRUD + search
-    bulk.ts         # bulk task update
-    agents.ts       # CRUD + health, sessions, stats
-    activity.ts     # logActivity, activity stream, heatmap
-    blockers.ts     # createBlocker, resolveBlocker
-    dependencies.ts # task dependency graph
-    comments.ts     # comments + @mentions
-    notifications.ts # notifications
-    costs.ts        # cost/token tracking per agent/milestone/project
-    metrics.ts      # aggregate dashboard metrics
-    worktrees.ts    # git worktree tracking
-    projectContext.ts # get_project_context aggregation for MCP
-  mcp/
-    server.ts       # MCP server factory + tool registration
-    tools.ts        # MCP tool handler implementations
-    stdio.ts        # MCP stdio transport entry point
-src/
-  App.tsx           # Main app + initialization
-  store.tsx         # Context API + useReducer state management
-  types.ts          # Frontend type definitions (mirrors server/types.ts)
-  components/       # React components (TaskCard, TaskBoard, DashboardView, etc.)
-  hooks/            # useApi, useWebSocket, usePolling
-  utils/            # agentColors, helpers
-cli/
-  index.ts          # Standalone CLI (list, add-task, status, agents)
-tests/
-  setup.ts          # createTestDb() — in-memory SQLite
-  *.test.ts         # Integration tests (no mocking, real DB operations)
-```
-
-## Development
-
-```bash
-npm run dev          # Concurrent: tsx watch server + vite client
-npm run dev:server   # Server only (port 3001)
-npm run dev:client   # Vite only (port 3000, proxies /api + /ws to 3001)
-npm start            # Production: vite build + tsx server/index.ts (serves at :3001)
-npm test             # vitest run
-npm run test:watch   # vitest in watch mode
-npm run build        # vite build + tsc --noEmit
-npm run mcp:stdio    # Run the MCP stdio transport directly (ad-hoc testing)
-```
+> **Source of truth** for this repo's code patterns and conventions — the things the code alone won't teach you. Stack, layout, and scripts are deliberately not duplicated here: read `package.json` and the tree. MCP integration (transports, tools, setup) lives in [docs/MCP-SETUP.md](docs/MCP-SETUP.md).
 
 ## Database Patterns
 
@@ -87,15 +14,6 @@ npm run mcp:stdio    # Run the MCP stdio transport directly (ad-hoc testing)
 - Activity logging: call `logActivity()` after mutations, then `broadcast()` the WebSocket event
 
 ## Route Patterns
-
-```typescript
-router.get("/api/resource", limiter, (req, res) => {
-  // 1. Validate params — early return with 400/404
-  // 2. Call db function
-  // 3. broadcast() WebSocket event (on mutations)
-  // 4. res.json(result)
-});
-```
 
 - Rate limiters: `statsLimiter` (30/min), `firstRunLimiter` (10/min), etc.
 - Error responses: `{ error: "message" }` with appropriate HTTP status
