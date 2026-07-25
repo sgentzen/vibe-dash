@@ -36,12 +36,6 @@ describe("AgentDashboard", () => {
     resetIdSeq();
   });
 
-  function getDashboard() {
-    // The AgentDashboard's outer div contains an h2 — get the first matching section
-    const headings = screen.getAllByRole("heading", { name: "Agent Dashboard" });
-    return headings[0].closest("div")!.parentElement!;
-  }
-
   it("renders the Agent Dashboard heading", () => {
     renderWithProviders(<AgentDashboard />);
     expect(screen.getAllByRole("heading", { name: "Agent Dashboard" }).length).toBeGreaterThan(0);

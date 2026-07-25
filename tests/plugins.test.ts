@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createServer } from "node:http";
-import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
+import { requestApp } from "./http-helper.js";
 import { createPluginContext } from "../server/plugins/sandbox.js";
 import { loadPluginsFromDir } from "../server/plugins/loader.js";
 
@@ -116,36 +115,7 @@ describe("5.3 Plugin/Extension System — loader", () => {
 });
 
 describe("5.3 Plugin/Extension System — REST routes", () => {
-  function makeRequest(
-    app: import("express").Express,
-    method: string,
-    path: string,
-  ): Promise<{ status: number; body: unknown }> {
-    return new Promise((resolve, reject) => {
-      const server = createServer(app);
-      server.listen(0, "127.0.0.1", () => {
-        const addr = server.address() as { port: number };
-        const options: import("http").RequestOptions = {
-          hostname: "127.0.0.1",
-          port: addr.port,
-          path,
-          method,
-          headers: { "Content-Type": "application/json" },
-        };
-        const req = http.request(options, (res) => {
-          let data = "";
-          res.on("data", (c: Buffer) => { data += c; });
-          res.on("end", () => {
-            server.close();
-            try { resolve({ status: res.statusCode ?? 0, body: JSON.parse(data) }); }
-            catch { resolve({ status: res.statusCode ?? 0, body: data }); }
-          });
-        });
-        req.on("error", (err) => { server.close(); reject(err); });
-        req.end();
-      });
-    });
-  }
+  const makeRequest = requestApp;
 
   it("GET /api/plugins returns plugin list", async () => {
     const expressModule = await import("express");

@@ -332,10 +332,8 @@ describe("list_tasks pagination + defaults", () => {
 
   it("excludes done/cancelled by default but includes them on explicit status", async () => {
     const { project_id } = parse(await handleTool(db, "create_project", { name: "Mixed" }));
-    const ids: string[] = [];
     for (const s of ["planned", "in_progress", "done", "cancelled"]) {
       const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: s, priority: "low" }));
-      ids.push(task_id);
       if (s !== "planned") await handleTool(db, "update_task", { task_id, status: s });
     }
 

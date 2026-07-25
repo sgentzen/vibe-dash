@@ -96,7 +96,8 @@ describe("runMigrations", () => {
     expect(() => runMigrations(db)).not.toThrow();
     expect(() => runMigrations(db)).not.toThrow();
     expect(migrationCount(db)).toBe(before);
-    expect([...tableNames(db)].sort()).toEqual([...tablesBefore].sort());
+    const byName = (a: string, b: string) => a.localeCompare(b);
+    expect([...tableNames(db)].sort(byName)).toEqual([...tablesBefore].sort(byName));
   });
 
   it("brings a raw empty database fully up to date on its own", () => {

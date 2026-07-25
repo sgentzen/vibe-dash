@@ -15,8 +15,10 @@ function walk(dir: string, out: string[] = []): string[] {
 // direct-literal form (`fontSize: "10px"`) AND ternary/computed forms
 // (`fontSize: cond ? "10px" : "11px"`, `const fontSize = size ? "12px" : "10px"`).
 // `[^,;}\n]*` stops the scan at the property boundary so a legit `marginBottom:
-// "10px"` on the same line as `fontSize: "12px"` is NOT flagged.
-const SUB_11_FONT = /font[Ss]ize\s*[:=]\s*[^,;}\n]*["'](9|10)px["']/;
+// "10px"` on the same line as `fontSize: "12px"` is NOT flagged. It also spans
+// any whitespace after the `:`/`=`, so no separate `\s*` belongs there — one
+// would overlap this class and make the match super-linear (S5852).
+const SUB_11_FONT = /font[Ss]ize\s*[:=][^,;}\n]*["'](9|10)px["']/;
 // `font:` shorthand carrying a sub-11px size.
 const SUB_11_SHORTHAND = /\b(9|10)px\b[^;]*sans-serif/;
 
