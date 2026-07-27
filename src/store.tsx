@@ -20,10 +20,7 @@ export type NavigationState = Pick<
   "rightRailCollapsed"
 >;
 
-export type NotificationState = Pick<
-  AppState,
-  "fileConflicts" | "loadError"
->;
+export type NotificationState = Pick<AppState, "loadError">;
 
 export type PollingState = Pick<AppState, "pollGeneration">;
 
@@ -45,7 +42,6 @@ const initialState: AppState = {
   activity: [],
   blockers: [],
   taskDepsMap: {},
-  fileConflicts: [],
   searchQuery: "",
   searchScope: getInitialSearchScope(),
   activeView: "fleet",
@@ -104,11 +100,8 @@ export function AppProvider({ children }: Readonly<{ children: React.ReactNode }
   );
 
   const notificationValue = useMemo<NotificationState>(
-    () => ({
-      fileConflicts: state.fileConflicts,
-      loadError: state.loadError,
-    }),
-    [state.fileConflicts, state.loadError]
+    () => ({ loadError: state.loadError }),
+    [state.loadError]
   );
 
   const pollingValue = useMemo<PollingState>(

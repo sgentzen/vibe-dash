@@ -24,7 +24,6 @@ export interface AppState {
   activity: ActivityEntry[];
   blockers: Blocker[];
   taskDepsMap: Record<string, string[]>;
-  fileConflicts: unknown[];
   searchQuery: string;
   searchScope: SearchScope;
   activeView: ActiveView;
