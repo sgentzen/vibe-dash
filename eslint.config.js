@@ -2,6 +2,7 @@ import tseslint from "typescript-eslint";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
 import jsxA11y from "eslint-plugin-jsx-a11y";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
@@ -66,6 +67,17 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
     },
+  },
+  // Every <button> needs an explicit type (S9011). A bare <button> defaults to
+  // type="submit"; this codebase has no <form> at all, so the default is never
+  // what's meant. Sonar scopes PR issues to changed files, so an untyped button
+  // fails the quality gate on the next PR to touch its file, whatever that PR
+  // was about; #162 lost time to exactly that. Catch it in lint instead.
+  // Scoped to all .tsx rather than src/, since test fixtures render buttons too.
+  {
+    files: ["**/*.tsx"],
+    plugins: { react },
+    rules: { "react/button-has-type": "error" },
   },
   // Tests legitimately use the DOM `window` global and testing-library casts,
   // which these two auto-fixing rules mis-flag (and their autofix breaks the
