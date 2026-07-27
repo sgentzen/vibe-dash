@@ -11,7 +11,7 @@
  */
 
 import Database from "better-sqlite3";
-import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers } from "../server/db/index.js";
+import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers, SchemaTooNewError } from "../server/db/index.js";
 import { resolveDbPath } from "../server/db/path.js";
 import {
   RESET,
@@ -59,9 +59,15 @@ try {
   db = new Database(dbPath);
   initDb(db);
 } catch (e) {
-  console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
-  console.error(e instanceof Error ? e.message : String(e));
-  console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
+  if (e instanceof SchemaTooNewError) {
+    // Not a path problem — suggesting --db would send the user the wrong way.
+    console.error(`${RED}Error:${RESET} ${e.message}`);
+    console.error(`Database: ${dbPath}`);
+  } else {
+    console.error(`${RED}Error:${RESET} Cannot open database at ${dbPath}`);
+    console.error(e instanceof Error ? e.message : String(e));
+    console.error("Use --db /path/to/vibe-dash.db to specify a different path.");
+  }
   process.exit(1);
 }
 

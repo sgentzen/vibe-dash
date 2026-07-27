@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
-import { runMigrations } from "../server/db/migrator.js";
+import { runMigrations, SchemaTooNewError } from "../server/db/migrator.js";
+import { initDb } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
 
 function tableNames(db: Database.Database): Set<string> {
@@ -111,5 +112,104 @@ describe("runMigrations", () => {
     runMigrations(raw);
     expect(migrationCount(raw)).toBe(n);
     raw.close();
+  });
+});
+
+describe("newer-database guard", () => {
+  let db: Database.Database;
+
+  /** Forge a migration record from a build that knows more than we do. */
+  function recordFutureMigration(target: Database.Database, name: string): void {
+    target
+      .prepare("INSERT INTO _migrations (name, run_at) VALUES (?, ?)")
+      .run(name, new Date().toISOString());
+  }
+
+  beforeEach(() => {
+    db = createTestDb();
+    delete process.env.VIBE_DASH_ALLOW_SCHEMA_DRIFT;
+  });
+
+  afterEach(() => {
+    delete process.env.VIBE_DASH_ALLOW_SCHEMA_DRIFT;
+    db.close();
+  });
+
+  it("throws SchemaTooNewError when the database has migrations this build doesn't know", () => {
+    recordFutureMigration(db, "999_from_the_future");
+    expect(() => runMigrations(db)).toThrow(SchemaTooNewError);
+  });
+
+  it("names the unknown migrations so the operator can see what is missing", () => {
+    recordFutureMigration(db, "998_earlier_future");
+    recordFutureMigration(db, "999_later_future");
+
+    try {
+      runMigrations(db);
+      expect.unreachable("expected runMigrations to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(SchemaTooNewError);
+      const e = err as SchemaTooNewError;
+      // Sorted, so the message is stable regardless of insertion order.
+      expect(e.unknownMigrations).toEqual(["998_earlier_future", "999_later_future"]);
+      expect(e.message).toContain("998_earlier_future");
+      expect(e.message).toContain("999_later_future");
+      // The message must point at the actual remedy, not at the file path.
+      expect(e.message).toContain("update this install");
+      expect(e.message).toContain("VIBE_DASH_ALLOW_SCHEMA_DRIFT");
+    }
+  });
+
+  it("does not fire on a database this build is fully up to date with", () => {
+    expect(() => runMigrations(db)).not.toThrow();
+  });
+
+  it("does not fire when the database is OLDER — migrations still run forward", () => {
+    // The guard is one-directional by design: a database with FEWER migrations
+    // than this build knows is the normal upgrade path, not drift. An empty
+    // database is that case at its limit — zero applied, all of them pending.
+    const old = new Database(":memory:");
+    expect(() => runMigrations(old)).not.toThrow();
+    expect(migrationCount(old)).toBeGreaterThan(1);
+    expect(tableNames(old)).toContain("projects");
+
+    // And having caught up, it is now clean on a second pass.
+    expect(() => runMigrations(old)).not.toThrow();
+    old.close();
+  });
+
+  it("still fires when the database is both behind AND ahead", () => {
+    // The realistic drift shape: two builds diverged, so the database carries a
+    // migration we lack while we carry migrations it lacks. Being behind must
+    // not excuse being ahead.
+    const mixed = new Database(":memory:");
+    mixed.exec(`
+      CREATE TABLE _migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        run_at TEXT NOT NULL
+      )
+    `);
+    recordFutureMigration(mixed, "999_from_the_future");
+
+    expect(() => runMigrations(mixed)).toThrow(SchemaTooNewError);
+    // It refused before applying anything.
+    expect(tableNames(mixed)).not.toContain("projects");
+    mixed.close();
+  });
+
+  it("can be bypassed with VIBE_DASH_ALLOW_SCHEMA_DRIFT", () => {
+    recordFutureMigration(db, "999_from_the_future");
+    process.env.VIBE_DASH_ALLOW_SCHEMA_DRIFT = "1";
+    expect(() => runMigrations(db)).not.toThrow();
+  });
+
+  it("surfaces through openDb, which is what every entry point actually calls", () => {
+    const file = new Database(":memory:");
+    runMigrations(file);
+    recordFutureMigration(file, "999_from_the_future");
+    // initDb() is openDb()'s second half; call it directly since openDb takes a path.
+    expect(() => initDb(file)).toThrow(SchemaTooNewError);
+    file.close();
   });
 });
