@@ -68,6 +68,7 @@ export function RailDrawers({
           }}
         >
           <button
+            type="button"
             className="rail-toggle"
             aria-label="Open projects"
             aria-expanded={drawer === "left"}
@@ -78,6 +79,7 @@ export function RailDrawers({
           </button>
           {topRow}
           <button
+            type="button"
             className="rail-toggle"
             aria-label="Open agent feed"
             aria-expanded={drawer === "right"}

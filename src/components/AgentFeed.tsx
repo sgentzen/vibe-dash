@@ -84,6 +84,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
             Active Agents
           </div>
           <button
+            type="button"
             onClick={onCollapse}
             title="Collapse agent feed"
             aria-label="Collapse agent feed"
@@ -144,6 +145,7 @@ export function AgentFeed({ onCollapse }: Readonly<{ onCollapse: () => void }>) 
         {offlineAgentCount > 0 && (
           <div style={{ marginTop: "var(--space-2)" }}>
             <button
+              type="button"
               onClick={() => setShowOffline(!showOffline)}
               style={{
                 background: "transparent",

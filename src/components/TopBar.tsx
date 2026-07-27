@@ -244,6 +244,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
       {/* Scope-mismatch quick-fix: jump to the view that shows this scope's results */}
       {scopeMismatch && (
         <button
+          type="button"
           onClick={handleScopeFix}
           title={`${scopeHintLabel[searchScope]} appear in ${SCOPE_FIX_LABEL[searchScope]}`}
           style={{
@@ -264,6 +265,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
       {/* Command palette trigger */}
       {onCommandPalette && (
         <button
+          type="button"
           onClick={onCommandPalette}
           title="Command palette (⌘⇧K)"
           aria-label="Open command palette"
@@ -289,6 +291,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
       {/* Keyboard shortcuts / help */}
       {onHelp && (
         <button
+          type="button"
           onClick={onHelp}
           title="Keyboard shortcuts (?)"
           aria-label="Keyboard shortcuts"
@@ -316,6 +319,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
       {/* Appearance Popover (theme + accent) */}
       <div ref={appearanceRef} style={{ position: "relative" }}>
         <button
+          type="button"
           onClick={() => setShowAppearance((v) => !v)}
           aria-label="Appearance settings"
           title="Appearance"
@@ -358,6 +362,7 @@ export function TopBar({ onCommandPalette, onHelp, searchInputRef }: TopBarProps
               <div style={{ display: "flex", gap: "6px" }}>
                 {(["light", "dark"] as const).map((t) => (
                   <button
+                    type="button"
                     key={t}
                     onClick={() => dispatch({ type: "SET_THEME", payload: t })}
                     aria-label={`Switch to ${t} mode`}

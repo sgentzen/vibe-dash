@@ -634,7 +634,11 @@ export function runMigrations(db: Database.Database): void {
   // once shipped: a rename makes every existing database look like the future.
   if (!process.env[DRIFT_OVERRIDE_ENV]) {
     const known = new Set(MIGRATIONS.map((m) => m.name));
-    const unknown = [...ran].filter((name) => !known.has(name)).sort();
+    // Locale pinned so the message order is identical on every runtime; the
+    // default locale varies with the host and Node's ICU build.
+    const unknown = [...ran]
+      .filter((name) => !known.has(name))
+      .sort((a, b) => a.localeCompare(b, "en"));
     if (unknown.length > 0) throw new SchemaTooNewError(unknown);
   }
 

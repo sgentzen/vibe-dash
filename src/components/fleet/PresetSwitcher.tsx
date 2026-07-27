@@ -29,6 +29,7 @@ export function PresetSwitcher({ active, onChange }: Readonly<PresetSwitcherProp
         const isActive = active === p.key;
         return (
           <button
+            type="button"
             key={p.key}
             role="tab"
             aria-selected={isActive}

@@ -16,6 +16,7 @@ export function TaskDrawerHeader({ onClose }: Readonly<TaskDrawerHeaderProps>) {
         Edit Task
       </span>
       <button
+        type="button"
         onClick={onClose}
         aria-label="Close"
         style={{

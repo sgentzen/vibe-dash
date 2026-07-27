@@ -11,6 +11,7 @@ export function MetricInfoTip({ text }: Readonly<Props>) {
   return (
     <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
       <button
+        type="button"
         onMouseEnter={() => setVisible(true)}
         onMouseLeave={() => setVisible(false)}
         onFocus={() => setVisible(true)}

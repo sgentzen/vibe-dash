@@ -101,6 +101,7 @@ export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
               Keyboard Shortcuts
             </h2>
             <button
+              type="button"
               onClick={onClose}
               aria-label="Close keyboard shortcuts"
               style={{

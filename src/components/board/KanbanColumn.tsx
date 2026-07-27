@@ -204,6 +204,7 @@ export function KanbanColumn({
                 }}
               />
               <button
+                type="button"
                 onClick={handleCreate}
                 disabled={creating || !newTaskTitle.trim()}
                 style={{
