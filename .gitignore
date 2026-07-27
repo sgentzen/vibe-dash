@@ -52,3 +52,4 @@ npm-debug.log*
 .env.local
 .worktrees/
 .claude/.last-code-review
+.claude/settings.local.json
