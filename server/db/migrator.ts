@@ -5,6 +5,38 @@ interface Migration {
   run: (db: Database.Database) => void;
 }
 
+/**
+ * Set this to bypass the newer-database guard in `runMigrations()`.
+ *
+ * Escape hatch for the legitimate case: checking out an older revision to debug
+ * while the shared database has already been migrated forward. Expect raw SQL
+ * errors on any table the older code doesn't know about.
+ */
+const DRIFT_OVERRIDE_ENV = "VIBE_DASH_ALLOW_SCHEMA_DRIFT";
+
+/**
+ * Thrown when the database records migrations this build has never heard of,
+ * which means it was written by a NEWER Vibe Dash than the one now opening it.
+ *
+ * Distinct from a corrupt or unreadable database so callers can tell the user
+ * to update rather than to check their path.
+ */
+export class SchemaTooNewError extends Error {
+  readonly unknownMigrations: string[];
+
+  constructor(unknownMigrations: string[]) {
+    const count = unknownMigrations.length;
+    super(
+      `Database schema is newer than this build: ${count} migration${count === 1 ? "" : "s"} ` +
+        `applied that this code doesn't know about (${unknownMigrations.join(", ")}). ` +
+        `It was written by a newer version of Vibe Dash — update this install. ` +
+        `To proceed anyway, set ${DRIFT_OVERRIDE_ENV}=1 (expect SQL errors for missing columns).`
+    );
+    this.name = "SchemaTooNewError";
+    this.unknownMigrations = unknownMigrations;
+  }
+}
+
 const MIGRATIONS: Migration[] = [
   {
     name: "001_initial_schema",
@@ -592,6 +624,19 @@ export function runMigrations(db: Database.Database): void {
   const ran = new Set(
     (db.prepare("SELECT name FROM _migrations").all() as { name: string }[]).map((r) => r.name)
   );
+
+  // Refuse to run against a database written by a newer build. Migrations are
+  // forward-only, so an older build silently applies nothing and then queries
+  // columns that don't exist in its worldview — surfacing as raw SQLite errors
+  // ("no such column: ...") far from the real cause. A name in `_migrations`
+  // that isn't in MIGRATIONS can only mean the writer knew more migrations than
+  // we do. This is why migration names are append-only and MUST NOT be renamed
+  // once shipped: a rename makes every existing database look like the future.
+  if (!process.env[DRIFT_OVERRIDE_ENV]) {
+    const known = new Set(MIGRATIONS.map((m) => m.name));
+    const unknown = [...ran].filter((name) => !known.has(name)).sort();
+    if (unknown.length > 0) throw new SchemaTooNewError(unknown);
+  }
 
   const insert = db.prepare("INSERT INTO _migrations (name, run_at) VALUES (?, ?)");
 

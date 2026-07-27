@@ -49,3 +49,4 @@ Local-first real-time dashboard for monitoring AI-driven development projects vi
 |----------|---------|---------|
 | `PORT` | `3001` | Express server (`server/index.ts`) |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | SQLite path for the server, stdio MCP, and CLI alike (all go through `resolveDbPath()`). Set it once to share one DB across all three. |
+| `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a DB carrying migrations this build doesn't know (i.e. one written by a newer Vibe Dash). Only for running an older checkout against a migrated DB on purpose — expect SQL errors for missing columns. |
