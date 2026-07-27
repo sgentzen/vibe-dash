@@ -126,6 +126,16 @@ textarea:focus-visible {
   min-width: 0; /* NEW: children may shrink below their content width */
 }
 
+/* Header, main and the alert banner must all be allowed to shrink below their
+   content width. Without this a grid child with min-width:auto (e.g. the alert
+   banner, whose message is `white-space: nowrap`) contributes its full
+   min-content width to this single auto column, stretching the whole app past
+   the viewport. `overflow: hidden` above then clips the excess, silently
+   pushing the board's In Progress and Done columns off-screen. */
+.app > * {
+  min-width: 0;
+}
+
 .main-content {
   display: grid;
   grid-template-columns: 200px 1fr 240px;

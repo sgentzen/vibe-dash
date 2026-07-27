@@ -122,4 +122,56 @@ test.describe("Board view", () => {
     const updated = await api.getTask(task.id);
     expect(updated.status).toBe("in_progress");
   });
+
+  test("a long alert banner message does not push board columns off-screen", async ({
+    page,
+  }) => {
+    // The banner truncates its message with an ellipsis, so a reason far wider
+    // than the viewport must never stretch the app grid. It used to: the banner
+    // is a grid child of `.app` with min-width:auto, so its nowrap message set
+    // that column's minimum size, and `.app { overflow: hidden }` then silently
+    // clipped the In Progress and Done columns out of view.
+    //
+    // The blocker is stubbed at the network layer rather than created via the
+    // API: the banner is global state in a shared SQLite DB, so a real one
+    // would leak into every other spec (and stay there if this test were
+    // interrupted before it could clean up).
+    const marker = "OverflowMarker";
+    await page.route("**/api/blockers", (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: "stub-blocker",
+            task_id: "stub-task",
+            reason: `${marker} ${"blocked by a very long upstream failure ".repeat(20)}`,
+            reported_at: new Date().toISOString(),
+            resolved_at: null,
+          },
+        ],
+      })
+    );
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Board", exact: true }).click();
+
+    const banner = page.getByRole("alert").filter({ hasText: marker });
+    await expect(banner).toBeVisible();
+
+    const viewportWidth = page.viewportSize()!.width;
+
+    // The banner itself must shrink and ellipsis-truncate, not stretch
+    const bannerBox = await banner.boundingBox();
+    expect(bannerBox).not.toBeNull();
+    expect(bannerBox!.width).toBeLessThanOrEqual(viewportWidth);
+
+    const mainBox = await page.locator(".main-content").boundingBox();
+    expect(mainBox).not.toBeNull();
+    expect(mainBox!.width).toBeLessThanOrEqual(viewportWidth);
+
+    // The right-most column must stay inside the viewport, not clipped away
+    const doneColumn = page.getByText("DONE", { exact: true }).locator("../..");
+    const doneBox = await doneColumn.boundingBox();
+    expect(doneBox).not.toBeNull();
+    expect(doneBox!.x + doneBox!.width).toBeLessThanOrEqual(viewportWidth);
+  });
 });
