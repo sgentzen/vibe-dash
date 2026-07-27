@@ -8,6 +8,7 @@
   },
   "type": "module",
   "scripts": {
+    "backup": "node scripts/backup-db.mjs",
     "dev": "concurrently \"cross-env PORT=3001 tsx watch server/index.ts\" \"vite\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
