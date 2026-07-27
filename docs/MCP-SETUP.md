@@ -28,12 +28,25 @@ Leave this running in a terminal.
 
 ## Step 2: Configure Claude Code to use the MCP server
 
-Two transports are available. Choose based on your setup:
+Two transports are available, and they trade off against each other. Pick deliberately:
 
-| Transport | When to use |
-|-----------|------------|
-| **Stdio** | Single machine, offline-first. Each agent writes directly to SQLite. |
-| **Streamable HTTP** | Multi-agent or remote. Modern MCP clients. Requires server running. |
+| | **Stdio** | **Streamable HTTP** |
+|---|---|---|
+| Works when the server is down | Yes | No |
+| Dashboard updates live on agent writes | **No** — see below | Yes |
+| Best for | Single machine, offline-first | Multi-agent or remote; keeping the UI live |
+
+The live-update row is the one that surprises people. Both transports run the same
+tool code, and that code calls `broadcast()` after every mutation — but `broadcast()`
+only reaches browsers through the WebSocket server that lives inside the Vibe Dash
+server process. A stdio MCP server is a separate process with no WebSocket server in
+it, so the broadcast is a silent no-op (`server/websocket.ts`, `broadcast()` returns
+early when `wss` is null). Agent writes land in SQLite correctly; the open dashboard
+just won't know about them until you reload.
+
+Choose stdio if you want tools that work whether or not the server is up. Choose
+Streamable HTTP if you want the dashboard to stay live. This repo's own `.mcp.json`
+uses Streamable HTTP for that reason.
 
 ### Option A: Stdio (recommended for local use)
 
@@ -65,7 +78,9 @@ Or add it **globally** (all projects get it) in `~/.claude/settings.json` under 
 }
 ```
 
-The stdio transport defaults to `<vibe-dash-dir>/vibe-dash.db` (same database the server reads). Override with the `VIBE_DASH_DB` environment variable if needed.
+The stdio transport defaults to `<git-root>/vibe-dash.db` (same database the server reads — `resolveDbPath()` resolves every worktree of a repo to the one root database). Override with the `VIBE_DASH_DB` environment variable if needed.
+
+Remember the tradeoff above: an open dashboard will not reflect stdio writes until it is reloaded.
 
 ### Option B: Streamable HTTP (recommended for multi-agent/remote)
 
@@ -75,13 +90,42 @@ Streamable HTTP is the modern MCP transport. All communication goes through the 
 {
   "mcpServers": {
     "vibe-dash": {
+      "type": "http",
       "url": "http://localhost:3001/mcp"
     }
   }
 }
 ```
 
-Requires the Vibe Dash server to be running. The server logs `MCP (Streamable HTTP) at http://localhost:3001/mcp` on startup to confirm the endpoint is live.
+**The server must be running.** There is no autostart: if the Vibe Dash server is
+down, every `vibe-dash` tool fails for the whole session, and clients generally only
+attempt to connect at session start — so starting the server afterwards will not
+recover an already-running session. Start it before you start the client.
+
+To confirm the endpoint is live, look for this line on startup (structured JSON from
+pino, so the fields are separate from the message):
+
+```
+{"level":30,"port":3001,"path":"/mcp","msg":"MCP (Streamable HTTP) available"}
+```
+
+Or probe it directly with a real handshake. Note both `Accept` types are required —
+Streamable HTTP rejects a request that does not accept `text/event-stream`:
+
+```bash
+curl -s -X POST http://localhost:3001/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
+```
+
+A healthy server replies over SSE:
+
+```
+event: message
+data: {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"vibe-dash","version":"0.1.0"}},"jsonrpc":"2.0","id":1}
+```
+
+The Vite dev server (port 3000) also proxies `/mcp` through to 3001, so a client
+pointed at either port reaches the same endpoint — swap the port in the command above
+and the reply is identical.
 
 ---
 
@@ -189,14 +233,21 @@ Watch the dashboard — you should see each action appear in real time.
 - Check the path to stdio.ts is correct and absolute
 
 **Tasks not showing in dashboard:**
-- Stdio transport writes directly to SQLite — the dashboard reads the same DB
-- Refresh the browser if WebSocket disconnected
-- Check the server is running (`npm run dev` or `npm start`)
+- **On stdio, this is expected.** Stdio writes straight to SQLite from a separate
+  process, so no WebSocket event reaches the browser and the page will not update on
+  its own. Reload it. This is not a disconnect to debug — see the transport table in
+  Step 2. Switch to Streamable HTTP if you need the dashboard to stay live.
+- On Streamable HTTP, the page should update without a reload. If it doesn't, the
+  WebSocket has dropped: reload, and check the server is still running.
+- Either way, confirm both sides are on the same database (below).
 
 **Database location:**
-- Default: `<vibe-dash-dir>/vibe-dash.db`
-- Override: set `VIBE_DASH_DB` environment variable (for stdio) or `DB_PATH` (for server)
-- Both the stdio MCP and the server must use the same database file
+- Default: `<git-root>/vibe-dash.db` — `resolveDbPath()` walks up to the repository
+  root, and follows worktree `.git` pointers, so every worktree shares one database
+- Override: set `VIBE_DASH_DB`. This is the only database environment variable, and it
+  is read identically by the server, both MCP transports, and the CLI — set it once
+  and all four agree
+- The stdio MCP, the server, and the CLI must all resolve to the same file
 
 **Streamable HTTP connection refused:**
 - Make sure the Vibe Dash server is running before starting Claude Code
