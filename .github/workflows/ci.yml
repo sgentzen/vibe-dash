@@ -33,7 +33,19 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - run: npm ci
+      # Lifecycle scripts are off, so a compromised transitive dependency can't
+      # run arbitrary code in CI at install time. Only the two packages that
+      # genuinely need one are rebuilt explicitly: better-sqlite3 (native addon)
+      # and esbuild (platform binary). Those two still run their scripts — this
+      # shrinks the trusted set from the whole tree to them, it doesn't empty it.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts && npm rebuild better-sqlite3 esbuild
+
+      # `npm rebuild` exits 0 for a name that matches nothing, so the list above
+      # would rot silently. Fail loudly if a dependency bump changes which
+      # packages carry install scripts.
+      - name: Check install-script allowlist
+        run: npm run check:install-scripts
 
       # Gate on the shipped dependency tree. Dev-only advisories are excluded
       # because the ESLint toolchain currently pins a vulnerable brace-expansion
@@ -44,7 +56,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=moderate
 
       - name: Type-check
-        run: npx tsc -p tsconfig.json --noEmit
+        run: npm run typecheck:all
 
       - name: Lint
         run: npm run lint
@@ -61,7 +73,7 @@ jobs:
           retention-days: 7
 
       - name: Build
-        run: npx vite build
+        run: npm run build:client
 
   e2e:
     runs-on: ubuntu-latest
@@ -74,16 +86,18 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # See the test job for why lifecycle scripts are disabled here.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts && npm rebuild better-sqlite3 esbuild
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npm run test:e2e:install
 
       # Build the client so the express server can serve the production bundle.
       # In CI, playwright.config.ts targets that single server on :3001 (no vite
       # dev server / proxy), which removes the dev-server warmup flakiness.
       - name: Build client
-        run: npx vite build
+        run: npm run build:client
 
       # Playwright's webServer boots the express server (:3001) serving the
       # prebuilt SPA + API + WS. CI=true (set by GitHub) enables the 2 retries.
@@ -113,12 +127,15 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # See the test job for why lifecycle scripts are disabled here.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts && npm rebuild better-sqlite3 esbuild
 
       - name: Coverage
         run: npm run test:coverage
 
       - name: SonarCloud Scan
+        # nosemgrep: generic.secrets.security.detected-sonarqube-docs-api-key.detected-sonarqube-docs-api-key -- 40-hex string is the action's pinned commit SHA, not a key
         uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

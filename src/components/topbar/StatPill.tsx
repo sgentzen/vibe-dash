@@ -22,6 +22,7 @@ export function StatPill({ label, value, color, onClick }: Readonly<StatPillProp
   if (onClick) {
     return (
       <button
+        type="button"
         onClick={onClick}
         aria-label={`View ${label.toLowerCase()}`}
         style={{

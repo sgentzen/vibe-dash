@@ -17,6 +17,7 @@ export function ViewToggle({ activeView, onChange }: Readonly<ViewToggleProps>) 
     <div style={{ display: "flex", gap: "2px", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "2px" }}>
       {VIEWS.map((v) => (
         <button
+          type="button"
           key={v.key}
           onClick={() => onChange(v.key)}
           style={{

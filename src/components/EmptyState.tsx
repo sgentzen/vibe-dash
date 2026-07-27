@@ -32,6 +32,7 @@ export function EmptyState({ message, compact = false, icon, color = "var(--text
       <span style={{ fontSize: "13px", color }}>{message}</span>
       {action && (
         <button
+          type="button"
           onClick={action.onClick}
           style={{
             marginTop: "4px",

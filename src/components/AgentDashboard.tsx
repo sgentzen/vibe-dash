@@ -121,6 +121,7 @@ export function AgentDashboard() {
         <div style={{ display: "flex", gap: "4px" }}>
           {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((f) => (
             <button
+              type="button"
               key={f}
               onClick={() => setStatusFilter(f)}
               style={{
@@ -336,7 +337,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable region needs keyboard access (WCAG 2.1.1)
     <section tabIndex={0} aria-label="Agent detail" style={{ flex: 1, padding: "var(--space-4)", overflowY: "auto" }}>
-      <button onClick={onBack} style={{
+      <button type="button" onClick={onBack} style={{
         background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
         borderRadius: "6px", padding: "4px 12px", fontSize: "12px", cursor: "pointer", marginBottom: "var(--space-4)",
       }}>

@@ -9,6 +9,7 @@ export function TaskDrawerActions({ saving, showMarkDone, onSave, onMarkDone }: 
   return (
     <div style={{ marginTop: "auto", display: "flex", gap: "10px" }}>
       <button
+        type="button"
         onClick={onSave}
         disabled={saving}
         style={{
@@ -27,6 +28,7 @@ export function TaskDrawerActions({ saving, showMarkDone, onSave, onMarkDone }: 
       </button>
       {showMarkDone && (
         <button
+          type="button"
           onClick={onMarkDone}
           disabled={saving}
           style={{

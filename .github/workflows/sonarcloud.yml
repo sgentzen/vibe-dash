@@ -3,6 +3,11 @@ name: Manual SonarCloud Run
 on:
   workflow_dispatch: # Enables manual triggering
 
+# Least privilege: the scan only reads the checkout. Without this the job would
+# inherit the repository default, which on older repos is contents: write.
+permissions:
+  contents: read
+
 jobs:
   sonarqube:
     runs-on: ubuntu-latest
@@ -18,12 +23,18 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Lifecycle scripts are off, so a compromised transitive dependency can't
+      # run arbitrary code in CI at install time. Only better-sqlite3 (native
+      # addon) and esbuild (platform binary) are rebuilt explicitly; see the CI
+      # workflow's test job for the allowlist check that keeps that list honest.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts && npm rebuild better-sqlite3 esbuild
 
       - name: Coverage
         run: npm run test:coverage
 
       - name: SonarCloud Scan
+        # nosemgrep: generic.secrets.security.detected-sonarqube-docs-api-key.detected-sonarqube-docs-api-key -- 40-hex string is the action's pinned commit SHA, not a key
         uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

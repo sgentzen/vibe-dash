@@ -193,6 +193,7 @@ export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>
                 />
               </div>
               <button
+                type="button"
                 onClick={handleCreateProject}
                 disabled={creating || loadingDemo || !projectName.trim()}
                 style={primaryBtnStyle}
@@ -204,6 +205,7 @@ export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>
                   Or explore with sample data:
                 </p>
                 <button
+                  type="button"
                   onClick={handleLoadDemo}
                   disabled={creating || loadingDemo}
                   style={secondaryBtnStyle}
@@ -232,10 +234,10 @@ export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>
                 {MCP_CONFIG_TEMPLATE}
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={handleCopyConfig} style={secondaryBtnStyle}>
+                <button type="button" onClick={handleCopyConfig} style={secondaryBtnStyle}>
                   {copied ? "Copied!" : "Copy Config"}
                 </button>
-                <button onClick={() => setStep(2)} style={primaryBtnStyle}>
+                <button type="button" onClick={() => setStep(2)} style={primaryBtnStyle}>
                   Next
                 </button>
               </div>
@@ -251,10 +253,10 @@ export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>
                 We'll create a sample task so you can see the board in action. You can skip this and create tasks later.
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={handleCreateSampleTask} disabled={creating} style={primaryBtnStyle}>
+                <button type="button" onClick={handleCreateSampleTask} disabled={creating} style={primaryBtnStyle}>
                   {creating ? "Creating..." : "Create Sample Task"}
                 </button>
-                <button onClick={onComplete} style={secondaryBtnStyle}>
+                <button type="button" onClick={onComplete} style={secondaryBtnStyle}>
                   Skip
                 </button>
               </div>

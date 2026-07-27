@@ -45,6 +45,7 @@ export function GettingStartedChecklist() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
         <div style={sectionHeader}>Getting started · {doneCount}/{items.length}</div>
         <button
+          type="button"
           onClick={dismiss}
           aria-label="Dismiss getting started checklist"
           style={{

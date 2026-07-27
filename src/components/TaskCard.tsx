@@ -281,6 +281,7 @@ export const TaskCard = memo(function TaskCard({ task, allTasks, activity, agent
       {hasChildren && (
         <div style={{ marginTop: "6px" }}>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               setExpanded(!expanded);

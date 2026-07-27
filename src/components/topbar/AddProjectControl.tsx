@@ -32,7 +32,7 @@ export function AddProjectControl({ onAdd }: Readonly<AddProjectControlProps>) {
 
   if (!showForm) {
     return (
-      <button onClick={() => setShowForm(true)} style={btnStyle("var(--accent-blue)")}>
+      <button type="button" onClick={() => setShowForm(true)} style={btnStyle("var(--accent-blue)")}>
         + New Project
       </button>
     );
@@ -60,6 +60,7 @@ export function AddProjectControl({ onAdd }: Readonly<AddProjectControlProps>) {
         }}
       />
       <button
+        type="button"
         onClick={handleAdd}
         disabled={creating || !projectName.trim()}
         style={btnStyle("var(--accent-green)")}
@@ -67,6 +68,7 @@ export function AddProjectControl({ onAdd }: Readonly<AddProjectControlProps>) {
         Add
       </button>
       <button
+        type="button"
         onClick={() => { setShowForm(false); setProjectName(""); }}
         style={btnStyle("var(--text-muted)")}
       >
