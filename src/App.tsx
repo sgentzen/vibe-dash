@@ -307,6 +307,7 @@ export function App() {
                 }}
               >
                 <button
+                  type="button"
                   onClick={() => dispatch({ type: "TOGGLE_RIGHT_RAIL" })}
                   title="Expand agent feed"
                   aria-label="Expand agent feed"
@@ -360,6 +361,7 @@ export function App() {
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Failed to load data</div>
           <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>{loadError}</div>
           <button
+            type="button"
             onClick={() => globalThis.location.reload()}
             style={{
               background: "transparent",
