@@ -33,7 +33,7 @@ export function App() {
   const dispatch = useAppDispatch();
   const { blockers } = useDataState();
   const { theme, activeView, fleetPreset, rightRailCollapsed } = useNavigationState();
-  const { fileConflicts, loadError } = useNotificationState();
+  const { loadError } = useNotificationState();
   const api = useApi();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -339,7 +339,7 @@ export function App() {
           })()}
         </RailDrawers>
       </div>
-      {(blockers.length > 0 || fileConflicts.length > 0) && <AlertBanner />}
+      {blockers.length > 0 && <AlertBanner />}
       {loadError && (
         <div
           role="alert"
