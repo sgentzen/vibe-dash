@@ -5,6 +5,7 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { requestApp, requestAppRaw } from "./http-helper.js";
 import { createRouter } from "../server/routes/index.js";
+import { errorHandler } from "../server/routes/middleware.js";
 import {
   createProject,
   createTask,
@@ -40,6 +41,11 @@ beforeEach(() => {
   app = express();
   app.use(express.json());
   app.use(createRouter(db));
+  // Mounted last, as server/index.ts does, and load-bearing here: the
+  // malformed-body test below reaches it, because express.json() rejects that
+  // payload before any route runs. Without it that test would get Express's
+  // default HTML page instead of `{ error }`. See tests/http-helper.test.ts.
+  app.use(errorHandler);
 });
 
 describe("completion_metrics DB functions", () => {
@@ -241,6 +247,17 @@ describe("metrics REST endpoints", () => {
       );
       expect(status).toBe(400);
       expect(body.error).toBe("duration_seconds must be a number");
+    });
+
+    it("rejects a body that is not valid JSON, in the same error shape", async () => {
+      // express.json() rejects this before the route runs, so the 400 comes
+      // from the mounted errorHandler rather than the route's own validation.
+      // Pinned here against the real router because that is what makes the
+      // errorHandler mount in this file's beforeEach load-bearing: drop it and
+      // this returns Express's default HTML page instead.
+      const { status, body } = await requestRaw("POST", "/api/metrics", "{not valid json");
+      expect(status).toBe(400);
+      expect(body).toEqual({ error: expect.any(String) });
     });
   });
 
