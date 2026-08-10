@@ -54,3 +54,52 @@ describe("migration 019_transcript_ingestion", () => {
     );
   });
 });
+
+describe("migration 020_cost_usd_nullable", () => {
+  const insert = (db: Database.Database, id: string, cost: number | null): void => {
+    db.prepare(
+      `INSERT INTO cost_entries (id, model, provider, input_tokens, output_tokens, cost_usd, created_at, source, external_id)
+       VALUES (?, 'claude-opus-5', 'anthropic', 10, 20, ?, '2026-08-09T00:00:00.000Z', 'transcript', ?)`
+    ).run(id, cost, `ext-${id}`);
+  };
+
+  it("accepts NULL cost_usd for an unpriced record", () => {
+    expect(() => insert(db, "unpriced", null)).not.toThrow();
+    const row = db.prepare(`SELECT cost_usd FROM cost_entries WHERE id = 'unpriced'`).get() as { cost_usd: number | null };
+    expect(row.cost_usd).toBeNull();
+  });
+
+  it("still stores a real cost when one is supplied", () => {
+    insert(db, "priced", 1.5);
+    const row = db.prepare(`SELECT cost_usd FROM cost_entries WHERE id = 'priced'`).get() as { cost_usd: number | null };
+    expect(row.cost_usd).toBeCloseTo(1.5, 10);
+  });
+
+  it("still defaults an omitted cost to 0, so existing writers are unaffected", () => {
+    db.prepare(
+      `INSERT INTO cost_entries (id, model, provider, created_at)
+       VALUES ('defaulted', 'claude-opus-5', 'anthropic', '2026-08-09T00:00:00.000Z')`
+    ).run();
+    const row = db.prepare(`SELECT cost_usd FROM cost_entries WHERE id = 'defaulted'`).get() as { cost_usd: number };
+    expect(row.cost_usd).toBe(0);
+  });
+
+  it("keeps the partial unique index on external_id after the rebuild", () => {
+    insert(db, "a", 1);
+    // Same external_id as row "a" — the index must still reject it.
+    expect(() =>
+      db.prepare(
+        `INSERT INTO cost_entries (id, model, provider, input_tokens, output_tokens, cost_usd, created_at, source, external_id)
+         VALUES ('b', 'claude-opus-5', 'anthropic', 1, 1, 1, '2026-08-09T00:00:00.000Z', 'transcript', 'ext-a')`
+      ).run()
+    ).toThrow(/UNIQUE/i);
+  });
+
+  it("preserves the columns migration 019 added", () => {
+    const cols = (db.pragma("table_info(cost_entries)") as { name: string }[]).map((c) => c.name);
+    expect(cols).toEqual(expect.arrayContaining([
+      "source", "external_id", "cache_creation_5m_tokens", "cache_creation_1h_tokens",
+      "agent_id", "task_id", "milestone_id", "project_id",
+    ]));
+  });
+});

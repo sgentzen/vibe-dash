@@ -664,6 +664,67 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "020_cost_usd_nullable",
+    run(db) {
+      // An unpriced record must store NULL, not 0: NULL means "we do not know
+      // what this cost", 0 means "this was free". Conflating them understates
+      // spend, which is the exact failure transcript ingestion exists to
+      // prevent. cost_usd was declared NOT NULL in the original schema, and
+      // SQLite cannot drop NOT NULL with ALTER TABLE, so the table is rebuilt.
+      //
+      // No PRAGMA foreign_keys toggle here, deliberately: runMigrations already
+      // wraps each migration in a transaction, and the pragma is a no-op inside
+      // one. It is not needed anyway — nothing in the schema references
+      // cost_entries, and the copied rows keep their existing parent ids.
+      //
+      // DEFAULT 0 is retained so an INSERT that omits the column behaves exactly
+      // as before; only the NOT NULL constraint is lifted.
+      db.exec(`
+        CREATE TABLE cost_entries_new (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT REFERENCES agents(id),
+          task_id TEXT REFERENCES tasks(id),
+          milestone_id TEXT REFERENCES milestones(id),
+          project_id TEXT REFERENCES projects(id),
+          model TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          input_tokens INTEGER NOT NULL DEFAULT 0,
+          output_tokens INTEGER NOT NULL DEFAULT 0,
+          cost_usd REAL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'mcp',
+          external_id TEXT,
+          cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0,
+          cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0
+        );
+
+        INSERT INTO cost_entries_new
+          (id, agent_id, task_id, milestone_id, project_id, model, provider,
+           input_tokens, output_tokens, cost_usd, created_at,
+           source, external_id, cache_creation_5m_tokens, cache_creation_1h_tokens)
+        SELECT
+           id, agent_id, task_id, milestone_id, project_id, model, provider,
+           input_tokens, output_tokens, cost_usd, created_at,
+           source, external_id, cache_creation_5m_tokens, cache_creation_1h_tokens
+        FROM cost_entries;
+
+        DROP TABLE cost_entries;
+        ALTER TABLE cost_entries_new RENAME TO cost_entries;
+
+        -- Indexes live with the table, so dropping it dropped these too.
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_agent_id ON cost_entries(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_task_id ON cost_entries(task_id);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_milestone_id ON cost_entries(milestone_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_entries_external_id
+          ON cost_entries(external_id) WHERE external_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_source
+          ON cost_entries(source);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
