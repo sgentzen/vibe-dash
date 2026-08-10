@@ -3,7 +3,7 @@ import express from "express";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { requestApp } from "./http-helper.js";
+import { requestApp, requestAppRaw } from "./http-helper.js";
 import { createRouter } from "../server/routes/index.js";
 import {
   createProject,
@@ -24,6 +24,15 @@ function request(
   body?: unknown
 ): Promise<{ status: number; body: any }> {
   return requestApp(app, method, path, body);
+}
+
+/** As `request`, but sends an already-serialised body verbatim. */
+function requestRaw(
+  method: string,
+  path: string,
+  payload: string
+): Promise<{ status: number; body: any }> {
+  return requestAppRaw(app, method, path, payload);
 }
 
 beforeEach(() => {
@@ -169,6 +178,70 @@ describe("metrics REST endpoints", () => {
   it("POST /api/metrics returns 400 without required fields", async () => {
     const { status } = await request("POST", "/api/metrics", { lines_added: 10 });
     expect(status).toBe(400);
+  });
+
+  describe("POST /api/metrics numeric field validation", () => {
+    // Spelled out rather than imported from the route, so this stays an
+    // independent statement of the contract: dropping a field from the
+    // route's own NUMERIC_FIELDS list has to turn one of these red.
+    const NUMERIC_FIELDS = [
+      "lines_added", "lines_removed", "files_changed",
+      "tests_added", "tests_passing", "duration_seconds",
+    ];
+
+    // Values that are not finite numbers, each paired with the field it is
+    // sent as. better-sqlite3 binds some of these without complaint, so
+    // without the guard they corrupt the row rather than failing loudly:
+    // an array is spread as a positional parameter list, making [1] insert 1.
+    const NON_NUMERIC_VALUES: Array<[string, string, unknown]> = [
+      ["an object", "lines_added", {}],
+      ["an array", "lines_added", [1]],
+      ["a boolean", "tests_passing", true],
+      ["null", "files_changed", null],
+    ];
+
+    let taskId: string;
+    let agentId: string;
+
+    beforeEach(() => {
+      const project = createProject(db, { name: "P1", description: null });
+      taskId = createTask(db, {
+        project_id: project.id, title: "T1", priority: "medium",
+        parent_task_id: null, assigned_agent_id: null,
+        description: null, due_date: null, start_date: null, estimate: null,
+      }).id;
+      agentId = registerAgent(db, { name: "agent-1", model: null, capabilities: [] }).id;
+    });
+
+    it.each(NUMERIC_FIELDS)("rejects a non-numeric string for %s", async (field) => {
+      const { status, body } = await request("POST", "/api/metrics", {
+        task_id: taskId, agent_id: agentId, [field]: "abc",
+      });
+      expect(status).toBe(400);
+      expect(body.error).toBe(`${field} must be a number`);
+    });
+
+    it.each(NON_NUMERIC_VALUES)("rejects %s", async (_label, field, value) => {
+      const { status, body } = await request("POST", "/api/metrics", {
+        task_id: taskId, agent_id: agentId, [field]: value,
+      });
+      expect(status).toBe(400);
+      expect(body.error).toBe(`${field} must be a number`);
+    });
+
+    it("rejects a numeric literal that overflows to Infinity", async () => {
+      // 1e400 is valid JSON but JSON.parse yields Infinity — a number that is
+      // not finite, so a plain typeof check would let it through. It has to be
+      // sent raw: JSON.stringify(Infinity) is "null". (NaN has no such case —
+      // it is not valid JSON, so express.json() rejects it before the route.)
+      const { status, body } = await requestRaw(
+        "POST",
+        "/api/metrics",
+        `{"task_id":${JSON.stringify(taskId)},"agent_id":${JSON.stringify(agentId)},"duration_seconds":1e400}`,
+      );
+      expect(status).toBe(400);
+      expect(body.error).toBe("duration_seconds must be a number");
+    });
   });
 
   it("GET /api/agents/:id/performance returns metrics", async () => {
