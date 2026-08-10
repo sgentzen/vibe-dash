@@ -3,12 +3,26 @@ services:
     build: .
     image: vibe-dash:latest
     ports:
-      - "3001:3001"
+      # Bound to loopback deliberately. Vibe Dash has NO built-in authentication:
+      # anyone who can reach this port can read and write the task database and
+      # drive every MCP tool. "3001:3001" would publish that to the whole LAN.
+      # For remote access, terminate at a reverse proxy on this host and add
+      # access control there — see docs/self-hosting.md, "Access control".
+      - "127.0.0.1:3001:3001"
     volumes:
-      # Bind-mount the real project DB so the container serves actual data
-      # (not an isolated empty named volume). Single-writer only — do not run
-      # the direct file-based server/MCP against this file while the container runs.
-      - ./vibe-dash.db:/data/vibe-dash.db
+      # A named volume holding the DB *directory*, matching the Dockerfile's
+      # VOLUME ["/data"] and the backup/restore procedure in docs/self-hosting.md.
+      #
+      # Do NOT bind-mount the .db file itself. SQLite in WAL mode creates
+      # `vibe-dash.db-wal` and `vibe-dash.db-shm` alongside the database; if only
+      # the single file is mounted, those sidecars land in the container's
+      # writable layer instead of the volume, and the host and container end up
+      # with divergent views of the same database.
+      #
+      # This container is an ALTERNATIVE to running the server natively, never a
+      # companion to it. SQLite tolerates exactly one owning process — running
+      # both against one database is what corrupts it.
+      - vibe-dash-data:/data
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -20,3 +34,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  # Named explicitly so `docker compose` uses `vibe-dash-data` rather than a
+  # project-prefixed name — the backup and restore commands in
+  # docs/self-hosting.md refer to it by this exact name.
+  vibe-dash-data:
+    name: vibe-dash-data
