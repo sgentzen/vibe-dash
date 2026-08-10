@@ -67,6 +67,14 @@ export function parseTranscript(text: string): ParseResult {
       continue;
     }
 
+    // Reject non-object JSON (null, scalars, arrays). Though JSON.parse succeeds
+    // on these, they cannot carry the fields a usage record needs, so treat them
+    // as structurally unusable, same as unparseable lines.
+    if (row === null || typeof row !== "object" || Array.isArray(row)) {
+      skippedLines++;
+      continue;
+    }
+
     const record = toUsageRecord(row);
     if (record === null) {
       // Most lines legitimately lack usage (user turns, attachments). Only

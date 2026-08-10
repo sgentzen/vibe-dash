@@ -61,4 +61,20 @@ describe("parseTranscript", () => {
   it("returns an empty result for empty input", () => {
     expect(parseTranscript("")).toEqual({ records: [], skippedLines: 0, bytesRead: 0, lastUuid: null });
   });
+
+  it("does not throw on adversarial top-level JSON and skips those lines", () => {
+    // Regression test: bare null, scalars, and arrays are valid JSON but not
+    // object records. The parser must skip them without throwing.
+    const validRecord = `{"type":"assistant","uuid":"v-1","sessionId":"s","timestamp":"2026-08-09T00:00:00.000Z","message":{"model":"claude-opus-5","usage":{"input_tokens":1,"output_tokens":1}}}`;
+    const validRecord2 = `{"type":"assistant","uuid":"v-2","sessionId":"s","timestamp":"2026-08-09T00:00:01.000Z","message":{"model":"claude-opus-5","usage":{"input_tokens":2,"output_tokens":2}}}`;
+
+    const transcript = [validRecord, "null", "5", "true", `"str"`, "[1,2]", validRecord2].join("\n");
+
+    expect(() => parseTranscript(transcript)).not.toThrow();
+
+    const result = parseTranscript(transcript);
+    expect(result.records.map((r) => r.uuid)).toEqual(["v-1", "v-2"]);
+    expect(result.skippedLines).toBe(5); // null, 5, true, "str", [1,2]
+    expect(result.lastUuid).toBe("v-2");
+  });
 });
