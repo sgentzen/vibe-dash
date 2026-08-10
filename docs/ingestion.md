@@ -66,9 +66,17 @@ lists every model the table can currently price.
 Spend is attributed to a project only by an explicit directory link, created
 with `POST /api/ingest/paths`. Nothing is inferred automatically and nothing
 is auto-linked, even when a `cwd` obviously matches a project you already
-have. Spend from a directory with no link shows up as **Unattributed**, tagged
-with the path it came from, so you can see it and link it yourself rather than
-have it guessed at or dropped.
+have.
+
+Spend from a directory with no link keeps its `project_id` as `NULL` and is
+counted separately, as `unattributed` in `GET /api/ingest/status`. The
+originating directory itself is not currently stored anywhere or exposed by
+any endpoint: the `cwd` on each transcript record is read only long enough to
+look up a project, then discarded. So linking that spend means knowing the
+directory yourself and calling `POST /api/ingest/paths` with it, not reading
+it back off the dashboard. Nothing is guessed and nothing is dropped, but
+matching an unattributed total back to the directory that produced it is on
+you today.
 
 ## What it does not know
 
