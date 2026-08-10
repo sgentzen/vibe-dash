@@ -230,6 +230,22 @@ export interface CostByAgentEntry {
   unpriced_entries: number;
 }
 
+/**
+ * A project and calendar day carrying cost from both sources at once.
+ *
+ * Reported rather than resolved: a second tool legitimately working on the same
+ * project the same day looks identical to a duplicate, and only a person can
+ * tell them apart. The agent names are what make that judgement quick.
+ */
+export interface CostOverlap {
+  project_id: string;
+  project_name: string;
+  date: string;
+  mcp_entries: number;
+  transcript_entries: number;
+  mcp_agent_names: string[];
+}
+
 export interface CompletionMetrics {
   id: string;
   task_id: string;

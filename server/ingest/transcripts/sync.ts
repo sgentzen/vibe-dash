@@ -7,6 +7,8 @@ import { parseTranscript } from "./parse.js";
 import { priceRecord } from "./pricing.js";
 import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
+import { excludeObservedCondition } from "../../db/costs.js";
+import type { CostOverlap } from "../../../shared/types.js";
 
 const PROVIDER = "anthropic";
 
@@ -227,15 +229,59 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
   return result;
 }
 
-/** Counts behind GET /api/ingest/status, so skipped and unpriced are visible. */
+interface OverlapRow {
+  project_id: string;
+  project_name: string;
+  date: string;
+  mcp_entries: number;
+  transcript_entries: number;
+  mcp_agent_names: string | null;
+}
+
+/** Counts behind GET /api/ingest/status, so skipped, unpriced and duplicated spend are all visible. */
 export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
+  overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
+
+  // A project and day holding both a self-report and an observation. Agents
+  // already marked as observed are filtered out, because their rows no longer
+  // reach any total and so are no longer a discrepancy to act on.
+  //
+  // GROUP_CONCAT skips NULLs, and transcript rows carry no agent_id, so the
+  // name list only ever describes the mcp side. A self-report that named no
+  // agent contributes to mcp_entries with no name, which is the visible form
+  // of the row that cannot be excluded by marking.
+  const rows = db.prepare(`
+    SELECT c.project_id                                             AS project_id,
+           p.name                                                   AS project_name,
+           DATE(c.created_at)                                        AS date,
+           SUM(CASE WHEN c.source = 'mcp' THEN 1 ELSE 0 END)         AS mcp_entries,
+           SUM(CASE WHEN c.source = 'transcript' THEN 1 ELSE 0 END)  AS transcript_entries,
+           GROUP_CONCAT(DISTINCT a.name)                             AS mcp_agent_names
+      FROM cost_entries c
+      JOIN projects p ON p.id = c.project_id
+      LEFT JOIN agents a ON a.id = c.agent_id
+     WHERE c.project_id IS NOT NULL
+       AND ${excludeObservedCondition("c.")}
+     GROUP BY c.project_id, p.name, DATE(c.created_at)
+    HAVING mcp_entries > 0 AND transcript_entries > 0
+     ORDER BY date DESC, p.name
+  `).all() as OverlapRow[];
+
   return {
     filesTracked: one(`SELECT COUNT(*) AS n FROM transcript_files`),
     transcriptRows: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript'`),
     unpriced: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript' AND cost_usd IS NULL`),
     unattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript' AND project_id IS NULL`),
+    overlaps: rows.map((r) => ({
+      project_id: r.project_id,
+      project_name: r.project_name,
+      date: r.date,
+      mcp_entries: r.mcp_entries,
+      transcript_entries: r.transcript_entries,
+      mcp_agent_names: r.mcp_agent_names === null ? [] : r.mcp_agent_names.split(","),
+    })),
   };
 }
