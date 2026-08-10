@@ -78,6 +78,17 @@ describe("project path links", () => {
     expect((await request("POST", "/api/ingest/paths", body)).status).toBe(409);
   });
 
+  it("rejects linking a filesystem root with 400, not 409", async () => {
+    // 409 would tell the caller the path was already linked, which is a lie.
+    const project = createProject(db, { name: "demo", description: null });
+    const res = await request("POST", "/api/ingest/paths", { project_id: project.id, path: "/" });
+    expect(res.status).toBe(400);
+    expect((res.body as { error?: string }).error).toMatch(/whole filesystem or drive/);
+
+    const listed = await request("GET", "/api/ingest/paths");
+    expect((listed.body as { paths: unknown[] }).paths).toHaveLength(0);
+  });
+
   it("deletes a link", async () => {
     const project = createProject(db, { name: "demo", description: null });
     const created = await request("POST", "/api/ingest/paths", {

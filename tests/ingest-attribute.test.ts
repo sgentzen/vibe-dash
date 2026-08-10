@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { createProject } from "../server/db/index.js";
-import { linkProjectPath, listProjectPaths } from "../server/db/projectPaths.js";
-import { normalisePath, buildAttributor } from "../server/ingest/transcripts/attribute.js";
+import { linkProjectPath, listProjectPaths, RootPathError } from "../server/db/projectPaths.js";
+import { normalisePath, isRootPath, buildAttributor } from "../server/ingest/transcripts/attribute.js";
 
 let db: Database.Database;
 beforeEach(() => { db = createTestDb(); });
@@ -21,6 +21,49 @@ describe("normalisePath", () => {
   it("does not require the path to exist on disk", () => {
     // Historical transcripts name directories that may since have been deleted.
     expect(normalisePath("C:\\gone\\forever")).toBe("c:/gone/forever");
+  });
+
+  it("never collapses a root to the empty string", () => {
+    // "" would make the prefix test in buildAttributor read
+    // `target.startsWith("/")`, which every POSIX path satisfies.
+    expect(normalisePath("/")).toBe("/");
+    expect(normalisePath("///")).toBe("/");
+    expect(normalisePath("\\")).toBe("/");
+  });
+});
+
+describe("root paths", () => {
+  it("is recognised for both a POSIX root and a bare drive", () => {
+    expect(isRootPath("/")).toBe(true);
+    expect(isRootPath("c:")).toBe(true);
+    expect(isRootPath("C:")).toBe(true);
+    expect(isRootPath("/home/dev")).toBe(false);
+    expect(isRootPath("c:/repos")).toBe(false);
+  });
+
+  it("is refused at the link boundary rather than stored", () => {
+    const project = createProject(db, { name: "demo", description: null });
+    expect(() => linkProjectPath(db, project.id, "/")).toThrow(RootPathError);
+    expect(listProjectPaths(db, project.id)).toHaveLength(0);
+  });
+
+  it("does not swallow unrelated paths even if one is stored directly", () => {
+    // Belt and braces: the link boundary refuses a root, so this bypasses it
+    // and writes the row by hand. Even then the matcher must not treat "/" as
+    // a prefix of every POSIX path.
+    const rootProject = createProject(db, { name: "catch-all", description: null });
+    const realProject = createProject(db, { name: "real", description: null });
+    db.prepare(
+      `INSERT INTO project_paths (id, project_id, path, created_at)
+       VALUES ('root-link', ?, '/', '2026-08-09T00:00:00.000Z')`
+    ).run(rootProject.id);
+    linkProjectPath(db, realProject.id, "/home/dev/real");
+
+    const attribute = buildAttributor(db);
+    expect(attribute("/home/dev/unrelated")).toBeNull();
+    expect(attribute("/etc")).toBeNull();
+    // The genuinely linked directory still wins for its own subtree.
+    expect(attribute("/home/dev/real/src")).toBe(realProject.id);
   });
 });
 

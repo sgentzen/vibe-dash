@@ -1,12 +1,29 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import { normalisePath } from "../ingest/transcripts/attribute.js";
+import { normalisePath, isRootPath } from "../ingest/transcripts/attribute.js";
 
 export interface ProjectPath {
   id: string;
   project_id: string;
   path: string;
   created_at: string;
+}
+
+/**
+ * Thrown when the requested link would claim a whole filesystem or drive.
+ *
+ * A distinct type so the route can answer 400 rather than lumping it in with
+ * the UNIQUE violation that means "already linked".
+ */
+export class RootPathError extends Error {
+  constructor(path: string) {
+    super(
+      `Refusing to link "${path}": it names a whole filesystem or drive, so every ` +
+        `transcript on this machine would be attributed to one project. Link the ` +
+        `specific project directories instead.`
+    );
+    this.name = "RootPathError";
+  }
 }
 
 /**
@@ -17,10 +34,13 @@ export interface ProjectPath {
  * wrong attribution cannot be spotted from the UI.
  */
 export function linkProjectPath(db: Database.Database, projectId: string, rawPath: string): string {
+  const path = normalisePath(rawPath);
+  if (isRootPath(path)) throw new RootPathError(path);
+
   const id = randomUUID();
   db.prepare(
     `INSERT INTO project_paths (id, project_id, path, created_at) VALUES (?, ?, ?, ?)`
-  ).run(id, projectId, normalisePath(rawPath), new Date().toISOString());
+  ).run(id, projectId, path, new Date().toISOString());
   return id;
 }
 

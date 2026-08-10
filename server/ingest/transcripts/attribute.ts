@@ -11,8 +11,28 @@ import type Database from "better-sqlite3";
  * not, so folding case on Linux would merge two genuinely different directories.
  */
 export function normalisePath(raw: string): string {
-  const forward = raw.replace(/\\/g, "/").replace(/\/+$/, "");
-  return process.platform === "win32" ? forward.toLowerCase() : forward;
+  const forward = raw.replace(/\\/g, "/");
+  // Strip trailing slashes, but never down to the empty string. "/" is all
+  // slash, and collapsing it to "" turns the prefix test in buildAttributor
+  // into `target.startsWith("/")`, which is true of every POSIX path on the
+  // machine: one link would silently claim every transcript on disk for one
+  // project. A wrong attribution is worse than no attribution, so a lone root
+  // stays "/" and matches only itself.
+  const trimmed = forward.replace(/\/+$/, "");
+  const normalised = trimmed === "" ? "/" : trimmed;
+  return process.platform === "win32" ? normalised.toLowerCase() : normalised;
+}
+
+/**
+ * True for a path that names a whole filesystem or a whole drive.
+ *
+ * Rejected at the link boundary rather than matched. Linking a root means
+ * every transcript on the machine lands on one project, and since the
+ * originating `cwd` is never stored there would be no way to see that it had
+ * happened, let alone unpick it.
+ */
+export function isRootPath(normalised: string): boolean {
+  return normalised === "/" || /^[a-z]:$/i.test(normalised);
 }
 
 interface PathRow { project_id: string; path: string }

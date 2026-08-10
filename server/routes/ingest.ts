@@ -4,7 +4,7 @@ import type Database from "better-sqlite3";
 import { logger } from "../logger.js";
 import { syncTranscripts, getIngestStatus } from "../ingest/transcripts/sync.js";
 import { knownModels } from "../ingest/transcripts/pricing.js";
-import { linkProjectPath, listProjectPaths, unlinkProjectPath } from "../db/projectPaths.js";
+import { linkProjectPath, listProjectPaths, unlinkProjectPath, RootPathError } from "../db/projectPaths.js";
 import type { BroadcastFn, RouteFactory } from "./types.js";
 
 // A scan walks the filesystem, so it is far more expensive than a normal read.
@@ -64,9 +64,19 @@ export const ingestRoutes: RouteFactory = (db: Database.Database, broadcast: Bro
       broadcast({ type: "project_path_linked", payload: { id, project_id: projectId } });
       return res.status(201).json({ id });
     } catch (err) {
-      // The UNIQUE constraint on path is the expected failure here.
-      logger.warn({ err, projectId }, "project path link rejected");
-      return res.status(409).json({ error: "That path is already linked to a project" });
+      if (err instanceof RootPathError) {
+        return res.status(400).json({ error: err.message });
+      }
+      // Only the UNIQUE constraint on path means "already linked". Reporting
+      // every other throw as 409 told the caller their path was a duplicate
+      // when the real fault was ours, and hid the actual error behind a status
+      // that reads as "nothing to do here".
+      if ((err as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE") {
+        logger.warn({ err, projectId }, "project path already linked");
+        return res.status(409).json({ error: "That path is already linked to a project" });
+      }
+      logger.error({ err, projectId }, "project path link failed");
+      return res.status(500).json({ error: "Failed to link path" });
     }
   });
 

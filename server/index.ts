@@ -151,9 +151,11 @@ server.listen(PORT, () => {
 
   // Backgrounded deliberately: the first run on a machine with a long Claude
   // Code history walks every transcript, and that must never delay the server
-  // becoming available. A failure here is logged and otherwise ignored, exactly
-  // like the backfill above: cost ingestion is best-effort and never degrades
-  // the running server.
+  // becoming available. syncTranscripts yields to the event loop between files,
+  // which is what makes that true rather than aspirational — every step of the
+  // work itself is synchronous. A failure here is logged and otherwise ignored,
+  // exactly like the backfill above: cost ingestion is best-effort and never
+  // degrades the running server.
   syncTranscripts(db)
     .then((result) => {
       if (result.recordsIngested > 0) {

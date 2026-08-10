@@ -98,6 +98,14 @@ function readFrom(
  * mid-write leaves the trailing partial line unread and the cursor pointing
  * at its start, so the next scan re-reads it once the writer finishes it,
  * rather than skipping it forever.
+ *
+ * Genuinely asynchronous, and has to be: this runs at startup, and a machine
+ * with a long Claude Code history has thousands of transcripts to walk. Every
+ * step of the work is synchronous (fs.readSync, better-sqlite3), so without an
+ * explicit yield the whole scan would run to completion in one go and the
+ * server would accept connections it could not answer until it finished. The
+ * yield sits between files, never inside one, so each file's transaction stays
+ * a single uninterrupted unit.
  */
 export async function syncTranscripts(db: Database.Database, opts: SyncOptions = {}): Promise<SyncResult> {
   const claudeHome = resolveClaudeHome(opts.claudeHome);
@@ -160,6 +168,12 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
   });
 
   for (const filePath of files) {
+    // Hand the event loop back before each file so pending HTTP and WebSocket
+    // work can run between them. setImmediate rather than a resolved promise:
+    // a microtask would drain without ever letting I/O callbacks in, which is
+    // no yield at all.
+    await new Promise((resolve) => setImmediate(resolve));
+
     try {
       const cursor = selectCursor.get(filePath) as CursorRow | undefined;
       const offset = cursor?.byte_offset ?? 0;
@@ -197,7 +211,12 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
 
       upsertCursor.run({
         path: filePath, size, mtime, byte_offset: newOffset,
-        last_uuid: parsed.lastUuid, updated_at: new Date().toISOString(),
+        // Fall back to what was already recorded: a scan that read lines but
+        // extracted no usage record (all skipped, or none carrying usage) has
+        // nothing newer to offer, and writing NULL there would throw away a
+        // cursor that was correct.
+        last_uuid: parsed.lastUuid ?? cursor?.last_uuid ?? null,
+        updated_at: new Date().toISOString(),
       });
     } catch (err) {
       // One bad file must not abort the scan.
