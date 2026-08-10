@@ -26,6 +26,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,20 +41,47 @@ const vitestArgs = process.argv.slice(2);
 //     mitigation Node refuses to spawn .cmd/.bat without `shell: true`. Using a
 //     shell to work around that would drag in argument-quoting problems.
 // `node <path>.mjs` sidesteps both and behaves identically on every platform.
+//
+// Which .mjs, though, is Node's question to answer and not ours. This script
+// also runs from git worktrees under .claude/worktrees/, which have no
+// node_modules of their own — Node walks up to the main checkout instead — so
+// assuming the package sits directly below this script is a MODULE_NOT_FOUND
+// waiting to happen. Resolving lets Node walk the ancestor node_modules chain
+// exactly as an `import "vitest"` from this file would.
+//
+// Resolution goes via `vitest/package.json` and its `bin`, not the bare
+// `vitest/vitest.mjs` path: the latter is absent from vitest's `exports` map,
+// so require.resolve rejects it outright with ERR_PACKAGE_PATH_NOT_EXPORTED.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const VITEST_ENTRY = path.join(repoRoot, "node_modules", "vitest", "vitest.mjs");
+
+function resolveVitestEntry() {
+  try {
+    const require = createRequire(import.meta.url);
+    const manifestPath = require.resolve("vitest/package.json");
+    const { bin } = require(manifestPath);
+    const entry = typeof bin === "string" ? bin : bin?.vitest;
+    if (entry) return path.join(path.dirname(manifestPath), entry);
+  } catch {
+    // Not resolvable — most plausibly an install whose vitest predates the
+    // `./package.json` export. Guess the conventional layout; the existence
+    // check in main() reports it properly if the guess is wrong too.
+  }
+  return path.join(repoRoot, "node_modules", "vitest", "vitest.mjs");
+}
+
+const VITEST_ENTRY = resolveVitestEntry();
 
 const SLOT_WRAPPER = path.join(homedir(), ".claude", "bin", "testslot.py");
 
 /** Run a command inheriting stdio; returns its exit code (null if it could not start). */
 function run(command, args) {
   // `command` is never user-controlled: it is either process.execPath or a name
-  // from the fixed ["python", "python3"] allowlist below. Args are equally
-  // fixed — paths derived from import.meta.url and homedir(), plus the literal
-  // flags in package.json's scripts. `shell` is left at its default of false,
-  // so args go straight to CreateProcess/execve as an array and are never
-  // parsed by a shell. This is local build tooling, unreachable from HTTP or
-  // MCP request data.
+  // from the fixed ["python", "python3"] allowlist below. The args are paths
+  // derived from import.meta.url, homedir() and Node's own module resolution,
+  // plus whatever `npm test` forwarded on argv. `shell` is left at its default
+  // of false, so every arg goes straight to CreateProcess/execve as an array
+  // element and is never parsed by a shell — forwarded argv included. This is
+  // local build tooling, unreachable from HTTP or MCP request data.
   // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
   const result = spawnSync(command, args, { stdio: "inherit" });
   if (result.error) return null;
@@ -64,7 +92,9 @@ function run(command, args) {
 function runVitestDirectly() {
   const code = run(process.execPath, [VITEST_ENTRY, ...vitestArgs]);
   if (code === null) {
-    console.error(`test-with-slot: could not start vitest at ${VITEST_ENTRY}. Is \`npm install\` done?`);
+    // Only reachable if the node binary itself will not spawn; a missing entry
+    // file is caught by the existence check in main().
+    console.error(`test-with-slot: could not spawn ${process.execPath}.`);
     return 1;
   }
   return code;
@@ -80,6 +110,15 @@ function findPython() {
 }
 
 function main() {
+  // Every branch below spawns this entry, directly or through the wrapper, so
+  // vet it once here. Node exits with a raw MODULE_NOT_FOUND stack when handed
+  // a path that isn't there — precisely the baffling failure that sent people
+  // hunting through this script in the first place.
+  if (!existsSync(VITEST_ENTRY)) {
+    console.error(`test-with-slot: no vitest at ${VITEST_ENTRY}. Run \`npm install\`.`);
+    return 1;
+  }
+
   if (process.env.CI) return runVitestDirectly();
   if (!existsSync(SLOT_WRAPPER)) return runVitestDirectly();
 
