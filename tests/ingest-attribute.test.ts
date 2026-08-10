@@ -9,8 +9,20 @@ let db: Database.Database;
 beforeEach(() => { db = createTestDb(); });
 
 describe("normalisePath", () => {
+  // Assertions on a Windows-shaped path have to follow the same platform rule
+  // normalisePath itself does: case is folded on win32 only, because NTFS is
+  // case-insensitive and ext4 is not. Hard-coding the lowercased form passed
+  // locally on Windows and failed on the Linux CI runner.
+  const expectPath = (raw: string, onWindows: string, elsewhere: string): void => {
+    expect(normalisePath(raw)).toBe(process.platform === "win32" ? onWindows : elsewhere);
+  };
+
   it("converts separators and strips a trailing slash", () => {
-    expect(normalisePath("C:\\Users\\sgent\\projects\\demo\\")).toBe("c:/users/sgent/projects/demo");
+    expectPath(
+      "C:\\Users\\sgent\\projects\\demo\\",
+      "c:/users/sgent/projects/demo",
+      "C:/Users/sgent/projects/demo",
+    );
   });
 
   it("lowercases on Windows only", () => {
@@ -20,7 +32,7 @@ describe("normalisePath", () => {
 
   it("does not require the path to exist on disk", () => {
     // Historical transcripts name directories that may since have been deleted.
-    expect(normalisePath("C:\\gone\\forever")).toBe("c:/gone/forever");
+    expectPath("C:\\gone\\forever", "c:/gone/forever", "C:/gone/forever");
   });
 
   it("never collapses a root to the empty string", () => {
