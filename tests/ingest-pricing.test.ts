@@ -47,4 +47,12 @@ describe("priceRecord", () => {
     expect(priceRecord(record({ model: "claude-haiku-4-5", outputTokens: 1_000_000 }))).toBeCloseTo(5, 10);
     expect(priceRecord(record({ model: "claude-fable-5", outputTokens: 1_000_000 }))).toBeCloseTo(50, 10);
   });
+
+  it("falls back to the standard rate for a model that has no fast tier", () => {
+    expect(priceRecord(record({ model: "claude-sonnet-5", speed: "fast", inputTokens: 1_000_000 }))).toBeCloseTo(3, 10);
+  });
+
+  it("returns null for an unknown model even in fast mode", () => {
+    expect(priceRecord(record({ model: "claude-unreleased", speed: "fast", inputTokens: 1_000_000 }))).toBeNull();
+  });
 });
