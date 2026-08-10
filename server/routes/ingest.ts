@@ -16,6 +16,17 @@ const scanLimiter = rateLimit({
   message: { error: "Too many ingest scans, please try again later." },
 });
 
+// The path-link endpoints write to the database, so they get a limiter too
+// (CodeQL js/missing-rate-limiting). Linking is a deliberate, occasional human
+// action, so the ceiling only has to be above real use, not generous.
+const pathsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many project path changes, please try again later." },
+});
+
 export const ingestRoutes: RouteFactory = (db: Database.Database, broadcast: BroadcastFn): Router => {
   const router = Router();
 
@@ -50,7 +61,7 @@ export const ingestRoutes: RouteFactory = (db: Database.Database, broadcast: Bro
    * silent wrong attribution puts money against the wrong project and cannot be
    * spotted from the UI.
    */
-  router.post("/api/ingest/paths", (req, res) => {
+  router.post("/api/ingest/paths", pathsLimiter, (req, res) => {
     const { project_id: projectId, path: rawPath } = req.body as { project_id?: string; path?: string };
     if (!projectId || !rawPath) {
       return res.status(400).json({ error: "project_id and path are required" });
@@ -81,10 +92,15 @@ export const ingestRoutes: RouteFactory = (db: Database.Database, broadcast: Bro
   });
 
   /** DELETE /api/ingest/paths/:id */
-  router.delete("/api/ingest/paths/:id", (req, res) => {
-    const removed = unlinkProjectPath(db, req.params.id);
+  router.delete("/api/ingest/paths/:id", pathsLimiter, (req, res) => {
+    // Read the param once and narrow it here. With a middleware in the chain
+    // Express widens req.params values to string | string[], so using it inline
+    // twice fails the build; a repeated `:id` would arrive as an array anyway,
+    // and this route only ever means the single-value case.
+    const id = String(req.params.id);
+    const removed = unlinkProjectPath(db, id);
     if (!removed) return res.status(404).json({ error: "Path link not found" });
-    broadcast({ type: "project_path_unlinked", payload: { id: req.params.id } });
+    broadcast({ type: "project_path_unlinked", payload: { id } });
     return res.status(204).end();
   });
 

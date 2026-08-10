@@ -109,3 +109,24 @@ describe("linkProjectPath", () => {
     expect(listProjectPaths(db, project.id)[0].path).toBe(normalisePath("C:\\Users\\sgent\\projects\\Demo"));
   });
 });
+
+describe("normalisePath on pathological input", () => {
+  // normalisePath runs on the `path` field of POST /api/ingest/paths, so its
+  // input is request-controlled. The trailing-slash trim used to be /\/+$/,
+  // which backtracks super-linearly on a long run of slashes (CodeQL
+  // js/polynomial-redos). These assert the linear index-based trim: if it ever
+  // regresses to a backtracking regex, they stop returning and the suite times
+  // out rather than quietly passing.
+  it("collapses a very long run of slashes to the root", () => {
+    expect(normalisePath("/".repeat(50_000))).toBe("/");
+  });
+
+  it("trims a very long trailing run without touching the path itself", () => {
+    const expected = normalisePath("C:/repos/demo");
+    expect(normalisePath(`C:/repos/demo${"/".repeat(50_000)}`)).toBe(expected);
+  });
+
+  it("handles a long run of backslashes, which are converted first", () => {
+    expect(normalisePath("\\".repeat(50_000))).toBe("/");
+  });
+});

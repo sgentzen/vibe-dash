@@ -10,6 +10,9 @@ import type Database from "better-sqlite3";
  * Lowercasing is Windows-only because NTFS is case-insensitive while ext4 is
  * not, so folding case on Linux would merge two genuinely different directories.
  */
+/** Character code for "/", used by the index-based trim below. */
+const SLASH = 47;
+
 export function normalisePath(raw: string): string {
   const forward = raw.replace(/\\/g, "/");
   // Strip trailing slashes, but never down to the empty string. "/" is all
@@ -18,8 +21,15 @@ export function normalisePath(raw: string): string {
   // machine: one link would silently claim every transcript on disk for one
   // project. A wrong attribution is worse than no attribution, so a lone root
   // stays "/" and matches only itself.
-  const trimmed = forward.replace(/\/+$/, "");
-  const normalised = trimmed === "" ? "/" : trimmed;
+  //
+  // Trimmed by index rather than with /\/+$/, deliberately. This runs on the
+  // `path` field of POST /api/ingest/paths, so the input is request-controlled,
+  // and a trailing-slash regex backtracks super-linearly on a string of many
+  // slashes (CodeQL js/polynomial-redos). Walking backwards is linear, and
+  // stopping at index 1 gives the "never collapse to empty" floor for free.
+  let end = forward.length;
+  while (end > 1 && forward.charCodeAt(end - 1) === SLASH) end--;
+  const normalised = forward.slice(0, end);
   return process.platform === "win32" ? normalised.toLowerCase() : normalised;
 }
 
