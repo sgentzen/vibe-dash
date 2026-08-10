@@ -29,6 +29,42 @@ const totalCostSql = (prefix = ""): string => `COALESCE(SUM(${prefix}cost_usd), 
 const unpricedSql = (prefix = ""): string =>
   `COALESCE(SUM(CASE WHEN ${prefix}cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries`;
 
+/**
+ * Rows an observed agent self-reported, which duplicate what we already read
+ * from its transcripts.
+ *
+ * Only `mcp` rows are excluded: the `transcript` row is the observation we
+ * trust, and dropping it would delete the very figure that replaced the
+ * duplicate. A row with a NULL agent_id is never excluded either, because a
+ * self-report that named no agent cannot be attributed to one — that is the
+ * documented limitation.
+ *
+ * The `agent_id IS NOT NULL` guard is load-bearing and must not be removed as
+ * redundant. `NULL IN (<non-empty subquery>)` evaluates to NULL, not FALSE, so
+ * without it `NOT (... AND NULL)` is NULL, a WHERE clause treats that as
+ * not-true, and every self-report that named no agent would vanish from the
+ * totals as soon as any agent was marked. Those rows are unattributable and so
+ * cannot be excluded by agent; they must stay counted.
+ *
+ * A named constant rather than a string repeated at six call sites, so a query
+ * added later cannot silently reintroduce double counting.
+ */
+const excludeObservedCondition = (prefix = ""): string =>
+  `NOT (${prefix}source = 'mcp' ` +
+  `AND ${prefix}agent_id IS NOT NULL ` +
+  `AND ${prefix}agent_id IN (SELECT id FROM agents WHERE cost_observed_externally = 1))`;
+
+/**
+ * Compose the exclusion onto a WHERE clause that may or may not exist.
+ *
+ * buildWhere() cannot carry this: it pushes a parameter for every clause it
+ * accepts, and this condition takes none.
+ */
+const withExclusion = (existingWhere: string, prefix = ""): string =>
+  existingWhere.length > 0
+    ? `${existingWhere} AND ${excludeObservedCondition(prefix)}`
+    : `WHERE ${excludeObservedCondition(prefix)}`;
+
 export interface LogCostInput {
   agent_id?: string | null;
   task_id?: string | null;
@@ -71,7 +107,7 @@ function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, valu
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
             COUNT(*) AS entry_count,
             ${unpricedSql()}
-     FROM cost_entries WHERE ${column} = ?`
+     FROM cost_entries WHERE ${column} = ? AND ${excludeObservedCondition()}`
   ).get(value) as CostSummary;
 }
 
@@ -79,7 +115,10 @@ export function getSpendToday(db: Database.Database): number {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const row = db
-    .prepare("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM cost_entries WHERE created_at >= ?")
+    .prepare(
+      `SELECT COALESCE(SUM(cost_usd), 0) AS total FROM cost_entries
+       WHERE created_at >= ? AND ${excludeObservedCondition()}`
+    )
     .get(todayStart.toISOString()) as { total: number };
   return row.total;
 }
@@ -91,7 +130,7 @@ export function getGlobalCostSummary(db: Database.Database): CostSummary {
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
             COUNT(*) AS entry_count,
             ${unpricedSql()}
-     FROM cost_entries`
+     FROM cost_entries ${withExclusion("")}`
   ).get() as CostSummary;
 }
 
@@ -127,7 +166,7 @@ export function getCostTimeseries(
             COUNT(*) AS entry_count,
             ${unpricedSql()}
      FROM cost_entries
-     ${where}
+     ${withExclusion(where)}
      GROUP BY DATE(created_at)
      ORDER BY date ASC`
   ).all(...params) as CostTimeseriesEntry[];
@@ -169,7 +208,7 @@ export function getCostByModel(
             COUNT(*) AS entry_count,
             ${unpricedSql()}
      FROM cost_entries
-     ${where}
+     ${withExclusion(where)}
      GROUP BY model, provider
      ORDER BY total_cost_usd DESC`
   ).all(...params) as CostByModelEntry[];
@@ -179,7 +218,7 @@ export function getCostByAgent(
   db: Database.Database,
   filter: { project_id?: string; milestone_id?: string } = {}
 ): CostByAgentEntry[] {
-  const conditions: string[] = ["c.agent_id IS NOT NULL"];
+  const conditions: string[] = ["c.agent_id IS NOT NULL", excludeObservedCondition("c.")];
   const params: unknown[] = [];
 
   if (filter.project_id) { conditions.push("c.project_id = ?"); params.push(filter.project_id); }
