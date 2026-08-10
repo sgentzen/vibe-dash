@@ -119,7 +119,7 @@ Icons per token: `success` ✓ · `warning` ⚠ · `danger` ✗ · `info` ● ·
 <span className="section-label">Orchestration Overview</span>  {/* should be ALL CAPS tracked-out */}
 ```
 
-Views without a visible page title (e.g., TaskBoard, TaskListView) are exempt only if the active view's name is visible in the top-bar ViewToggle — add a page title if the view ever renders standalone.
+Views without a visible page title (e.g., TaskBoard) are exempt only if the active view's name is visible in the top-bar ViewToggle — add a page title if the view ever renders standalone.
 
 ---
 
@@ -155,7 +155,7 @@ Defined in `src/App.css` (`:root`). Use `typeScale.*` spread in React inline sty
 |------------------|----------------|-----------------------------------|
 | `--type-display` | `600 32px/1.2` | Hero numbers, large KPI values    |
 | `--type-h1`      | `600 24px/1.3` | Page titles (reserved)            |
-| `--type-h2`      | `600 18px/1.4` | View headings (WorktreeView, ExecutiveView) |
+| `--type-h2`      | `600 18px/1.4` | View headings (DashboardView, AgentDashboard) |
 | `--type-body`    | `400 14px/1.5` | Default body copy, sub-headings   |
 | `--type-caption` | `400 12px/1.4` | Card metadata, secondary labels   |
 | `--type-micro`   | `500 11px/1.3` | Section headers, stat labels, badges |
