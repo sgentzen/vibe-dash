@@ -83,6 +83,23 @@ describe("syncTranscripts", () => {
     expect(rowCount()).toBe(2);
   });
 
+  it("does not lose a record that was mid-write during a scan", async () => {
+    const file = writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo"));
+    await syncTranscripts(db, { claudeHome: home });
+
+    // Simulate catching a write in progress: append a line with no terminator.
+    const partial = line("a-2", "C:/repos/demo").replace(/\n$/, "");
+    appendFileSync(file, partial, "utf8");
+    const mid = await syncTranscripts(db, { claudeHome: home });
+    expect(mid.recordsIngested).toBe(0);
+
+    // The writer finishes the line.
+    appendFileSync(file, "\n", "utf8");
+    const after = await syncTranscripts(db, { claudeHome: home });
+    expect(after.recordsIngested).toBe(1);
+    expect(rowCount()).toBe(2);
+  });
+
   it("attributes to a linked project and leaves the rest unattributed", async () => {
     const project = createProject(db, { name: "demo", description: null });
     linkProjectPath(db, project.id, "C:/repos/demo");

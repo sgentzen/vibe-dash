@@ -10,10 +10,24 @@ import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 
 const PROVIDER = "anthropic";
 
-interface CursorRow { size: number; byte_offset: number }
+interface CursorRow { size: number; byte_offset: number; last_uuid: string | null }
 
-/** Read the new tail of a file, given the recorded cursor. */
-function readFrom(filePath: string, offset: number): { text: string; size: number; mtime: string } {
+/**
+ * Read the new tail of a file, given the recorded cursor.
+ *
+ * Never returns a byte past the last complete line. A transcript is written
+ * one JSONL line at a time, and a scan can land while a write is still in
+ * progress, so the last bytes on disk may be an unterminated line. Handing
+ * that fragment to the parser and then advancing the cursor past it would
+ * strand it: once the writer finishes the line, the next scan would start
+ * reading after it and that record's spend would be lost for good. Waiting
+ * for the trailing newline costs nothing — every complete transcript on disk
+ * ends with one, so a tail without one only ever means "write in progress."
+ */
+function readFrom(
+  filePath: string,
+  offset: number
+): { text: string; size: number; mtime: string; newOffset: number } {
   const stat = fs.statSync(filePath);
   const size = stat.size;
   // A file smaller than the recorded size was rotated or rewritten, so the old
@@ -23,10 +37,22 @@ function readFrom(filePath: string, offset: number): { text: string; size: numbe
   const handle = fs.openSync(filePath, "r");
   try {
     const length = size - start;
-    if (length <= 0) return { text: "", size, mtime: stat.mtime.toISOString() };
+    if (length <= 0) return { text: "", size, mtime: stat.mtime.toISOString(), newOffset: start };
     const buffer = Buffer.alloc(length);
     fs.readSync(handle, buffer, 0, length, start);
-    return { text: buffer.toString("utf8"), size, mtime: stat.mtime.toISOString() };
+
+    // Byte index, not string index: the file is UTF-8 and a multi-byte
+    // character could straddle the boundary, so the search has to happen on
+    // the raw bytes before any decoding.
+    const lastNewline = buffer.lastIndexOf(0x0a);
+    if (lastNewline === -1) {
+      // No complete line in the new bytes yet. Nothing to parse this scan,
+      // and the offset does not move — the same bytes are re-read next time.
+      return { text: "", size, mtime: stat.mtime.toISOString(), newOffset: start };
+    }
+
+    const text = buffer.subarray(0, lastNewline + 1).toString("utf8");
+    return { text, size, mtime: stat.mtime.toISOString(), newOffset: start + lastNewline + 1 };
   } finally {
     fs.closeSync(handle);
   }
@@ -40,6 +66,12 @@ function readFrom(filePath: string, offset: number): { text: string; size: numbe
  * re-scan a no-op. That guarantee lives in the database rather than in this
  * function, because money that can be double-counted by one logic bug is not
  * trustworthy money.
+ *
+ * Invariant: the persisted `byte_offset` never advances past the last
+ * complete (newline-terminated) line. A scan that catches a transcript
+ * mid-write leaves the trailing partial line unread and the cursor pointing
+ * at its start, so the next scan re-reads it once the writer finishes it,
+ * rather than skipping it forever.
  */
 export async function syncTranscripts(db: Database.Database, opts: SyncOptions = {}): Promise<SyncResult> {
   const claudeHome = resolveClaudeHome(opts.claudeHome);
@@ -52,7 +84,7 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
 
   const attribute = buildAttributor(db);
 
-  const selectCursor = db.prepare(`SELECT size, byte_offset FROM transcript_files WHERE path = ?`);
+  const selectCursor = db.prepare(`SELECT size, byte_offset, last_uuid FROM transcript_files WHERE path = ?`);
   const upsertCursor = db.prepare(`
     INSERT INTO transcript_files (path, size, mtime, byte_offset, last_uuid, updated_at)
     VALUES (@path, @size, @mtime, @byte_offset, @last_uuid, @updated_at)
@@ -107,11 +139,25 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
       const offset = cursor?.byte_offset ?? 0;
       const previousSize = cursor?.size ?? 0;
 
-      const { text, size, mtime } = readFrom(filePath, offset);
+      const { text, size, mtime, newOffset } = readFrom(filePath, offset);
       result.filesScanned++;
 
-      // Nothing new and the file has not shrunk: skip without parsing.
-      if (text.length === 0 && size === previousSize) continue;
+      // No complete new line this scan (either truly nothing new, or a
+      // trailing partial line caught mid-write). Either way there is nothing
+      // to parse, so byte_offset never moves here.
+      if (text.length === 0) {
+        // The file still grew or shrank even though no full line was ready —
+        // record the new size so shrink detection stays accurate next time,
+        // but leave byte_offset where it is so the partial line is re-read
+        // once it is complete.
+        if (size !== previousSize) {
+          upsertCursor.run({
+            path: filePath, size, mtime, byte_offset: newOffset,
+            last_uuid: cursor?.last_uuid ?? null, updated_at: new Date().toISOString(),
+          });
+        }
+        continue;
+      }
 
       const parsed = parseTranscript(text);
       result.recordsSkipped += parsed.skippedLines;
@@ -122,7 +168,7 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
       result.unattributed += counts.unattributed;
 
       upsertCursor.run({
-        path: filePath, size, mtime, byte_offset: size,
+        path: filePath, size, mtime, byte_offset: newOffset,
         last_uuid: parsed.lastUuid, updated_at: new Date().toISOString(),
       });
     } catch (err) {
