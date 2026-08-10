@@ -233,8 +233,7 @@ export type WsEventType =
   | "cost_logged"
   | "metrics_logged"
   | "worktree_created"
-  | "worktree_updated"
-  | "plugins_reloaded";
+  | "worktree_updated";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -263,8 +262,7 @@ export type WsEvent =
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>
   | WsEventOf<"worktree_created", TaskWorktree>
-  | WsEventOf<"worktree_updated", TaskWorktree>
-  | WsEventOf<"plugins_reloaded", { count: number }>;
+  | WsEventOf<"worktree_updated", TaskWorktree>;
 
 // ─── Agent Cost ───────────────────────────────────────────────────────────────
 
