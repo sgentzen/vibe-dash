@@ -259,9 +259,18 @@ function handleResolveBlocker(db: Database.Database, args: Args, agentName?: str
   return ok({ success: true });
 }
 
-function handleLogCost(db: Database.Database, args: Args): ToolResult {
+function handleLogCost(db: Database.Database, args: Args, agentName?: string): ToolResult {
+  // Resolve the session agent when the caller did not name one, exactly as
+  // log_activity does through autoLog. Without this a cost row can land
+  // attached to no agent, and an agent-level exclusion deliberately skips
+  // rows with no agent, so that spend stays double counted forever.
+  let agentId = (args.agent_id as string) ?? null;
+  if (!agentId && agentName) {
+    agentId = touchAgent(db, agentName).id;
+  }
+
   const entry = logCost(db, {
-    agent_id: (args.agent_id as string) ?? null,
+    agent_id: agentId,
     task_id: (args.task_id as string) ?? null,
     milestone_id: (args.milestone_id as string) ?? null,
     project_id: (args.project_id as string) ?? null,
