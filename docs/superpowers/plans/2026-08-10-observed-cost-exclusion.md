@@ -313,8 +313,9 @@ describe("excluding an observed agent's self-reported cost", () => {
     const agent = registerAgent(db, { name: "claude", model: "claude-opus-5", capabilities: [] });
     setAgentCostObserved(db, agent.id, true);
 
-    // NULL IN (...) is never true, so this row survives. That is the documented
-    // limitation: an unattributed self-report cannot be excluded by agent.
+    // The condition's explicit agent_id IS NOT NULL guard keeps this row. That
+    // is the documented limitation: an unattributed self-report cannot be
+    // excluded by agent, so it must stay counted.
     expect(getProjectCostSummary(db, project.id).total_cost_usd).toBeCloseTo(3, 10);
   });
 
@@ -346,8 +347,9 @@ In `server/db/costs.ts`, beside the existing `totalCostSql` and `unpricedSql` fr
  * Only `mcp` rows are excluded: the `transcript` row is the observation we
  * trust, and dropping it would delete the very figure that replaced the
  * duplicate. A row with a NULL agent_id is never excluded either, because
- * `NULL IN (...)` is never true — that is the documented limitation for a
- * self-report that named no agent.
+ * the explicit `agent_id IS NOT NULL` guard keeps it. That guard is
+ * load-bearing: `NULL IN (<non-empty subquery>)` is NULL rather than FALSE, so
+ * without it those rows would vanish once any agent was marked.
  *
  * A named constant rather than a string repeated at six call sites, so a query
  * added later cannot silently reintroduce double counting.
@@ -804,7 +806,7 @@ git commit -m "feat(api): add the endpoint to mark an agent cost-observed"
 - Consumes: `touchAgent(db, name): Agent` from `server/db/agents.ts`, already used by `autoLog` in the same file.
 - Produces: no new exports. `log_cost` gains the same auto-registration behaviour `log_activity` already has.
 
-**Why this task exists.** `log_cost` takes `agent_id` as optional and `handleLogCost` ignores the per-session `agentName` its handler signature already receives. A caller supplying neither writes a cost row attached to no agent, and an agent-level exclusion can never touch it: `NULL IN (...)` is never true. Without this task the feature has a hole that only appears for one caller shape.
+**Why this task exists.** `log_cost` takes `agent_id` as optional and `handleLogCost` ignores the per-session `agentName` its handler signature already receives. A caller supplying neither writes a cost row attached to no agent, and an agent-level exclusion can never touch it, because the condition deliberately skips rows with no agent. Without this task the feature has a hole that only appears for one caller shape.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -873,8 +875,8 @@ In `server/mcp/tools.ts`, change `handleLogCost` to accept the session agent nam
 function handleLogCost(db: Database.Database, args: Args, agentName?: string): ToolResult {
   // Resolve the session agent when the caller did not name one, exactly as
   // log_activity does through autoLog. Without this a cost row can land
-  // attached to no agent, and an agent-level exclusion can never reach it —
-  // `NULL IN (...)` is never true — so the spend stays double counted forever.
+  // attached to no agent, and an agent-level exclusion deliberately skips
+  // rows with no agent, so that spend stays double counted forever.
   let agentId = (args.agent_id as string) ?? null;
   if (!agentId && agentName) {
     agentId = touchAgent(db, agentName).id;
