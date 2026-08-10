@@ -233,7 +233,10 @@ export type WsEventType =
   | "cost_logged"
   | "metrics_logged"
   | "worktree_created"
-  | "worktree_updated";
+  | "worktree_updated"
+  | "cost_ingested"
+  | "project_path_linked"
+  | "project_path_unlinked";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -262,7 +265,10 @@ export type WsEvent =
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>
   | WsEventOf<"worktree_created", TaskWorktree>
-  | WsEventOf<"worktree_updated", TaskWorktree>;
+  | WsEventOf<"worktree_updated", TaskWorktree>
+  | WsEventOf<"cost_ingested", { filesScanned: number; recordsIngested: number; recordsSkipped: number; unpriced: number; unattributed: number }>
+  | WsEventOf<"project_path_linked", { id: string; project_id: string }>
+  | WsEventOf<"project_path_unlinked", { id: string }>;
 
 // ─── Agent Cost ───────────────────────────────────────────────────────────────
 
