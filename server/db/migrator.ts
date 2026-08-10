@@ -610,6 +610,60 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "019_transcript_ingestion",
+    run(db) {
+      // Cost rows now come from two places: an agent calling log_cost ('mcp')
+      // and Claude Code transcripts read off disk ('transcript'). Tagging the
+      // source is what stops the two double-counting the same spend.
+      //
+      // external_id holds the transcript record's own uuid. The partial unique
+      // index below is the whole idempotency guarantee: re-scanning a file can
+      // never insert a row twice, and it is enforced by the database rather
+      // than by application logic that could regress.
+      //
+      // Cache writes are split by TTL because they are priced differently
+      // (1.25x input for 5-minute, 2x for 1-hour) and the transcript reports
+      // them separately. Folding them together would make cost_usd
+      // unauditable.
+      db.exec(`
+        ALTER TABLE cost_entries ADD COLUMN source TEXT NOT NULL DEFAULT 'mcp';
+        ALTER TABLE cost_entries ADD COLUMN external_id TEXT;
+        ALTER TABLE cost_entries ADD COLUMN cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE cost_entries ADD COLUMN cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_entries_external_id
+          ON cost_entries(external_id) WHERE external_id IS NOT NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_source
+          ON cost_entries(source);
+
+        -- One project has many directories once git worktrees are in use, so
+        -- this is a table rather than a column on projects. Paths are stored
+        -- already normalised (see attribute.ts) so lookup is string equality.
+        CREATE TABLE IF NOT EXISTS project_paths (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id),
+          path TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_paths_project ON project_paths(project_id);
+
+        -- The incremental cursor. byte_offset is where the last scan stopped,
+        -- so a steady-state scan costs time proportional to new bytes rather
+        -- than to the number of transcripts on disk.
+        CREATE TABLE IF NOT EXISTS transcript_files (
+          path TEXT PRIMARY KEY,
+          size INTEGER NOT NULL,
+          mtime TEXT NOT NULL,
+          byte_offset INTEGER NOT NULL DEFAULT 0,
+          last_uuid TEXT,
+          updated_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
