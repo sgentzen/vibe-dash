@@ -63,6 +63,28 @@ describe("project path links", () => {
     expect((res.body as { error?: string }).error).toBeTruthy();
   });
 
+  // A truthy non-string passed the old `!projectId || !rawPath` guard: an object
+  // project_id reached the prepared statement as named parameters, and an object
+  // path reached normalisePath's string methods. Both threw, both became 500s.
+  it("rejects a non-string project_id with 400, not 500", async () => {
+    const res = await request("POST", "/api/ingest/paths", {
+      project_id: { a: 1 },
+      path: "C:/repos/demo",
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as { error?: string }).error).toBeTruthy();
+  });
+
+  it("rejects a non-string path with 400, not 500", async () => {
+    const project = createProject(db, { name: "demo", description: null });
+    const res = await request("POST", "/api/ingest/paths", {
+      project_id: project.id,
+      path: { a: 1 },
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as { error?: string }).error).toBeTruthy();
+  });
+
   it("rejects a link to a project that does not exist", async () => {
     const res = await request("POST", "/api/ingest/paths", {
       project_id: "no-such-project",

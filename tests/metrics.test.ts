@@ -5,6 +5,7 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { requestApp } from "./http-helper.js";
 import { createRouter } from "../server/routes/index.js";
+import { errorHandler } from "../server/routes/middleware.js";
 import {
   createProject,
   createTask,
@@ -31,6 +32,10 @@ beforeEach(() => {
   app = express();
   app.use(express.json());
   app.use(createRouter(db));
+  // Production mounts errorHandler last (server/index.ts). Without it a thrown
+  // route error falls through to Express's default HTML finaliser, so a test
+  // asserting on a 500 would not be checking what a client actually receives.
+  app.use(errorHandler);
 });
 
 describe("completion_metrics DB functions", () => {
@@ -169,6 +174,53 @@ describe("metrics REST endpoints", () => {
   it("POST /api/metrics returns 400 without required fields", async () => {
     const { status } = await request("POST", "/api/metrics", { lines_added: 10 });
     expect(status).toBe(400);
+  });
+
+  // A truthy non-string used to sail past the `!task_id || !agent_id` guard and
+  // reach the prepared statement, where better-sqlite3 refuses to bind it. That
+  // is a malformed request, not a server fault, so it must not be a 500.
+  it("POST /api/metrics returns 400 when the ids are booleans", async () => {
+    const { status, body } = await request("POST", "/api/metrics", { task_id: true, agent_id: true });
+    expect(status).toBe(400);
+    expect(body.error).toBeTruthy();
+  });
+
+  it("POST /api/metrics returns 400 when the ids are numbers", async () => {
+    const { status, body } = await request("POST", "/api/metrics", { task_id: 123, agent_id: 456 });
+    expect(status).toBe(400);
+    expect(body.error).toBeTruthy();
+  });
+
+  it("POST /api/metrics returns 404 for well-formed ids that match no rows", async () => {
+    const { status, body } = await request("POST", "/api/metrics", {
+      task_id: "no-such-task",
+      agent_id: "no-such-agent",
+    });
+    expect(status).toBe(404);
+    expect(body.error).toMatch(/Unknown task_id or agent_id/);
+  });
+
+  // The 404 above is reached by matching one specific SQLite error code. Without
+  // this, a catch that swallowed every error would still look green, and a real
+  // server fault would be reported to the operator as a missing row.
+  it("POST /api/metrics still returns 500 for a failure that is not a bad id", async () => {
+    const project = createProject(db, { name: "P1", description: null });
+    const task = createTask(db, {
+      project_id: project.id, title: "T1", priority: "medium",
+      parent_task_id: null, assigned_agent_id: null,
+      description: null, due_date: null, start_date: null, estimate: null,
+    });
+    const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
+    // Both ids are valid, so nothing here is the caller's fault: the insert
+    // fails because the connection is gone, which is ours.
+    db.close();
+
+    const { status, body } = await request("POST", "/api/metrics", {
+      task_id: task.id,
+      agent_id: agent.id,
+    });
+    expect(status).toBe(500);
+    expect(body.error).toBe("Internal server error");
   });
 
   it("GET /api/agents/:id/performance returns metrics", async () => {
