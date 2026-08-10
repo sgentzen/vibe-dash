@@ -1,6 +1,12 @@
 # Strategic positioning: hobby vs portfolio piece vs real product
 
 **Status:** Decided (Portfolio piece)
+
+> **Superseded 2026-08-09** by [2026-08-09-used-oss-project.md](2026-08-09-used-oss-project.md).
+> The "portfolio piece" scope cap, and its "does this only matter to a paying
+> customer?" test, no longer apply. This file is kept for the reasoning that led
+> to the original decision.
+
 **Date:** 2026-05-12
 **Milestone:** May 2026 Brainstorm — Cuts, Gaps & Verification
 **Task:** vibe-dash 12b0ca7f
