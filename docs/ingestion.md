@@ -135,13 +135,29 @@ Rows do carry a `source` column, `mcp` or `transcript`, so the two are
 distinguishable and the damage is auditable after the fact.
 
 **Mark the agent as cost-observed to correct the double count, past and
-future.** Call `POST /api/agents/:id/cost-observed` with body
-`{ "observed": true }` for the Claude Code agent whose spend is doubled. Every
-cost query then excludes that agent's `source = 'mcp'` rows, so every total,
-past and future, drops back to what the transcripts alone report. Its
-`source = 'transcript'` rows keep counting, since those are the real figure.
-`GET /api/ingest/status` lists the overlap that makes the affected agent easy
-to find before you mark it, under its `overlaps` array.
+future, for every row that names an agent.** Call
+`POST /api/agents/:id/cost-observed` with body `{ "observed": true }` for the
+Claude Code agent whose spend is doubled. Every cost query then excludes that
+agent's `source = 'mcp'` rows, so every total, past and future, drops back to
+what the transcripts alone report. Its `source = 'transcript'` rows keep
+counting, since those are the real figure. `GET /api/ingest/status` lists the
+overlap that makes the affected agent easy to find before you mark it, under
+its `overlaps` array, and once you mark the agent, that project-and-day entry
+stops appearing there, confirming the correction took effect.
+
+**A row recorded with no agent attached can never be excluded by marking.**
+The exclusion requires the row to name the agent you mark, because a
+self-report that named no agent cannot be attributed to any agent, marked or
+not. This affects anyone whose earlier `log_cost` calls did not name an
+agent, which older setups could do before this release started attaching the
+session agent to `log_cost` automatically. Those rows stay double counted no
+matter what you mark, and stay listed in `GET /api/ingest/status`'s
+`overlaps` array indefinitely. There is no way to correct them through the
+interface today. The signal that one of these rows is present: an
+`overlaps` entry's `mcp_agent_names` list names fewer agents than
+`mcp_entries` would suggest, because a self-report that named no agent is
+counted in `mcp_entries` but never appears in `mcp_agent_names`. Reading that
+gap and deciding what it means is left to you.
 
 **Nothing is deleted.** Marking an agent only changes which rows a query
 counts; the excluded `mcp` rows stay in the database, so unmarking the agent
