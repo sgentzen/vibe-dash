@@ -49,7 +49,7 @@ const unpricedSql = (prefix = ""): string =>
  * A named constant rather than a string repeated at six call sites, so a query
  * added later cannot silently reintroduce double counting.
  */
-const excludeObservedCondition = (prefix = ""): string =>
+export const excludeObservedCondition = (prefix = ""): string =>
   `NOT (${prefix}source = 'mcp' ` +
   `AND ${prefix}agent_id IS NOT NULL ` +
   `AND ${prefix}agent_id IN (SELECT id FROM agents WHERE cost_observed_externally = 1))`;
