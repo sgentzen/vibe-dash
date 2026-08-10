@@ -12,7 +12,6 @@ import { errorHandler, notFoundHandler } from "./routes/middleware.js";
 import { logger } from "./logger.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
-import { initPlugins } from "./routes/plugins.js";
 import { randomUUID } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -139,7 +138,6 @@ initWebSocket(server);
 
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "Vibe Dash running");
-  initPlugins(db).catch((err) => logger.warn({ err }, "plugin init failed"));
   logger.info({ port: PORT, path: "/ws" }, "WebSocket available");
   logger.info({ port: PORT, path: "/mcp" }, "MCP (Streamable HTTP) available");
   // Backfill milestone daily stats so the dashboard has data immediately
