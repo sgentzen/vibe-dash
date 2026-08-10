@@ -62,7 +62,9 @@ export const ingestRoutes: RouteFactory = (db: Database.Database, broadcast: Bro
    * spotted from the UI.
    */
   router.post("/api/ingest/paths", pathsLimiter, (req, res) => {
-    const { project_id: projectId, path: rawPath } = req.body as { project_id?: string; path?: string };
+    // express.json() leaves req.body undefined without a JSON Content-Type,
+    // and destructuring that throws a 500; `?? {}` keeps that case a 400.
+    const { project_id: projectId, path: rawPath } = (req.body ?? {}) as { project_id?: string; path?: string };
     if (!projectId || !rawPath) {
       return res.status(400).json({ error: "project_id and path are required" });
     }

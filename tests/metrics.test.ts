@@ -171,6 +171,32 @@ describe("metrics REST endpoints", () => {
     expect(status).toBe(400);
   });
 
+  it("POST /api/metrics returns 400 for a non-numeric metric field", async () => {
+    // The NUMERIC_FIELDS guard had no coverage in either direction, and it
+    // reads the same body binding the unparsed-body fix introduced.
+    const { status, body } = await request("POST", "/api/metrics", {
+      task_id: "t1",
+      agent_id: "a1",
+      lines_added: "oops",
+    });
+    expect(status).toBe(400);
+    expect(body.error).toBe("lines_added must be a number");
+  });
+
+  it("POST /api/metrics returns 400 when the body was never parsed as JSON", async () => {
+    // Omitting Content-Type: application/json leaves req.body undefined under
+    // Express 5. Malformed client input has to read as a 400, not a 500.
+    const { status, body } = await requestApp(
+      app,
+      "POST",
+      "/api/metrics",
+      { task_id: "t1", agent_id: "a1" },
+      { contentType: "text/plain" },
+    );
+    expect(status).toBe(400);
+    expect((body as { error?: string }).error).toBe("task_id and agent_id are required");
+  });
+
   it("GET /api/agents/:id/performance returns metrics", async () => {
     const project = createProject(db, { name: "P1", description: null });
     const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });

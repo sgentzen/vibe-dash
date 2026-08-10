@@ -51,6 +51,27 @@ describe("POST /api/agents/:id/cost-observed", () => {
 
     expect((await request("POST", `/api/agents/${agent.id}/cost-observed`, {})).status).toBe(400);
     expect((await request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: "yes" })).status).toBe(400);
+    // null and 1 are the two truthiness-adjacent values a looser check would
+    // wave through, so they are pinned separately from the string case.
+    expect((await request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: null })).status).toBe(400);
+    expect((await request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: 1 })).status).toBe(400);
+  });
+
+  it("400s when the body was never parsed as JSON", async () => {
+    const agent = registerAgent(db, { name: "claude", model: "claude-opus-5", capabilities: [] });
+
+    // A client that omits Content-Type: application/json leaves req.body
+    // undefined under Express 5. That is malformed client input, so it has to
+    // read as a 400, not as an internal error.
+    const res = await requestApp(
+      app,
+      "POST",
+      `/api/agents/${agent.id}/cost-observed`,
+      { observed: true },
+      { contentType: "text/plain" },
+    );
+    expect(res.status).toBe(400);
+    expect((res.body as { error?: string }).error).toBe("observed must be true or false");
   });
 
   it("broadcasts the updated agent", async () => {

@@ -86,7 +86,9 @@ export function agentRoutes(db: Database.Database, broadcast: BroadcastFn): Rout
    * precisely the guess this feature exists to avoid.
    */
   router.post("/api/agents/:id/cost-observed", costObservedLimiter, (req, res) => {
-    const { observed } = req.body as { observed?: unknown };
+    // express.json() leaves req.body undefined without a JSON Content-Type,
+    // and destructuring that throws a 500; `?? {}` keeps that case a 400.
+    const { observed } = (req.body ?? {}) as { observed?: unknown };
     if (typeof observed !== "boolean") {
       return res.status(400).json({ error: "observed must be true or false" });
     }

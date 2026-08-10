@@ -13,11 +13,22 @@ function listen(server: Server): Promise<number> {
 /** Issues the request and resolves with the response head. */
 function send(options: http.RequestOptions, payload?: string): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
-    const req = http.request(options, resolve);
+    // `agent: false` opts out of http.globalAgent, which defaults to
+    // keepAlive on Node 18+. Each call here binds a throwaway server to an
+    // ephemeral port, so a pooled socket outliving its server can be handed to
+    // a later request once the OS recycles that port — which surfaces as one
+    // test seeing another's response. Rare, but it did reproduce under full
+    // suite concurrency. An unpooled socket closes with its response.
+    const req = http.request({ ...options, agent: false }, resolve);
     req.on("error", reject);
     if (payload) req.write(payload);
     req.end();
   });
+}
+
+/** Closes the one-shot server and waits for it to stop listening. */
+function close(server: Server): Promise<void> {
+  return new Promise((resolve) => server.close(() => resolve()));
 }
 
 /** Collects a response body into a string. */
@@ -28,6 +39,17 @@ function readBody(res: IncomingMessage): Promise<string> {
     res.on("end", () => resolve(data));
     res.on("error", reject);
   });
+}
+
+export interface RequestAppOptions {
+  /**
+   * Overrides the default `application/json`. A non-JSON type makes
+   * `express.json()` skip the body entirely, which is how a client that forgets
+   * the header reaches a route with `req.body` still `undefined` under
+   * Express 5. The payload itself is still JSON-encoded, so the only thing
+   * under test is the missing content type.
+   */
+  contentType?: string;
 }
 
 /**
@@ -44,6 +66,7 @@ export async function requestApp(
   method: string,
   path: string,
   body?: unknown,
+  options?: RequestAppOptions,
 ): Promise<{ status: number; body: unknown }> {
   const server = createServer(app);
   const port = await listen(server);
@@ -56,7 +79,7 @@ export async function requestApp(
         path,
         method,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": options?.contentType ?? "application/json",
           ...(payload ? { "Content-Length": String(Buffer.byteLength(payload)) } : {}),
         },
       },
@@ -70,6 +93,7 @@ export async function requestApp(
       return { status, body: data };
     }
   } finally {
-    server.close();
+    // Awaited, so the next call cannot bind while this one is still draining.
+    await close(server);
   }
 }

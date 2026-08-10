@@ -17,9 +17,14 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
   const metricsLimiter = makeReadLimiter(120);
 
   router.post("/api/metrics", metricsLimiter, (req, res) => {
-    const { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds } = req.body as {
-      task_id: string;
-      agent_id: string;
+    // express.json() leaves req.body undefined without a JSON Content-Type,
+    // and destructuring that throws a 500; `?? {}` keeps that case a 400.
+    // Bound once so the numeric-field loop below reads the same guarded object
+    // rather than req.body directly, which would reintroduce the throw if the
+    // required-field check above it were ever reordered.
+    const body = (req.body ?? {}) as {
+      task_id?: string;
+      agent_id?: string;
       lines_added?: number;
       lines_removed?: number;
       files_changed?: number;
@@ -27,12 +32,13 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       tests_passing?: number;
       duration_seconds?: number;
     };
+    const { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds } = body;
     if (!task_id || !agent_id) {
       badRequest(res, "task_id and agent_id are required");
       return;
     }
     for (const field of NUMERIC_FIELDS) {
-      const val = req.body[field];
+      const val = body[field];
       if (val !== undefined && !Number.isFinite(val)) {
         badRequest(res, `${field} must be a number`);
         return;

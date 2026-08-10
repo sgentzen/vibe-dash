@@ -63,6 +63,20 @@ describe("project path links", () => {
     expect((res.body as { error?: string }).error).toBeTruthy();
   });
 
+  it("rejects a link whose body was never parsed as JSON", async () => {
+    // Omitting Content-Type: application/json leaves req.body undefined under
+    // Express 5. Malformed client input has to read as a 400, not a 500.
+    const res = await requestApp(
+      app,
+      "POST",
+      "/api/ingest/paths",
+      { project_id: "p1", path: "C:/repos/demo" },
+      { contentType: "text/plain" },
+    );
+    expect(res.status).toBe(400);
+    expect((res.body as { error?: string }).error).toBe("project_id and path are required");
+  });
+
   it("rejects a link to a project that does not exist", async () => {
     const res = await request("POST", "/api/ingest/paths", {
       project_id: "no-such-project",
