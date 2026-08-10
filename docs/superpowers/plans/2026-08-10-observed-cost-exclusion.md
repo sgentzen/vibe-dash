@@ -33,7 +33,7 @@ Copied from the spec and the repository's CLAUDE.md. Every task's requirements i
 |---|---|
 | `server/db/migrator.ts` (modify) | Migration `021_agent_cost_observed` |
 | `server/db/agents.ts` (modify) | `setAgentCostObserved(db, agentId, observed)` |
-| `server/db/costs.ts` (modify) | The exclusion condition, and its application to all six queries |
+| `server/db/costs.ts` (modify) | The exclusion condition, and its application to all six queries. Task 3 exports the condition so the overlap query reuses it. |
 | `server/ingest/transcripts/sync.ts` (modify) | `overlaps` on `getIngestStatus` |
 | `server/routes/agents.ts` (modify) | `POST /api/agents/:id/cost-observed` |
 | `shared/types.ts` (modify) | `Agent.cost_observed_externally`, `CostOverlap` |
@@ -428,7 +428,12 @@ git commit -m "feat(costs): exclude an observed agent's self-reported rows from 
 - Test: `tests/ingest-overlaps.test.ts` (create)
 
 **Interfaces:**
-- Consumes: the `cost_observed_externally` column from Task 1.
+- Consumes: `excludeObservedCondition` from Task 2, which must be exported from
+  `server/db/costs.ts` as part of THIS task (Task 2 left it module-private).
+  Export it there, add it to the `server/db/index.ts` re-export beside the other
+  cost exports, and import it here. Do NOT retype the SQL: the spec makes it a
+  shared named constant precisely so a later query cannot drift from it, and the
+  `agent_id IS NOT NULL` guard inside it is load-bearing.
 - Produces:
   - `interface CostOverlap { project_id: string; project_name: string; date: string; mcp_entries: number; transcript_entries: number; mcp_agent_names: string[] }` in `shared/types.ts`.
   - `getIngestStatus` return type gains `overlaps: CostOverlap[]`.
@@ -522,6 +527,21 @@ describe("getIngestStatus overlaps", () => {
     expect(overlap.mcp_agent_names).toEqual([]);
   });
 
+  it("still reports the agent-less self-report when a DIFFERENT agent is marked", () => {
+    // The IS NOT NULL guard inside the shared condition is what makes this
+    // pass. Without it the subquery is non-empty, NULL IN (...) is SQL NULL,
+    // and the WHERE clause silently drops the row from the report.
+    const project = createProject(db, { name: "demo", description: null });
+    const other = registerAgent(db, { name: "claude", model: "claude-opus-5", capabilities: [] });
+    addCost(db, { id: "m1", project: project.id, agent: null, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: project.id, source: "transcript", day: "2026-08-10" });
+
+    setAgentCostObserved(db, other.id, true);
+
+    const [overlap] = getIngestStatus(db).overlaps;
+    expect(overlap.mcp_entries).toBe(1);
+  });
+
   it("is empty on a database with no cost rows", () => {
     expect(getIngestStatus(db).overlaps).toEqual([]);
   });
@@ -595,8 +615,7 @@ export function getIngestStatus(db: Database.Database): {
       JOIN projects p ON p.id = c.project_id
       LEFT JOIN agents a ON a.id = c.agent_id
      WHERE c.project_id IS NOT NULL
-       AND NOT (c.source = 'mcp' AND c.agent_id IN
-                (SELECT id FROM agents WHERE cost_observed_externally = 1))
+       AND ${excludeObservedCondition("c.")}
      GROUP BY c.project_id, p.name, DATE(c.created_at)
     HAVING mcp_entries > 0 AND transcript_entries > 0
      ORDER BY date DESC, p.name
@@ -621,10 +640,20 @@ export function getIngestStatus(db: Database.Database): {
 
 Add `import type { CostOverlap } from "../../../shared/types.js";` beside the file's existing imports. If `sync.ts` already imports from `shared/types.js`, extend that import instead of adding a second one.
 
+Also add `import { excludeObservedCondition } from "../../db/costs.js";` and make
+the query a template literal so the interpolation works. Because the fragment is
+now interpolated into a second module, confirm the file still has no bound
+parameters mismatched against placeholders: the fragment takes none.
+
+Note the resulting subtlety and keep it: a self-report with no `agent_id` is
+kept by the fragment's `IS NOT NULL` guard, so it keeps appearing in the overlap
+report. That is correct. Marking an agent cannot remove such a row from the
+totals, so it must stay visible as something only a person can resolve.
+
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/ingest-overlaps.test.ts`
-Expected: PASS, 6 tests.
+Expected: PASS, 7 tests.
 
 - [ ] **Step 6: Confirm the status route still matches**
 
