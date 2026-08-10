@@ -42,4 +42,25 @@ describe("log_cost agent attribution", () => {
     expect(row.agent_id).toBeNull();
     expect(row.cost_usd).toBeCloseTo(1, 10);
   });
+
+  it("writes the row instead of throwing when agent_id is an empty string", async () => {
+    // "" is schema-valid (no .min(1)) and is an FK column. `?? null` treats
+    // "" as present, so an unnormalised handler passes it straight to the DB
+    // and the FK constraint throws, losing the row entirely.
+    await handleTool(db, "log_cost", { ...args, agent_id: "" });
+
+    const rows = db.prepare(`SELECT agent_id FROM cost_entries`).all() as { agent_id: string | null }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].agent_id).toBeNull();
+  });
+
+  it("writes the row instead of throwing when task_id is an empty string", async () => {
+    // Same defect, same FK-column shape: task_id, milestone_id and project_id
+    // all go through the identical `?? null` pattern as agent_id.
+    await handleTool(db, "log_cost", { ...args, task_id: "" });
+
+    const rows = db.prepare(`SELECT task_id FROM cost_entries`).all() as { task_id: string | null }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].task_id).toBeNull();
+  });
 });
