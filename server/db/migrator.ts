@@ -618,12 +618,16 @@ const MIGRATIONS: Migration[] = [
       // column records which, so a row's provenance is auditable and a future
       // change can filter or reconcile on it.
       //
-      // It does NOT deduplicate anything today: no query filters on source, so
-      // a Claude Code session that both calls log_cost and gets its transcript
-      // ingested is counted twice. That is a real upgrade hazard for anyone
-      // whose per-project CLAUDE.md still carries the old log_cost instruction,
-      // and is documented in docs/ingestion.md. Making the cost queries
-      // source-aware is tracked as follow-up work.
+      // On its own, a Claude Code session that both calls log_cost and gets
+      // its transcript ingested is counted twice — a real upgrade hazard for
+      // anyone whose per-project CLAUDE.md still carries the old log_cost
+      // instruction, documented in docs/ingestion.md. Migration 021 adds the
+      // fix: excludeObservedCondition() in server/db/costs.ts filters on this
+      // column for every agent marked cost-observed. That marking is always
+      // an explicit human action through POST /api/agents/:id/cost-observed —
+      // never inferred from source or anything else, because guessing that an
+      // agent is Claude Code is exactly the mistake this column exists to let
+      // a person correct instead.
       //
       // external_id holds the transcript record's own uuid. The partial unique
       // index below is the whole idempotency guarantee: re-scanning a file can

@@ -132,9 +132,22 @@ reads the same turns out of the transcript. Every affected total is roughly
 double, and nothing in the interface flags it.
 
 Rows do carry a `source` column, `mcp` or `transcript`, so the two are
-distinguishable and the damage is auditable after the fact. But no cost query
-filters on it today, so the column does not deduplicate anything on its own.
-Making the cost queries source-aware is tracked as follow-up work.
+distinguishable and the damage is auditable after the fact.
+
+**Mark the agent as cost-observed to correct the double count, past and
+future.** Call `POST /api/agents/:id/cost-observed` with body
+`{ "observed": true }` for the Claude Code agent whose spend is doubled. Every
+cost query then excludes that agent's `source = 'mcp'` rows, so every total,
+past and future, drops back to what the transcripts alone report. Its
+`source = 'transcript'` rows keep counting, since those are the real figure.
+`GET /api/ingest/status` lists the overlap that makes the affected agent easy
+to find before you mark it, under its `overlaps` array.
+
+**Nothing is deleted.** Marking an agent only changes which rows a query
+counts; the excluded `mcp` rows stay in the database, so unmarking the agent
+(`{ "observed": false }`) restores the previous totals exactly. Marking is
+also never automatic: nothing in Vibe Dash infers that an agent is Claude
+Code, so a duplicate stays visible until you mark the agent yourself.
 
 Leave the `log_cost` step in place for every other agent. Cursor, Codex, Aider
 and anything custom are not read from transcripts, so for them it remains the
