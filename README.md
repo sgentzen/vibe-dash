@@ -24,7 +24,7 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 Requires **Node.js 20+**.
 
 ```bash
-git clone https://github.com/sgent/vibe-dash.git
+git clone https://github.com/sgentzen/vibe-dash.git
 cd vibe-dash
 npm install
 npm start          # http://localhost:3001
@@ -139,7 +139,7 @@ npm run dev:client   # Frontend only
 Deploy Vibe Dash on a shared server so all your agents report to the same dashboard:
 
 ```bash
-git clone https://github.com/sgent/vibe-dash.git
+git clone https://github.com/sgentzen/vibe-dash.git
 cd vibe-dash
 docker compose up -d    # dashboard at http://your-server:3001
 ```

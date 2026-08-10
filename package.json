@@ -52,11 +52,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sgent/vibe-dash.git"
+    "url": "git+https://github.com/sgentzen/vibe-dash.git"
   },
-  "homepage": "https://github.com/sgent/vibe-dash",
+  "homepage": "https://github.com/sgentzen/vibe-dash",
   "bugs": {
-    "url": "https://github.com/sgent/vibe-dash/issues"
+    "url": "https://github.com/sgentzen/vibe-dash/issues"
   },
   "engines": {
     "node": ">=20"
