@@ -148,11 +148,15 @@ that reads `cost_entries`. There are six such queries today.
 ```sql
 AND NOT (
   cost_entries.source = 'mcp'
+  AND cost_entries.agent_id IS NOT NULL
   AND cost_entries.agent_id IN (
     SELECT id FROM agents WHERE cost_observed_externally = 1
   )
 )
 ```
+
+The `IS NOT NULL` guard is load-bearing and must not be removed as redundant.
+See the second property below for what happens without it.
 
 Exported as a named constant beside the existing `unpricedSql()` fragment
 introduced during the ingestion review, so the two follow one pattern and a
@@ -163,9 +167,14 @@ Two properties the fragment must preserve, both worth a test:
 - A `transcript` row from a marked agent is **not** excluded. Only `mcp` rows
   are, because the point is to drop the duplicate self-report and keep the
   observation.
-- A row with `agent_id IS NULL` is **not** excluded, since `NULL IN (...)` is
-  never true. That is the accepted limitation in §4, and it should be a test
-  rather than an accident of SQL semantics.
+- A row with `agent_id IS NULL` is **not** excluded. This needs an explicit
+  `agent_id IS NOT NULL` guard in the condition and does NOT come for free:
+  `NULL IN (<non-empty subquery>)` evaluates to SQL NULL rather than FALSE,
+  `NOT (... AND NULL)` is NULL, and a WHERE clause treats NULL as not-true, so
+  without the guard every self-report that named no agent would vanish from
+  the totals the moment any agent was marked. That is real spend disappearing.
+  It is the accepted limitation in §4 and it gets a test, precisely because it
+  is not an accident of SQL semantics that can be relied on.
 
 ## 7. Detection and surfacing
 
