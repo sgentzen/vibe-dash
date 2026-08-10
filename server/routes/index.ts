@@ -14,6 +14,7 @@ import { metricRoutes } from "./metrics.js";
 import { bulkRoutes } from "./bulk.js";
 import { worktreeRoutes } from "./worktrees.js";
 import { milestoneRoutes } from "./milestones.js";
+import { ingestRoutes } from "./ingest.js";
 import type { RouteFactory } from "./types.js";
 import rateLimit from "express-rate-limit";
 
@@ -49,6 +50,7 @@ const routeFactories: RouteFactory[] = [
   bulkRoutes,
   worktreeRoutes,
   milestoneRoutes,
+  ingestRoutes,
 ];
 
 export function createRouter(db: Database.Database): Router {

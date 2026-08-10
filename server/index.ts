@@ -10,6 +10,7 @@ import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
 import { errorHandler, notFoundHandler } from "./routes/middleware.js";
 import { logger } from "./logger.js";
+import { syncTranscripts } from "./ingest/transcripts/sync.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp/server.js";
 import { randomUUID } from "node:crypto";
@@ -147,6 +148,31 @@ server.listen(PORT, () => {
   } catch (err) {
     logger.error({ err }, "backfillMilestoneDailyStats failed — continuing without backfill");
   }
+
+  // Backgrounded deliberately: the first run on a machine with a long Claude
+  // Code history walks every transcript, and that must never delay the server
+  // becoming available. syncTranscripts yields to the event loop between files,
+  // which is what makes that true rather than aspirational — every step of the
+  // work itself is synchronous. A failure here is logged and otherwise ignored,
+  // exactly like the backfill above: cost ingestion is best-effort and never
+  // degrades the running server.
+  syncTranscripts(db)
+    .then((result) => {
+      if (result.recordsIngested > 0) {
+        logger.info(result, "Ingested Claude Code transcript usage");
+      }
+    })
+    .catch((err) => logger.warn({ err }, "transcript ingestion failed — continuing"));
+
+  // A steady-state pass costs time proportional to new bytes, not to the number
+  // of transcripts on disk, because each file resumes from its recorded byte
+  // offset. unref() keeps this timer from holding the process open, so the
+  // server still exits cleanly on SIGINT.
+  const INGEST_INTERVAL_MS = 60_000;
+  const ingestTimer = setInterval(() => {
+    syncTranscripts(db).catch((err) => logger.warn({ err }, "periodic transcript scan failed"));
+  }, INGEST_INTERVAL_MS);
+  ingestTimer.unref();
 });
 
 export { app, db, server };

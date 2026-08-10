@@ -14,15 +14,16 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 
 - **Task board** — agents claim tasks, log progress, and flag blockers through MCP tool calls
 - **Activity feed** — every agent action appears in real time; no polling needed
-- **Cost tracker** — per-agent and per-model token spend, recorded when an agent calls `log_cost`
+- **Cost tracker**: per-model token spend, read directly from Claude Code's local session transcripts
 - **Local-first** — SQLite on your machine, no cloud, no subscriptions
 
-> **How reporting works:** everything above arrives because an agent *chooses* to
-> call an MCP tool. Vibe Dash does not scrape logs, tail session files, or read
-> provider billing APIs, so a task the agent forgets to update stays stale and a
-> model call it never reports costs nothing on the dashboard. The per-agent
-> `CLAUDE.md` snippets in [docs/integrations/](docs/integrations/) exist to make
-> that reporting habitual.
+> **How reporting works:** cost and token figures for Claude Code are read from
+> its own transcripts on disk, so they are correct whether or not an agent
+> remembered to report anything. Task status is different: that still arrives
+> because an agent chose to call an MCP tool, so a task nobody updates stays
+> stale. Agents other than Claude Code report cost through the `log_cost` tool.
+> See [docs/ingestion.md](docs/ingestion.md) for exactly what is read and what
+> is not.
 
 ---
 
@@ -127,6 +128,7 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 | `PORT` | `3001` | Backend port |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path. Used by the server, the stdio MCP transport, and the CLI alike — all go through the same resolver, so setting it once points all three at one file. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know (i.e. one written by a newer Vibe Dash). Only for deliberately running an older checkout against a migrated database — expect SQL errors for missing columns. |
+| `VIBE_DASH_CLAUDE_HOME` | `~/.claude/projects` | Where to look for Claude Code session transcripts. Point this elsewhere if your Claude Code install keeps them somewhere else, or at an empty directory to switch ingestion off. |
 
 > **The `VIBE_DASH_DB` default is not relative to your current directory.** With
 > the variable unset, the path resolves to `vibe-dash.db` at the root of the git
@@ -172,11 +174,10 @@ earlier, wider direction and is kept for context; superseded plans live under
 
 ## What Vibe Dash is *not*
 
-Vibe Dash is a **portfolio piece** — a polished, local-first, single-user dashboard, not a SaaS or a team platform. That scope is deliberate; see the [strategic-positioning decision](docs/decisions/2026-05-strategic-positioning.md) and the [R11.4 deprecation audit](docs/archive/completed-plans/R11.4-feature-deprecation-audit.md). It intentionally does **not** include:
+Vibe Dash is a **local-first, single-user dashboard**, not a SaaS or a team platform. See the [used-open-source-project positioning decision](docs/decisions/2026-08-09-used-oss-project.md), which supersedes the original [portfolio-piece scope cap](docs/decisions/2026-05-strategic-positioning.md), and the [R11.4 deprecation audit](docs/archive/completed-plans/R11.4-feature-deprecation-audit.md). It intentionally does **not** include:
 
 - **Multi-user accounts / team mode** — single-user by design. An optional team flag exists but is not promoted to real auth/RBAC.
 - **A cloud or hosted service** — it runs on your machine against local SQLite. No accounts, nothing to sign up for.
-- **Passive cross-platform ingestion** (webhooks, log scraping) — agents report over MCP, not by POSTing to an ingest endpoint. That ingestion path was removed as dead code.
 - **Git-host sync** (GitHub/GitLab issues, PR mirroring) — Vibe Dash tracks agent work, not your issue tracker.
 - **AI digests or natural-language querying** — no LLM summarization layer; the data is yours to query directly over SQLite.
 - **Sprints, auto-generated reports, and plugin/template/alert-rule systems** — cut as unused complexity.

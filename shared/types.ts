@@ -167,8 +167,59 @@ export interface CostEntry {
   provider: string;
   input_tokens: number;
   output_tokens: number;
-  cost_usd: number;
+  /**
+   * NULL when the model is not in the price table, never 0.
+   *
+   * 0 means "this was free"; NULL means "we do not know what this cost". Any
+   * consumer that treats the two the same understates spend, which is the exact
+   * failure transcript ingestion exists to prevent.
+   */
+  cost_usd: number | null;
   created_at: string;
+}
+
+/**
+ * Shape of every cost aggregate the API returns.
+ *
+ * `total_cost_usd` is always a number: the queries floor it with COALESCE so a
+ * group whose rows are all unpriced reports 0 rather than null. That total is
+ * therefore a LOWER BOUND, not the whole truth, whenever `unpriced_entries` is
+ * above zero, because SQL SUM skips NULLs while COUNT(*) does not.
+ */
+export interface CostSummary {
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  entry_count: number;
+  /** Rows in this group whose cost is unknown, so they contributed nothing to the total. */
+  unpriced_entries: number;
+}
+
+export interface CostTimeseriesEntry {
+  date: string;
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  entry_count: number;
+  unpriced_entries: number;
+}
+
+export interface CostByModelEntry {
+  model: string;
+  provider: string;
+  total_cost_usd: number;
+  total_tokens: number;
+  entry_count: number;
+  unpriced_entries: number;
+}
+
+export interface CostByAgentEntry {
+  agent_id: string;
+  agent_name: string;
+  total_cost_usd: number;
+  total_tokens: number;
+  entry_count: number;
+  unpriced_entries: number;
 }
 
 export interface CompletionMetrics {
@@ -233,7 +284,10 @@ export type WsEventType =
   | "cost_logged"
   | "metrics_logged"
   | "worktree_created"
-  | "worktree_updated";
+  | "worktree_updated"
+  | "cost_ingested"
+  | "project_path_linked"
+  | "project_path_unlinked";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -262,7 +316,10 @@ export type WsEvent =
   | WsEventOf<"cost_logged", CostEntry>
   | WsEventOf<"metrics_logged", CompletionMetrics>
   | WsEventOf<"worktree_created", TaskWorktree>
-  | WsEventOf<"worktree_updated", TaskWorktree>;
+  | WsEventOf<"worktree_updated", TaskWorktree>
+  | WsEventOf<"cost_ingested", { filesScanned: number; recordsIngested: number; recordsSkipped: number; unpriced: number; unattributed: number }>
+  | WsEventOf<"project_path_linked", { id: string; project_id: string }>
+  | WsEventOf<"project_path_unlinked", { id: string }>;
 
 // ─── Agent Cost ───────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 
 **Maturity: Tested** — verified end-to-end (this is the reference integration).
 
-Connect Claude Code to Vibe Dash so every session reports task progress, activity, and cost to your dashboard. Claude Code talks to Vibe Dash over MCP, giving Claude *tools* (`list_tasks`, `update_task`, `log_activity`, …) it uses to read and write task state as it works.
+Connect Claude Code to Vibe Dash so every session reports task progress and activity to your dashboard, and has its cost tracked automatically. Claude Code talks to Vibe Dash over MCP, giving Claude *tools* (`list_tasks`, `update_task`, `log_activity`, …) it uses to read and write task state as it works.
 
 ---
 
@@ -73,8 +73,12 @@ This project reports task status to Vibe Dash via MCP. When working on tasks:
 3. During work: call `log_activity` at natural checkpoints
 4. Report blockers: call `report_blocker` with a specific reason
 5. When done: call `complete_task`
-6. Log cost: call `log_cost` with model name, token counts, and cost_usd
 ```
+
+> **Cost is not something you need to report.** Vibe Dash reads Claude Code's
+> own session transcripts off disk and records token spend automatically, so
+> there is no `log_cost` step here. See
+> [docs/ingestion.md](../ingestion.md) for exactly what is read.
 
 ---
 

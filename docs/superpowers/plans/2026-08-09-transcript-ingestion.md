@@ -20,7 +20,10 @@ Copied verbatim from the spec and the repository's CLAUDE.md. Every task's requi
 - **Imports:** ESM with explicit `.js` extensions in relative imports.
 - **Naming:** PascalCase types, camelCase functions, snake_case DB columns and tables.
 - **Tests:** live in `tests/`, named `*.test.ts`; each gets a fresh in-memory DB via `beforeEach(() => { db = createTestDb(); })`; integration style, no mocking.
-- **Style:** Australian English in user-facing prose and documents. No em-dashes. No emojis.
+- **Style:** Australian English in user-facing prose and documents (README, docs/,
+  commit messages, PR bodies). No em-dashes there, and no emojis anywhere.
+  Code comments follow the surrounding repository convention, which does use
+  em-dashes; do not rewrite existing comments to match the prose rule.
 - **Never guess a price.** All rates come from the `claude-api` skill, recorded in Task 3.
 - **Unattributed and unpriced are visible states, never silent defaults.** Spend with no matching project keeps `project_id` NULL. An unknown model stores tokens with `cost_usd` NULL.
 - **The gate before any completing commit** is the `finish-task` skill.
@@ -698,14 +701,14 @@ describe("normalisePath", () => {
 
 describe("buildAttributor", () => {
   it("matches an exact linked path", () => {
-    const project = createProject(db, "demo", null);
+    const project = createProject(db, { name: "demo", description: null });
     linkProjectPath(db, project.id, "C:\\Users\\sgent\\projects\\demo");
     expect(buildAttributor(db)("C:\\Users\\sgent\\projects\\demo")).toBe(project.id);
   });
 
   it("matches a subdirectory by longest prefix", () => {
-    const outer = createProject(db, "outer", null);
-    const inner = createProject(db, "inner", null);
+    const outer = createProject(db, { name: "outer", description: null });
+    const inner = createProject(db, { name: "inner", description: null });
     linkProjectPath(db, outer.id, "C:/repos");
     linkProjectPath(db, inner.id, "C:/repos/inner");
 
@@ -714,7 +717,7 @@ describe("buildAttributor", () => {
   });
 
   it("does not match a sibling that merely shares a prefix string", () => {
-    const project = createProject(db, "demo", null);
+    const project = createProject(db, { name: "demo", description: null });
     linkProjectPath(db, project.id, "C:/repos/demo");
     // "C:/repos/demo-old" starts with "C:/repos/demo" as a string but is a
     // different directory. Matching it would attribute money to the wrong project.
@@ -722,7 +725,7 @@ describe("buildAttributor", () => {
   });
 
   it("returns null when nothing matches, rather than guessing", () => {
-    createProject(db, "demo", null);
+    createProject(db, { name: "demo", description: null });
     expect(buildAttributor(db)("C:/somewhere/else")).toBeNull();
   });
 
@@ -733,7 +736,7 @@ describe("buildAttributor", () => {
 
 describe("linkProjectPath", () => {
   it("stores the normalised form so lookups are plain string comparisons", () => {
-    const project = createProject(db, "demo", null);
+    const project = createProject(db, { name: "demo", description: null });
     linkProjectPath(db, project.id, "C:\\Users\\sgent\\projects\\Demo\\");
     expect(listProjectPaths(db, project.id)[0].path).toBe(normalisePath("C:\\Users\\sgent\\projects\\Demo"));
   });
@@ -958,7 +961,7 @@ describe("syncTranscripts", () => {
   });
 
   it("attributes to a linked project and leaves the rest unattributed", async () => {
-    const project = createProject(db, "demo", null);
+    const project = createProject(db, { name: "demo", description: null });
     linkProjectPath(db, project.id, "C:/repos/demo");
     writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo") + line("a-2", "C:/elsewhere"));
 
@@ -1219,8 +1222,6 @@ export function getIngestStatus(db: Database.Database): {
 Run: `npx vitest run tests/ingest-sync.test.ts`
 Expected: PASS, 9 tests.
 
-If `createProject` has a different signature than `createProject(db, name, description)`, check `server/db/projects.ts` and adjust the test's calls. Do not change production code to fit the test.
-
 - [ ] **Step 6: Run the full suite and commit**
 
 Run: `npm test`
@@ -1253,13 +1254,20 @@ Create `tests/ingest-routes.test.ts`. Follow the existing pattern in `tests/rout
 import { describe, it, expect, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import express from "express";
+import type { Express } from "express";
 import { createTestDb } from "./setup.js";
 import { createProject } from "../server/db/index.js";
 import { ingestRoutes } from "../server/routes/ingest.js";
-import { request } from "./http-helper.js";
+import { requestApp } from "./http-helper.js";
 
 let db: Database.Database;
-let app: express.Express;
+let app: Express;
+
+// Same shape as tests/routes.test.ts: requestApp mounts the app on a one-shot
+// server per call and returns { status, body }.
+function request(method: string, path: string, body?: unknown) {
+  return requestApp(app, method, path, body);
+}
 
 beforeEach(() => {
   db = createTestDb();
@@ -1270,7 +1278,7 @@ beforeEach(() => {
 
 describe("GET /api/ingest/status", () => {
   it("returns zeroed counts on a fresh database", async () => {
-    const res = await request(app).get("/api/ingest/status");
+    const res = await request("GET", "/api/ingest/status");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ filesTracked: 0, transcriptRows: 0, unpriced: 0, unattributed: 0 });
   });
@@ -1278,40 +1286,54 @@ describe("GET /api/ingest/status", () => {
 
 describe("project path links", () => {
   it("links a directory to a project and lists it", async () => {
-    const project = createProject(db, "demo", null);
+    const project = createProject(db, { name: "demo", description: null });
 
-    const created = await request(app)
-      .post("/api/ingest/paths")
-      .send({ project_id: project.id, path: "C:/repos/demo" });
+    const created = await request("POST", "/api/ingest/paths", {
+      project_id: project.id,
+      path: "C:/repos/demo",
+    });
     expect(created.status).toBe(201);
 
-    const listed = await request(app).get("/api/ingest/paths");
-    expect(listed.body.paths).toHaveLength(1);
-    expect(listed.body.paths[0].project_id).toBe(project.id);
+    const listed = await request("GET", "/api/ingest/paths");
+    const paths = (listed.body as { paths: { project_id: string }[] }).paths;
+    expect(paths).toHaveLength(1);
+    expect(paths[0].project_id).toBe(project.id);
   });
 
   it("rejects a link with no project_id", async () => {
-    const res = await request(app).post("/api/ingest/paths").send({ path: "C:/repos/demo" });
+    const res = await request("POST", "/api/ingest/paths", { path: "C:/repos/demo" });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBeTruthy();
+    expect((res.body as { error?: string }).error).toBeTruthy();
   });
 
   it("rejects a link to a project that does not exist", async () => {
-    const res = await request(app)
-      .post("/api/ingest/paths")
-      .send({ project_id: "no-such-project", path: "C:/repos/demo" });
+    const res = await request("POST", "/api/ingest/paths", {
+      project_id: "no-such-project",
+      path: "C:/repos/demo",
+    });
     expect(res.status).toBe(404);
   });
 
-  it("deletes a link", async () => {
-    const project = createProject(db, "demo", null);
-    const created = await request(app)
-      .post("/api/ingest/paths")
-      .send({ project_id: project.id, path: "C:/repos/demo" });
+  it("rejects linking the same path twice", async () => {
+    const project = createProject(db, { name: "demo", description: null });
+    const body = { project_id: project.id, path: "C:/repos/demo" };
+    expect((await request("POST", "/api/ingest/paths", body)).status).toBe(201);
+    expect((await request("POST", "/api/ingest/paths", body)).status).toBe(409);
+  });
 
-    const deleted = await request(app).delete(`/api/ingest/paths/${created.body.id}`);
+  it("deletes a link", async () => {
+    const project = createProject(db, { name: "demo", description: null });
+    const created = await request("POST", "/api/ingest/paths", {
+      project_id: project.id,
+      path: "C:/repos/demo",
+    });
+    const { id } = created.body as { id: string };
+
+    const deleted = await request("DELETE", `/api/ingest/paths/${id}`);
     expect(deleted.status).toBe(204);
-    expect((await request(app).get("/api/ingest/paths")).body.paths).toHaveLength(0);
+
+    const listed = await request("GET", "/api/ingest/paths");
+    expect((listed.body as { paths: unknown[] }).paths).toHaveLength(0);
   });
 });
 ```
@@ -1320,8 +1342,6 @@ describe("project path links", () => {
 
 Run: `npx vitest run tests/ingest-routes.test.ts`
 Expected: FAIL. cannot resolve `ingest.js`.
-
-Before writing the route, open `tests/routes.test.ts` and `tests/http-helper.ts` and match whatever request helper they use. If the helper's API differs from `request(app).get(...)`, adapt the test above to it rather than adding a new HTTP helper.
 
 - [ ] **Step 3: Write `ingest.ts`**
 
@@ -1446,7 +1466,7 @@ and add `ingestRoutes,` to the end of the `routeFactories` array.
 - [ ] **Step 6: Run the tests**
 
 Run: `npx vitest run tests/ingest-routes.test.ts && npm run typecheck:all`
-Expected: PASS, 5 tests, typecheck clean.
+Expected: PASS, 6 tests, typecheck clean.
 
 - [ ] **Step 7: Kick off a background scan at startup**
 

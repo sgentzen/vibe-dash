@@ -610,6 +610,153 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "019_transcript_ingestion",
+    run(db) {
+      // Cost rows now come from two places: an agent calling log_cost ('mcp')
+      // and Claude Code transcripts read off disk ('transcript'). The source
+      // column records which, so a row's provenance is auditable and a future
+      // change can filter or reconcile on it.
+      //
+      // It does NOT deduplicate anything today: no query filters on source, so
+      // a Claude Code session that both calls log_cost and gets its transcript
+      // ingested is counted twice. That is a real upgrade hazard for anyone
+      // whose per-project CLAUDE.md still carries the old log_cost instruction,
+      // and is documented in docs/ingestion.md. Making the cost queries
+      // source-aware is tracked as follow-up work.
+      //
+      // external_id holds the transcript record's own uuid. The partial unique
+      // index below is the whole idempotency guarantee: re-scanning a file can
+      // never insert a row twice, and it is enforced by the database rather
+      // than by application logic that could regress.
+      //
+      // Cache writes are split by TTL because they are priced differently
+      // (1.25x input for 5-minute, 2x for 1-hour) and the transcript reports
+      // them separately. Folding them together would make cost_usd
+      // unauditable.
+      db.exec(`
+        ALTER TABLE cost_entries ADD COLUMN source TEXT NOT NULL DEFAULT 'mcp';
+        ALTER TABLE cost_entries ADD COLUMN external_id TEXT;
+        ALTER TABLE cost_entries ADD COLUMN cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE cost_entries ADD COLUMN cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_entries_external_id
+          ON cost_entries(external_id) WHERE external_id IS NOT NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_source
+          ON cost_entries(source);
+
+        -- One project has many directories once git worktrees are in use, so
+        -- this is a table rather than a column on projects. Paths are stored
+        -- already normalised (see attribute.ts) so lookup is string equality.
+        CREATE TABLE IF NOT EXISTS project_paths (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id),
+          path TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_paths_project ON project_paths(project_id);
+
+        -- The incremental cursor. byte_offset is where the last scan stopped,
+        -- so a steady-state scan costs time proportional to new bytes rather
+        -- than to the number of transcripts on disk.
+        CREATE TABLE IF NOT EXISTS transcript_files (
+          path TEXT PRIMARY KEY,
+          size INTEGER NOT NULL,
+          mtime TEXT NOT NULL,
+          byte_offset INTEGER NOT NULL DEFAULT 0,
+          last_uuid TEXT,
+          updated_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
+  {
+    name: "020_cost_usd_nullable",
+    run(db) {
+      // An unpriced record must store NULL, not 0: NULL means "we do not know
+      // what this cost", 0 means "this was free". Conflating them understates
+      // spend, which is the exact failure transcript ingestion exists to
+      // prevent. cost_usd was declared NOT NULL in the original schema, and
+      // SQLite cannot drop NOT NULL with ALTER TABLE, so the table is rebuilt.
+      //
+      // The copy below can raise FOREIGN KEY constraint failed, and the usual
+      // `PRAGMA foreign_keys = OFF` rescue is not available: schema.ts turns
+      // foreign_keys ON before runMigrations, and the pragma is inert inside a
+      // transaction — which is exactly where every migration runs. So dangling
+      // references are nulled out first instead.
+      //
+      // This is not hypothetical. A database that has been through manual
+      // corruption salvage can hold a cost_entries row whose agent_id (or
+      // task_id, milestone_id, project_id) names a row that no longer exists.
+      // The old table never re-validated it, but INSERTing into the new table
+      // does: the constraint fails, the migration rolls back, runMigrations
+      // throws, initDb throws, and the server, the stdio MCP transport and the
+      // CLI all refuse to open that database on every start from then on.
+      // Recovery would need manual sqlite3 surgery.
+      //
+      // All four columns are nullable, so nulling a dangling reference keeps
+      // the row and its money and drops only a pointer that already pointed at
+      // nothing.
+      db.exec(`
+        UPDATE cost_entries SET agent_id = NULL
+          WHERE agent_id IS NOT NULL AND agent_id NOT IN (SELECT id FROM agents);
+        UPDATE cost_entries SET task_id = NULL
+          WHERE task_id IS NOT NULL AND task_id NOT IN (SELECT id FROM tasks);
+        UPDATE cost_entries SET milestone_id = NULL
+          WHERE milestone_id IS NOT NULL AND milestone_id NOT IN (SELECT id FROM milestones);
+        UPDATE cost_entries SET project_id = NULL
+          WHERE project_id IS NOT NULL AND project_id NOT IN (SELECT id FROM projects);
+      `);
+
+      // DEFAULT 0 is retained so an INSERT that omits the column behaves exactly
+      // as before; only the NOT NULL constraint is lifted.
+      db.exec(`
+        CREATE TABLE cost_entries_new (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT REFERENCES agents(id),
+          task_id TEXT REFERENCES tasks(id),
+          milestone_id TEXT REFERENCES milestones(id),
+          project_id TEXT REFERENCES projects(id),
+          model TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          input_tokens INTEGER NOT NULL DEFAULT 0,
+          output_tokens INTEGER NOT NULL DEFAULT 0,
+          cost_usd REAL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'mcp',
+          external_id TEXT,
+          cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0,
+          cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0
+        );
+
+        INSERT INTO cost_entries_new
+          (id, agent_id, task_id, milestone_id, project_id, model, provider,
+           input_tokens, output_tokens, cost_usd, created_at,
+           source, external_id, cache_creation_5m_tokens, cache_creation_1h_tokens)
+        SELECT
+           id, agent_id, task_id, milestone_id, project_id, model, provider,
+           input_tokens, output_tokens, cost_usd, created_at,
+           source, external_id, cache_creation_5m_tokens, cache_creation_1h_tokens
+        FROM cost_entries;
+
+        DROP TABLE cost_entries;
+        ALTER TABLE cost_entries_new RENAME TO cost_entries;
+
+        -- Indexes live with the table, so dropping it dropped these too.
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_agent_id ON cost_entries(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_task_id ON cost_entries(task_id);
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_milestone_id ON cost_entries(milestone_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_entries_external_id
+          ON cost_entries(external_id) WHERE external_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_source
+          ON cost_entries(source);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
