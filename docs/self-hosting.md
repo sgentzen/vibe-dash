@@ -67,7 +67,8 @@ All four entry points share the same SQLite database file.
 | Environment variable | Default | Description |
 |---------------------|---------|-------------|
 | `PORT` | `3001` | Port the server listens on |
-| `VIBE_DASH_DB` | `./vibe-dash.db` | Database path — used by both the server process and the stdio MCP transport |
+| `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path — used by the server process, the stdio MCP transport and the CLI. Not relative to your working directory: left unset it resolves to the git root of the Vibe Dash install. The Docker image sets it to `/data/vibe-dash.db`. |
+| `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know. Only for deliberately running an older build against a migrated database. |
 
 Override in `docker-compose.yml` under `environment`, or in a `.env` file.
 

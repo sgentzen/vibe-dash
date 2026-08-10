@@ -14,8 +14,15 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 
 - **Task board** — agents claim tasks, log progress, and flag blockers through MCP tool calls
 - **Activity feed** — every agent action appears in real time; no polling needed
-- **Cost tracker** — per-agent and per-model token spend logged automatically
+- **Cost tracker** — per-agent and per-model token spend, recorded when an agent calls `log_cost`
 - **Local-first** — SQLite on your machine, no cloud, no subscriptions
+
+> **How reporting works:** everything above arrives because an agent *chooses* to
+> call an MCP tool. Vibe Dash does not scrape logs, tail session files, or read
+> provider billing APIs, so a task the agent forgets to update stays stale and a
+> model call it never reports costs nothing on the dashboard. The per-agent
+> `CLAUDE.md` snippets in [docs/integrations/](docs/integrations/) exist to make
+> that reporting habitual.
 
 ---
 
@@ -118,7 +125,15 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Backend port |
-| `VIBE_DASH_DB` | `./vibe-dash.db` | Database path — used by both the server and stdio MCP transport |
+| `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path. Used by the server, the stdio MCP transport, and the CLI alike — all go through the same resolver, so setting it once points all three at one file. |
+| `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know (i.e. one written by a newer Vibe Dash). Only for deliberately running an older checkout against a migrated database — expect SQL errors for missing columns. |
+
+> **The `VIBE_DASH_DB` default is not relative to your current directory.** With
+> the variable unset, the path resolves to `vibe-dash.db` at the root of the git
+> repository *containing the Vibe Dash install*, not the directory you launched
+> from. Every worktree of that repo therefore resolves to the same file, which is
+> deliberate — one database, one owner. Set `VIBE_DASH_DB` explicitly if you want
+> it anywhere else.
 
 ---
 
