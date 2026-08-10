@@ -78,7 +78,14 @@ export {
   getGlobalCostSummary,
   getSpendToday,
 } from "./costs.js";
-export type { CostEntry, LogCostInput, CostSummary, CostTimeseriesEntry } from "./costs.js";
+export type {
+  CostEntry,
+  LogCostInput,
+  CostSummary,
+  CostTimeseriesEntry,
+  CostByModelEntry,
+  CostByAgentEntry,
+} from "./costs.js";
 export {
   logCompletionMetrics,
   getAgentPerformance,

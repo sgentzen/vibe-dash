@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown } from "../types";
+import type { Project, Task, Milestone, Agent, ActivityEntry, Blocker, TaskDependency, AgentSession, MilestoneProgress, AgentStats, MilestoneDailyStats, ActivityHeatmapEntry, AgentPerformance, AgentComparison, TaskTypeBreakdown, CostSummary, CostTimeseriesEntry, CostByModelEntry, CostByAgentEntry } from "../types";
 
 function jsonHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -305,36 +305,10 @@ async function getActivityStreamApi(params: Record<string, string | undefined> =
 
 // ─── Cost & Token Tracking ──────────────────────────────────────────
 
-interface CostSummary {
-  total_cost_usd: number;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  entry_count: number;
-}
-
-export interface CostTimeseriesEntry {
-  date: string;
-  total_cost_usd: number;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  entry_count: number;
-}
-
-interface CostByModelEntry {
-  model: string;
-  provider: string;
-  total_cost_usd: number;
-  total_tokens: number;
-  entry_count: number;
-}
-
-interface CostByAgentEntry {
-  agent_id: string;
-  agent_name: string;
-  total_cost_usd: number;
-  total_tokens: number;
-  entry_count: number;
-}
+// The cost aggregate shapes live in shared/types.ts so the server and the
+// client cannot drift on what a total means. Re-exported because callers in
+// src/ already import CostTimeseriesEntry from this module.
+export type { CostTimeseriesEntry };
 
 async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
   const qs = buildQueryString({ ...params, groupBy: "day" });

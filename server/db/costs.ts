@@ -1,20 +1,33 @@
 import type Database from "better-sqlite3";
 import { now, genId } from "./helpers.js";
 import { buildWhere } from "./where.js";
+import type {
+  CostEntry,
+  CostSummary,
+  CostTimeseriesEntry,
+  CostByModelEntry,
+  CostByAgentEntry,
+} from "../../shared/types.js";
 
-export interface CostEntry {
-  id: string;
-  agent_id: string | null;
-  task_id: string | null;
-  milestone_id: string | null;
-  project_id: string | null;
-  model: string;
-  provider: string;
-  input_tokens: number;
-  output_tokens: number;
-  cost_usd: number;
-  created_at: string;
-}
+export type { CostEntry, CostSummary, CostTimeseriesEntry, CostByModelEntry, CostByAgentEntry };
+
+/**
+ * The two SQL fragments every aggregate below needs, as functions because
+ * `getCostByAgent` joins and so has to qualify the column.
+ *
+ * COALESCE on the total is not cosmetic. cost_usd is nullable by design (an
+ * unpriced model stores NULL, never 0) and SQL SUM skips NULLs, so a group
+ * whose rows are all unpriced sums to NULL. Emitting that reaches the dashboard
+ * as `null.toFixed(4)`, which throws, and with no ErrorBoundary in the tree it
+ * takes every other card down with it. Every total is floored at the query.
+ *
+ * The unpriced count is the honesty half of the same problem: flooring the
+ * total makes a group of unpriced rows look like $0.00 of genuine spend. This
+ * count is how a caller can tell "cheap" from "not known".
+ */
+const totalCostSql = (prefix = ""): string => `COALESCE(SUM(${prefix}cost_usd), 0) AS total_cost_usd`;
+const unpricedSql = (prefix = ""): string =>
+  `COALESCE(SUM(CASE WHEN ${prefix}cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries`;
 
 export interface LogCostInput {
   agent_id?: string | null;
@@ -26,21 +39,6 @@ export interface LogCostInput {
   input_tokens: number;
   output_tokens: number;
   cost_usd: number;
-}
-
-export interface CostSummary {
-  total_cost_usd: number;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  entry_count: number;
-}
-
-export interface CostTimeseriesEntry {
-  date: string;
-  total_cost_usd: number;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  entry_count: number;
 }
 
 export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
@@ -68,10 +66,11 @@ type CostSummaryColumn = "agent_id" | "milestone_id" | "project_id";
 
 function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, value: string): CostSummary {
   return db.prepare(
-    `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
+    `SELECT ${totalCostSql()},
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count
+            COUNT(*) AS entry_count,
+            ${unpricedSql()}
      FROM cost_entries WHERE ${column} = ?`
   ).get(value) as CostSummary;
 }
@@ -87,10 +86,11 @@ export function getSpendToday(db: Database.Database): number {
 
 export function getGlobalCostSummary(db: Database.Database): CostSummary {
   return db.prepare(
-    `SELECT COALESCE(SUM(cost_usd), 0) AS total_cost_usd,
+    `SELECT ${totalCostSql()},
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count
+            COUNT(*) AS entry_count,
+            ${unpricedSql()}
      FROM cost_entries`
   ).get() as CostSummary;
 }
@@ -121,10 +121,11 @@ export function getCostTimeseries(
 
   const rows = db.prepare(
     `SELECT DATE(created_at) AS date,
-            SUM(cost_usd) AS total_cost_usd,
-            SUM(input_tokens) AS total_input_tokens,
-            SUM(output_tokens) AS total_output_tokens,
-            COUNT(*) AS entry_count
+            ${totalCostSql()},
+            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+            COUNT(*) AS entry_count,
+            ${unpricedSql()}
      FROM cost_entries
      ${where}
      GROUP BY DATE(created_at)
@@ -145,6 +146,7 @@ export function getCostTimeseries(
         total_input_tokens: 0,
         total_output_tokens: 0,
         entry_count: 0,
+        unpriced_entries: 0,
       }
     );
   }
@@ -154,7 +156,7 @@ export function getCostTimeseries(
 export function getCostByModel(
   db: Database.Database,
   filter: { project_id?: string; milestone_id?: string } = {}
-): { model: string; provider: string; total_cost_usd: number; total_tokens: number; entry_count: number }[] {
+): CostByModelEntry[] {
   const { sql: where, params } = buildWhere([
     filter.project_id ? ["project_id = ?", filter.project_id] : null,
     filter.milestone_id ? ["milestone_id = ?", filter.milestone_id] : null,
@@ -162,20 +164,21 @@ export function getCostByModel(
 
   return db.prepare(
     `SELECT model, provider,
-            SUM(cost_usd) AS total_cost_usd,
-            SUM(input_tokens + output_tokens) AS total_tokens,
-            COUNT(*) AS entry_count
+            ${totalCostSql()},
+            COALESCE(SUM(input_tokens + output_tokens), 0) AS total_tokens,
+            COUNT(*) AS entry_count,
+            ${unpricedSql()}
      FROM cost_entries
      ${where}
      GROUP BY model, provider
      ORDER BY total_cost_usd DESC`
-  ).all(...params) as { model: string; provider: string; total_cost_usd: number; total_tokens: number; entry_count: number }[];
+  ).all(...params) as CostByModelEntry[];
 }
 
 export function getCostByAgent(
   db: Database.Database,
   filter: { project_id?: string; milestone_id?: string } = {}
-): { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; entry_count: number }[] {
+): CostByAgentEntry[] {
   const conditions: string[] = ["c.agent_id IS NOT NULL"];
   const params: unknown[] = [];
 
@@ -186,13 +189,14 @@ export function getCostByAgent(
 
   return db.prepare(
     `SELECT c.agent_id, a.name AS agent_name,
-            SUM(c.cost_usd) AS total_cost_usd,
-            SUM(c.input_tokens + c.output_tokens) AS total_tokens,
-            COUNT(*) AS entry_count
+            ${totalCostSql("c.")},
+            COALESCE(SUM(c.input_tokens + c.output_tokens), 0) AS total_tokens,
+            COUNT(*) AS entry_count,
+            ${unpricedSql("c.")}
      FROM cost_entries c
      JOIN agents a ON c.agent_id = a.id
      ${where}
      GROUP BY c.agent_id, a.name
      ORDER BY total_cost_usd DESC`
-  ).all(...params) as { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; entry_count: number }[];
+  ).all(...params) as CostByAgentEntry[];
 }

@@ -141,3 +141,84 @@ describe("cost tracking", () => {
     expect(summary.entry_count).toBe(0);
   });
 });
+
+describe("unpriced rows", () => {
+  // A model that is not in the rate table stores cost_usd NULL, never 0. That
+  // is deliberate, but SQL SUM skips NULLs, so every aggregate has to say what
+  // it did with those rows instead of quietly reporting NULL (which crashes the
+  // dashboard) or a bare 0 (which reads as "this was free").
+  const insertUnpriced = (id: string, projectId: string, createdAt: string = new Date().toISOString()): void => {
+    db.prepare(
+      `INSERT INTO cost_entries
+         (id, agent_id, task_id, milestone_id, project_id, model, provider,
+          input_tokens, output_tokens, cost_usd, created_at, source, external_id)
+       VALUES (?, NULL, NULL, NULL, ?, 'claude-not-yet-released', 'anthropic',
+               1000, 500, NULL, ?, 'transcript', ?)`
+    ).run(id, projectId, createdAt, `ext-${id}`);
+  };
+
+  it("getCostByModel returns a number total when every row for a model is unpriced", () => {
+    const project = createProject(db, { name: "P", description: null });
+    insertUnpriced("u1", project.id);
+
+    const byModel = getCostByModel(db, { project_id: project.id });
+    expect(byModel).toHaveLength(1);
+    // A null here reaches the UI as null.toFixed(4) and blanks the whole page.
+    expect(typeof byModel[0].total_cost_usd).toBe("number");
+    expect(byModel[0].total_cost_usd).toBe(0);
+    expect(byModel[0].total_tokens).toBe(1500);
+  });
+
+  it("getCostTimeseries returns a number total for a day whose rows are all unpriced", () => {
+    const project = createProject(db, { name: "P", description: null });
+    insertUnpriced("u2", project.id);
+
+    const ts = getCostTimeseries(db, { project_id: project.id, days: 7 });
+    const today = ts[ts.length - 1];
+    expect(typeof today.total_cost_usd).toBe("number");
+    expect(today.total_cost_usd).toBe(0);
+    expect(today.entry_count).toBe(1);
+  });
+
+  it("counts the unpriced rows behind each total", () => {
+    const project = createProject(db, { name: "P", description: null });
+    logCost(db, { project_id: project.id, model: "claude-not-yet-released", provider: "anthropic", input_tokens: 100, output_tokens: 50, cost_usd: 0.05 });
+    insertUnpriced("u3", project.id);
+    insertUnpriced("u4", project.id);
+
+    const summary = getProjectCostSummary(db, project.id);
+    expect(summary.entry_count).toBe(3);
+    expect(summary.total_cost_usd).toBeCloseTo(0.05, 10);
+    // Without this the $0.05 is indistinguishable from the whole truth.
+    expect(summary.unpriced_entries).toBe(2);
+
+    const byModel = getCostByModel(db, { project_id: project.id });
+    expect(byModel).toHaveLength(1);
+    expect(byModel[0].unpriced_entries).toBe(2);
+
+    const ts = getCostTimeseries(db, { project_id: project.id, days: 7 });
+    expect(ts[ts.length - 1].unpriced_entries).toBe(2);
+  });
+
+  it("reports zero unpriced entries when every row is priced", () => {
+    const project = createProject(db, { name: "P", description: null });
+    logCost(db, { project_id: project.id, model: "claude-opus-5", provider: "anthropic", input_tokens: 100, output_tokens: 50, cost_usd: 0.05 });
+
+    expect(getProjectCostSummary(db, project.id).unpriced_entries).toBe(0);
+    expect(getCostByModel(db, { project_id: project.id })[0].unpriced_entries).toBe(0);
+  });
+
+  it("counts unpriced rows in the per-agent breakdown too", () => {
+    const project = createProject(db, { name: "P", description: null });
+    const agent = registerAgent(db, { name: "unpriced-agent", model: null, capabilities: [] });
+    logCost(db, { project_id: project.id, agent_id: agent.id, model: "m1", provider: "p1", input_tokens: 10, output_tokens: 5, cost_usd: 0.01 });
+    insertUnpriced("u5", project.id);
+    db.prepare(`UPDATE cost_entries SET agent_id = ? WHERE id = 'u5'`).run(agent.id);
+
+    const byAgent = getCostByAgent(db, { project_id: project.id });
+    expect(byAgent).toHaveLength(1);
+    expect(typeof byAgent[0].total_cost_usd).toBe("number");
+    expect(byAgent[0].unpriced_entries).toBe(1);
+    expect(byAgent[0].entry_count).toBe(2);
+  });
+});
