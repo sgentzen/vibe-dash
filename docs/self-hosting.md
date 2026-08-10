@@ -9,7 +9,7 @@ This guide covers running Vibe Dash as a shared server so all your team's AI age
 The fastest way to get a shared instance running:
 
 ```bash
-git clone https://github.com/sgent/vibe-dash.git
+git clone https://github.com/sgentzen/vibe-dash.git
 cd vibe-dash
 docker compose up -d
 ```
@@ -78,7 +78,7 @@ Override in `docker-compose.yml` under `environment`, or in a `.env` file.
 Requires **Node.js 20+**.
 
 ```bash
-git clone https://github.com/sgent/vibe-dash.git
+git clone https://github.com/sgentzen/vibe-dash.git
 cd vibe-dash
 npm install
 npm start          # builds frontend + starts server on :3001
