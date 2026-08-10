@@ -283,3 +283,131 @@ that asserts every exported cost function honours it.
    and stops reporting it once the agent is marked.
 4. No cost row is deleted at any point.
 5. A fresh install with no agent marked behaves exactly as it does today.
+
+---
+
+## 14. Amendment: the mark is keyed to the client, not the agent row
+
+**Added 2026-08-10, after the final whole-branch review. This supersedes D3 and
+§5 above; both are left in place so the reasoning that failed stays readable.**
+
+### 14.1 What the review found
+
+D3 said "an agent is either observed through its transcripts or it is not",
+and §5 therefore hung the flag on a row in `agents`. That assumed an agent has
+one stable row. In this deployment it does not.
+
+`server/mcp/server.ts:28` computes a connection suffix, falling back to
+`randomUUID().slice(0, 8)` when the transport supplies no connection id, which
+is the stdio path Claude Code uses. Line 40 then names the agent
+`${clientName}-${suffix}`. `registerAgent` dedupes on `name_normalized`, so
+every launch produces a distinct row with a distinct id.
+
+The consequence is that marking an agent excludes one session's rows. A user
+marks `claude-code-a1b2c3d4`, watches the doubled total halve and concludes it
+is fixed. The next session is `claude-code-9f8e7d6c`, unmarked, and counts
+twice again. Goal 1 promised past and future rows corrected with one action.
+As built it delivers neither: past duplicates are spread across one row per
+past session, so they need one mark each too.
+
+That is worse than the bug being fixed, because it is silent and it is
+accompanied by documentation telling the user the problem is solved.
+
+### 14.2 The correction
+
+The suffix exists for a real reason: two Claude Code windows open at once
+should be two agents, with their own sessions and activity. Making the name
+stable would break that. So the agent row stays per-connection, and the mark
+moves to the thing that is actually stable.
+
+`server/mcp/server.ts` already holds the client name and the suffix as separate
+values before it joins them. The client name is recorded rather than recovered
+later:
+
+```sql
+ALTER TABLE agents ADD COLUMN client_name TEXT;
+```
+
+An agent's **cost identity** is `COALESCE(client_name, name)`. For an agent
+registered through an MCP connection that is the client name, stable across
+every launch. For an agent that named itself through `register_agent` or
+`log_activity` it is its own name, which was already stable. One rule covers
+both without a special case.
+
+Marking is then a property of an identity:
+
+```sql
+CREATE TABLE cost_observed_identities (
+  identity  TEXT PRIMARY KEY,
+  marked_at TEXT NOT NULL
+);
+```
+
+and the exclusion condition resolves through it:
+
+```sql
+NOT (
+  cost_entries.source = 'mcp'
+  AND cost_entries.agent_id IS NOT NULL
+  AND cost_entries.agent_id IN (
+    SELECT a.id FROM agents a
+    WHERE COALESCE(a.client_name, a.name) IN (
+      SELECT identity FROM cost_observed_identities
+    )
+  )
+)
+```
+
+The `agent_id IS NOT NULL` guard stays load-bearing for the reason given in §6.
+
+**Rejected:** deriving the stem by stripping a trailing `-[0-9a-f]{8}` from the
+agent name. It needs no new column and would work on rows written before this
+change, which is its whole appeal. It is also a guess, and it is wrong for any
+agent legitimately named that way. This design's first decision is that the
+system never guesses about money, and a rule that is right almost always is
+exactly the shape of thing that produces a confidently wrong total.
+
+**Rejected:** propagating the flag to new agents whose name resembles a marked
+agent's. Same objection, with the added defect that it marks rows the user
+never marked.
+
+### 14.3 What this does not fix, stated plainly
+
+An agent row written before this change has no `client_name`, so its identity
+is its full suffixed name. Marking it covers that row and no other. Historical
+duplicates from earlier sessions therefore still need one mark each.
+
+There is no backfill, because the only available backfill is the stem-stripping
+guess rejected above. This is a real limitation for anyone upgrading with
+existing duplicates, it is the same population §11's upgrade advice addresses,
+and the documentation must say so rather than let the identity mechanism imply
+a completeness it does not have.
+
+### 14.4 Consequences for the shipped surface
+
+- Migration 021 is amended in place rather than corrected by a later migration.
+  It has not run against any database, so there is nothing deployed to migrate.
+  `agents.cost_observed_externally` is replaced by `client_name` and the new
+  table.
+- `Agent.cost_observed_externally` remains in the API response, computed by
+  join rather than stored, so no client has to learn a new shape.
+- `POST /api/agents/:id/cost-observed` keeps its path and body, and additionally
+  returns the identity it marked. A user who marks one agent and silently gets
+  coverage of every session sharing its client name should be told that is what
+  happened.
+- The overlap report gains the identity alongside `mcp_agent_names`, so the
+  value to mark is visible where the problem is reported rather than deduced.
+
+### 14.5 Additional findings from the same review, carried into this work
+
+- A marked agent's own cost summary reads `$0.00`. Transcript rows are inserted
+  with `agent_id NULL`, so `getAgentCostSummary` and `getCostByAgent` show the
+  heaviest spender as free once its self-reports stop counting. The agent view
+  needs a signal distinguishing this from a genuinely idle agent.
+- The overlap query requires `project_id IS NOT NULL`, but `log_cost` takes an
+  optional project and this work attaches an agent rather than a project. A
+  project-less `mcp` row is invisible to the report yet fully counted in global
+  totals, so an entry disappearing confirms less than §11's advice claims.
+- `registerAgent` updates on a normalised-name match and preserves the mark, so
+  a different tool registering under a marked name inherits suppression of its
+  genuine spend. Keying on identity narrows this rather than removing it.
