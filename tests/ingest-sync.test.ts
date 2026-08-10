@@ -33,6 +33,9 @@ function writeTranscript(name: string, body: string): string {
 const rowCount = (): number =>
   (db.prepare(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript'`).get() as { n: number }).n;
 
+const cursorOffset = (file: string): number =>
+  (db.prepare(`SELECT byte_offset FROM transcript_files WHERE path = ?`).get(file) as { byte_offset: number }).byte_offset;
+
 describe("syncTranscripts", () => {
   it("ingests records and prices them", async () => {
     writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo"));
@@ -83,21 +86,92 @@ describe("syncTranscripts", () => {
     expect(rowCount()).toBe(2);
   });
 
-  it("does not lose a record that was mid-write during a scan", async () => {
+  it("re-reads correctly when a mid-write cursor is followed by a smaller rewrite (C-1)", async () => {
+    // A cursor that has stopped short of the file's recorded size (because it
+    // caught a write in progress) must not be trusted as a valid read
+    // position against a *different*, smaller file later. `offset <= size`
+    // alone cannot tell "same file, more of the same content" apart from
+    // "different, unrelated content that happens to still be longer than
+    // offset" — only comparing against the previously recorded size can.
     const file = writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo"));
     await syncTranscripts(db, { claudeHome: home });
+    const offsetAfterFirst = cursorOffset(file);
 
-    // Simulate catching a write in progress: append a line with no terminator.
-    const partial = line("a-2", "C:/repos/demo").replace(/\n$/, "");
-    appendFileSync(file, partial, "utf8");
+    // Simulate a large write in progress: a long unterminated fragment with
+    // no newline anywhere in it, so the cursor cannot advance past a-1's line.
+    appendFileSync(file, "X".repeat(500), "utf8");
     const mid = await syncTranscripts(db, { claudeHome: home });
     expect(mid.recordsIngested).toBe(0);
+    const cursorAfterMid = db.prepare(`SELECT byte_offset, size FROM transcript_files WHERE path = ?`).get(file) as
+      { byte_offset: number; size: number };
+    expect(cursorAfterMid.byte_offset).toBe(offsetAfterFirst); // did not move
+    expect(cursorAfterMid.size).toBeGreaterThan(cursorAfterMid.byte_offset); // stopped short
+
+    // The in-progress write is abandoned. The file is rewritten smaller than
+    // the recorded size (previousSize), but the new content at the old
+    // byte_offset is unrelated to what used to be there — a longer cwd path
+    // shifts every line boundary so nothing lines up by coincidence.
+    writeFileSync(
+      file,
+      line("a-9", "C:/repos/demo/a/deliberately/much/longer/path/so/nothing/lines/up/by/accident"),
+      "utf8"
+    );
+    const after = await syncTranscripts(db, { claudeHome: home });
+
+    expect(after.recordsIngested).toBe(1);
+    const row = db.prepare(`SELECT * FROM cost_entries WHERE external_id = 'a-9'`).get();
+    expect(row).toBeDefined();
+  });
+
+  it("does not lose a record torn mid-object during a scan", async () => {
+    const file = writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo"));
+    await syncTranscripts(db, { claudeHome: home });
+    const offsetAfterFirst = cursorOffset(file);
+
+    // A genuine torn write: cut inside the JSON body, not just off the
+    // trailing newline. This is syntactically invalid JSON, unlike stripping
+    // only the terminator, which still parses.
+    const full = Buffer.from(line("a-2", "C:/repos/demo"), "utf8");
+    const torn = full.subarray(0, full.length - 15);
+    appendFileSync(file, torn);
+
+    const mid = await syncTranscripts(db, { claudeHome: home });
+    expect(mid.recordsIngested).toBe(0);
+    expect(cursorOffset(file)).toBe(offsetAfterFirst); // cursor must not have moved
 
     // The writer finishes the line.
-    appendFileSync(file, "\n", "utf8");
+    appendFileSync(file, full.subarray(full.length - 15));
     const after = await syncTranscripts(db, { claudeHome: home });
+
     expect(after.recordsIngested).toBe(1);
     expect(rowCount()).toBe(2);
+    expect(cursorOffset(file)).toBe(offsetAfterFirst + full.length);
+  });
+
+  it("does not lose a record torn inside a multi-byte character", async () => {
+    const file = writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo"));
+    await syncTranscripts(db, { claudeHome: home });
+    const offsetAfterFirst = cursorOffset(file);
+
+    // Cut inside the UTF-8 bytes of an emoji (a 4-byte code point), not on a
+    // character boundary. A string-index approach to finding the newline
+    // could mis-locate the boundary here; a byte-index approach cannot.
+    const full = Buffer.from(line("a-2", "C:/repos/demo-\uD83D\uDE42"), "utf8"); // 🙂
+    const emojiStart = full.indexOf(Buffer.from("\uD83D\uDE42", "utf8"));
+    expect(emojiStart).toBeGreaterThan(-1);
+    const torn = full.subarray(0, emojiStart + 2); // 2 of the emoji's 4 bytes
+    appendFileSync(file, torn);
+
+    const mid = await syncTranscripts(db, { claudeHome: home });
+    expect(mid.recordsIngested).toBe(0);
+    expect(cursorOffset(file)).toBe(offsetAfterFirst); // cursor must not have moved
+
+    appendFileSync(file, full.subarray(emojiStart + 2));
+    const after = await syncTranscripts(db, { claudeHome: home });
+
+    expect(after.recordsIngested).toBe(1);
+    expect(rowCount()).toBe(2);
+    expect(cursorOffset(file)).toBe(offsetAfterFirst + full.length);
   });
 
   it("attributes to a linked project and leaves the rest unattributed", async () => {

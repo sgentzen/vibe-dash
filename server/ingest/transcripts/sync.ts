@@ -10,7 +10,7 @@ import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 
 const PROVIDER = "anthropic";
 
-interface CursorRow { size: number; byte_offset: number; last_uuid: string | null }
+interface CursorRow { size: number; byte_offset: number; mtime: string; last_uuid: string | null }
 
 /**
  * Read the new tail of a file, given the recorded cursor.
@@ -23,21 +23,47 @@ interface CursorRow { size: number; byte_offset: number; last_uuid: string | nul
  * reading after it and that record's spend would be lost for good. Waiting
  * for the trailing newline costs nothing — every complete transcript on disk
  * ends with one, so a tail without one only ever means "write in progress."
+ *
+ * Deciding where to start reading needs more than "is offset still <= size":
+ * byte_offset now stops at the last complete line while size is the file's
+ * true, larger size, so the two can and routinely do disagree even when
+ * nothing is wrong. `size < previousSize` (rotated/truncated), `offset > size`
+ * (cursor past EOF), and `size === previousSize && mtime !== previousMtime`
+ * (same-size rewrite) are all cases where byte_offset cannot be trusted to
+ * still name the same bytes, so each resets to 0.
+ *
+ * This is safe to get conservative about: idempotency is enforced by the
+ * database (`external_id` plus the partial unique index plus INSERT OR
+ * IGNORE), so re-reading bytes that were already ingested is always safe — at
+ * worst it costs a wasted parse and a no-op insert. Do not "optimise" any of
+ * these resets away in favour of trusting byte_offset more; that is exactly
+ * the bug this function was rewritten to fix.
  */
 function readFrom(
   filePath: string,
-  offset: number
+  offset: number,
+  previousSize: number,
+  previousMtime: string | null
 ): { text: string; size: number; mtime: string; newOffset: number } {
   const stat = fs.statSync(filePath);
   const size = stat.size;
-  // A file smaller than the recorded size was rotated or rewritten, so the old
-  // offset is meaningless. Re-read from zero. Idempotency makes that safe.
-  const start = offset <= size ? offset : 0;
+  const mtime = stat.mtime.toISOString();
+
+  let start: number;
+  if (size < previousSize) {
+    start = 0; // Rotated or truncated: the old offset no longer means anything.
+  } else if (offset > size) {
+    start = 0; // Cursor is past EOF for the file as it exists now.
+  } else if (size === previousSize && mtime !== previousMtime) {
+    start = 0; // Same size, different content: a same-size rewrite.
+  } else {
+    start = offset;
+  }
 
   const handle = fs.openSync(filePath, "r");
   try {
     const length = size - start;
-    if (length <= 0) return { text: "", size, mtime: stat.mtime.toISOString(), newOffset: start };
+    if (length <= 0) return { text: "", size, mtime, newOffset: start };
     const buffer = Buffer.alloc(length);
     fs.readSync(handle, buffer, 0, length, start);
 
@@ -48,11 +74,11 @@ function readFrom(
     if (lastNewline === -1) {
       // No complete line in the new bytes yet. Nothing to parse this scan,
       // and the offset does not move — the same bytes are re-read next time.
-      return { text: "", size, mtime: stat.mtime.toISOString(), newOffset: start };
+      return { text: "", size, mtime, newOffset: start };
     }
 
     const text = buffer.subarray(0, lastNewline + 1).toString("utf8");
-    return { text, size, mtime: stat.mtime.toISOString(), newOffset: start + lastNewline + 1 };
+    return { text, size, mtime, newOffset: start + lastNewline + 1 };
   } finally {
     fs.closeSync(handle);
   }
@@ -84,7 +110,7 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
 
   const attribute = buildAttributor(db);
 
-  const selectCursor = db.prepare(`SELECT size, byte_offset, last_uuid FROM transcript_files WHERE path = ?`);
+  const selectCursor = db.prepare(`SELECT size, byte_offset, mtime, last_uuid FROM transcript_files WHERE path = ?`);
   const upsertCursor = db.prepare(`
     INSERT INTO transcript_files (path, size, mtime, byte_offset, last_uuid, updated_at)
     VALUES (@path, @size, @mtime, @byte_offset, @last_uuid, @updated_at)
@@ -138,24 +164,26 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
       const cursor = selectCursor.get(filePath) as CursorRow | undefined;
       const offset = cursor?.byte_offset ?? 0;
       const previousSize = cursor?.size ?? 0;
+      const previousMtime = cursor?.mtime ?? null;
 
-      const { text, size, mtime, newOffset } = readFrom(filePath, offset);
+      const { text, size, mtime, newOffset } = readFrom(filePath, offset, previousSize, previousMtime);
       result.filesScanned++;
 
-      // No complete new line this scan (either truly nothing new, or a
-      // trailing partial line caught mid-write). Either way there is nothing
-      // to parse, so byte_offset never moves here.
+      // True no-op: same size, same mtime as last scan, so nothing on disk
+      // has changed. Nothing to read, nothing to persist.
+      if (size === previousSize && mtime === previousMtime) continue;
+
+      // Something changed (grew, shrank, or was rewritten) but no complete
+      // line is available to parse yet — still record the new size/mtime so
+      // rotation and same-size-rewrite detection stay accurate next time, but
+      // leave byte_offset at newOffset (unchanged, or reset to 0 by readFrom
+      // if this was a rotation/rewrite) so that content is re-read once a
+      // complete line is available.
       if (text.length === 0) {
-        // The file still grew or shrank even though no full line was ready —
-        // record the new size so shrink detection stays accurate next time,
-        // but leave byte_offset where it is so the partial line is re-read
-        // once it is complete.
-        if (size !== previousSize) {
-          upsertCursor.run({
-            path: filePath, size, mtime, byte_offset: newOffset,
-            last_uuid: cursor?.last_uuid ?? null, updated_at: new Date().toISOString(),
-          });
-        }
+        upsertCursor.run({
+          path: filePath, size, mtime, byte_offset: newOffset,
+          last_uuid: cursor?.last_uuid ?? null, updated_at: new Date().toISOString(),
+        });
         continue;
       }
 
