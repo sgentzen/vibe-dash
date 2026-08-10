@@ -64,8 +64,11 @@ lists every model the table can currently price.
 Two consequences of an unpriced row that are easy to miss. First, SQL `SUM`
 skips `NULL`, so an unpriced row contributes nothing to a cost total while
 still counting as an entry. Cost responses therefore carry an
-`unpriced_entries` count beside every total, and a total with a non-zero
-count next to it is a floor, not the whole figure. Second, an unpriced row
+`unpriced_entries` count beside their totals, and a total with a non-zero
+count next to it is a floor, not the whole figure. One figure is not covered
+by that: the "Spend Today" number on the dashboard comes from `GET /api/stats`
+and is a bare total with no count beside it, so it silently excludes unpriced
+rows. Plumbing the count through it is tracked as follow-up work. Second, an unpriced row
 cannot be fully repriced later: input, output and cache-write tokens are
 stored, but cache-read tokens are priced and then dropped, because
 `cost_entries` has no column for them. Cache reads are usually the largest
