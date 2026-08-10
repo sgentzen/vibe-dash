@@ -61,6 +61,18 @@ mean "free" and quietly understate your spend. `GET /api/ingest/status`
 reports how many rows are unpriced, and `knownModels` in that same response
 lists every model the table can currently price.
 
+Two consequences of an unpriced row that are easy to miss. First, SQL `SUM`
+skips `NULL`, so an unpriced row contributes nothing to a cost total while
+still counting as an entry. Cost responses therefore carry an
+`unpriced_entries` count beside every total, and a total with a non-zero
+count next to it is a floor, not the whole figure. Second, an unpriced row
+cannot be fully repriced later: input, output and cache-write tokens are
+stored, but cache-read tokens are priced and then dropped, because
+`cost_entries` has no column for them. Cache reads are usually the largest
+token component of a Claude Code turn, so repricing a stored unpriced row
+would understate it by most of its real cost. Persisting cache reads is
+tracked as follow-up work.
+
 ## What is inferred, and how conservatively
 
 Spend is attributed to a project only by an explicit directory link, created
@@ -83,6 +95,11 @@ you today.
 - **Which task the spend belongs to.** Transcripts carry a session and a
   working directory, not a task ID, so ingestion attributes spend to a
   project, never to a task within it.
+- **Which agent produced the spend.** Ingested rows are stored with no agent
+  attached, and the Cost by Agent view filters those rows out. So transcript
+  spend appears in per-project and per-model figures but never in per-agent
+  ones, which will look like the two disagree if you are not expecting it.
+  Only spend reported through `log_cost` names an agent.
 - **Anything about agents other than Claude Code.** This whole pipeline reads
   Claude Code's transcript format specifically. Cursor, Codex, Aider, and any
   custom agent still report cost the way they always have, by calling the
@@ -93,3 +110,29 @@ you today.
   response reports how many lines it skipped. A skipped count near zero is
   normal; a skipped count that keeps climbing is the early warning that the
   format has moved and this page's field list is now out of date.
+
+## Upgrading from an earlier version
+
+**Remove the `log_cost` step from your Claude Code instructions, or your spend
+will be counted twice.**
+
+Before this feature, the way to get Claude Code cost onto the dashboard was to
+tell the agent to call the `log_cost` MCP tool, and
+[docs/integrations/claude-code.md](integrations/claude-code.md) said exactly
+that. Any per-project `CLAUDE.md` you set up under those instructions still
+carries that step, and upgrading Vibe Dash does not change files in your other
+repositories.
+
+If that instruction is still in place, a single Claude Code session now records
+its cost twice: once when the agent calls `log_cost`, and again when the scan
+reads the same turns out of the transcript. Every affected total is roughly
+double, and nothing in the interface flags it.
+
+Rows do carry a `source` column, `mcp` or `transcript`, so the two are
+distinguishable and the damage is auditable after the fact. But no cost query
+filters on it today, so the column does not deduplicate anything on its own.
+Making the cost queries source-aware is tracked as follow-up work.
+
+Leave the `log_cost` step in place for every other agent. Cursor, Codex, Aider
+and anything custom are not read from transcripts, so for them it remains the
+only way spend is recorded at all.

@@ -55,8 +55,15 @@ const PER_MILLION = 1_000_000;
  *
  * Null is deliberate and is never coerced to zero: a silent zero would
  * understate spend and quietly corrupt the total this whole feature exists to
- * make trustworthy. An unpriced record still stores its tokens, so it can be
- * repriced later once the rate is known.
+ * make trustworthy.
+ *
+ * An unpriced record keeps its input, output and cache-write tokens, but NOT
+ * its cache-read tokens: those are priced here and then dropped, because
+ * cost_entries has no column for them. Cache reads are typically the largest
+ * token component of a Claude Code turn, so a stored unpriced row CANNOT be
+ * fully repriced once the rate is known — any later repricing would understate
+ * it by most of its true cost, with nothing to show that it had. Persisting
+ * cache reads is tracked as follow-up work.
  */
 export function priceRecord(record: UsageRecord): number | null {
   const table = record.speed === "fast" ? FAST_RATES : RATES;

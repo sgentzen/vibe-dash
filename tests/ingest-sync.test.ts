@@ -196,7 +196,9 @@ describe("syncTranscripts", () => {
     const row = db.prepare(`SELECT cost_usd, input_tokens FROM cost_entries WHERE external_id = 'a-1'`).get() as
       { cost_usd: number | null; input_tokens: number };
     expect(row.cost_usd).toBeNull();
-    expect(row.input_tokens).toBe(1_000_000); // tokens kept, so it can be repriced later
+    // Input, output and cache-write tokens are kept. Cache reads are priced and
+    // then dropped, so this row cannot be fully repriced later; see pricing.ts.
+    expect(row.input_tokens).toBe(1_000_000);
   });
 
   it("is a no-op when the Claude home does not exist", async () => {

@@ -14,7 +14,7 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 
 - **Task board** — agents claim tasks, log progress, and flag blockers through MCP tool calls
 - **Activity feed** — every agent action appears in real time; no polling needed
-- **Cost tracker**: per-agent and per-model token spend, read directly from Claude Code's local session transcripts
+- **Cost tracker**: per-model token spend, read directly from Claude Code's local session transcripts
 - **Local-first** — SQLite on your machine, no cloud, no subscriptions
 
 > **How reporting works:** cost and token figures for Claude Code are read from
