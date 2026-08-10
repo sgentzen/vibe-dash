@@ -614,8 +614,16 @@ const MIGRATIONS: Migration[] = [
     name: "019_transcript_ingestion",
     run(db) {
       // Cost rows now come from two places: an agent calling log_cost ('mcp')
-      // and Claude Code transcripts read off disk ('transcript'). Tagging the
-      // source is what stops the two double-counting the same spend.
+      // and Claude Code transcripts read off disk ('transcript'). The source
+      // column records which, so a row's provenance is auditable and a future
+      // change can filter or reconcile on it.
+      //
+      // It does NOT deduplicate anything today: no query filters on source, so
+      // a Claude Code session that both calls log_cost and gets its transcript
+      // ingested is counted twice. That is a real upgrade hazard for anyone
+      // whose per-project CLAUDE.md still carries the old log_cost instruction,
+      // and is documented in docs/ingestion.md. Making the cost queries
+      // source-aware is tracked as follow-up work.
       //
       // external_id holds the transcript record's own uuid. The partial unique
       // index below is the whole idempotency guarantee: re-scanning a file can
@@ -673,11 +681,35 @@ const MIGRATIONS: Migration[] = [
       // prevent. cost_usd was declared NOT NULL in the original schema, and
       // SQLite cannot drop NOT NULL with ALTER TABLE, so the table is rebuilt.
       //
-      // No PRAGMA foreign_keys toggle here, deliberately: runMigrations already
-      // wraps each migration in a transaction, and the pragma is a no-op inside
-      // one. It is not needed anyway — nothing in the schema references
-      // cost_entries, and the copied rows keep their existing parent ids.
+      // The copy below can raise FOREIGN KEY constraint failed, and the usual
+      // `PRAGMA foreign_keys = OFF` rescue is not available: schema.ts turns
+      // foreign_keys ON before runMigrations, and the pragma is inert inside a
+      // transaction — which is exactly where every migration runs. So dangling
+      // references are nulled out first instead.
       //
+      // This is not hypothetical. A database that has been through manual
+      // corruption salvage can hold a cost_entries row whose agent_id (or
+      // task_id, milestone_id, project_id) names a row that no longer exists.
+      // The old table never re-validated it, but INSERTing into the new table
+      // does: the constraint fails, the migration rolls back, runMigrations
+      // throws, initDb throws, and the server, the stdio MCP transport and the
+      // CLI all refuse to open that database on every start from then on.
+      // Recovery would need manual sqlite3 surgery.
+      //
+      // All four columns are nullable, so nulling a dangling reference keeps
+      // the row and its money and drops only a pointer that already pointed at
+      // nothing.
+      db.exec(`
+        UPDATE cost_entries SET agent_id = NULL
+          WHERE agent_id IS NOT NULL AND agent_id NOT IN (SELECT id FROM agents);
+        UPDATE cost_entries SET task_id = NULL
+          WHERE task_id IS NOT NULL AND task_id NOT IN (SELECT id FROM tasks);
+        UPDATE cost_entries SET milestone_id = NULL
+          WHERE milestone_id IS NOT NULL AND milestone_id NOT IN (SELECT id FROM milestones);
+        UPDATE cost_entries SET project_id = NULL
+          WHERE project_id IS NOT NULL AND project_id NOT IN (SELECT id FROM projects);
+      `);
+
       // DEFAULT 0 is retained so an INSERT that omits the column behaves exactly
       // as before; only the NOT NULL constraint is lifted.
       db.exec(`

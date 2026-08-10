@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type Database from "better-sqlite3";
+import Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
+import { runMigrations } from "../server/db/migrator.js";
 
 let db: Database.Database;
 
@@ -101,5 +102,120 @@ describe("migration 020_cost_usd_nullable", () => {
       "source", "external_id", "cache_creation_5m_tokens", "cache_creation_1h_tokens",
       "agent_id", "task_id", "milestone_id", "project_id",
     ]));
+  });
+});
+
+// Migration 020 rebuilds cost_entries, and the rebuild re-validates foreign
+// keys that the old table never re-checked. A database that has been through
+// manual corruption salvage can hold a row pointing at a parent that is gone,
+// and before the dangling-reference cleanup that row failed the copy, rolled
+// the migration back, and left the database permanently unopenable.
+describe("migration 020 against a salvaged pre-019 database", () => {
+  const MIGRATIONS_BEFORE_019 = [
+    "001_initial_schema", "002_tasks_columns", "003_agents_columns",
+    "004_sprints_to_milestones", "005_ingestion_and_git_sync", "006_users",
+    "007_agents_name_normalized", "008_agents_dedup_normalized", "009_activity_source",
+    "010_drop_saved_filters", "011_drop_project_templates", "012_drop_agent_file_locks",
+    "013_drop_alert_rules", "014_commits_and_milestone_history",
+    "015_drop_orphan_tables_and_recurrence_column", "016_agent_current_status",
+    "017_drop_tags", "018_drop_comments_notifications",
+  ];
+
+  const TS = "2026-08-09T00:00:00.000Z";
+
+  /**
+   * The subset of the pre-019 schema that migrations 019 and 020 touch, with
+   * 001-018 recorded as already run so runMigrations picks up at 019. Only the
+   * parent tables the cost_entries foreign keys name are needed.
+   */
+  function createPre019Db(): Database.Database {
+    const fresh = new Database(":memory:");
+    fresh.pragma("foreign_keys = ON"); // Exactly what schema.ts does before migrating.
+    fresh.exec(`
+      CREATE TABLE _migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, run_at TEXT NOT NULL
+      );
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE milestones (
+        id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),
+        name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE agents (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),
+        title TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE cost_entries (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT REFERENCES agents(id),
+        task_id TEXT REFERENCES tasks(id),
+        milestone_id TEXT REFERENCES milestones(id),
+        project_id TEXT REFERENCES projects(id),
+        model TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cost_usd REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+    `);
+    const record = fresh.prepare("INSERT INTO _migrations (name, run_at) VALUES (?, ?)");
+    for (const name of MIGRATIONS_BEFORE_019) record.run(name, TS);
+    return fresh;
+  }
+
+  const insertCost = (target: Database.Database, id: string, agentId: string | null): void => {
+    target.prepare(
+      `INSERT INTO cost_entries
+         (id, agent_id, task_id, milestone_id, project_id, model, provider,
+          input_tokens, output_tokens, cost_usd, created_at)
+       VALUES (?, ?, NULL, NULL, NULL, 'claude-opus-5', 'anthropic', 10, 20, 1.25, ?)`
+    ).run(id, agentId, TS);
+  };
+
+  let legacy: Database.Database;
+
+  beforeEach(() => {
+    legacy = createPre019Db();
+    // Foreign keys off is how the orphan gets there in the first place: manual
+    // salvage of a corrupt database, which is exactly the history this owner's
+    // database has.
+    legacy.pragma("foreign_keys = OFF");
+    insertCost(legacy, "salvaged", "agent-that-no-longer-exists");
+    legacy.pragma("foreign_keys = ON");
+  });
+
+  it("completes rather than bricking the database", () => {
+    expect(() => runMigrations(legacy)).not.toThrow();
+    const applied = legacy
+      .prepare("SELECT name FROM _migrations WHERE name IN ('019_transcript_ingestion', '020_cost_usd_nullable')")
+      .all() as { name: string }[];
+    expect(applied).toHaveLength(2);
+  });
+
+  it("keeps the row and its money, dropping only the broken reference", () => {
+    runMigrations(legacy);
+    const row = legacy
+      .prepare("SELECT agent_id, cost_usd, input_tokens FROM cost_entries WHERE id = 'salvaged'")
+      .get() as { agent_id: string | null; cost_usd: number; input_tokens: number };
+
+    expect(row).toBeDefined();
+    expect(row.cost_usd).toBeCloseTo(1.25, 10);
+    expect(row.input_tokens).toBe(10);
+    expect(row.agent_id).toBeNull();
+  });
+
+  it("leaves a reference that still resolves alone", () => {
+    legacy.prepare("INSERT INTO agents (id, name, created_at, updated_at) VALUES ('real', 'real-agent', ?, ?)").run(TS, TS);
+    insertCost(legacy, "healthy", "real");
+
+    runMigrations(legacy);
+
+    const row = legacy.prepare("SELECT agent_id FROM cost_entries WHERE id = 'healthy'").get() as { agent_id: string | null };
+    expect(row.agent_id).toBe("real");
   });
 });
