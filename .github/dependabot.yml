@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # GitHub Actions are pinned to full commit SHAs in .github/workflows/ (a
+  # supply-chain hardening measure — a tag can be moved, a SHA cannot). The
+  # cost of that is pins never move on their own, so a patched action is not
+  # picked up and the pin silently ages. Dependabot is what keeps them current;
+  # it rewrites the SHA and updates the trailing `# vX.Y.Z` comment.
+  #
+  # Only this ecosystem is configured. npm *security* updates already arrive
+  # without a config entry (they are what opened #166); adding npm version
+  # updates here would trade a real but small benefit for a steady stream of
+  # PRs on a solo-maintained project.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Wait 7 days before proposing a newly published version. A freshly
+    # compromised or simply broken release is most likely to be caught and
+    # yanked inside that window, and nothing here is urgent enough to want
+    # day-zero adoption. Security advisories are unaffected — Dependabot
+    # security updates bypass the cooldown.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # One PR per week for all action bumps rather than one per action —
+      # they are reviewed together and almost never conflict.
+      actions:
+        patterns:
+          - "*"

@@ -14,15 +14,20 @@ cd vibe-dash
 docker compose up -d
 ```
 
-The dashboard is now available at `http://your-server:3001`.
+The dashboard is now available **on the server itself** at `http://localhost:3001`.
 
-Agents connect over the Streamable HTTP MCP transport:
+It is not reachable from other machines yet, and that is deliberate: `docker-compose.yml`
+publishes the port on loopback only, because Vibe Dash has no built-in authentication
+(see [Access control](#access-control)). To reach it from the rest of your team,
+put a reverse proxy in front of it and enforce access control there.
+
+Once the proxy is in place, agents connect over the Streamable HTTP MCP transport:
 
 ```json
 {
   "mcpServers": {
     "vibe-dash": {
-      "url": "http://your-server:3001/mcp"
+      "url": "https://vibe-dash.example.com/mcp"
     }
   }
 }

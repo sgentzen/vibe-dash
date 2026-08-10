@@ -112,31 +112,21 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  sonarcloud:
-    name: SonarCloud
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          # Full history so SonarCloud can assign issues/coverage to the right commits.
-          fetch-depth: 0
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          cache: npm
-
-      # See the test job for why lifecycle scripts are disabled here.
-      - name: Install dependencies
-        run: npm ci --ignore-scripts && npm rebuild better-sqlite3 esbuild
-
-      - name: Coverage
-        run: npm run test:coverage
-
-      - name: SonarCloud Scan
-        # nosemgrep: generic.secrets.security.detected-sonarqube-docs-api-key.detected-sonarqube-docs-api-key -- 40-hex string is the action's pinned commit SHA, not a key
-        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
+# NOTE: there is deliberately no SonarCloud job here. This project uses
+# SonarCloud Automatic Analysis, which SonarSource documents as mutually
+# exclusive with CI-based analysis: "If you enable automatic analysis, you must
+# ensure that you do not have any CI-based analyses configured. If you do then
+# these CI-based analyses will fail and cause a failure in your build process."
+# A scanner job used to live here and did exactly that — it failed every run
+# with "You are running CI analysis while Automatic Analysis is enabled". The
+# last green run on main was 2026-07-13; every run after it was red on this job
+# alone, while test, e2e, lint and typecheck all passed. Nearly four weeks of
+# red CI came from one unreachable job. Analyser config is in
+# .sonarcloud.properties, which is the file Automatic Analysis actually reads.
+#
+# The trade-off: Automatic Analysis does not support code coverage, so no lcov
+# reaches SonarCloud. The test job still produces coverage and uploads it as a
+# build artifact. To get coverage into SonarCloud you must switch the whole
+# project back to CI analysis — re-add a scanner job here AND disable Automatic
+# Analysis in the SonarCloud UI (Administration > Analysis Method). Doing only
+# one of those two is what caused the original outage.
