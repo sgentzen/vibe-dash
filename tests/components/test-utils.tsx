@@ -56,6 +56,7 @@ export function makeAgent(overrides: Partial<Agent> = {}): Agent {
     parent_agent_id: null,
     registered_at: "2026-01-01T00:00:00.000Z",
     last_seen_at: "2026-01-01T00:00:00.000Z",
+    cost_observed_externally: 0,
     ...overrides,
   };
 }

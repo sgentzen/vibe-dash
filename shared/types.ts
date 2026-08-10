@@ -63,6 +63,14 @@ export interface Agent {
   completed_today?: number;
   current_status?: string | null;
   current_status_at?: string | null;
+  /**
+   * 1 when this agent's spend is already read from its transcripts, so its
+   * log_cost rows are duplicates and are excluded from cost totals.
+   *
+   * A number rather than a boolean because SQLite has no boolean type and this
+   * project uses raw SQL with no ORM layer to map it.
+   */
+  cost_observed_externally: number;
 }
 
 export interface ActivityEntry {

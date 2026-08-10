@@ -38,6 +38,7 @@ export {
   getAgentById,
   touchAgent,
   setAgentStatus,
+  setAgentCostObserved,
   getAgentHealthStatus,
   getAgentActivity,
   getAgentCompletedToday,

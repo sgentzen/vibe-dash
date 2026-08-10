@@ -757,6 +757,27 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "021_agent_cost_observed",
+    run(db) {
+      // Marks an agent whose spend we already read from its transcripts, so
+      // its self-reported log_cost rows are duplicates rather than new spend.
+      // Excluded at query time in server/db/costs.ts; the rows are never
+      // deleted, because destroying money records to fix a reporting bug
+      // removes the audit trail that makes the fix checkable.
+      //
+      // Defaults to 0, so this migration moves no existing total on its own.
+      // Nothing sets it automatically: concluding that an agent is Claude Code
+      // would be exactly the guess this feature refuses to make.
+      const cols = db.pragma("table_info(agents)") as { name: string }[];
+      const has = (name: string): boolean => cols.some((c) => c.name === name);
+      if (!has("cost_observed_externally")) {
+        db.prepare(
+          "ALTER TABLE agents ADD COLUMN cost_observed_externally INTEGER NOT NULL DEFAULT 0"
+        ).run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

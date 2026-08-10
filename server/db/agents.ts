@@ -88,6 +88,24 @@ export function setAgentStatus(db: Database.Database, agentName: string, status:
   ).run(status, now(), normalized);
 }
 
+/**
+ * Mark or unmark an agent as already observed through its transcripts.
+ *
+ * Always an explicit human action. Nothing in the ingestion path calls this,
+ * because inferring that an agent is Claude Code and silently dropping its
+ * self-reported spend is the guess this feature exists to avoid.
+ */
+export function setAgentCostObserved(
+  db: Database.Database,
+  agentId: string,
+  observed: boolean
+): Agent | null {
+  const changed = db
+    .prepare("UPDATE agents SET cost_observed_externally = ? WHERE id = ?")
+    .run(observed ? 1 : 0, agentId).changes;
+  return changed > 0 ? getAgentById(db, agentId) : null;
+}
+
 export function touchAgent(db: Database.Database, name: string): Agent {
   const existing = getAgentByName(db, name);
   if (existing) {
