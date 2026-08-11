@@ -156,4 +156,24 @@ describe("excluding an observed agent's self-reported cost", () => {
 
     expect(getGlobalCostSummary(db).total_cost_usd).toBeCloseTo(10, 10);
   });
+
+  it("excludes a later connection of a marked client", () => {
+    // The mark must follow the client, not one session's agent row.
+    const project = createProject(db, { name: "demo", description: null });
+    const monday = registerAgent(db, {
+      name: "claude-code-a1b2c3d4", model: null, capabilities: [], client_name: "claude-code",
+    });
+    setAgentCostObserved(db, monday.id, true);
+
+    const tuesday = registerAgent(db, {
+      name: "claude-code-9f8e7d6c", model: null, capabilities: [], client_name: "claude-code",
+    });
+    db.prepare(
+      `INSERT INTO cost_entries (id, agent_id, project_id, model, provider, input_tokens, output_tokens, cost_usd, created_at, source, external_id)
+       VALUES ('m1', ?, ?, 'claude-opus-5', 'anthropic', 1, 1, 5, '2026-08-10T10:00:00.000Z', 'mcp', NULL)`
+    ).run(tuesday.id, project.id);
+
+    expect(getProjectCostSummary(db, project.id).total_cost_usd).toBe(0);
+    expect(getGlobalCostSummary(db).total_cost_usd).toBe(0);
+  });
 });

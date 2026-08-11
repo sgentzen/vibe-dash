@@ -30,29 +30,43 @@ const unpricedSql = (prefix = ""): string =>
   `COALESCE(SUM(CASE WHEN ${prefix}cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries`;
 
 /**
- * Rows an observed agent self-reported, which duplicate what we already read
+ * Rows an observed client self-reported, which duplicate what we already read
  * from its transcripts.
  *
- * Only `mcp` rows are excluded: the `transcript` row is the observation we
- * trust, and dropping it would delete the very figure that replaced the
- * duplicate. A row with a NULL agent_id is never excluded either, because a
- * self-report that named no agent cannot be attributed to one — that is the
- * documented limitation.
+ * Only `mcp` rows match: the `transcript` row is the observation we trust, and
+ * dropping it would delete the very figure that replaced the duplicate. A row
+ * with a NULL agent_id never matches either, because a self-report that named
+ * no agent cannot be attributed to one — that is the documented limitation.
  *
  * The `agent_id IS NOT NULL` guard is load-bearing and must not be removed as
  * redundant. `NULL IN (<non-empty subquery>)` evaluates to NULL, not FALSE, so
  * without it `NOT (... AND NULL)` is NULL, a WHERE clause treats that as
  * not-true, and every self-report that named no agent would vanish from the
- * totals as soon as any agent was marked. Those rows are unattributable and so
- * cannot be excluded by agent; they must stay counted.
+ * totals as soon as any client was marked. Those rows are unattributable and
+ * so cannot be excluded; they must stay counted.
+ *
+ * Resolved through the agent's cost identity, not through a flag on the agent
+ * row: every MCP connection registers a new agent, so a row-level mark stopped
+ * applying the next time the client started. See section 14 of the design.
+ *
+ * Stated positively, and the exclusion derived from it below, so a query can
+ * either drop these rows or COUNT them without the two definitions drifting.
+ */
+export const observedDuplicateSql = (prefix = ""): string =>
+  `(${prefix}source = 'mcp' ` +
+  `AND ${prefix}agent_id IS NOT NULL ` +
+  `AND ${prefix}agent_id IN (` +
+  `SELECT a.id FROM agents a WHERE COALESCE(a.client_name, a.name) IN ` +
+  `(SELECT identity FROM cost_observed_identities)))`;
+
+/**
+ * The exclusion applied by every query that reads cost_entries.
  *
  * A named constant rather than a string repeated at six call sites, so a query
  * added later cannot silently reintroduce double counting.
  */
 export const excludeObservedCondition = (prefix = ""): string =>
-  `NOT (${prefix}source = 'mcp' ` +
-  `AND ${prefix}agent_id IS NOT NULL ` +
-  `AND ${prefix}agent_id IN (SELECT id FROM agents WHERE cost_observed_externally = 1))`;
+  `NOT ${observedDuplicateSql(prefix)}`;
 
 /**
  * Compose the exclusion onto a WHERE clause that may or may not exist.
