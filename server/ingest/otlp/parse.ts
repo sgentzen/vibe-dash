@@ -31,12 +31,30 @@ function isCumulative(raw: unknown): boolean {
 
 /** 64-bit ints arrive as strings under the protobuf JSON mapping. */
 function asNumber(raw: unknown): number | null {
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  if (typeof raw === "string" && raw.trim() !== "") {
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
-  }
+  if (typeof raw === "number") return boundedOrNull(raw);
+  if (typeof raw === "string" && raw.trim() !== "") return boundedOrNull(Number(raw));
   return null;
+}
+
+/**
+ * A quantity we are willing to treat as a token count.
+ *
+ * Finite is not enough. A point carrying `sum: 1e308` is finite, so it used to
+ * be recorded, and it wrote a row of 1e308 tokens costing 1.75e302 dollars.
+ * Because no cost row is ever deleted, that permanently corrupted every
+ * aggregate it appeared in, with no supported way to remove it.
+ *
+ * MAX_SAFE_INTEGER is the bound rather than some larger "surely nobody" figure,
+ * because it is where integer arithmetic stops being exact. A token count above
+ * it cannot be represented faithfully, so it is not a number we can honestly
+ * record whatever its provenance. Negative values are rejected here too, though
+ * the ingest layer would also skip them: a negative token count is nonsense,
+ * and nonsense in the money path should stop at the first gate that sees it.
+ */
+function boundedOrNull(value: number): number | null {
+  if (!Number.isFinite(value)) return null;
+  if (value < 0 || value > Number.MAX_SAFE_INTEGER) return null;
+  return value;
 }
 
 /**

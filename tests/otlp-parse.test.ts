@@ -141,3 +141,52 @@ describe("parseMetricsPayload", () => {
     expect(parseMetricsPayload(payload)).toEqual([]);
   });
 });
+
+// A quantity has to be a number we can honestly record, not merely a finite
+// one. `sum: 1e308` is finite, so it used to produce a row of 1e308 tokens
+// costing 1.75e302 dollars, and because no cost row is ever deleted that
+// permanently corrupted every aggregate it landed in.
+describe("implausible quantities", () => {
+  function withSum(sum: unknown): unknown {
+    return {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{ scope: { name: "s" }, metrics: [{
+          name: "codex.turn.token_usage",
+          histogram: {
+            aggregationTemporality: 1,
+            dataPoints: [{ attributes: [], startTimeUnixNano: "1", timeUnixNano: "2", sum }],
+          },
+        }] }],
+      }],
+    };
+  }
+
+  it("skips a value beyond exact integer representation", () => {
+    expect(parseMetricsPayload(withSum(1e308))).toEqual([]);
+  });
+
+  it("skips a value just past MAX_SAFE_INTEGER", () => {
+    // The boundary is where integer arithmetic stops being exact, not an
+    // arbitrary "too big to be real" threshold.
+    expect(parseMetricsPayload(withSum(Number.MAX_SAFE_INTEGER + 2))).toEqual([]);
+  });
+
+  it("keeps a value at exactly MAX_SAFE_INTEGER", () => {
+    expect(parseMetricsPayload(withSum(Number.MAX_SAFE_INTEGER))[0].value).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("skips a negative quantity", () => {
+    // Nonsense in the money path should stop at the first gate that sees it,
+    // even though the ingest layer would also skip a non-positive increment.
+    expect(parseMetricsPayload(withSum(-5))).toEqual([]);
+  });
+
+  it("still skips an overflowing string, as before", () => {
+    expect(parseMetricsPayload(withSum("1e999"))).toEqual([]);
+  });
+
+  it("keeps an ordinary token count", () => {
+    expect(parseMetricsPayload(withSum(1500))[0].value).toBe(1500);
+  });
+});
