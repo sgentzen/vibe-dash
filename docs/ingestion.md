@@ -148,9 +148,18 @@ since those are the real figure. The response names what it matched, as
 `{ agent, identity, observed }`, so you can see which client is now covered.
 `GET /api/ingest/status` lists the overlap that makes the affected client
 easy to find before you mark it, under its `overlaps` array, where each entry
-now carries `mcp_identities` alongside `mcp_agent_names`; once you mark the
-identity, that project-and-day entry stops appearing there, confirming the
-correction took effect.
+now carries `mcp_identities` alongside `mcp_agent_names`.
+
+An overlap entry is grouped by project and day, not by identity, so marking
+one identity does not necessarily make the entry disappear. If a
+project-and-day entry lists two identities in `mcp_identities` and you mark
+one, the entry stays, with a lower `mcp_entries` count and a shorter
+`mcp_identities` list, because the identity you marked drops out of both
+while the other identity's `mcp` rows are still there and still unmarked. A
+row surviving with a reduced count and one fewer name in `mcp_identities` is
+progress, not a sign the mark failed. The entry disappears only once
+`mcp_identities` is empty, which is what confirms every identity on that
+project and day is covered.
 
 **Agent rows written before this release predate `client_name` and get no
 benefit from the above.** An agent row created by an earlier version of Vibe
@@ -190,9 +199,17 @@ duplicates of anything, so real spend disappears from totals rather than
 being counted twice. This is a consequence of keying the mark to a shared
 identity rather than to one row, and it will not fix itself. To avoid it,
 do not name a self-reporting agent after a client you have already marked
-as cost-observed. If you hit it, unmark the client
-(`{ "observed": false }`); the affected agent's spend returns immediately
-because nothing was ever deleted.
+as cost-observed.
+
+If you hit it, unmarking (`{ "observed": false }`) is only a stop-gap, not
+the fix. The mark is keyed to the identity string, not to either agent, so
+unmarking restores the wrongly suppressed agent's spend and, at the same
+time, stops excluding the marked client's own `mcp` rows, which brings back
+the double counting the mark existed to remove for that client. Unmarking
+trades one wrong total for the other rather than fixing either. The actual
+fix is to rename the self-reporting agent so its name no longer matches the
+marked client's name, then mark the client again: two distinct identities
+means each is excluded or not on its own.
 
 **Nothing is deleted.** Marking a client only changes which rows a query
 counts; the excluded `mcp` rows stay in the database, so unmarking

@@ -623,8 +623,8 @@ const MIGRATIONS: Migration[] = [
       // anyone whose per-project CLAUDE.md still carries the old log_cost
       // instruction, documented in docs/ingestion.md. Migration 021 adds the
       // fix: excludeObservedCondition() in server/db/costs.ts filters on this
-      // column for every row whose agent's client is marked cost-observed.
-      // That marking is always an explicit human action through
+      // column for every row whose agent's cost identity is marked
+      // cost-observed. That marking is always an explicit human action through
       // POST /api/agents/:id/cost-observed — never inferred from source or
       // anything else, because guessing that an agent is Claude Code is
       // exactly the mistake this column exists to let a person correct
