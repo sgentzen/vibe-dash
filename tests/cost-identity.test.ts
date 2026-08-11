@@ -137,3 +137,30 @@ describe("marking by identity", () => {
     expect(listAgents(db).find((a) => a.id === agent.id)!.cost_observed_externally).toBe(1);
   });
 });
+
+describe("MCP registration records the client name", () => {
+  it("stores the client name separately from the suffixed agent name", () => {
+    // server.ts builds `${info.name}-${suffix}`. It holds both halves before
+    // joining them, so the client name is recorded rather than recovered later.
+    const agent = registerAgent(db, {
+      name: "claude-code-a1b2c3d4",
+      model: "claude-code/1.0",
+      capabilities: [],
+      client_name: "claude-code",
+    });
+    expect(agent.client_name).toBe("claude-code");
+    expect(agent.name).toBe("claude-code-a1b2c3d4");
+  });
+
+  it("keeps a recorded client name when a later call omits it", () => {
+    // touchAgent and other paths re-register by name without knowing the
+    // client. Losing the client name there would silently unmark the agent.
+    registerAgent(db, {
+      name: "claude-code-a1b2c3d4", model: null, capabilities: [], client_name: "claude-code",
+    });
+    const again = registerAgent(db, {
+      name: "claude-code-a1b2c3d4", model: null, capabilities: [],
+    });
+    expect(again.client_name).toBe("claude-code");
+  });
+});

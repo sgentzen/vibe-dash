@@ -42,6 +42,10 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
         name: agentName,
         model: info.version ? `${info.name}/${info.version}` : null,
         capabilities: [],
+        // Recorded so a cost-observed mark can key on something stable. The
+        // suffix above makes every connection a new agent row, so the row is
+        // not a durable identity and info.name is.
+        client_name: info.name,
       });
       agentId = agent.id;
       startOrGetSession(db, agent.id);
