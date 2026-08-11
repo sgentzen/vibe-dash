@@ -74,7 +74,7 @@ function sortedReplacer(_key: string, value: unknown): unknown {
  */
 function resolveQuantity(db: Database.Database, point: OtlpPoint): number {
   if (!point.cumulative) return point.value;
-  return seriesIncrement(db, seriesKey(point), point.startTimeUnixNano, point.value);
+  return seriesIncrement(db, seriesKey(point), point.startTimeUnixNano, point.timeUnixNano, point.value);
 }
 
 /**

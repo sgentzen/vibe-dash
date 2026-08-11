@@ -808,17 +808,41 @@ const MIGRATIONS: Migration[] = [
       // cumulative sender's spend is multiplied by the number of exports and
       // nothing fails to make that visible.
       //
-      // start_time_nano is stored rather than folded into the key: it is what
-      // identifies a restart, and a restart must take the full new value
-      // instead of subtracting against a high-water mark that no longer exists.
+      // start_time_nano is stored for diagnostics but is NOT what identifies a
+      // restart -- that is judged purely by last_value going backwards. See
+      // seriesIncrement's doc comment in server/ingest/otlp/series.ts.
+      //
+      // last_time_unix_nano (Finding 2) is the point's own clock, stored so an
+      // out-of-order delivery -- a retried export arriving after a later one
+      // has already been processed -- can be told apart from real forward
+      // progress. A cumulative point whose timeUnixNano is not strictly
+      // greater than what is stored here carries no new information about the
+      // running total and must be ignored rather than perturbing it; see
+      // seriesIncrement. Defaults to '' rather than NOT NULL alone so the
+      // guarded ALTER TABLE below can add it to a database where this table
+      // already exists.
+      //
+      // Migration 022 has not shipped anywhere yet, so this column is added by
+      // amending 022 in place rather than adding an 023. The CREATE TABLE
+      // covers a fresh database; the guarded ALTER TABLE below covers a
+      // developer database where 022 already ran before this column existed,
+      // following the pragma table_info + has(name) pattern used by 021's
+      // agent-column addition above.
       db.exec(`
         CREATE TABLE IF NOT EXISTS otlp_series (
-          series_key      TEXT PRIMARY KEY NOT NULL,
-          start_time_nano TEXT NOT NULL,
-          last_value      REAL NOT NULL,
-          updated_at      TEXT NOT NULL
+          series_key          TEXT PRIMARY KEY NOT NULL,
+          start_time_nano      TEXT NOT NULL,
+          last_value            REAL NOT NULL,
+          last_time_unix_nano  TEXT NOT NULL DEFAULT '',
+          updated_at            TEXT NOT NULL
         )
       `);
+
+      const cols = db.pragma("table_info(otlp_series)") as { name: string }[];
+      const has = (name: string): boolean => cols.some((c) => c.name === name);
+      if (!has("last_time_unix_nano")) {
+        db.prepare("ALTER TABLE otlp_series ADD COLUMN last_time_unix_nano TEXT NOT NULL DEFAULT ''").run();
+      }
     },
   },
 ];

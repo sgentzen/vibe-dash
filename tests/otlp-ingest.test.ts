@@ -164,6 +164,30 @@ describe("ingestMetricsPayload", () => {
     expect(rows(db).map((r) => r.input_tokens)).toEqual([100, 50, 30]);
   });
 
+  it("does not let a late retry of an earlier export corrupt a later increment (Finding 2)", () => {
+    // Reproduces the exact trace from the finding. A cumulative sender
+    // exports 100 at t=2000, then 150 at t=3000. A late retry of the FIRST
+    // export then arrives (value 100, t=2000) -- e.g. a slow network retry,
+    // now specifically expected behaviour since the endpoint returns 503 for
+    // transient failures precisely so exporters retry. Without the
+    // timeUnixNano guard in seriesIncrement, the retry reads as a restart
+    // (100 < 150) and resets the stored total to 100, so the next legitimate
+    // export (200) computes 200 - 100 = 100 instead of the true
+    // 200 - 150 = 50: rows [100, 50, 100] totalling 250 against a truth of
+    // 200. The retry itself always produces no row (its timeUnixNano matches
+    // the first export's external_id either way), so the fixed behaviour is
+    // three real rows: 100, 50, 50.
+    const at = (time: string, input: number) =>
+      ingestMetricsPayload(db, codexPayload({ tokens: { input }, cumulative: true, time }));
+
+    at("2000", 100);
+    at("3000", 150);
+    at("2000", 100); // late retry of the first export
+    at("4000", 200);
+
+    expect(rows(db).map((r) => r.input_tokens)).toEqual([100, 50, 50]);
+  });
+
   it("records a delta series as sent", () => {
     ingestMetricsPayload(db, codexPayload({ tokens: { input: 100 }, time: "2000" }));
     ingestMetricsPayload(db, codexPayload({ tokens: { input: 100 }, time: "3000" }));
