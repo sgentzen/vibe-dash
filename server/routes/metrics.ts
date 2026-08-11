@@ -6,6 +6,7 @@ import {
   getAgentComparison,
   getTaskTypeBreakdown,
 } from "../db/index.js";
+import type { CompletionMetrics } from "../db/index.js";
 import { makeReadLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { badRequest, notFound } from "./responses.js";
@@ -18,8 +19,11 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
 
   router.post("/api/metrics", metricsLimiter, (req, res) => {
     const { task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds } = req.body as {
-      task_id: string;
-      agent_id: string;
+      // The ids arrive as `unknown` because a JSON body can carry any type here.
+      // Declaring them `string` would let the guard below look redundant to a
+      // reader while the actual values reached SQLite unchecked.
+      task_id?: unknown;
+      agent_id?: unknown;
       lines_added?: number;
       lines_removed?: number;
       files_changed?: number;
@@ -27,7 +31,10 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
       tests_passing?: number;
       duration_seconds?: number;
     };
-    if (!task_id || !agent_id) {
+    // Truthiness alone is not enough: `true` and `123` are truthy but cannot be
+    // bound by better-sqlite3, so they used to surface as a 500 for what is
+    // plainly a malformed request.
+    if (typeof task_id !== "string" || !task_id || typeof agent_id !== "string" || !agent_id) {
       badRequest(res, "task_id and agent_id are required");
       return;
     }
@@ -38,9 +45,21 @@ export function metricRoutes(db: Database.Database, broadcast: BroadcastFn): Rou
         return;
       }
     }
-    const entry = logCompletionMetrics(db, {
-      task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds,
-    });
+    let entry: CompletionMetrics;
+    try {
+      entry = logCompletionMetrics(db, {
+        task_id, agent_id, lines_added, lines_removed, files_changed, tests_added, tests_passing, duration_seconds,
+      });
+    } catch (err) {
+      // The only foreign keys on completion_metrics are task_id and agent_id, so
+      // this constraint can only mean the caller named a row that isn't there —
+      // their mistake, not ours. Every other throw is still a genuine 500.
+      if ((err as { code?: string }).code === "SQLITE_CONSTRAINT_FOREIGNKEY") {
+        notFound(res, "Unknown task_id or agent_id");
+        return;
+      }
+      throw err;
+    }
     broadcast({ type: "metrics_logged", payload: entry });
     res.status(201).json(entry);
   });
