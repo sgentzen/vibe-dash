@@ -117,12 +117,22 @@ function buildGroups(
   let unmapped = 0;
 
   for (const point of points) {
-    const mapped = mapPoint(point);
-    if (!mapped) {
+    const result = mapPoint(point);
+
+    // "unmapped": no mapper recognised this metric name -- the one thing
+    // otlpUnmapped exists to surface (spec §7). "ignored": a mapper DID
+    // recognise the metric but deliberately skipped this point (Codex's
+    // token_type="total", a point with no model) -- working as designed, and
+    // must not inflate the same counter that answers "is my runner
+    // recognised?". See MapResult (types.ts) for why these are kept distinct.
+    if (result.status === "unmapped") {
       unmapped++;
       unmappedPoints++;
       continue;
     }
+    if (result.status === "ignored") continue;
+
+    const mapped = result.usage;
 
     // A cumulative point that has not moved yields zero. Writing a zero row
     // would inflate entry_count with a row that carries no new spend.

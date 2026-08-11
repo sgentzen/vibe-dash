@@ -30,16 +30,18 @@ const NO_TOKENS = {
 };
 
 describe("a token_type naming an inherited property", () => {
-  it.each(INHERITED)("leaves %s unmapped rather than mapping to a function", (name) => {
+  it.each(INHERITED)("leaves %s ignored rather than mapping to a function", (name) => {
     // Before the guard this returned a truthy MappedUsage whose kind was
     // Object.prototype.constructor, so the tokens were carried into the
-    // pipeline under a kind that matches no bucket.
-    expect(mapPoint(point({ token_type: name, model: "gpt-5.3-codex" }))).toBeNull();
+    // pipeline under a kind that matches no bucket. "ignored", not
+    // "unmapped": the metric name (codex.turn.token_usage) is recognised, so
+    // this must not move the otlpUnmapped counter -- see MapResult (types.ts).
+    expect(mapPoint(point({ token_type: name, model: "gpt-5.3-codex" }))).toEqual({ status: "ignored" });
   });
 
   it("still maps a real token type", () => {
     expect(mapPoint(point({ token_type: "input", model: "gpt-5.3-codex" })))
-      .toEqual({ model: "gpt-5.3-codex", kind: "input" });
+      .toEqual({ status: "mapped", usage: { model: "gpt-5.3-codex", kind: "input" } });
   });
 });
 

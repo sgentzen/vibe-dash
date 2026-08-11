@@ -74,6 +74,82 @@ describe("ingestMetricsPayload", () => {
     expect(all[0].output_tokens).toBe(20);
   });
 
+  it("does not count the skipped total as unmapped, on an otherwise normal Codex payload", () => {
+    // This is Finding 3's regression test. token_type="total" is a working-as-
+    // designed skip of a metric this mapper DOES recognise, not a sign that
+    // the runner is unrecognised. Before the fix, every one of these turns
+    // incremented otlpUnmapped once per turn, forever, on a perfectly working
+    // Codex setup -- exactly the false alarm otlpUnmapped must never raise.
+    const result = ingestMetricsPayload(
+      db,
+      codexPayload({ tokens: { input: 100, output: 20, cached_input: 10, total: 130 } })
+    );
+
+    expect(result.unmapped).toBe(0);
+  });
+
+  it("writes no row and records nothing for a payload of only ignored points", () => {
+    // Every point here is "ignored" (recognised metric, deliberately skipped
+    // point), not "unmapped". A regression that let an ignored point slip
+    // into a written row would hide behind a mapped row in the mixed test
+    // above; this payload has no mapped point to hide behind.
+    const result = ingestMetricsPayload(db, codexPayload({ tokens: { total: 100 } }));
+
+    expect(result.recorded).toBe(0);
+    expect(result.unmapped).toBe(0);
+    expect(rows(db)).toHaveLength(0);
+  });
+
+  it("counts an ignored point and an unmapped point separately in the same payload", () => {
+    // The exact cross-contamination case Finding 3 exists to prevent: an
+    // "ignored" point (Codex's total, metric recognised) sitting alongside a
+    // genuinely "unmapped" point (a metric no mapper reads at all) in ONE
+    // payload must move only the unmapped counter, and by exactly one -- not
+    // two, which is what conflating the two statuses would produce.
+    const payload = {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [
+          {
+            scope: { name: "codex" },
+            metrics: [{
+              name: "codex.turn.token_usage",
+              histogram: {
+                aggregationTemporality: "AGGREGATION_TEMPORALITY_DELTA",
+                dataPoints: [{
+                  attributes: [
+                    { key: "token_type", value: { stringValue: "total" } },
+                    { key: "model", value: { stringValue: "gpt-5.3-codex" } },
+                  ],
+                  startTimeUnixNano: "1000",
+                  timeUnixNano: "2000",
+                  count: "1",
+                  sum: 100,
+                }],
+              },
+            }],
+          },
+          {
+            scope: { name: "some-other-runner" },
+            metrics: [{
+              name: "some_other_runner.turn.token_usage",
+              histogram: {
+                aggregationTemporality: "AGGREGATION_TEMPORALITY_DELTA",
+                dataPoints: [{ attributes: [], startTimeUnixNano: "1000", timeUnixNano: "2000", sum: 42 }],
+              },
+            }],
+          },
+        ],
+      }],
+    };
+
+    const result = ingestMetricsPayload(db, payload);
+
+    expect(result.unmapped).toBe(1);
+    expect(result.recorded).toBe(0);
+    expect(rows(db)).toHaveLength(0);
+  });
+
   it("records a cumulative series as increments, not running totals", () => {
     // THE test of this feature. Three exports of a climbing total must record
     // 100, then 50, then 30 — not 100, 150, 180, which is what recording the

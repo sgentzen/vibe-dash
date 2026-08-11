@@ -1,4 +1,4 @@
-import type { MappedUsage, OtlpPoint } from "../types.js";
+import type { MapResult, OtlpPoint } from "../types.js";
 import { mapCodexPoint } from "./codex.js";
 
 /**
@@ -11,11 +11,18 @@ import { mapCodexPoint } from "./codex.js";
  */
 const MAPPERS = [mapCodexPoint];
 
-/** The first mapper that recognises this point, or null if none does. */
-export function mapPoint(point: OtlpPoint): MappedUsage | null {
+/**
+ * Run every mapper against this point and report what happened.
+ *
+ * A mapper returning anything other than "unmapped" means it recognised the
+ * metric, so that result -- "mapped" or "ignored" -- is final; no other
+ * mapper gets a turn. Only when every mapper says "unmapped" does the point
+ * as a whole count as unmapped: no mapper recognised its metric name at all.
+ */
+export function mapPoint(point: OtlpPoint): MapResult {
   for (const mapper of MAPPERS) {
-    const mapped = mapper(point);
-    if (mapped) return mapped;
+    const result = mapper(point);
+    if (result.status !== "unmapped") return result;
   }
-  return null;
+  return { status: "unmapped" };
 }
