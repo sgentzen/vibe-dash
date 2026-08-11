@@ -5,6 +5,7 @@ import { mapPoint } from "./mappers/index.js";
 import { seriesIncrement } from "./series.js";
 import { resolveProjectId } from "./attribute.js";
 import { priceTokens } from "../transcripts/pricing.js";
+import { logger } from "../../logger.js";
 import type { OtlpPoint } from "./types.js";
 
 const PROVIDER = "openai";
@@ -74,6 +75,30 @@ function sortedReplacer(_key: string, value: unknown): unknown {
 function resolveQuantity(db: Database.Database, point: OtlpPoint): number {
   if (!point.cumulative) return point.value;
   return seriesIncrement(db, seriesKey(point), point.startTimeUnixNano, point.value);
+}
+
+/**
+ * Whether a group's accumulated total has grown past what can be faithfully
+ * represented as an integer token count.
+ *
+ * `boundedOrNull` (parse.ts) bounds each POINT to [0, MAX_SAFE_INTEGER], but
+ * `accumulate` sums many in-bound points into one group with no ceiling of
+ * its own: enough points sharing a (metric, model, timeUnixNano) group key
+ * can sum past MAX_SAFE_INTEGER even though every point that fed them
+ * individually passed the per-point bound. The same reasoning applies here as
+ * there: beyond MAX_SAFE_INTEGER the total is not a number that can be
+ * represented exactly, so it is not one we can honestly record, whatever its
+ * provenance. The group is rejected outright rather than clamped to the
+ * maximum -- clamping would record a fabricated figure in place of a refused
+ * one, and because no cost row is ever deleted, that fabrication would be
+ * permanent.
+ */
+function groupExceedsSafeBound(group: Group): boolean {
+  return (
+    group.inputTokens > Number.MAX_SAFE_INTEGER ||
+    group.outputTokens > Number.MAX_SAFE_INTEGER ||
+    group.cacheReadTokens > Number.MAX_SAFE_INTEGER
+  );
 }
 
 /** Fold one point's quantity into its turn's group, creating the group on first sight. */
@@ -221,6 +246,25 @@ export function ingestMetricsPayload(db: Database.Database, body: unknown): Inge
     unmapped = built.unmapped;
 
     for (const [key, group] of built.groups) {
+      // Reject before pricing or inserting: an unbounded group total must
+      // never reach priceTokens or the INSERT, since a fabricated cost row is
+      // permanent (no cost row is ever deleted). See groupExceedsSafeBound.
+      if (groupExceedsSafeBound(group)) {
+        logger.warn(
+          {
+            key,
+            model: group.model,
+            resourceAttributes: group.resourceAttributes,
+            timeUnixNano: group.timeUnixNano,
+            inputTokens: group.inputTokens,
+            outputTokens: group.outputTokens,
+            cacheReadTokens: group.cacheReadTokens,
+          },
+          "OTLP group total exceeds MAX_SAFE_INTEGER and cannot be faithfully recorded; skipping the whole group"
+        );
+        continue;
+      }
+
       const result = writeGroup(db, key, group);
       if (result.recorded) recorded++;
       if (result.unattributed) unattributed++;

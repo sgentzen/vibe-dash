@@ -381,6 +381,46 @@ describe("ingestMetricsPayload", () => {
     expect(rows(db)[0].cost_usd).toBeCloseTo(0.175, 6);
   });
 
+  it("rejects a group whose accumulated total exceeds MAX_SAFE_INTEGER, rather than recording a fabricated figure (Finding 1)", () => {
+    // Reproduces the finding exactly. boundedOrNull (parse.ts) bounds each
+    // POINT to MAX_SAFE_INTEGER, but nothing bounded the GROUP they fold
+    // into: 2000 points sharing one (metric, model, timeUnixNano) key, each
+    // individually at exactly MAX_SAFE_INTEGER, used to sum into one row
+    // worth $31.5 trillion -- every point passed the per-point bound, and
+    // because no cost row is ever deleted, the corruption was permanent.
+    const POINT_COUNT = 2000;
+    const dataPoints = Array.from({ length: POINT_COUNT }, () => ({
+      attributes: [
+        { key: "token_type", value: { stringValue: "input" } },
+        { key: "model", value: { stringValue: "gpt-5.3-codex" } },
+      ],
+      startTimeUnixNano: "1000",
+      timeUnixNano: "2000",
+      count: "1",
+      sum: Number.MAX_SAFE_INTEGER,
+    }));
+    const payload = {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{
+          scope: { name: "codex" },
+          metrics: [{
+            name: "codex.turn.token_usage",
+            histogram: {
+              aggregationTemporality: "AGGREGATION_TEMPORALITY_DELTA",
+              dataPoints,
+            },
+          }],
+        }],
+      }],
+    };
+
+    const result = ingestMetricsPayload(db, payload);
+
+    expect(result.recorded).toBe(0);
+    expect(rows(db)).toHaveLength(0);
+  });
+
   it("propagates a malformed payload's parse failure rather than swallowing it", () => {
     // parseMetricsPayload (parse.ts) throws for a non-object body. Whether
     // that throw reaches the caller matters to the route this feeds: an
