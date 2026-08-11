@@ -235,8 +235,26 @@ interface OverlapRow {
   date: string;
   mcp_entries: number;
   transcript_entries: number;
-  mcp_agent_names: string | null;
-  mcp_identities: string | null;
+  /** JSON arrays from json_group_array, so a name containing a comma survives intact. */
+  mcp_agent_names: string;
+  mcp_identities: string;
+}
+
+/**
+ * Read one of the overlap query's JSON name arrays.
+ *
+ * json_group_array rather than GROUP_CONCAT because the result is split back
+ * into a list, and GROUP_CONCAT's separator is a comma with no escaping, so an
+ * agent or client name containing a comma split into two bogus entries. That
+ * matters beyond display: mcp_identities is the value a user copies to mark,
+ * and half a name marks nothing. SQLite refuses a custom separator alongside
+ * DISTINCT, so the fix is a format that quotes its own elements.
+ *
+ * Unlike GROUP_CONCAT, json_group_array keeps NULLs, and every transcript row
+ * joins to no agent, so the nulls are dropped here instead.
+ */
+function parseNameArray(json: string): string[] {
+  return (JSON.parse(json) as (string | null)[]).filter((n): n is string => n !== null);
 }
 
 /** Counts behind GET /api/ingest/status, so skipped, unpriced and duplicated spend are all visible. */
@@ -250,10 +268,10 @@ export function getIngestStatus(db: Database.Database): {
   // already marked as observed are filtered out, because their rows no longer
   // reach any total and so are no longer a discrepancy to act on.
   //
-  // GROUP_CONCAT skips NULLs, and transcript rows carry no agent_id, so the
-  // name list only ever describes the mcp side. A self-report that named no
-  // agent contributes to mcp_entries with no name, which is the visible form
-  // of the row that cannot be excluded by marking.
+  // Transcript rows carry no agent_id, so once parseNameArray drops the NULLs
+  // the name list only ever describes the mcp side. A self-report that named
+  // no agent contributes to mcp_entries with no name, which is the visible
+  // form of the row that cannot be excluded by marking.
   //
   // LEFT JOIN projects, not JOIN: log_cost's project id is optional, and an
   // mcp row that carries none was attached to an agent instead (an earlier
@@ -266,8 +284,8 @@ export function getIngestStatus(db: Database.Database): {
            DATE(c.created_at)                                        AS date,
            SUM(CASE WHEN c.source = 'mcp' THEN 1 ELSE 0 END)         AS mcp_entries,
            SUM(CASE WHEN c.source = 'transcript' THEN 1 ELSE 0 END)  AS transcript_entries,
-           GROUP_CONCAT(DISTINCT a.name)                             AS mcp_agent_names,
-           GROUP_CONCAT(DISTINCT COALESCE(a.client_name, a.name))    AS mcp_identities
+           json_group_array(DISTINCT a.name)                         AS mcp_agent_names,
+           json_group_array(DISTINCT COALESCE(a.client_name, a.name)) AS mcp_identities
       FROM cost_entries c
       LEFT JOIN projects p ON p.id = c.project_id
       LEFT JOIN agents a ON a.id = c.agent_id
@@ -288,8 +306,8 @@ export function getIngestStatus(db: Database.Database): {
       date: r.date,
       mcp_entries: r.mcp_entries,
       transcript_entries: r.transcript_entries,
-      mcp_agent_names: r.mcp_agent_names === null ? [] : r.mcp_agent_names.split(","),
-      mcp_identities: r.mcp_identities === null ? [] : r.mcp_identities.split(","),
+      mcp_agent_names: parseNameArray(r.mcp_agent_names),
+      mcp_identities: parseNameArray(r.mcp_identities),
     })),
   };
 }

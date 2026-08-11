@@ -147,3 +147,58 @@ describe("overlaps with no project", () => {
     expect(overlap.mcp_identities).toEqual(["claude-code"]);
   });
 });
+
+describe("names containing a comma", () => {
+  // The lists are built by an aggregate and read back as an array. GROUP_CONCAT
+  // joins on a comma with no escaping, so a name carrying one split into two
+  // bogus entries. That is not merely cosmetic: mcp_identities is the value a
+  // user copies to mark, and half a name marks nothing, so they would act on it
+  // and silently achieve nothing.
+  it("keeps a comma-bearing agent name and identity in one piece", () => {
+    const project = createProject(db, { name: "demo", description: null });
+    const agent = registerAgent(db, {
+      name: "acme, inc bot-a1b2c3d4",
+      model: null,
+      capabilities: [],
+      client_name: "acme, inc bot",
+    });
+    addCost(db, { id: "m1", project: project.id, agent: agent.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: project.id, source: "transcript", day: "2026-08-10" });
+
+    const [overlap] = getIngestStatus(db).overlaps;
+    expect(overlap.mcp_agent_names).toEqual(["acme, inc bot-a1b2c3d4"]);
+    expect(overlap.mcp_identities).toEqual(["acme, inc bot"]);
+  });
+
+  it("still separates two distinct clients when one carries a comma", () => {
+    // The separator has to keep doing its job, not just stop over-splitting.
+    const project = createProject(db, { name: "demo", description: null });
+    const comma = registerAgent(db, {
+      name: "acme, inc-aaaaaaaa", model: null, capabilities: [], client_name: "acme, inc",
+    });
+    const plain = registerAgent(db, {
+      name: "claude-code-bbbbbbbb", model: null, capabilities: [], client_name: "claude-code",
+    });
+    addCost(db, { id: "m1", project: project.id, agent: comma.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "m2", project: project.id, agent: plain.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: project.id, source: "transcript", day: "2026-08-10" });
+
+    const [overlap] = getIngestStatus(db).overlaps;
+    expect([...overlap.mcp_identities].sort()).toEqual(["acme, inc", "claude-code"]);
+  });
+
+  it("reports no names at all for a self-report that named no agent", () => {
+    // json_group_array keeps NULLs where GROUP_CONCAT dropped them, so the
+    // filter that removes them is load-bearing. Without it this would be
+    // [null] and a consumer would render an empty entry as though an agent
+    // were named.
+    const project = createProject(db, { name: "demo", description: null });
+    addCost(db, { id: "m1", project: project.id, agent: null, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: project.id, source: "transcript", day: "2026-08-10" });
+
+    const [overlap] = getIngestStatus(db).overlaps;
+    expect(overlap.mcp_entries).toBe(1);
+    expect(overlap.mcp_agent_names).toEqual([]);
+    expect(overlap.mcp_identities).toEqual([]);
+  });
+});
