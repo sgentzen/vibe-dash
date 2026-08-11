@@ -211,6 +211,16 @@ export interface CostSummary {
   entry_count: number;
   /** Rows in this group whose cost is unknown, so they contributed nothing to the total. */
   unpriced_entries: number;
+  /**
+   * Rows in this scope suppressed as duplicates of an observed client's
+   * transcripts, so they contributed nothing to the total.
+   *
+   * Above zero means the total is not this scope's whole spend: the money is
+   * counted globally against the transcript rows instead. Transcript rows carry
+   * no agent_id, so without this an observed agent's own summary reads $0.00
+   * and looks identical to an agent that never did anything.
+   */
+  excluded_entries: number;
 }
 
 export interface CostTimeseriesEntry {
@@ -238,6 +248,8 @@ export interface CostByAgentEntry {
   total_tokens: number;
   entry_count: number;
   unpriced_entries: number;
+  /** Rows suppressed as duplicates of an observed client's transcripts — the money is counted globally instead. */
+  excluded_entries: number;
 }
 
 /**

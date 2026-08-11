@@ -87,8 +87,13 @@ describe("excluding an observed agent's self-reported cost", () => {
     expect(byModel).toHaveLength(1);
     expect(byModel[0].total_cost_usd).toBeCloseTo(5, 10);
 
-    // The only agent-attributed row was the excluded one, so the breakdown empties.
-    expect(getCostByAgent(db)).toHaveLength(0);
+    // The agent stays in the breakdown even though its only row is suppressed —
+    // it reads as excluded, not as an agent that never spent anything (Task 4).
+    const byAgent = getCostByAgent(db);
+    expect(byAgent).toHaveLength(1);
+    expect(byAgent[0].total_cost_usd).toBeCloseTo(0, 10);
+    expect(byAgent[0].entry_count).toBe(0);
+    expect(byAgent[0].excluded_entries).toBe(1);
 
     const total = getCostTimeseries(db).reduce((sum, d) => sum + d.total_cost_usd, 0);
     expect(total).toBeCloseTo(5, 10);

@@ -115,13 +115,23 @@ export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
 type CostSummaryColumn = "agent_id" | "milestone_id" | "project_id";
 
 function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, value: string): CostSummary {
+  // Conditional aggregation rather than a WHERE filter, so the suppressed rows
+  // can still be counted. observedDuplicateSql is never NULL — its
+  // agent_id IS NOT NULL guard makes the predicate definite — so the CASE
+  // arms are exhaustive.
+  // Every count is COALESCEd. This query has no GROUP BY, so a scope matching
+  // no rows at all still returns one row, and SUM over zero rows is NULL where
+  // the COUNT(*) it replaces was 0. Without the COALESCE, an agent with no cost
+  // rows would report entry_count: null and the field's type would be a lie.
+  const dup = observedDuplicateSql();
   return db.prepare(
-    `SELECT ${totalCostSql()},
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count,
-            ${unpricedSql()}
-     FROM cost_entries WHERE ${column} = ? AND ${excludeObservedCondition()}`
+    `SELECT COALESCE(SUM(CASE WHEN NOT ${dup} THEN cost_usd END), 0) AS total_cost_usd,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN input_tokens END), 0) AS total_input_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN output_tokens END), 0) AS total_output_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN 1 ELSE 0 END), 0) AS entry_count,
+            COALESCE(SUM(CASE WHEN NOT ${dup} AND cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries,
+            COALESCE(SUM(CASE WHEN ${dup} THEN 1 ELSE 0 END), 0) AS excluded_entries
+     FROM cost_entries WHERE ${column} = ?`
   ).get(value) as CostSummary;
 }
 
@@ -232,7 +242,11 @@ export function getCostByAgent(
   db: Database.Database,
   filter: { project_id?: string; milestone_id?: string } = {}
 ): CostByAgentEntry[] {
-  const conditions: string[] = ["c.agent_id IS NOT NULL", excludeObservedCondition("c.")];
+  // The exclusion is NOT in the WHERE clause here. Filtering it there removed
+  // an observed agent's only rows, GROUP BY produced no group, and the agent
+  // disappeared from the breakdown as though it had never spent anything.
+  const dup = observedDuplicateSql("c.");
+  const conditions: string[] = ["c.agent_id IS NOT NULL"];
   const params: unknown[] = [];
 
   if (filter.project_id) { conditions.push("c.project_id = ?"); params.push(filter.project_id); }
@@ -242,10 +256,11 @@ export function getCostByAgent(
 
   return db.prepare(
     `SELECT c.agent_id, a.name AS agent_name,
-            ${totalCostSql("c.")},
-            COALESCE(SUM(c.input_tokens + c.output_tokens), 0) AS total_tokens,
-            COUNT(*) AS entry_count,
-            ${unpricedSql("c.")}
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN c.cost_usd END), 0) AS total_cost_usd,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN c.input_tokens + c.output_tokens END), 0) AS total_tokens,
+            SUM(CASE WHEN NOT ${dup} THEN 1 ELSE 0 END) AS entry_count,
+            SUM(CASE WHEN NOT ${dup} AND c.cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced_entries,
+            SUM(CASE WHEN ${dup} THEN 1 ELSE 0 END) AS excluded_entries
      FROM cost_entries c
      JOIN agents a ON c.agent_id = a.id
      ${where}
