@@ -43,6 +43,30 @@ const FAST_RATES: Record<string, Rate> = {
   "claude-opus-4-8": { input: 10, output: 50 },
 };
 
+// Non-Anthropic rates, in USD per million tokens.
+//
+// Added for OTLP ingestion: Codex reports tokens and no cost, so without these
+// a Codex user sees token counts and no spend at all.
+//
+// SOURCE: https://platform.openai.com/docs/pricing (redirects to
+// https://developers.openai.com/api/docs/pricing)
+// RATES CACHED: 2026-08-11
+// REVIEW DATE: 2026-11-11
+//
+// Same rule as the table above: a model that is not listed here comes out
+// unpriced rather than priced at zero. Do not add a rate you cannot cite.
+//
+// Only "gpt-5.3-codex" was found on the pricing page at the time of writing.
+// Earlier Codex model IDs some deployments may still report (e.g.
+// "gpt-5-codex", "gpt-5.1-codex", "gpt-5.2-codex") were not listed there and
+// were deliberately left out rather than guessed — those rows come out
+// unpriced via the NULL path above.
+const OPENAI_RATES: Record<string, Rate> = {
+  "gpt-5.3-codex": { input: 1.75, output: 14 },
+};
+
+const ALL_RATES: Record<string, Rate> = { ...RATES, ...OPENAI_RATES };
+
 // Derived from the base input rate.
 const CACHE_READ_MULTIPLIER = 0.1;
 const CACHE_WRITE_5M_MULTIPLIER = 1.25;
@@ -51,11 +75,45 @@ const CACHE_WRITE_1H_MULTIPLIER = 2;
 const PER_MILLION = 1_000_000;
 
 /**
- * Cost in USD for one usage record, or null when the model is unknown.
+ * Token counts for one priceable unit of work, independent of where they came
+ * from. A transcript record and an OTLP metric point both reduce to this.
+ */
+export interface TokenCounts {
+  model: string;
+  /** "fast" selects the premium rate table. Null or absent means standard. */
+  speed?: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreation5mTokens: number;
+  cacheCreation1hTokens: number;
+}
+
+/**
+ * Cost in USD for a set of token counts, or null when the model is unknown.
  *
  * Null is deliberate and is never coerced to zero: a silent zero would
  * understate spend and quietly corrupt the total this whole feature exists to
- * make trustworthy.
+ * make trustworthy. Zero is returned only when the model IS known and there
+ * were genuinely no tokens.
+ */
+export function priceTokens(counts: TokenCounts): number | null {
+  const table = counts.speed === "fast" ? FAST_RATES : ALL_RATES;
+  const rate = table[counts.model] ?? (counts.speed === "fast" ? ALL_RATES[counts.model] : undefined);
+  if (!rate) return null;
+
+  const input = counts.inputTokens * rate.input;
+  const output = counts.outputTokens * rate.output;
+  const cacheRead = counts.cacheReadTokens * rate.input * CACHE_READ_MULTIPLIER;
+  const write5m = counts.cacheCreation5mTokens * rate.input * CACHE_WRITE_5M_MULTIPLIER;
+  const write1h = counts.cacheCreation1hTokens * rate.input * CACHE_WRITE_1H_MULTIPLIER;
+
+  return (input + output + cacheRead + write5m + write1h) / PER_MILLION;
+}
+
+/**
+ * Cost in USD for one transcript usage record, or null when the model is
+ * unknown.
  *
  * An unpriced record keeps its input, output and cache-write tokens, but NOT
  * its cache-read tokens: those are priced here and then dropped, because
@@ -66,20 +124,10 @@ const PER_MILLION = 1_000_000;
  * cache reads is tracked as follow-up work.
  */
 export function priceRecord(record: UsageRecord): number | null {
-  const table = record.speed === "fast" ? FAST_RATES : RATES;
-  const rate = table[record.model] ?? (record.speed === "fast" ? RATES[record.model] : undefined);
-  if (!rate) return null;
-
-  const input = record.inputTokens * rate.input;
-  const output = record.outputTokens * rate.output;
-  const cacheRead = record.cacheReadTokens * rate.input * CACHE_READ_MULTIPLIER;
-  const write5m = record.cacheCreation5mTokens * rate.input * CACHE_WRITE_5M_MULTIPLIER;
-  const write1h = record.cacheCreation1hTokens * rate.input * CACHE_WRITE_1H_MULTIPLIER;
-
-  return (input + output + cacheRead + write5m + write1h) / PER_MILLION;
+  return priceTokens(record);
 }
 
 /** Exposed for the status endpoint so operators can see what is priceable. */
 export function knownModels(): string[] {
-  return Object.keys(RATES).sort((a, b) => a.localeCompare(b));
+  return Object.keys(ALL_RATES).sort((a, b) => a.localeCompare(b));
 }
