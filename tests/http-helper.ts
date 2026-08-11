@@ -15,7 +15,7 @@ function send(options: http.RequestOptions, payload?: string): Promise<IncomingM
   return new Promise((resolve, reject) => {
     const req = http.request(options, resolve);
     req.on("error", reject);
-    if (payload) req.write(payload);
+    if (payload !== undefined) req.write(payload);
     req.end();
   });
 }
@@ -30,24 +30,45 @@ function readBody(res: IncomingMessage): Promise<string> {
   });
 }
 
-/**
- * Minimal HTTP helper: mounts `app` on a one-shot server bound to a random
- * port, issues a single request, then tears the server down. The body is
- * JSON-parsed when possible and returned as raw text otherwise.
- *
- * Awaiting each step keeps the callback nesting shallow — the previous
- * inline version nested five deep (promise -> listen -> request -> response
- * -> stream events), which Sonar flags as S2004.
- */
-export async function requestApp(
+/** Minimal HTTP helper: JSON-serialises `body` and delegates to `requestAppRaw`. */
+export function requestApp(
   app: Express,
   method: string,
   path: string,
   body?: unknown,
 ): Promise<{ status: number; body: unknown }> {
+  return requestAppRaw(app, method, path, body === undefined ? undefined : JSON.stringify(body));
+}
+
+/**
+ * Mounts `app` on a one-shot server bound to a random port, issues a single
+ * request sending `payload` verbatim as the body, then tears the server down.
+ * The response body is JSON-parsed when possible and returned as raw text
+ * otherwise.
+ *
+ * Taking an already-serialised payload is what lets callers reach bodies
+ * JSON.stringify cannot produce — e.g. `1e400`, which parses to `Infinity` on
+ * the server but stringifies back to `null` on the way out.
+ *
+ * A payload that is not valid JSON never reaches a route: `express.json()`
+ * rejects it with a 400 SyntaxError. Which *shape* that 400 comes back in
+ * depends on the app under test having `errorHandler` mounted last, as
+ * `server/index.ts` does — without it Express's default handler answers in
+ * HTML rather than this suite's `{ error }` JSON. See tests/http-helper.test.ts,
+ * which pins both shapes.
+ *
+ * Awaiting each step keeps the callback nesting shallow — the previous
+ * inline version nested five deep (promise -> listen -> request -> response
+ * -> stream events), which Sonar flags as S2004.
+ */
+export async function requestAppRaw(
+  app: Express,
+  method: string,
+  path: string,
+  payload?: string,
+): Promise<{ status: number; body: unknown }> {
   const server = createServer(app);
   const port = await listen(server);
-  const payload = body === undefined ? undefined : JSON.stringify(body);
   try {
     const res = await send(
       {
@@ -57,7 +78,7 @@ export async function requestApp(
         method,
         headers: {
           "Content-Type": "application/json",
-          ...(payload ? { "Content-Length": String(Buffer.byteLength(payload)) } : {}),
+          ...(payload === undefined ? {} : { "Content-Length": String(Buffer.byteLength(payload)) }),
         },
       },
       payload,

@@ -3,7 +3,7 @@ import express from "express";
 import type { Express } from "express";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { requestApp } from "./http-helper.js";
+import { requestApp, requestAppRaw } from "./http-helper.js";
 import { createRouter } from "../server/routes/index.js";
 import { errorHandler } from "../server/routes/middleware.js";
 import {
@@ -27,14 +27,24 @@ function request(
   return requestApp(app, method, path, body);
 }
 
+/** As `request`, but sends an already-serialised body verbatim. */
+function requestRaw(
+  method: string,
+  path: string,
+  payload: string
+): Promise<{ status: number; body: any }> {
+  return requestAppRaw(app, method, path, payload);
+}
+
 beforeEach(() => {
   db = createTestDb();
   app = express();
   app.use(express.json());
   app.use(createRouter(db));
-  // Production mounts errorHandler last (server/index.ts). Without it a thrown
-  // route error falls through to Express's default HTML finaliser, so a test
-  // asserting on a 500 would not be checking what a client actually receives.
+  // Mounted last, as server/index.ts does, and load-bearing here: the
+  // malformed-body test below reaches it, because express.json() rejects that
+  // payload before any route runs. Without it that test would get Express's
+  // default HTML page instead of `{ error }`. See tests/http-helper.test.ts.
   app.use(errorHandler);
 });
 
@@ -176,51 +186,79 @@ describe("metrics REST endpoints", () => {
     expect(status).toBe(400);
   });
 
-  // A truthy non-string used to sail past the `!task_id || !agent_id` guard and
-  // reach the prepared statement, where better-sqlite3 refuses to bind it. That
-  // is a malformed request, not a server fault, so it must not be a 500.
-  it("POST /api/metrics returns 400 when the ids are booleans", async () => {
-    const { status, body } = await request("POST", "/api/metrics", { task_id: true, agent_id: true });
-    expect(status).toBe(400);
-    expect(body.error).toBeTruthy();
-  });
+  describe("POST /api/metrics numeric field validation", () => {
+    // Spelled out rather than imported from the route, so this stays an
+    // independent statement of the contract: dropping a field from the
+    // route's own NUMERIC_FIELDS list has to turn one of these red.
+    const NUMERIC_FIELDS = [
+      "lines_added", "lines_removed", "files_changed",
+      "tests_added", "tests_passing", "duration_seconds",
+    ];
 
-  it("POST /api/metrics returns 400 when the ids are numbers", async () => {
-    const { status, body } = await request("POST", "/api/metrics", { task_id: 123, agent_id: 456 });
-    expect(status).toBe(400);
-    expect(body.error).toBeTruthy();
-  });
+    // Values that are not finite numbers, each paired with the field it is
+    // sent as. better-sqlite3 binds some of these without complaint, so
+    // without the guard they corrupt the row rather than failing loudly:
+    // an array is spread as a positional parameter list, making [1] insert 1.
+    const NON_NUMERIC_VALUES: Array<[string, string, unknown]> = [
+      ["an object", "lines_added", {}],
+      ["an array", "lines_added", [1]],
+      ["a boolean", "tests_passing", true],
+      ["null", "files_changed", null],
+    ];
 
-  it("POST /api/metrics returns 404 for well-formed ids that match no rows", async () => {
-    const { status, body } = await request("POST", "/api/metrics", {
-      task_id: "no-such-task",
-      agent_id: "no-such-agent",
+    let taskId: string;
+    let agentId: string;
+
+    beforeEach(() => {
+      const project = createProject(db, { name: "P1", description: null });
+      taskId = createTask(db, {
+        project_id: project.id, title: "T1", priority: "medium",
+        parent_task_id: null, assigned_agent_id: null,
+        description: null, due_date: null, start_date: null, estimate: null,
+      }).id;
+      agentId = registerAgent(db, { name: "agent-1", model: null, capabilities: [] }).id;
     });
-    expect(status).toBe(404);
-    expect(body.error).toMatch(/Unknown task_id or agent_id/);
-  });
 
-  // The 404 above is reached by matching one specific SQLite error code. Without
-  // this, a catch that swallowed every error would still look green, and a real
-  // server fault would be reported to the operator as a missing row.
-  it("POST /api/metrics still returns 500 for a failure that is not a bad id", async () => {
-    const project = createProject(db, { name: "P1", description: null });
-    const task = createTask(db, {
-      project_id: project.id, title: "T1", priority: "medium",
-      parent_task_id: null, assigned_agent_id: null,
-      description: null, due_date: null, start_date: null, estimate: null,
+    it.each(NUMERIC_FIELDS)("rejects a non-numeric string for %s", async (field) => {
+      const { status, body } = await request("POST", "/api/metrics", {
+        task_id: taskId, agent_id: agentId, [field]: "abc",
+      });
+      expect(status).toBe(400);
+      expect(body.error).toBe(`${field} must be a number`);
     });
-    const agent = registerAgent(db, { name: "agent-1", model: null, capabilities: [] });
-    // Both ids are valid, so nothing here is the caller's fault: the insert
-    // fails because the connection is gone, which is ours.
-    db.close();
 
-    const { status, body } = await request("POST", "/api/metrics", {
-      task_id: task.id,
-      agent_id: agent.id,
+    it.each(NON_NUMERIC_VALUES)("rejects %s", async (_label, field, value) => {
+      const { status, body } = await request("POST", "/api/metrics", {
+        task_id: taskId, agent_id: agentId, [field]: value,
+      });
+      expect(status).toBe(400);
+      expect(body.error).toBe(`${field} must be a number`);
     });
-    expect(status).toBe(500);
-    expect(body.error).toBe("Internal server error");
+
+    it("rejects a numeric literal that overflows to Infinity", async () => {
+      // 1e400 is valid JSON but JSON.parse yields Infinity — a number that is
+      // not finite, so a plain typeof check would let it through. It has to be
+      // sent raw: JSON.stringify(Infinity) is "null". (NaN has no such case —
+      // it is not valid JSON, so express.json() rejects it before the route.)
+      const { status, body } = await requestRaw(
+        "POST",
+        "/api/metrics",
+        `{"task_id":${JSON.stringify(taskId)},"agent_id":${JSON.stringify(agentId)},"duration_seconds":1e400}`,
+      );
+      expect(status).toBe(400);
+      expect(body.error).toBe("duration_seconds must be a number");
+    });
+
+    it("rejects a body that is not valid JSON, in the same error shape", async () => {
+      // express.json() rejects this before the route runs, so the 400 comes
+      // from the mounted errorHandler rather than the route's own validation.
+      // Pinned here against the real router because that is what makes the
+      // errorHandler mount in this file's beforeEach load-bearing: drop it and
+      // this returns Express's default HTML page instead.
+      const { status, body } = await requestRaw("POST", "/api/metrics", "{not valid json");
+      expect(status).toBe(400);
+      expect(body).toEqual({ error: expect.any(String) });
+    });
   });
 
   it("GET /api/agents/:id/performance returns metrics", async () => {

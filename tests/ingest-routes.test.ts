@@ -5,6 +5,7 @@ import type { Express } from "express";
 import { createTestDb } from "./setup.js";
 import { createProject } from "../server/db/index.js";
 import { ingestRoutes } from "../server/routes/ingest.js";
+import { errorHandler } from "../server/routes/middleware.js";
 import { requestApp } from "./http-helper.js";
 
 let db: Database.Database;
@@ -21,6 +22,13 @@ beforeEach(() => {
   app = express();
   app.use(express.json());
   app.use(ingestRoutes(db, () => {}));
+  // Mounted last, as server/index.ts does, so this app answers errors in the
+  // shape production does. Nothing in this file reaches it today — the two
+  // `{ error }` assertions below come from the route's own validation, not
+  // from here — but a future test that throws, or that sends a raw payload,
+  // gets `{ error }` rather than Express's default HTML page. See
+  // tests/http-helper.test.ts, which pins both shapes.
+  app.use(errorHandler);
 });
 
 describe("GET /api/ingest/status", () => {
