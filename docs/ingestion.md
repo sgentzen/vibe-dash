@@ -179,6 +179,22 @@ unmapped count described below. Claude Code cost comes from transcripts, at
 the top of this page, and having two sources report the same spend is
 exactly the double-counting problem transcript ingestion was built to avoid.
 
+**A runner sending OTLP must stop calling `log_cost`, or its spend doubles.**
+This is the same hazard as the Claude Code one above, in a new place. OTLP
+rows are stored with `source = 'otlp'` and `log_cost` rows with
+`source = 'mcp'`, and nothing suppresses one because the other exists. A Codex
+setup that both exports OTLP and follows the reporting instructions in
+[docs/integrations/codex.md](integrations/codex.md) reports every turn twice,
+and the total looks entirely plausible at roughly double the truth.
+
+There are two ways out and you only need one. Remove the `log_cost` line from
+your Codex instructions, which fixes future spend and leaves anything already
+recorded doubled. Or mark the agent cost-observed with
+`POST /api/agents/:id/cost-observed`, which also corrects the rows already
+written, because the exclusion applies at query time rather than by deleting
+anything. Marking excludes only `source = 'mcp'` rows, so the OTLP figures it
+is meant to leave alone are never touched.
+
 **Runners need a mapper.** Recognising a metric name and turning its points
 into token counts is a small, per-runner piece of code. A runner Vibe Dash
 has no mapper for has every point counted as unmapped and nothing else: no
