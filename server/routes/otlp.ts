@@ -8,7 +8,16 @@ import type { BroadcastFn, RouteFactory } from "./types.js";
 
 // An exporter posts on its own interval, typically every 60 seconds, and one
 // machine may run several agents. The ceiling only has to sit above that.
-const otlpLimiter = rateLimit({
+//
+// Exported rather than applied here as route middleware: it is mounted in
+// server/index.ts, ahead of even the 1mb body parser for this path, so an
+// excess request is rejected before its body is ever read. See the ordering
+// comment there for why the parser cannot come first. `express-rate-limit`
+// counts per INSTANCE of the limiter it returns, not per path, so this must
+// be applied exactly once across the app -- mounting it here as well as in
+// index.ts would consume the same budget twice per request and start
+// rejecting at half the intended rate.
+export const otlpLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
   standardHeaders: true,
@@ -46,7 +55,7 @@ export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: Broad
    * double counting it, and `external_id` idempotency is what makes a retry of
    * a 503 free rather than risky.
    */
-  router.post("/v1/metrics", otlpLimiter, (req, res) => {
+  router.post("/v1/metrics", (req, res) => {
     try {
       const result = ingestMetricsPayload(db, req.body);
       if (result.recorded > 0) {
