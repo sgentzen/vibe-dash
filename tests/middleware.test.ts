@@ -14,6 +14,11 @@ function request(method: string, path: string, body?: unknown) {
   return requestApp(app, method, path, body);
 }
 
+// No errorHandler here, unlike the other route test files, because it would be
+// inert rather than useful: this file tests the handlers themselves, and the
+// tests that need one register their throwing route first and then mount it, so
+// a beforeEach copy would sit behind the error source and never be reached. An
+// error handler only catches errors raised by middleware mounted before it.
 beforeEach(() => {
   db = createTestDb();
   app = express();

@@ -50,6 +50,13 @@ export function requestApp(
  * JSON.stringify cannot produce — e.g. `1e400`, which parses to `Infinity` on
  * the server but stringifies back to `null` on the way out.
  *
+ * A payload that is not valid JSON never reaches a route: `express.json()`
+ * rejects it with a 400 SyntaxError. Which *shape* that 400 comes back in
+ * depends on the app under test having `errorHandler` mounted last, as
+ * `server/index.ts` does — without it Express's default handler answers in
+ * HTML rather than this suite's `{ error }` JSON. See tests/http-helper.test.ts,
+ * which pins both shapes.
+ *
  * Awaiting each step keeps the callback nesting shallow — the previous
  * inline version nested five deep (promise -> listen -> request -> response
  * -> stream events), which Sonar flags as S2004.

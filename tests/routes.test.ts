@@ -5,6 +5,7 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { requestApp } from "./http-helper.js";
 import { createRouter } from "../server/routes/index.js";
+import { errorHandler } from "../server/routes/middleware.js";
 import {
   createProject,
   createTask,
@@ -28,6 +29,13 @@ beforeEach(() => {
   app = express();
   app.use(express.json());
   app.use(createRouter(db));
+  // Mounted last, as server/index.ts does, so this app answers errors in the
+  // shape production does. Nothing in this file reaches it today — every
+  // request goes through requestApp, which cannot produce an unparseable body
+  // — but a future test that throws, or that sends a raw payload, gets
+  // `{ error }` rather than Express's default HTML page. See
+  // tests/http-helper.test.ts, which pins both shapes.
+  app.use(errorHandler);
 });
 
 describe("GET /api/stats", () => {
