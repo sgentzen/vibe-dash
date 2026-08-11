@@ -11,7 +11,7 @@ const AT = (day: string): string => `${day}T10:00:00.000Z`;
 
 function addCost(
   db: Database.Database,
-  opts: { id: string; project: string; agent?: string | null; source: "mcp" | "transcript"; day: string }
+  opts: { id: string; project: string | null; agent?: string | null; source: "mcp" | "transcript"; day: string }
 ): void {
   db.prepare(
     `INSERT INTO cost_entries (id, agent_id, project_id, model, provider, input_tokens, output_tokens, cost_usd, created_at, source, external_id)
@@ -99,5 +99,51 @@ describe("getIngestStatus overlaps", () => {
 
   it("is empty on a database with no cost rows", () => {
     expect(getIngestStatus(db).overlaps).toEqual([]);
+  });
+});
+
+describe("overlaps with no project", () => {
+  it("reports a project-less mcp row against an unattributed transcript row", () => {
+    // Both sides carry no project. Previously invisible to the report while
+    // counting fully in the global total, so a user was told the correction
+    // had taken effect when it had not.
+    const agent = registerAgent(db, { name: "claude", model: null, capabilities: [] });
+    addCost(db, { id: "m1", project: null, agent: agent.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: null, source: "transcript", day: "2026-08-10" });
+
+    const [overlap] = getIngestStatus(db).overlaps;
+    expect(overlap.project_id).toBeNull();
+    expect(overlap.project_name).toBe("Unattributed");
+    expect(overlap.mcp_entries).toBe(1);
+    expect(overlap.transcript_entries).toBe(1);
+  });
+
+  it("keeps the unattributed bucket separate from a real project", () => {
+    const project = createProject(db, { name: "demo", description: null });
+    const agent = registerAgent(db, { name: "claude", model: null, capabilities: [] });
+    addCost(db, { id: "m1", project: project.id, agent: agent.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: project.id, source: "transcript", day: "2026-08-10" });
+    addCost(db, { id: "m2", project: null, agent: agent.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t2", project: null, source: "transcript", day: "2026-08-10" });
+
+    const { overlaps } = getIngestStatus(db);
+    expect(overlaps).toHaveLength(2);
+    expect(overlaps.filter((o) => o.project_id === null)).toHaveLength(1);
+    expect(overlaps.filter((o) => o.project_id === project.id)).toHaveLength(1);
+  });
+
+  it("names the identity to mark, not just the per-session agent name", () => {
+    // The suffixed agent name is not what a user marks, so reporting only that
+    // tells them to act on something that will not stay marked.
+    const project = createProject(db, { name: "demo", description: null });
+    const agent = registerAgent(db, {
+      name: "claude-code-a1b2c3d4", model: null, capabilities: [], client_name: "claude-code",
+    });
+    addCost(db, { id: "m1", project: project.id, agent: agent.id, source: "mcp", day: "2026-08-10" });
+    addCost(db, { id: "t1", project: project.id, source: "transcript", day: "2026-08-10" });
+
+    const [overlap] = getIngestStatus(db).overlaps;
+    expect(overlap.mcp_agent_names).toEqual(["claude-code-a1b2c3d4"]);
+    expect(overlap.mcp_identities).toEqual(["claude-code"]);
   });
 });

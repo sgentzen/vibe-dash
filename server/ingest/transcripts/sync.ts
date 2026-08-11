@@ -230,12 +230,13 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
 }
 
 interface OverlapRow {
-  project_id: string;
+  project_id: string | null;
   project_name: string;
   date: string;
   mcp_entries: number;
   transcript_entries: number;
   mcp_agent_names: string | null;
+  mcp_identities: string | null;
 }
 
 /** Counts behind GET /api/ingest/status, so skipped, unpriced and duplicated spend are all visible. */
@@ -253,21 +254,27 @@ export function getIngestStatus(db: Database.Database): {
   // name list only ever describes the mcp side. A self-report that named no
   // agent contributes to mcp_entries with no name, which is the visible form
   // of the row that cannot be excluded by marking.
+  //
+  // LEFT JOIN projects, not JOIN: log_cost's project id is optional, and an
+  // mcp row that carries none was attached to an agent instead (an earlier
+  // task's fix), so it must still be reportable here rather than dropped by
+  // an inner join. GROUP BY c.project_id groups every NULL into one bucket in
+  // SQLite, which is exactly the "Unattributed" grouping this needs.
   const rows = db.prepare(`
     SELECT c.project_id                                             AS project_id,
-           p.name                                                   AS project_name,
+           COALESCE(p.name, 'Unattributed')                          AS project_name,
            DATE(c.created_at)                                        AS date,
            SUM(CASE WHEN c.source = 'mcp' THEN 1 ELSE 0 END)         AS mcp_entries,
            SUM(CASE WHEN c.source = 'transcript' THEN 1 ELSE 0 END)  AS transcript_entries,
-           GROUP_CONCAT(DISTINCT a.name)                             AS mcp_agent_names
+           GROUP_CONCAT(DISTINCT a.name)                             AS mcp_agent_names,
+           GROUP_CONCAT(DISTINCT COALESCE(a.client_name, a.name))    AS mcp_identities
       FROM cost_entries c
-      JOIN projects p ON p.id = c.project_id
+      LEFT JOIN projects p ON p.id = c.project_id
       LEFT JOIN agents a ON a.id = c.agent_id
-     WHERE c.project_id IS NOT NULL
-       AND ${excludeObservedCondition("c.")}
-     GROUP BY c.project_id, p.name, DATE(c.created_at)
+     WHERE ${excludeObservedCondition("c.")}
+     GROUP BY c.project_id, project_name, DATE(c.created_at)
     HAVING mcp_entries > 0 AND transcript_entries > 0
-     ORDER BY date DESC, p.name
+     ORDER BY date DESC, project_name
   `).all() as OverlapRow[];
 
   return {
@@ -282,6 +289,7 @@ export function getIngestStatus(db: Database.Database): {
       mcp_entries: r.mcp_entries,
       transcript_entries: r.transcript_entries,
       mcp_agent_names: r.mcp_agent_names === null ? [] : r.mcp_agent_names.split(","),
+      mcp_identities: r.mcp_identities === null ? [] : r.mcp_identities.split(","),
     })),
   };
 }

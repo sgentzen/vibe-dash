@@ -260,12 +260,17 @@ export interface CostByAgentEntry {
  * tell them apart. The agent names are what make that judgement quick.
  */
 export interface CostOverlap {
-  project_id: string;
+  /** Null for spend that matched no project. Reported rather than hidden. */
+  project_id: string | null;
+  /** "Unattributed" when project_id is null, matching how ingestion already names this state. */
   project_name: string;
   date: string;
   mcp_entries: number;
   transcript_entries: number;
+  /** Per-session agent names on the mcp side. Empty for a self-report that named no agent. */
   mcp_agent_names: string[];
+  /** The cost identities behind those agents. This is what a user actually marks. */
+  mcp_identities: string[];
 }
 
 export interface CompletionMetrics {
