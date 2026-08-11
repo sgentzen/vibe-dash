@@ -64,6 +64,78 @@ describe("parseMetricsPayload", () => {
     expect(parseMetricsPayload(payload)[0].cumulative).toBe(true);
   });
 
+  it("reads temporality given as a quoted enum number", () => {
+    // Some exporters send the number itself as a JSON string ("2") rather than
+    // a bare number. Before this was recognised, a quoted "2" fell through to
+    // the delta default -- which is the interpretation that re-records a
+    // cumulative sender's running total as new spend on every export.
+    const withTemporality = (aggregationTemporality: unknown) => ({
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{ scope: { name: "s" }, metrics: [{
+          name: "m",
+          histogram: {
+            aggregationTemporality,
+            dataPoints: [{ attributes: [], startTimeUnixNano: "1", timeUnixNano: "2", sum: 5 }],
+          },
+        }] }],
+      }],
+    });
+
+    expect(parseMetricsPayload(withTemporality("2"))[0].cumulative).toBe(true);
+    expect(parseMetricsPayload(withTemporality("1"))[0].cumulative).toBe(false);
+    expect(parseMetricsPayload(withTemporality(1))[0].cumulative).toBe(false);
+  });
+
+  it("treats UNSPECIFIED (0) as delta, a deliberate choice rather than the spec's own default", () => {
+    // The proto default for an unset aggregationTemporality is UNSPECIFIED
+    // (0), not DELTA -- this pins the code's chosen fallback rather than
+    // implying the spec assigns it.
+    const payload = {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{ scope: { name: "s" }, metrics: [{
+          name: "m",
+          histogram: {
+            aggregationTemporality: 0,
+            dataPoints: [{ attributes: [], startTimeUnixNano: "1", timeUnixNano: "2", sum: 5 }],
+          },
+        }] }],
+      }],
+    };
+    expect(parseMetricsPayload(payload)[0].cumulative).toBe(false);
+  });
+
+  it("falls back to delta for a missing, null, or otherwise malformed aggregationTemporality", () => {
+    // classifyTemporality (parse.ts) reads this field with Set.has against
+    // attacker-controlled JSON. None of these shapes should throw or be
+    // misclassified as cumulative -- they should all land on the same
+    // documented delta fallback as UNSPECIFIED.
+    const withTemporality = (aggregationTemporality: unknown) => {
+      const metric: Record<string, unknown> = {
+        name: "m",
+        histogram: {
+          dataPoints: [{ attributes: [], startTimeUnixNano: "1", timeUnixNano: "2", sum: 5 }],
+        },
+      };
+      if (aggregationTemporality !== undefined) {
+        (metric.histogram as Record<string, unknown>).aggregationTemporality = aggregationTemporality;
+      }
+      return {
+        resourceMetrics: [{
+          resource: { attributes: [] },
+          scopeMetrics: [{ scope: { name: "s" }, metrics: [metric] }],
+        }],
+      };
+    };
+
+    expect(parseMetricsPayload(withTemporality(undefined))[0].cumulative).toBe(false);
+    expect(parseMetricsPayload(withTemporality(null))[0].cumulative).toBe(false);
+    expect(parseMetricsPayload(withTemporality({}))[0].cumulative).toBe(false);
+    expect(parseMetricsPayload(withTemporality(true))[0].cumulative).toBe(false);
+    expect(parseMetricsPayload(withTemporality("not-a-real-enum-value"))[0].cumulative).toBe(false);
+  });
+
   it("reads a Sum point given asInt, which arrives as a string", () => {
     const payload = {
       resourceMetrics: [{
@@ -86,9 +158,10 @@ describe("parseMetricsPayload", () => {
   it("gives points missing startTimeUnixNano a value that does not vary with timeUnixNano", () => {
     // startTimeUnixNano is optional in OTLP. Defaulting an absent one to the
     // point's own timeUnixNano would make it different on every export of the
-    // same series, and seriesIncrement (series.ts) treats any change in start
-    // time as a restart -- re-recording the whole cumulative value as new
-    // spend, on every export. Two points of the same series exported at
+    // same series. seriesIncrement (series.ts) no longer uses start time to
+    // detect a restart at all, but the field is still stored for diagnostics,
+    // so it should still be stable across exports of the same series rather
+    // than churning for no reason. Two points of the same series exported at
     // different times must resolve to the SAME startTimeUnixNano, whatever
     // that value is -- asserting the literal "" would pass for the wrong
     // reason if the sentinel ever changed.

@@ -34,11 +34,39 @@ function flattenAttributes(raw: unknown): Record<string, string> {
  * Whether an aggregationTemporality field means cumulative.
  *
  * The protobuf JSON mapping allows an enum as its name or its number, and
- * exporters genuinely differ, so both are read. Anything unrecognised is
- * treated as delta, which is the OTLP default for a field left unset.
+ * exporters genuinely differ on which they send -- and some additionally send
+ * the number itself quoted (`"2"` rather than `2`). Both numeric and string
+ * forms of both DELTA and CUMULATIVE are therefore recognised explicitly, so
+ * a quoted `"2"` is read as cumulative rather than silently falling through
+ * to the delta branch below, which is the interpretation that re-records a
+ * running total as new spend on every export.
+ *
+ * Anything left over -- including UNSPECIFIED (0, the field's actual protobuf
+ * default) and any value not recognised at all -- is treated as delta. This
+ * is NOT something the spec mandates: the true default for an unset field is
+ * UNSPECIFIED, not DELTA, and a given exporter's own effective default can be
+ * either. Defaulting to delta here is a deliberate choice with a known risk:
+ * if the point is actually cumulative, treating it as delta records its raw
+ * running-total value instead of the increment, overstating spend on every
+ * export (see D4 in the design doc). The alternative -- discarding a point
+ * whose temporality cannot be determined -- trades that for silently losing
+ * real spend from a genuinely-delta sender, which this project treats as
+ * equally bad, not as the safer option.
  */
+const CUMULATIVE_VALUES = new Set<unknown>([2, "2", "AGGREGATION_TEMPORALITY_CUMULATIVE"]);
+const DELTA_VALUES = new Set<unknown>([1, "1", "AGGREGATION_TEMPORALITY_DELTA"]);
+
+/** The three states the wire value can name -- "unspecified" also covers anything unrecognised. */
+function classifyTemporality(raw: unknown): "cumulative" | "delta" | "unspecified" {
+  if (CUMULATIVE_VALUES.has(raw)) return "cumulative";
+  if (DELTA_VALUES.has(raw)) return "delta";
+  return "unspecified";
+}
+
 function isCumulative(raw: unknown): boolean {
-  return raw === 2 || raw === "AGGREGATION_TEMPORALITY_CUMULATIVE";
+  // "delta" and "unspecified" both resolve to false here -- see the doc
+  // comment above for why that default is deliberate, not spec-mandated.
+  return classifyTemporality(raw) === "cumulative";
 }
 
 /** 64-bit ints arrive as strings under the protobuf JSON mapping. */
@@ -86,12 +114,13 @@ function resolvePointValue(point: Record<string, unknown>, isHistogram: boolean)
  *
  * `startTimeUnixNano` is optional in OTLP. Defaulting an absent one to the
  * point's own `timeUnixNano` would make it different on every export of the
- * same series — and `seriesIncrement` (series.ts) treats any change in start
- * time as a process restart, re-recording the whole cumulative value as new
- * spend on every export. A constant default ("") keeps it stable across
- * exports of the same series instead, so restart detection falls back to the
- * value-going-backwards rule in series.ts, which exists for exactly this
- * case: a sender whose start time cannot be used to spot a restart.
+ * same series, which is exactly the shape of sender `seriesIncrement`
+ * (series.ts) is written to tolerate: it no longer uses `startTimeUnixNano`
+ * to detect a restart at all, precisely because senders vary here (some hold
+ * it constant, some re-stamp it on every export while climbing normally). A
+ * constant default ("") keeps this field stable across exports of the same
+ * series regardless, since it is still stored for diagnostics even though it
+ * is not part of the restart decision.
  *
  * Returns null when `timeUnixNano` itself is absent — unlike the start time,
  * that field is not optional, and a point without it cannot be placed in
