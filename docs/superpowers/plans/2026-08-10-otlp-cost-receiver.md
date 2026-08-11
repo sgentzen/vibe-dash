@@ -47,6 +47,7 @@ Treating a cumulative point as delta multiplies reported spend by the number of 
 | `server/ingest/transcripts/pricing.ts` (modify) | Extract `priceTokens`, add non-Anthropic rates |
 | `server/routes/otlp.ts` (create) | `POST /v1/metrics` and the OTLP response contract |
 | `server/routes/index.ts` (modify) | Register the route factory |
+| `server/index.ts` (modify) | Mount the OTLP body parser ahead of the global one |
 | `server/ingest/transcripts/sync.ts` (modify) | `otlpUnmapped` and `otlpUnattributed` on the status |
 | `tests/otlp-series.test.ts` (create) | Temporality and reset behaviour |
 | `tests/otlp-parse.test.ts` (create) | Payload walking and encoding quirks |
@@ -1208,6 +1209,7 @@ git commit -m "feat(otlp): turn metric points into priced, attributed cost rows"
 - Modify: `server/routes/index.ts`
 - Modify: `server/ingest/transcripts/sync.ts` (`getIngestStatus`)
 - Modify: `server/ingest/otlp/ingest.ts` (add and export `unmappedPointCount`)
+- Modify: `server/index.ts` (mount the OTLP body parser before the global one)
 - Test: `tests/otlp-route.test.ts` (create)
 
 **Interfaces:**
@@ -1375,8 +1377,13 @@ const otlpLimiter = rateLimit({
   message: {},
 });
 
-// A batch of metric points is larger than a normal API call, so this route
-// gets its own body limit rather than raising the global 256kb one.
+// A batch of metric points is larger than a normal API call, so this route gets
+// its own body limit rather than raising the global one.
+//
+// This parser only takes effect because server/index.ts mounts it for this path
+// BEFORE the global express.json. body-parser marks a request as parsed and the
+// second parser then no-ops, so mounting it here alone would silently leave the
+// global 256kb cap in force.
 const otlpBody = json({ limit: "1mb" });
 
 export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: BroadcastFn): Router => {
@@ -1419,6 +1426,24 @@ export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: Broad
 
 Register it in `server/routes/index.ts` by adding `otlpRoutes` to the `routeFactories` array, following the existing import style.
 
+**Then make the larger body limit real.** `server/index.ts` calls
+`app.use(express.json({ limit: "256kb" }))` at line 60, before it mounts the
+router. body-parser sets a flag once it has parsed a request, so a second parser
+inside the route is a no-op and the 256kb cap would silently remain. Mount the
+OTLP parser for that path first, immediately above the existing global line:
+
+```ts
+// OTLP metric batches are larger than a normal API call. This must precede the
+// global parser below: whichever runs first is the one whose limit applies.
+app.use("/v1/metrics", express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "256kb" }));
+```
+
+Note also that `createRouter` applies a global `apiLimiter` whose 429 body is
+`{ error: ... }`, which is not the OTLP shape. Leave it alone. Exporters act on
+the status code, and changing a limiter shared by every route to suit one
+endpoint would be the wrong trade.
+
 - [ ] **Step 4: Add the status counters**
 
 In `server/ingest/transcripts/sync.ts`, extend `getIngestStatus`'s return type and body with three counts, using the same `one(sql)` helper the existing counters use:
@@ -1443,7 +1468,7 @@ Expected: PASS. `tests/ingest-routes.test.ts` asserts the status keys with `toMa
 - [ ] **Step 7: Commit**
 
 ```bash
-git add server/routes/otlp.ts server/routes/index.ts server/ingest/transcripts/sync.ts server/ingest/otlp/ingest.ts tests/otlp-route.test.ts
+git add server/routes/otlp.ts server/routes/index.ts server/index.ts server/ingest/transcripts/sync.ts server/ingest/otlp/ingest.ts tests/otlp-route.test.ts
 git commit -m "feat(otlp): accept OTLP metrics at /v1/metrics and report what was ignored"
 ```
 
