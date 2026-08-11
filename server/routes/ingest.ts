@@ -62,8 +62,13 @@ export const ingestRoutes: RouteFactory = (db: Database.Database, broadcast: Bro
    * spotted from the UI.
    */
   router.post("/api/ingest/paths", pathsLimiter, (req, res) => {
-    const { project_id: projectId, path: rawPath } = req.body as { project_id?: string; path?: string };
-    if (!projectId || !rawPath) {
+    // Typed `unknown` because a JSON body can carry any type here, and both
+    // fields are used as strings downstream: an object project_id was read by
+    // better-sqlite3 as named parameters, and an object path hit
+    // normalisePath's string methods. Both threw, and both became 500s for
+    // what is plainly a malformed request.
+    const { project_id: projectId, path: rawPath } = req.body as { project_id?: unknown; path?: unknown };
+    if (typeof projectId !== "string" || !projectId || typeof rawPath !== "string" || !rawPath) {
       return res.status(400).json({ error: "project_id and path are required" });
     }
 
