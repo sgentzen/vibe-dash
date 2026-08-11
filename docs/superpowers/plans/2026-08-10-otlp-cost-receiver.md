@@ -1492,7 +1492,7 @@ No code. The two previous features in this area both shipped documentation that 
 - Modify: `docs/ingestion.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Write the Codex setup section**
+- [x] **Step 1: Write the Codex setup section**
 
 Add a section to `docs/ingestion.md` covering:
 
@@ -1509,7 +1509,7 @@ protocol = "json"
 
 - Binding spend to a project with `OTEL_RESOURCE_ATTRIBUTES=vibe_dash.project=<name or id>`, and that without it the spend is recorded and shown as Unattributed rather than dropped.
 
-- [ ] **Step 2: State the limits plainly**
+- [x] **Step 2: State the limits plainly**
 
 In the same section, and not in a parenthetical:
 
@@ -1520,11 +1520,11 @@ In the same section, and not in a parenthetical:
 
 Verify each of these against the code before writing it rather than trusting this plan.
 
-- [ ] **Step 3: Correct the README**
+- [x] **Step 3: Correct the README**
 
 `README.md` describes cost ingestion. Add OTLP beside transcripts, worded as coverage for "runners with a mapper" rather than "any runner", per D6.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `npm test && npm run lint`
 Expected: PASS.

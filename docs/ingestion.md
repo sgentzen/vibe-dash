@@ -114,6 +114,92 @@ you today.
   normal; a skipped count that keeps climbing is the early warning that the
   format has moved and this page's field list is now out of date.
 
+## Cost from other runners, over OTLP
+
+Transcript ingestion above reads Claude Code only. For every other runner,
+Vibe Dash accepts OTLP/JSON metrics on the same server:
+
+```
+POST http://localhost:3001/v1/metrics
+```
+
+This is the standard OTLP/HTTP convention: an exporter appends `/v1/metrics`
+to whatever endpoint it is given, so pointing a runner at
+`http://localhost:3001` is the whole of its setup. No separate port and no
+separate process.
+
+### Setting up Codex
+
+Add this to `~/.codex/config.toml`:
+
+```toml
+[otel]
+metrics_exporter = "otlp-http"
+
+[otel.exporter.otlp-http]
+endpoint = "http://localhost:3001"
+protocol = "json"
+```
+
+That is sufficient for Codex's token usage to reach the dashboard with no
+`log_cost` call.
+
+### Binding spend to a project
+
+OTLP carries no working directory, so there is nothing here to match against
+`project_paths` the way transcript ingestion does. A point is attributed only
+when you set a resource attribute naming the project yourself:
+
+```bash
+OTEL_RESOURCE_ATTRIBUTES=vibe_dash.project=<name or id>
+```
+
+The value is matched against a project name first, then a project id. Without
+this variable, spend is not dropped: it is still recorded, with `project_id`
+`NULL`, and counted in `GET /api/ingest/status` as `otlpUnattributed`. Nothing
+here is ever guessed from `service.name` or any other attribute.
+
+### What this does not cover
+
+**Interactive CLI only.** Codex only emits OTLP metrics from the interactive
+CLI session. `codex exec` emits logs and traces but no metrics, and `codex
+mcp-server` emits no telemetry at all, so a headless or MCP-driven run
+produces nothing here regardless of `config.toml`. See
+[openai/codex#12913](https://github.com/openai/codex/issues/12913).
+
+**Not retroactive.** Unlike transcript ingestion, which can read a whole
+history of past `.jsonl` files the first time it runs, nothing is recorded
+for sessions that ran before the exporter was switched on. There is no
+backfill.
+
+**Claude Code is not read here.** This endpoint accepts OTLP from any sender,
+but no mapper recognises Claude Code's metric names, so pointing a Claude
+Code OTLP exporter at it records no cost rows and only increments the
+unmapped count described below. Claude Code cost comes from transcripts, at
+the top of this page, and having two sources report the same spend is
+exactly the double-counting problem transcript ingestion was built to avoid.
+
+**Runners need a mapper.** Recognising a metric name and turning its points
+into token counts is a small, per-runner piece of code. A runner Vibe Dash
+has no mapper for has every point counted as unmapped and nothing else: no
+row is written, and no error is raised, so a wrong or unsupported setup looks
+identical to a correct one that simply has nowhere to report. Today the only
+mapped runner is Codex.
+
+**Only one Codex model is priced.** The rate table currently has one Codex
+entry, `gpt-5.3-codex`. A Codex session on any other model still has its
+tokens recorded, exactly as an unknown model already is for Claude Code, but
+with `cost_usd` `NULL` rather than a figure — visibly unpriced, not free.
+`GET /api/ingest/status`'s `knownModels` lists every model, across both
+Claude and Codex, that the table can currently price.
+
+**The unmapped count does not survive a restart.** `otlpUnmapped` on
+`GET /api/ingest/status` is a count kept in the running server process, not a
+database query, unlike `otlpRows` and `otlpUnattributed` beside it. Restarting
+the server resets it to zero. It is useful for confirming, right now, that a
+runner you just configured is or is not being recognised; it is not a
+durable record of how much has gone unmapped over time.
+
 ## Upgrading from an earlier version
 
 **Remove the `log_cost` step from your Claude Code instructions, or your spend

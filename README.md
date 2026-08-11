@@ -14,16 +14,19 @@ When multiple AI agents work across multiple projects, you lose visibility into 
 
 - **Task board** — agents claim tasks, log progress, and flag blockers through MCP tool calls
 - **Activity feed** — every agent action appears in real time; no polling needed
-- **Cost tracker**: per-model token spend, read directly from Claude Code's local session transcripts
+- **Cost tracker**: per-model token spend, read directly from Claude Code's local session transcripts, plus OTLP metrics for runners with a mapper (Codex today)
 - **Local-first** — SQLite on your machine, no cloud, no subscriptions
 
 > **How reporting works:** cost and token figures for Claude Code are read from
 > its own transcripts on disk, so they are correct whether or not an agent
-> remembered to report anything. Task status is different: that still arrives
-> because an agent chose to call an MCP tool, so a task nobody updates stays
-> stale. Agents other than Claude Code report cost through the `log_cost` tool.
-> See [docs/ingestion.md](docs/ingestion.md) for exactly what is read and what
-> is not.
+> remembered to report anything. A runner Vibe Dash has a mapper for can also
+> send cost over OTLP with no agent cooperation at all — Codex today, see
+> [docs/ingestion.md](docs/ingestion.md#cost-from-other-runners-over-otlp) for
+> setup and its limits. Task status is different: that still arrives because an
+> agent chose to call an MCP tool, so a task nobody updates stays stale. Any
+> other agent, or Codex outside its mapped OTLP setup, reports cost through the
+> `log_cost` tool. See [docs/ingestion.md](docs/ingestion.md) for exactly what
+> is read and what is not.
 
 ---
 
