@@ -29,6 +29,56 @@ const totalCostSql = (prefix = ""): string => `COALESCE(SUM(${prefix}cost_usd), 
 const unpricedSql = (prefix = ""): string =>
   `COALESCE(SUM(CASE WHEN ${prefix}cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries`;
 
+/**
+ * Rows an observed client self-reported, which duplicate what we already read
+ * from its transcripts.
+ *
+ * Only `mcp` rows match: the `transcript` row is the observation we trust, and
+ * dropping it would delete the very figure that replaced the duplicate. A row
+ * with a NULL agent_id never matches either, because a self-report that named
+ * no agent cannot be attributed to one — that is the documented limitation.
+ *
+ * The `agent_id IS NOT NULL` guard is load-bearing and must not be removed as
+ * redundant. `NULL IN (<non-empty subquery>)` evaluates to NULL, not FALSE, so
+ * without it `NOT (... AND NULL)` is NULL, a WHERE clause treats that as
+ * not-true, and every self-report that named no agent would vanish from the
+ * totals as soon as any client was marked. Those rows are unattributable and
+ * so cannot be excluded; they must stay counted.
+ *
+ * Resolved through the agent's cost identity, not through a flag on the agent
+ * row: every MCP connection registers a new agent, so a row-level mark stopped
+ * applying the next time the client started. See section 14 of the design.
+ *
+ * Stated positively, and the exclusion derived from it below, so a query can
+ * either drop these rows or COUNT them without the two definitions drifting.
+ */
+export const observedDuplicateSql = (prefix = ""): string =>
+  `(${prefix}source = 'mcp' ` +
+  `AND ${prefix}agent_id IS NOT NULL ` +
+  `AND ${prefix}agent_id IN (` +
+  `SELECT a.id FROM agents a WHERE COALESCE(a.client_name, a.name) IN ` +
+  `(SELECT identity FROM cost_observed_identities)))`;
+
+/**
+ * The exclusion applied by every query that reads cost_entries.
+ *
+ * A named constant rather than a string repeated at six call sites, so a query
+ * added later cannot silently reintroduce double counting.
+ */
+export const excludeObservedCondition = (prefix = ""): string =>
+  `NOT ${observedDuplicateSql(prefix)}`;
+
+/**
+ * Compose the exclusion onto a WHERE clause that may or may not exist.
+ *
+ * buildWhere() cannot carry this: it pushes a parameter for every clause it
+ * accepts, and this condition takes none.
+ */
+const withExclusion = (existingWhere: string, prefix = ""): string =>
+  existingWhere.length > 0
+    ? `${existingWhere} AND ${excludeObservedCondition(prefix)}`
+    : `WHERE ${excludeObservedCondition(prefix)}`;
+
 export interface LogCostInput {
   agent_id?: string | null;
   task_id?: string | null;
@@ -65,12 +115,22 @@ export function logCost(db: Database.Database, input: LogCostInput): CostEntry {
 type CostSummaryColumn = "agent_id" | "milestone_id" | "project_id";
 
 function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, value: string): CostSummary {
+  // Conditional aggregation rather than a WHERE filter, so the suppressed rows
+  // can still be counted. observedDuplicateSql is never NULL — its
+  // agent_id IS NOT NULL guard makes the predicate definite — so the CASE
+  // arms are exhaustive.
+  // Every count is COALESCEd. This query has no GROUP BY, so a scope matching
+  // no rows at all still returns one row, and SUM over zero rows is NULL where
+  // the COUNT(*) it replaces was 0. Without the COALESCE, an agent with no cost
+  // rows would report entry_count: null and the field's type would be a lie.
+  const dup = observedDuplicateSql();
   return db.prepare(
-    `SELECT ${totalCostSql()},
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count,
-            ${unpricedSql()}
+    `SELECT COALESCE(SUM(CASE WHEN NOT ${dup} THEN cost_usd END), 0) AS total_cost_usd,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN input_tokens END), 0) AS total_input_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN output_tokens END), 0) AS total_output_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN 1 ELSE 0 END), 0) AS entry_count,
+            COALESCE(SUM(CASE WHEN NOT ${dup} AND cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries,
+            COALESCE(SUM(CASE WHEN ${dup} THEN 1 ELSE 0 END), 0) AS excluded_entries
      FROM cost_entries WHERE ${column} = ?`
   ).get(value) as CostSummary;
 }
@@ -79,18 +139,33 @@ export function getSpendToday(db: Database.Database): number {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const row = db
-    .prepare("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM cost_entries WHERE created_at >= ?")
+    .prepare(
+      `SELECT COALESCE(SUM(cost_usd), 0) AS total FROM cost_entries
+       WHERE created_at >= ? AND ${excludeObservedCondition()}`
+    )
     .get(todayStart.toISOString()) as { total: number };
   return row.total;
 }
 
 export function getGlobalCostSummary(db: Database.Database): CostSummary {
+  // Same conditional-aggregation shape as getCostSummaryBy, for the same
+  // reason: CostSummary now carries excluded_entries, and a WHERE-clause
+  // exclusion has no row left to count once it has filtered a row out. The
+  // global scope genuinely does suppress rows, so leaving this on the old
+  // WHERE-based path (or reporting a literal 0) would state a wrong number
+  // confidently instead of a missing one — worse than the bug this task
+  // exists to fix.
+  // Every count is COALESCEd: this query has no GROUP BY, so an empty
+  // database still returns one row, and SUM over zero rows is NULL where the
+  // COUNT(*) it replaces was 0.
+  const dup = observedDuplicateSql();
   return db.prepare(
-    `SELECT ${totalCostSql()},
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count,
-            ${unpricedSql()}
+    `SELECT COALESCE(SUM(CASE WHEN NOT ${dup} THEN cost_usd END), 0) AS total_cost_usd,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN input_tokens END), 0) AS total_input_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN output_tokens END), 0) AS total_output_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN 1 ELSE 0 END), 0) AS entry_count,
+            COALESCE(SUM(CASE WHEN NOT ${dup} AND cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries,
+            COALESCE(SUM(CASE WHEN ${dup} THEN 1 ELSE 0 END), 0) AS excluded_entries
      FROM cost_entries`
   ).get() as CostSummary;
 }
@@ -127,7 +202,7 @@ export function getCostTimeseries(
             COUNT(*) AS entry_count,
             ${unpricedSql()}
      FROM cost_entries
-     ${where}
+     ${withExclusion(where)}
      GROUP BY DATE(created_at)
      ORDER BY date ASC`
   ).all(...params) as CostTimeseriesEntry[];
@@ -169,7 +244,7 @@ export function getCostByModel(
             COUNT(*) AS entry_count,
             ${unpricedSql()}
      FROM cost_entries
-     ${where}
+     ${withExclusion(where)}
      GROUP BY model, provider
      ORDER BY total_cost_usd DESC`
   ).all(...params) as CostByModelEntry[];
@@ -179,6 +254,10 @@ export function getCostByAgent(
   db: Database.Database,
   filter: { project_id?: string; milestone_id?: string } = {}
 ): CostByAgentEntry[] {
+  // The exclusion is NOT in the WHERE clause here. Filtering it there removed
+  // an observed agent's only rows, GROUP BY produced no group, and the agent
+  // disappeared from the breakdown as though it had never spent anything.
+  const dup = observedDuplicateSql("c.");
   const conditions: string[] = ["c.agent_id IS NOT NULL"];
   const params: unknown[] = [];
 
@@ -189,10 +268,11 @@ export function getCostByAgent(
 
   return db.prepare(
     `SELECT c.agent_id, a.name AS agent_name,
-            ${totalCostSql("c.")},
-            COALESCE(SUM(c.input_tokens + c.output_tokens), 0) AS total_tokens,
-            COUNT(*) AS entry_count,
-            ${unpricedSql("c.")}
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN c.cost_usd END), 0) AS total_cost_usd,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN c.input_tokens + c.output_tokens END), 0) AS total_tokens,
+            SUM(CASE WHEN NOT ${dup} THEN 1 ELSE 0 END) AS entry_count,
+            SUM(CASE WHEN NOT ${dup} AND c.cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced_entries,
+            SUM(CASE WHEN ${dup} THEN 1 ELSE 0 END) AS excluded_entries
      FROM cost_entries c
      JOIN agents a ON c.agent_id = a.id
      ${where}

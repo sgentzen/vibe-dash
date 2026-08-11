@@ -42,6 +42,16 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
         name: agentName,
         model: info.version ? `${info.name}/${info.version}` : null,
         capabilities: [],
+        // Recorded so a cost-observed mark can key on something stable. The
+        // suffix above makes every connection a new agent row, so the row is
+        // not a durable identity and info.name is.
+        //
+        // Blank folds to null rather than through. The MCP schema types
+        // clientInfo.name as a bare string, so "" is accepted, and both
+        // agentCostIdentity's ?? and the COALESCE in SQL treat "" as a real
+        // value. Every blank-named client would then share the identity "",
+        // and marking one would suppress another's genuine spend.
+        client_name: info.name.trim().length > 0 ? info.name : null,
       });
       agentId = agent.id;
       startOrGetSession(db, agent.id);

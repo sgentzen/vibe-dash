@@ -15,10 +15,10 @@ import { CardError } from "./dashboard/CardError";
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 type CostSetters = {
-  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null) => void;
+  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number } | null) => void;
   setCostTimeseries: (ts: { date: string; total_cost_usd: number }[]) => void;
   setCostByModel: (m: { model: string; provider: string; total_cost_usd: number; total_tokens: number }[]) => void;
-  setCostByAgent: (a: { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]) => void;
+  setCostByAgent: (a: { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; excluded_entries?: number }[]) => void;
 };
 
 async function loadChartData(
@@ -83,10 +83,10 @@ export function DashboardView() {
 
   const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
-  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number } | null>(null);
+  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
-  const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number }[]>([]);
+  const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; excluded_entries?: number }[]>([]);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
   const [costError, setCostError] = useState(false);
   const [chartError, setChartError] = useState(false);
@@ -244,7 +244,16 @@ export function DashboardView() {
           return (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-                <KpiCard label="Total Spend" value={`$${costSummary.total_cost_usd.toFixed(2)}`} color="var(--accent-blue)" />
+                <KpiCard
+                  label="Total Spend"
+                  value={`$${costSummary.total_cost_usd.toFixed(2)}`}
+                  color="var(--accent-blue)"
+                  tooltip={
+                    (costSummary.excluded_entries ?? 0) > 0
+                      ? `Excludes ${costSummary.excluded_entries} self-reported entries counted as duplicates, because their client is marked as observed through its transcripts. That spend is counted from the transcripts instead, so this total is not missing it.`
+                      : undefined
+                  }
+                />
                 <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
                 <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
                 <KpiCard

@@ -38,6 +38,10 @@ export {
   getAgentById,
   touchAgent,
   setAgentStatus,
+  setAgentCostObserved,
+  agentCostIdentity,
+  costObservedSql,
+  isCostObservedIdentity,
   getAgentHealthStatus,
   getAgentActivity,
   getAgentCompletedToday,
@@ -77,6 +81,7 @@ export {
   getCostByAgent,
   getGlobalCostSummary,
   getSpendToday,
+  excludeObservedCondition,
 } from "./costs.js";
 export type {
   CostEntry,

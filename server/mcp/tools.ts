@@ -259,12 +259,32 @@ function handleResolveBlocker(db: Database.Database, args: Args, agentName?: str
   return ok({ success: true });
 }
 
-function handleLogCost(db: Database.Database, args: Args): ToolResult {
+// The schema declares these ids `.optional()` with no `.min(1)`, so a
+// schema-valid "" (or whitespace-only string) reaches this function. `?? null`
+// does not catch that — "" is not nullish — and each id is an FK column, so
+// an empty string is passed straight to `logCost`, which throws and the row
+// is lost entirely. Losing a row is worse than the double counting this
+// whole feature exists to fix, so blank strings are normalised to null here.
+function blankToNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return value.trim().length > 0 ? value : null;
+}
+
+function handleLogCost(db: Database.Database, args: Args, agentName?: string): ToolResult {
+  // Resolve the session agent when the caller did not name one, exactly as
+  // log_activity does through autoLog. Without this a cost row can land
+  // attached to no agent, and an agent-level exclusion deliberately skips
+  // rows with no agent, so that spend stays double counted forever.
+  let agentId = blankToNull(args.agent_id);
+  if (!agentId && agentName) {
+    agentId = touchAgent(db, agentName).id;
+  }
+
   const entry = logCost(db, {
-    agent_id: (args.agent_id as string) ?? null,
-    task_id: (args.task_id as string) ?? null,
-    milestone_id: (args.milestone_id as string) ?? null,
-    project_id: (args.project_id as string) ?? null,
+    agent_id: agentId,
+    task_id: blankToNull(args.task_id),
+    milestone_id: blankToNull(args.milestone_id),
+    project_id: blankToNull(args.project_id),
     model: args.model as string,
     provider: args.provider as string,
     input_tokens: args.input_tokens as number,

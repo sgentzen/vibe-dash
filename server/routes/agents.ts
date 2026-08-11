@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import type Database from "better-sqlite3";
 import {
   listAgents,
@@ -11,12 +12,25 @@ import {
   getAgentCompletedToday,
   listAgentSessions,
   getAgentStats,
+  setAgentCostObserved,
+  agentCostIdentity,
+  isCostObservedIdentity,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { requireEntity } from "./handlers.js";
 import { MAX_ACTIVITY_LIMIT, clampLimit } from "../constants.js";
 
-export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Router {
+// Marking an agent is a deliberate, occasional human action, so the ceiling
+// only has to sit above real use.
+const costObservedLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many agent changes, please try again later." },
+});
+
+export function agentRoutes(db: Database.Database, broadcast: BroadcastFn): Router {
   const router = Router();
 
   router.get("/api/agents", (_req, res) => {
@@ -63,6 +77,34 @@ export function agentRoutes(db: Database.Database, _broadcast: BroadcastFn): Rou
   router.get("/api/agents/:id/stats", (req, res) => {
     const sprintId = req.query.sprint_id as string | undefined;
     res.json(getAgentStats(db, req.params.id, sprintId));
+  });
+
+  /**
+   * POST /api/agents/:id/cost-observed — mark an agent as already observed
+   * through its transcripts, so its self-reported log_cost rows stop counting.
+   *
+   * Explicit by design. Nothing infers this: concluding on its own that an
+   * agent is Claude Code, and then silently dropping its reported spend, is
+   * precisely the guess this feature exists to avoid.
+   */
+  router.post("/api/agents/:id/cost-observed", costObservedLimiter, (req, res) => {
+    const { observed } = req.body as { observed?: unknown };
+    if (typeof observed !== "boolean") {
+      return res.status(400).json({ error: "observed must be true or false" });
+    }
+
+    // Read the param once and narrow it here: with a middleware in the chain
+    // Express widens req.params values to string | string[].
+    const id = String(req.params.id);
+    const agent = setAgentCostObserved(db, id, observed);
+    if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+    // Naming the identity matters: marking one agent covers every past and
+    // future connection of the same client, which is the point but is a
+    // surprise unless the response says which client was marked.
+    const identity = agentCostIdentity(agent);
+    broadcast({ type: "agent_registered", payload: agent });
+    return res.json({ agent, identity, observed: isCostObservedIdentity(db, identity) });
   });
 
   return router;

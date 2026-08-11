@@ -14,12 +14,36 @@ import { now, genId, parseAgent, normalizeAgentName } from "./helpers.js";
 
 // ─── Agent CRUD ─────────────────────────────────────────────────────────────
 
+/**
+ * The stable thing a cost-observed mark attaches to.
+ *
+ * An MCP connection registers as `${clientName}-${suffix}` with a fresh random
+ * suffix each launch, so the agent row is not durable and the client name is.
+ * An agent that named itself has no client name and was already stable, so it
+ * is its own identity. One rule, no special case.
+ */
+export function agentCostIdentity(agent: Pick<Agent, "client_name" | "name">): string {
+  return agent.client_name ?? agent.name;
+}
+
+/**
+ * SQL computing the derived cost-observed flag for a row of `agents`.
+ *
+ * Every query that reads agents must select this, because parseAgent spreads
+ * the row and a missing column would silently report an unmarked agent. The
+ * test "reports the flag from every agent read path" is what enforces it.
+ */
+export const costObservedSql = (prefix = ""): string =>
+  `CASE WHEN COALESCE(${prefix}client_name, ${prefix}name) IN ` +
+  `(SELECT identity FROM cost_observed_identities) THEN 1 ELSE 0 END AS cost_observed_externally`;
+
 export interface RegisterAgentInput {
   name: string;
   model: string | null;
   capabilities: string[];
   role?: Agent["role"];
   parent_agent_name?: string;
+  client_name?: string | null;
 }
 
 export function registerAgent(
@@ -44,13 +68,16 @@ export function registerAgent(
   let row: Record<string, unknown>;
   if (existing) {
     row = db.prepare(
-      "UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), last_seen_at = ? WHERE name_normalized = ? RETURNING *"
-    ).get(input.model ?? null, capJson, role, parentAgentId, ts, normalized) as Record<string, unknown>;
+      `UPDATE agents SET model = ?, capabilities = ?, role = ?, parent_agent_id = COALESCE(?, parent_agent_id), ` +
+      `client_name = COALESCE(?, client_name), last_seen_at = ? WHERE name_normalized = ? ` +
+      `RETURNING *, ${costObservedSql()}`
+    ).get(input.model ?? null, capJson, role, parentAgentId, input.client_name ?? null, ts, normalized) as Record<string, unknown>;
   } else {
     const id = genId();
     row = db.prepare(
-      "INSERT INTO agents (id, name, name_normalized, model, capabilities, role, parent_agent_id, registered_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
-    ).get(id, input.name, normalized, input.model ?? null, capJson, role, parentAgentId, ts, ts) as Record<string, unknown>;
+      `INSERT INTO agents (id, name, name_normalized, model, capabilities, role, parent_agent_id, client_name, registered_at, last_seen_at) ` +
+      `VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *, ${costObservedSql()}`
+    ).get(id, input.name, normalized, input.model ?? null, capJson, role, parentAgentId, input.client_name ?? null, ts, ts) as Record<string, unknown>;
   }
 
   return parseAgent(row);
@@ -58,7 +85,7 @@ export function registerAgent(
 
 export function listAgents(db: Database.Database): Agent[] {
   const rows = db
-    .prepare("SELECT * FROM agents ORDER BY registered_at ASC")
+    .prepare(`SELECT *, ${costObservedSql()} FROM agents ORDER BY registered_at ASC`)
     .all() as Record<string, unknown>[];
   return rows.map(parseAgent);
 }
@@ -69,14 +96,16 @@ export function getAgentByName(
 ): Agent | null {
   const normalized = normalizeAgentName(name);
   const row = db
-    .prepare("SELECT * FROM agents WHERE name_normalized = ?")
+    .prepare(`SELECT *, ${costObservedSql()} FROM agents WHERE name_normalized = ?`)
     .get(normalized) as Record<string, unknown> | undefined;
   if (!row) return null;
   return parseAgent(row);
 }
 
 export function getAgentById(db: Database.Database, id: string): Agent | null {
-  const row = db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+  const row = db
+    .prepare(`SELECT *, ${costObservedSql()} FROM agents WHERE id = ?`)
+    .get(id) as Record<string, unknown> | undefined;
   if (!row) return null;
   return parseAgent(row);
 }
@@ -86,6 +115,45 @@ export function setAgentStatus(db: Database.Database, agentName: string, status:
   db.prepare(
     "UPDATE agents SET current_status = ?, current_status_at = ? WHERE name_normalized = ?"
   ).run(status, now(), normalized);
+}
+
+/**
+ * Mark or unmark the CLIENT this agent belongs to as already observed through
+ * its transcripts.
+ *
+ * Takes an agent id because that is what a user has in front of them, but acts
+ * on the agent's cost identity, so the mark covers every past and future
+ * connection of the same client rather than one session's row.
+ *
+ * Always an explicit human action. Nothing in the ingestion path calls this,
+ * because inferring that an agent is Claude Code and silently dropping its
+ * self-reported spend is the guess this feature exists to avoid.
+ */
+export function setAgentCostObserved(
+  db: Database.Database,
+  agentId: string,
+  observed: boolean
+): Agent | null {
+  const agent = getAgentById(db, agentId);
+  if (!agent) return null;
+
+  const identity = agentCostIdentity(agent);
+  if (observed) {
+    db.prepare(
+      "INSERT OR IGNORE INTO cost_observed_identities (identity, marked_at) VALUES (?, ?)"
+    ).run(identity, now());
+  } else {
+    db.prepare("DELETE FROM cost_observed_identities WHERE identity = ?").run(identity);
+  }
+  return getAgentById(db, agentId);
+}
+
+/** Whether a cost identity is currently marked. Used by the route's response. */
+export function isCostObservedIdentity(db: Database.Database, identity: string): boolean {
+  const row = db
+    .prepare("SELECT 1 AS present FROM cost_observed_identities WHERE identity = ?")
+    .get(identity);
+  return row !== undefined;
 }
 
 export function touchAgent(db: Database.Database, name: string): Agent {

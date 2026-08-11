@@ -63,6 +63,24 @@ export interface Agent {
   completed_today?: number;
   current_status?: string | null;
   current_status_at?: string | null;
+  /**
+   * The MCP client this agent connected as, or null for an agent that named
+   * itself through register_agent or log_activity.
+   *
+   * Recorded so the cost-observed mark can key on something stable. Each MCP
+   * connection registers a fresh agent row with a random suffix, so the row is
+   * not a durable identity and the client name is.
+   */
+  client_name: string | null;
+  /**
+   * 1 when this agent's spend is already read from its transcripts, so its
+   * log_cost rows are duplicates and are excluded from cost totals.
+   *
+   * Derived, not stored: it is true when this agent's cost identity appears in
+   * cost_observed_identities. A number rather than a boolean because SQLite has
+   * no boolean type and this project uses raw SQL with no ORM layer to map it.
+   */
+  cost_observed_externally: number;
 }
 
 export interface ActivityEntry {
@@ -193,6 +211,16 @@ export interface CostSummary {
   entry_count: number;
   /** Rows in this group whose cost is unknown, so they contributed nothing to the total. */
   unpriced_entries: number;
+  /**
+   * Rows in this scope suppressed as duplicates of an observed client's
+   * transcripts, so they contributed nothing to the total.
+   *
+   * Above zero means the total is not this scope's whole spend: the money is
+   * counted globally against the transcript rows instead. Transcript rows carry
+   * no agent_id, so without this an observed agent's own summary reads $0.00
+   * and looks identical to an agent that never did anything.
+   */
+  excluded_entries: number;
 }
 
 export interface CostTimeseriesEntry {
@@ -220,6 +248,29 @@ export interface CostByAgentEntry {
   total_tokens: number;
   entry_count: number;
   unpriced_entries: number;
+  /** Rows suppressed as duplicates of an observed client's transcripts — the money is counted globally instead. */
+  excluded_entries: number;
+}
+
+/**
+ * A project and calendar day carrying cost from both sources at once.
+ *
+ * Reported rather than resolved: a second tool legitimately working on the same
+ * project the same day looks identical to a duplicate, and only a person can
+ * tell them apart. The agent names are what make that judgement quick.
+ */
+export interface CostOverlap {
+  /** Null for spend that matched no project. Reported rather than hidden. */
+  project_id: string | null;
+  /** "Unattributed" when project_id is null, matching how ingestion already names this state. */
+  project_name: string;
+  date: string;
+  mcp_entries: number;
+  transcript_entries: number;
+  /** Per-session agent names on the mcp side. Empty for a self-report that named no agent. */
+  mcp_agent_names: string[];
+  /** The cost identities behind those agents. This is what a user actually marks. */
+  mcp_identities: string[];
 }
 
 export interface CompletionMetrics {

@@ -7,6 +7,8 @@ import { parseTranscript } from "./parse.js";
 import { priceRecord } from "./pricing.js";
 import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
+import { excludeObservedCondition } from "../../db/costs.js";
+import type { CostOverlap } from "../../../shared/types.js";
 
 const PROVIDER = "anthropic";
 
@@ -227,15 +229,85 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
   return result;
 }
 
-/** Counts behind GET /api/ingest/status, so skipped and unpriced are visible. */
+interface OverlapRow {
+  project_id: string | null;
+  project_name: string;
+  date: string;
+  mcp_entries: number;
+  transcript_entries: number;
+  /** JSON arrays from json_group_array, so a name containing a comma survives intact. */
+  mcp_agent_names: string;
+  mcp_identities: string;
+}
+
+/**
+ * Read one of the overlap query's JSON name arrays.
+ *
+ * json_group_array rather than GROUP_CONCAT because the result is split back
+ * into a list, and GROUP_CONCAT's separator is a comma with no escaping, so an
+ * agent or client name containing a comma split into two bogus entries. That
+ * matters beyond display: mcp_identities is the value a user copies to mark,
+ * and half a name marks nothing. SQLite refuses a custom separator alongside
+ * DISTINCT, so the fix is a format that quotes its own elements.
+ *
+ * Unlike GROUP_CONCAT, json_group_array keeps NULLs, and every transcript row
+ * joins to no agent, so the nulls are dropped here instead.
+ */
+function parseNameArray(json: string): string[] {
+  return (JSON.parse(json) as (string | null)[]).filter((n): n is string => n !== null);
+}
+
+/** Counts behind GET /api/ingest/status, so skipped, unpriced and duplicated spend are all visible. */
 export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
+  overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
+
+  // A project and day holding both a self-report and an observation. Agents
+  // already marked as observed are filtered out, because their rows no longer
+  // reach any total and so are no longer a discrepancy to act on.
+  //
+  // Transcript rows carry no agent_id, so once parseNameArray drops the NULLs
+  // the name list only ever describes the mcp side. A self-report that named
+  // no agent contributes to mcp_entries with no name, which is the visible
+  // form of the row that cannot be excluded by marking.
+  //
+  // LEFT JOIN projects, not JOIN: log_cost's project id is optional, and an
+  // mcp row that carries none was attached to an agent instead (an earlier
+  // task's fix), so it must still be reportable here rather than dropped by
+  // an inner join. GROUP BY c.project_id groups every NULL into one bucket in
+  // SQLite, which is exactly the "Unattributed" grouping this needs.
+  const rows = db.prepare(`
+    SELECT c.project_id                                             AS project_id,
+           COALESCE(p.name, 'Unattributed')                          AS project_name,
+           DATE(c.created_at)                                        AS date,
+           SUM(CASE WHEN c.source = 'mcp' THEN 1 ELSE 0 END)         AS mcp_entries,
+           SUM(CASE WHEN c.source = 'transcript' THEN 1 ELSE 0 END)  AS transcript_entries,
+           json_group_array(DISTINCT a.name)                         AS mcp_agent_names,
+           json_group_array(DISTINCT COALESCE(a.client_name, a.name)) AS mcp_identities
+      FROM cost_entries c
+      LEFT JOIN projects p ON p.id = c.project_id
+      LEFT JOIN agents a ON a.id = c.agent_id
+     WHERE ${excludeObservedCondition("c.")}
+     GROUP BY c.project_id, project_name, DATE(c.created_at)
+    HAVING mcp_entries > 0 AND transcript_entries > 0
+     ORDER BY date DESC, project_name
+  `).all() as OverlapRow[];
+
   return {
     filesTracked: one(`SELECT COUNT(*) AS n FROM transcript_files`),
     transcriptRows: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript'`),
     unpriced: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript' AND cost_usd IS NULL`),
     unattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript' AND project_id IS NULL`),
+    overlaps: rows.map((r) => ({
+      project_id: r.project_id,
+      project_name: r.project_name,
+      date: r.date,
+      mcp_entries: r.mcp_entries,
+      transcript_entries: r.transcript_entries,
+      mcp_agent_names: parseNameArray(r.mcp_agent_names),
+      mcp_identities: parseNameArray(r.mcp_identities),
+    })),
   };
 }

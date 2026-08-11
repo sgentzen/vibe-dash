@@ -618,12 +618,17 @@ const MIGRATIONS: Migration[] = [
       // column records which, so a row's provenance is auditable and a future
       // change can filter or reconcile on it.
       //
-      // It does NOT deduplicate anything today: no query filters on source, so
-      // a Claude Code session that both calls log_cost and gets its transcript
-      // ingested is counted twice. That is a real upgrade hazard for anyone
-      // whose per-project CLAUDE.md still carries the old log_cost instruction,
-      // and is documented in docs/ingestion.md. Making the cost queries
-      // source-aware is tracked as follow-up work.
+      // On its own, a Claude Code session that both calls log_cost and gets
+      // its transcript ingested is counted twice — a real upgrade hazard for
+      // anyone whose per-project CLAUDE.md still carries the old log_cost
+      // instruction, documented in docs/ingestion.md. Migration 021 adds the
+      // fix: excludeObservedCondition() in server/db/costs.ts filters on this
+      // column for every row whose agent's cost identity is marked
+      // cost-observed. That marking is always an explicit human action through
+      // POST /api/agents/:id/cost-observed — never inferred from source or
+      // anything else, because guessing that an agent is Claude Code is
+      // exactly the mistake this column exists to let a person correct
+      // instead.
       //
       // external_id holds the transcript record's own uuid. The partial unique
       // index below is the whole idempotency guarantee: re-scanning a file can
@@ -754,6 +759,41 @@ const MIGRATIONS: Migration[] = [
           ON cost_entries(external_id) WHERE external_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_cost_entries_source
           ON cost_entries(source);
+      `);
+    },
+  },
+  {
+    name: "021_agent_cost_observed",
+    run(db) {
+      // Marks a CLIENT whose spend we already read from its transcripts, so its
+      // self-reported log_cost rows are duplicates rather than new spend.
+      // Excluded at query time in server/db/costs.ts; the rows are never
+      // deleted, because destroying money records to fix a reporting bug
+      // removes the audit trail that makes the fix checkable.
+      //
+      // Keyed to the client rather than to a row in `agents` because agent
+      // identity is per-connection: server/mcp/server.ts names each connection
+      // `${clientName}-${suffix}` with a random suffix, so a mark on one row
+      // stopped applying the next time the client started. See section 14 of
+      // the design.
+      //
+      // `client_name` is recorded at registration rather than recovered later
+      // by stripping the suffix. Stripping would work on rows written before
+      // this change, which is its appeal, but it is a guess and it is wrong for
+      // an agent legitimately named that way. This feature does not guess.
+      const cols = db.pragma("table_info(agents)") as { name: string }[];
+      const has = (name: string): boolean => cols.some((c) => c.name === name);
+      if (!has("client_name")) {
+        db.prepare("ALTER TABLE agents ADD COLUMN client_name TEXT").run();
+      }
+
+      // NOT NULL is spelled out: SQLite permits NULLs in a non-INTEGER PRIMARY
+      // KEY, and a NULL identity would make the IN test below behave oddly.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cost_observed_identities (
+          identity  TEXT PRIMARY KEY NOT NULL,
+          marked_at TEXT NOT NULL
+        )
       `);
     },
   },
