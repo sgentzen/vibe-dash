@@ -206,10 +206,25 @@ the fix. The mark is keyed to the identity string, not to either agent, so
 unmarking restores the wrongly suppressed agent's spend and, at the same
 time, stops excluding the marked client's own `mcp` rows, which brings back
 the double counting the mark existed to remove for that client. Unmarking
-trades one wrong total for the other rather than fixing either. The actual
-fix is to rename the self-reporting agent so its name no longer matches the
-marked client's name, then mark the client again: two distinct identities
-means each is excluded or not on its own.
+trades one wrong total for the other rather than fixing either.
+
+Renaming the self-reporting agent so its name no longer matches the marked
+client's name, then marking the client again, only fixes this going forward.
+`registerAgent` upserts on the normalised name, so a new name is a new agent
+row, not a change to the old one, and there is no rename endpoint that would
+alter the old row instead. Every `mcp` row already recorded still points at
+that old agent row, whose name (and therefore whose identity, since a
+self-named agent has no `client_name`) is still the colliding value. Marking
+the client again after the rename excludes the old row's historical rows
+exactly as before, and it is easy to believe the problem is now fixed when
+only new spend under the new name is behaving correctly.
+
+There is no way to correct those already-suppressed historical rows through
+the interface today, the same as the two no-backfill limitations above. A
+user who has already accumulated them chooses between leaving the client
+unmarked, which counts that historical spend correctly but resumes double
+counting for the client, and marking the client, which fixes the double
+counting but keeps the old agent's historical spend suppressed.
 
 **Nothing is deleted.** Marking a client only changes which rows a query
 counts; the excluded `mcp` rows stay in the database, so unmarking
