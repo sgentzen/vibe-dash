@@ -157,9 +157,13 @@ one, the entry stays, with a lower `mcp_entries` count and a shorter
 `mcp_identities` list, because the identity you marked drops out of both
 while the other identity's `mcp` rows are still there and still unmarked. A
 row surviving with a reduced count and one fewer name in `mcp_identities` is
-progress, not a sign the mark failed. The entry disappears only once
-`mcp_identities` is empty, which is what confirms every identity on that
-project and day is covered.
+progress, not a sign the mark failed. An empty `mcp_identities` is what
+confirms every identity on that project and day is covered.
+
+An empty `mcp_identities` does not on its own mean the entry will disappear.
+An entry whose `mcp` rows all carry no agent starts out with an empty list and
+stays in the report permanently, because marking cannot reach those rows at
+all. See "A row recorded with no agent attached" below.
 
 **Agent rows written before this release predate `client_name` and get no
 benefit from the above.** An agent row created by an earlier version of Vibe
