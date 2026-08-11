@@ -1,6 +1,18 @@
 import type { OtlpPoint } from "./types.js";
 
 /**
+ * A body `parseMetricsPayload` refuses outright: not object-shaped OTLP at
+ * all, so no retry of the same bytes could ever succeed.
+ *
+ * A distinct class rather than matching on the message, so the route can tell
+ * "this will never parse" (400, do not retry) apart from every other failure
+ * downstream, including a transient one (503, safe to retry — `external_id`
+ * idempotency is exactly what makes that safe). Matching on message text would
+ * break silently the first time this string is reworded.
+ */
+export class MalformedOtlpPayloadError extends Error {}
+
+/**
  * Flatten OTLP's wrapped attribute list into a plain record.
  *
  * Only string values are kept. Token counts and model names are strings in
@@ -154,7 +166,7 @@ function parseMetric(
  */
 export function parseMetricsPayload(body: unknown): OtlpPoint[] {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    throw new Error("OTLP payload must be a JSON object");
+    throw new MalformedOtlpPayloadError("OTLP payload must be a JSON object");
   }
 
   const points: OtlpPoint[] = [];

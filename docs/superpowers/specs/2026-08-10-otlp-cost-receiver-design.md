@@ -299,7 +299,8 @@ Unpriced points are already covered by the existing `unpriced` counter.
 
 | Condition | Behaviour |
 |---|---|
-| Malformed JSON body | `400`, nothing recorded |
+| Malformed JSON body (not object-shaped OTLP) | `400`, nothing recorded |
+| Any other ingest failure (e.g. a transient DB error) | `503`, nothing recorded |
 | Body over the size cap | `413`, nothing recorded |
 | Unknown metric name | Point ignored, `otlpUnmapped` incremented, `200` |
 | `claude_code.*` metric | Point ignored and counted as unmapped, per D2 |
@@ -311,6 +312,18 @@ Unpriced points are already covered by the existing `unpriced` counter.
 
 A malformed payload never partially applies: parsing and mapping complete before
 anything is written, and the writes run in one transaction.
+
+`400` and `503` mean opposite things to an exporter and must not share a catch:
+`400` says the body will never parse, whatever is sent again, so the exporter
+must not retry it; `503` says the fault is ours and a retry is expected to
+succeed. Only a body `parseMetricsPayload` refuses outright (thrown as
+`MalformedOtlpPayloadError`, `server/ingest/otlp/parse.ts`) is `400`. Every
+other failure raised while ingesting an otherwise well-formed payload is
+`503` — retryable, and safely so, because `external_id` idempotency makes a
+retried export a no-op rather than a double count. This project treats losing
+spend (a wrongly-permanent `400`) as exactly as bad as double counting it, so
+the distinction is made on error type, not on message text, which would break
+silently the first time the message is reworded.
 
 ## 9. Testing
 

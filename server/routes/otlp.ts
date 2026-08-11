@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import type Database from "better-sqlite3";
 import { logger } from "../logger.js";
 import { ingestMetricsPayload } from "../ingest/otlp/ingest.js";
+import { MalformedOtlpPayloadError } from "../ingest/otlp/parse.js";
 import type { BroadcastFn, RouteFactory } from "./types.js";
 
 // An exporter posts on its own interval, typically every 60 seconds, and one
@@ -38,6 +39,15 @@ export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: Broad
    * because exporters act on the status code: 400 tells a sender not to retry a
    * body that will never parse, and anything retryable is made harmless by the
    * external_id idempotency in the ingest layer.
+   *
+   * A 400 and a 503 mean opposite things to an exporter, so the two failure
+   * classes must not share a catch. `parseMetricsPayload` throws
+   * `MalformedOtlpPayloadError` for a body that could never parse, whatever is
+   * sent again — that, and only that, is 400. Everything else — a transient
+   * DB error mid-transaction, say — has no reason to recur on the exact same
+   * bytes, so it is 503: this project treats losing spend as exactly as bad as
+   * double counting it, and `external_id` idempotency is what makes a retry of
+   * a 503 free rather than risky.
    */
   router.post("/v1/metrics", otlpLimiter, otlpBody, (req, res) => {
     try {
@@ -53,8 +63,12 @@ export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: Broad
       }
       return res.status(200).json({});
     } catch (err) {
-      logger.warn({ err }, "rejected an OTLP metrics payload");
-      return res.status(400).json({});
+      if (err instanceof MalformedOtlpPayloadError) {
+        logger.warn({ err }, "rejected a malformed OTLP payload");
+        return res.status(400).json({});
+      }
+      logger.error({ err }, "OTLP ingest failed; asking the exporter to retry");
+      return res.status(503).json({});
     }
   });
 

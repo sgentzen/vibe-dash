@@ -78,6 +78,20 @@ describe("POST /v1/metrics", () => {
     expect(res.status).toBe(200);
   });
 
+  it("returns 503, not 400, when ingest fails for a reason other than a malformed body", async () => {
+    // An honest failure, not a stubbed one: closing the real db connection
+    // makes ingestMetricsPayload's own db.transaction(...) throw a genuine
+    // SqliteError that has nothing to do with the body. A well-formed export
+    // must never come back looking like "this will never parse" (400) when
+    // the fault is on our side and a retry could well succeed.
+    db.close();
+
+    const res = await requestApp(app, "POST", "/v1/metrics", codexPayload(100));
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({});
+  });
+
   it("broadcasts when rows were recorded", async () => {
     const events: { type: string }[] = [];
     app = express();
