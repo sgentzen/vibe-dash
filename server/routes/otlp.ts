@@ -1,4 +1,4 @@
-import { Router, json } from "express";
+import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import type Database from "better-sqlite3";
 import { logger } from "../logger.js";
@@ -16,14 +16,11 @@ const otlpLimiter = rateLimit({
   message: {},
 });
 
-// A batch of metric points is larger than a normal API call, so this route gets
-// its own body limit rather than raising the global one.
-//
-// This parser only takes effect because server/index.ts mounts it for this path
-// BEFORE the global express.json. body-parser marks a request as parsed and the
-// second parser then no-ops, so mounting it here alone would silently leave the
-// global 256kb cap in force.
-const otlpBody = json({ limit: "1mb" });
+// The 1mb body limit for this path is NOT set here. It is mounted in
+// server/index.ts, ahead of the global express.json, because body-parser marks
+// a request as parsed and any later parser then no-ops. A parser mounted here
+// would never run, and would leave a reader believing this route enforces its
+// own limit when the global 256kb cap was really the one in force.
 
 export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: BroadcastFn): Router => {
   const router = Router();
@@ -49,7 +46,7 @@ export const otlpRoutes: RouteFactory = (db: Database.Database, broadcast: Broad
    * double counting it, and `external_id` idempotency is what makes a retry of
    * a 503 free rather than risky.
    */
-  router.post("/v1/metrics", otlpLimiter, otlpBody, (req, res) => {
+  router.post("/v1/metrics", otlpLimiter, (req, res) => {
     try {
       const result = ingestMetricsPayload(db, req.body);
       if (result.recorded > 0) {
