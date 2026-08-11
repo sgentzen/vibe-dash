@@ -134,36 +134,71 @@ double, and nothing in the interface flags it.
 Rows do carry a `source` column, `mcp` or `transcript`, so the two are
 distinguishable and the damage is auditable after the fact.
 
-**Mark the agent as cost-observed to correct the double count, past and
-future, for every row that names an agent.** Call
-`POST /api/agents/:id/cost-observed` with body `{ "observed": true }` for the
-Claude Code agent whose spend is doubled. Every cost query then excludes that
-agent's `source = 'mcp'` rows, so every total, past and future, drops back to
-what the transcripts alone report. Its `source = 'transcript'` rows keep
-counting, since those are the real figure. `GET /api/ingest/status` lists the
-overlap that makes the affected agent easy to find before you mark it, under
-its `overlaps` array, and once you mark the agent, that project-and-day entry
-stops appearing there, confirming the correction took effect.
+**Mark the agent as cost-observed, which corrects every session of the same
+client, past and future.** Call `POST /api/agents/:id/cost-observed` with
+body `{ "observed": true }` for the Claude Code agent whose spend is
+doubled. The mark is not stored against that one agent row: it is keyed to
+the MCP client the agent connected as (`agents.client_name`, recorded when
+the agent registered), and an agent's cost identity is
+`COALESCE(client_name, name)`. Every cost query then excludes `source =
+'mcp'` rows from any agent sharing that identity, so marking one Claude Code
+session also covers every earlier and later session of that same client
+without marking each one. Its `source = 'transcript'` rows keep counting,
+since those are the real figure. The response names what it matched, as
+`{ agent, identity, observed }`, so you can see which client is now covered.
+`GET /api/ingest/status` lists the overlap that makes the affected client
+easy to find before you mark it, under its `overlaps` array, where each entry
+now carries `mcp_identities` alongside `mcp_agent_names`; once you mark the
+identity, that project-and-day entry stops appearing there, confirming the
+correction took effect.
+
+**Agent rows written before this release predate `client_name` and get no
+benefit from the above.** An agent row created by an earlier version of Vibe
+Dash has no recorded client name, so its cost identity falls back to its own
+full, connection-suffixed name (for example `claude-code-a1b2c3d4`), which is
+unique to that one past session. Marking such a row covers only that session;
+it does not reach any other past session of the same client, and it does not
+generalise to future sessions the way marking a current agent does. If you
+are upgrading with existing duplicates spread across many past sessions, you
+need one mark per past agent row, found by listing agents and marking each
+one whose spend looks doubled. There is no backfill for this: the only way to
+backfill would be guessing which part of an old agent's name is the
+connection suffix, and this feature is built specifically to never guess
+about money.
 
 **A row recorded with no agent attached can never be excluded by marking.**
-The exclusion requires the row to name the agent you mark, because a
-self-report that named no agent cannot be attributed to any agent, marked or
-not. This affects anyone whose earlier `log_cost` calls did not name an
-agent, which older setups could do before this release started attaching the
-session agent to `log_cost` automatically. Those rows stay double counted no
-matter what you mark, and stay listed in `GET /api/ingest/status`'s
-`overlaps` array indefinitely. There is no way to correct them through the
-interface today. The signal that one of these rows is present: an
-`overlaps` entry's `mcp_agent_names` list names fewer agents than
-`mcp_entries` would suggest, because a self-report that named no agent is
-counted in `mcp_entries` but never appears in `mcp_agent_names`. Reading that
-gap and deciding what it means is left to you.
+The exclusion requires the row to name an agent, because a self-report that
+named no agent cannot be resolved to any identity, marked or not. This
+affects anyone whose earlier `log_cost` calls did not name an agent, which
+older setups could do before this release started attaching the session
+agent to `log_cost` automatically. Those rows stay double counted no matter
+what you mark, and stay listed in `GET /api/ingest/status`'s `overlaps` array
+indefinitely. There is no way to correct them through the interface today.
+The signal that one of these rows is present: an `overlaps` entry's
+`mcp_agent_names` list names fewer agents than `mcp_entries` would suggest,
+because a self-report that named no agent is counted in `mcp_entries` but
+never appears in `mcp_agent_names`. Reading that gap and deciding what it
+means is left to you.
 
-**Nothing is deleted.** Marking an agent only changes which rows a query
-counts; the excluded `mcp` rows stay in the database, so unmarking the agent
+**Marking a client can also suppress a different agent's genuine spend, if
+that agent happens to share the client's name.** Because identity is
+`COALESCE(client_name, name)`, a self-named agent (one registered through
+`register_agent` or `log_activity` rather than an MCP connection) whose own
+name is identical to a client name you have marked is treated as the same
+identity. Its `mcp` rows are then excluded too, even though they are not
+duplicates of anything, so real spend disappears from totals rather than
+being counted twice. This is a consequence of keying the mark to a shared
+identity rather than to one row, and it will not fix itself. To avoid it,
+do not name a self-reporting agent after a client you have already marked
+as cost-observed. If you hit it, unmark the client
+(`{ "observed": false }`); the affected agent's spend returns immediately
+because nothing was ever deleted.
+
+**Nothing is deleted.** Marking a client only changes which rows a query
+counts; the excluded `mcp` rows stay in the database, so unmarking
 (`{ "observed": false }`) restores the previous totals exactly. Marking is
 also never automatic: nothing in Vibe Dash infers that an agent is Claude
-Code, so a duplicate stays visible until you mark the agent yourself.
+Code, so a duplicate stays visible until you mark it yourself.
 
 Leave the `log_cost` step in place for every other agent. Cursor, Codex, Aider
 and anything custom are not read from transcripts, so for them it remains the

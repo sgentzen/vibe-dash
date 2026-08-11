@@ -92,7 +92,7 @@ Core tools your agents will use most:
 | `register_agent` / `heartbeat` | Announce an agent and keep it live |
 | `log_activity` | Post a status update (auto-registers the agent) |
 | `report_blocker` / `resolve_blocker` | Flag and clear blockers |
-| `log_cost` | Record token spend. Claude Code cost is read from transcripts instead, so this is ignored for any agent marked cost-observed. See [docs/ingestion.md](docs/ingestion.md#upgrading-from-an-earlier-version) |
+| `log_cost` | Record token spend. Claude Code cost is read from transcripts instead, so this is ignored for any MCP client marked cost-observed, covering every session of that client, past and future. See [docs/ingestion.md](docs/ingestion.md#upgrading-from-an-earlier-version) |
 | `get_project_context` | Pull a project's current state in one call |
 
 See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
