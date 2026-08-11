@@ -8,6 +8,7 @@ import { priceRecord } from "./pricing.js";
 import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 import { excludeObservedCondition } from "../../db/costs.js";
+import { unmappedPointCount } from "../otlp/ingest.js";
 import type { CostOverlap } from "../../../shared/types.js";
 
 const PROVIDER = "anthropic";
@@ -260,6 +261,7 @@ function parseNameArray(json: string): string[] {
 /** Counts behind GET /api/ingest/status, so skipped, unpriced and duplicated spend are all visible. */
 export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
+  otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
   overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
@@ -300,6 +302,12 @@ export function getIngestStatus(db: Database.Database): {
     transcriptRows: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript'`),
     unpriced: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript' AND cost_usd IS NULL`),
     unattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'transcript' AND project_id IS NULL`),
+    otlpRows: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'otlp'`),
+    // Process-lifetime, not a query — see unmappedPointCount's own comment
+    // (server/ingest/otlp/ingest.ts). Resets on restart, unlike every other
+    // count on this object.
+    otlpUnmapped: unmappedPointCount(),
+    otlpUnattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'otlp' AND project_id IS NULL`),
     overlaps: rows.map((r) => ({
       project_id: r.project_id,
       project_name: r.project_name,

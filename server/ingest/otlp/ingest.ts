@@ -15,6 +15,18 @@ export interface IngestResult {
   unattributed: number;
 }
 
+// Process-lifetime, not a query — an unmapped point writes no row, so unlike
+// otlpRows/otlpUnattributed (which read cost_entries) there is no table to
+// count it from. This resets on restart, which is a real, weaker guarantee
+// than the other status counters: fine for "is my runner recognised right
+// now", not fine for anything that needs to survive a restart.
+let unmappedPoints = 0;
+
+/** Read the process-lifetime count of OTLP points no mapper recognised. */
+export function unmappedPointCount(): number {
+  return unmappedPoints;
+}
+
 /** One turn's worth of grouped token counts, still unpriced and unattributed. */
 interface Group {
   model: string;
@@ -108,6 +120,7 @@ function buildGroups(
     const mapped = mapPoint(point);
     if (!mapped) {
       unmapped++;
+      unmappedPoints++;
       continue;
     }
 

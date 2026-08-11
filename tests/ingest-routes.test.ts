@@ -35,7 +35,10 @@ describe("GET /api/ingest/status", () => {
   it("returns zeroed counts on a fresh database", async () => {
     const res = await request("GET", "/api/ingest/status");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ filesTracked: 0, transcriptRows: 0, unpriced: 0, unattributed: 0 });
+    expect(res.body).toMatchObject({
+      filesTracked: 0, transcriptRows: 0, unpriced: 0, unattributed: 0,
+      otlpRows: 0, otlpUnmapped: 0, otlpUnattributed: 0,
+    });
   });
 
   it("includes knownModels as a non-empty array of strings", async () => {

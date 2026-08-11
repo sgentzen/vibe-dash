@@ -57,6 +57,13 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
+// OTLP metric batches are larger than a normal API call. This must precede the
+// global parser below: whichever runs first is the one whose limit applies.
+// body-parser marks a request as parsed once it runs, so a second parser
+// mounted after this one (the global 256kb line) is a no-op for this path —
+// mounting the 1mb parser only inside the route, instead of here ahead of the
+// global line, would silently leave the effective cap at 256kb.
+app.use("/v1/metrics", express.json({ limit: "1mb" }));
 app.use(express.json({ limit: "256kb" }));
 
 function openDbOrExit(): Database.Database {
