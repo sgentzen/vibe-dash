@@ -89,13 +89,63 @@ describe("excluded_entries", () => {
   });
 
   it("does not change the global total's shape", () => {
-    // Global scope keeps filtering in WHERE: the suppressed rows are simply not
-    // part of that answer.
+    // getGlobalCostSummary also moved to conditional aggregation (fix round 1):
+    // CostSummary.excluded_entries is non-optional, and a WHERE-based exclusion
+    // has no row left to count once it has filtered a row out. The total must
+    // still land in the same place as before.
     const agent = registerAgent(db, { name: "claude", model: null, capabilities: [] });
     addMcpCost(db, "m1", agent.id, 5);
     setAgentCostObserved(db, agent.id, true);
 
     expect(getGlobalCostSummary(db).total_cost_usd).toBe(0);
+  });
+
+  it("reports a real, non-zero excluded_entries for the global scope once marked", () => {
+    // The fix this round of review demanded: 0 AS excluded_entries would state
+    // confidently that nothing was suppressed when something was — a wrong
+    // number presented as a real one, worse than a missing field. The global
+    // total must drop by exactly the suppressed amount at the same time.
+    const agent = registerAgent(db, { name: "claude", model: null, capabilities: [] });
+    addMcpCost(db, "m1", agent.id, 5);
+    addMcpCost(db, "m2", agent.id, 7);
+
+    const before = getGlobalCostSummary(db);
+    expect(before.total_cost_usd).toBe(12);
+    expect(before.excluded_entries).toBe(0);
+
+    setAgentCostObserved(db, agent.id, true);
+
+    const after = getGlobalCostSummary(db);
+    expect(after.total_cost_usd).toBe(0);
+    expect(after.excluded_entries).toBe(2);
+  });
+
+  it("reports definite zeroes for the global scope on an empty database", () => {
+    // Same NULL trap as getCostSummaryBy: this query has no GROUP BY, so an
+    // empty database still returns one row, and bare SUM over zero rows is
+    // NULL where COUNT(*) was 0. Every column must be COALESCEd.
+    const summary = getGlobalCostSummary(db);
+    expect(summary.total_cost_usd).toBe(0);
+    expect(summary.total_input_tokens).toBe(0);
+    expect(summary.total_output_tokens).toBe(0);
+    expect(summary.entry_count).toBe(0);
+    expect(summary.unpriced_entries).toBe(0);
+    expect(summary.excluded_entries).toBe(0);
+  });
+
+  it("leaves the global total unmoved by the conditional-aggregation refactor", () => {
+    // With nothing marked, the exclusion predicate is false for every row, so
+    // every CASE WHEN NOT dup arm covers exactly what the old WHERE filter did.
+    // Two agents, two unmarked rows: the total must be their plain sum.
+    const a = registerAgent(db, { name: "claude", model: null, capabilities: [] });
+    const b = registerAgent(db, { name: "cursor-bot", model: null, capabilities: [] });
+    addMcpCost(db, "m1", a.id, 5);
+    addMcpCost(db, "m2", b.id, 3);
+
+    const summary = getGlobalCostSummary(db);
+    expect(summary.total_cost_usd).toBe(8);
+    expect(summary.entry_count).toBe(2);
+    expect(summary.excluded_entries).toBe(0);
   });
 
   it("suppresses a reconnected agent sharing the marked client identity", () => {

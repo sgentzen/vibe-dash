@@ -148,13 +148,25 @@ export function getSpendToday(db: Database.Database): number {
 }
 
 export function getGlobalCostSummary(db: Database.Database): CostSummary {
+  // Same conditional-aggregation shape as getCostSummaryBy, for the same
+  // reason: CostSummary now carries excluded_entries, and a WHERE-clause
+  // exclusion has no row left to count once it has filtered a row out. The
+  // global scope genuinely does suppress rows, so leaving this on the old
+  // WHERE-based path (or reporting a literal 0) would state a wrong number
+  // confidently instead of a missing one — worse than the bug this task
+  // exists to fix.
+  // Every count is COALESCEd: this query has no GROUP BY, so an empty
+  // database still returns one row, and SUM over zero rows is NULL where the
+  // COUNT(*) it replaces was 0.
+  const dup = observedDuplicateSql();
   return db.prepare(
-    `SELECT ${totalCostSql()},
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COUNT(*) AS entry_count,
-            ${unpricedSql()}
-     FROM cost_entries ${withExclusion("")}`
+    `SELECT COALESCE(SUM(CASE WHEN NOT ${dup} THEN cost_usd END), 0) AS total_cost_usd,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN input_tokens END), 0) AS total_input_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN output_tokens END), 0) AS total_output_tokens,
+            COALESCE(SUM(CASE WHEN NOT ${dup} THEN 1 ELSE 0 END), 0) AS entry_count,
+            COALESCE(SUM(CASE WHEN NOT ${dup} AND cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced_entries,
+            COALESCE(SUM(CASE WHEN ${dup} THEN 1 ELSE 0 END), 0) AS excluded_entries
+     FROM cost_entries`
   ).get() as CostSummary;
 }
 
