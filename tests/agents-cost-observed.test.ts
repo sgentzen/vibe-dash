@@ -27,7 +27,7 @@ describe("POST /api/agents/:id/cost-observed", () => {
 
     const res = await request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: true });
     expect(res.status).toBe(200);
-    expect((res.body as { cost_observed_externally: number }).cost_observed_externally).toBe(1);
+    expect((res.body as { agent: { cost_observed_externally: number } }).agent.cost_observed_externally).toBe(1);
     expect(getAgentById(db, agent.id)!.cost_observed_externally).toBe(1);
   });
 
@@ -63,5 +63,29 @@ describe("POST /api/agents/:id/cost-observed", () => {
     await request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: true });
 
     expect(events.map((e) => e.type)).toContain("agent_registered");
+  });
+});
+
+describe("the response names the identity", () => {
+  it("reports the client name it actually marked", () => {
+    const agent = registerAgent(db, {
+      name: "claude-code-a1b2c3d4", model: null, capabilities: [], client_name: "claude-code",
+    });
+
+    return request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: true }).then((res) => {
+      expect(res.status).toBe(200);
+      const body = res.body as { identity: string; observed: boolean; agent: { cost_observed_externally: number } };
+      expect(body.identity).toBe("claude-code");
+      expect(body.observed).toBe(true);
+      expect(body.agent.cost_observed_externally).toBe(1);
+    });
+  });
+
+  it("reports the agent's own name when it has no client name", () => {
+    const agent = registerAgent(db, { name: "cursor-bot", model: null, capabilities: [] });
+
+    return request("POST", `/api/agents/${agent.id}/cost-observed`, { observed: true }).then((res) => {
+      expect((res.body as { identity: string }).identity).toBe("cursor-bot");
+    });
   });
 });

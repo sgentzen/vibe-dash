@@ -13,6 +13,8 @@ import {
   listAgentSessions,
   getAgentStats,
   setAgentCostObserved,
+  agentCostIdentity,
+  isCostObservedIdentity,
 } from "../db/index.js";
 import type { BroadcastFn } from "./types.js";
 import { requireEntity } from "./handlers.js";
@@ -97,8 +99,12 @@ export function agentRoutes(db: Database.Database, broadcast: BroadcastFn): Rout
     const agent = setAgentCostObserved(db, id, observed);
     if (!agent) return res.status(404).json({ error: "Agent not found" });
 
+    // Naming the identity matters: marking one agent covers every past and
+    // future connection of the same client, which is the point but is a
+    // surprise unless the response says which client was marked.
+    const identity = agentCostIdentity(agent);
     broadcast({ type: "agent_registered", payload: agent });
-    return res.json(agent);
+    return res.json({ agent, identity, observed: isCostObservedIdentity(db, identity) });
   });
 
   return router;
