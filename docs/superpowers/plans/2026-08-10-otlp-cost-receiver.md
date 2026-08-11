@@ -280,7 +280,7 @@ function histogramPayload(overrides: Record<string, unknown> = {}): unknown {
             dataPoints: [{
               attributes: [
                 { key: "token_type", value: { stringValue: "input" } },
-                { key: "model", value: { stringValue: "gpt-5-codex" } },
+                { key: "model", value: { stringValue: "gpt-5.3-codex" } },
               ],
               startTimeUnixNano: "1000",
               timeUnixNano: "2000",
@@ -960,7 +960,7 @@ function codexPayload(opts: {
             dataPoints: Object.entries(opts.tokens).map(([token_type, sum]) => ({
               attributes: [
                 { key: "token_type", value: { stringValue: token_type } },
-                { key: "model", value: { stringValue: opts.model ?? "gpt-5-codex" } },
+                { key: "model", value: { stringValue: opts.model ?? "gpt-5.3-codex" } },
               ],
               startTimeUnixNano: opts.start ?? "1000",
               timeUnixNano: opts.time ?? "2000",
@@ -1076,6 +1076,16 @@ describe("ingestMetricsPayload", () => {
     ingestMetricsPayload(db, codexPayload({ tokens: { input: 100 }, model: "not-a-real-model" }));
 
     expect(rows(db)[0].cost_usd).toBeNull();
+  });
+
+  it("produces a real cost figure for a priced model", () => {
+    // The feature's whole promise: a Codex user sees what they spent. Every
+    // other test here would pass with pricing entirely broken, because they
+    // assert on token counts. This one would not.
+    // gpt-5.3-codex is $1.75/MTok input, so 1,000,000 input tokens is $1.75.
+    ingestMetricsPayload(db, codexPayload({ tokens: { input: 1_000_000 } }));
+
+    expect(rows(db)[0].cost_usd).toBeCloseTo(1.75, 6);
   });
 });
 ```
@@ -1266,7 +1276,7 @@ function codexPayload(input: number, project?: string): unknown {
             dataPoints: [{
               attributes: [
                 { key: "token_type", value: { stringValue: "input" } },
-                { key: "model", value: { stringValue: "gpt-5-codex" } },
+                { key: "model", value: { stringValue: "gpt-5.3-codex" } },
               ],
               startTimeUnixNano: "1000",
               timeUnixNano: "2000",
