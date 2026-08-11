@@ -174,6 +174,7 @@ describe("cli/format: row formatters", () => {
     capabilities: [],
     role: "coder",
     parent_agent_id: null,
+    client_name: null,
     registered_at: "2026-01-01T00:00:00Z",
     last_seen_at: "2026-04-17T00:00:00Z",
     cost_observed_externally: 0,

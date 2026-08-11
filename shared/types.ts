@@ -64,11 +64,21 @@ export interface Agent {
   current_status?: string | null;
   current_status_at?: string | null;
   /**
+   * The MCP client this agent connected as, or null for an agent that named
+   * itself through register_agent or log_activity.
+   *
+   * Recorded so the cost-observed mark can key on something stable. Each MCP
+   * connection registers a fresh agent row with a random suffix, so the row is
+   * not a durable identity and the client name is.
+   */
+  client_name: string | null;
+  /**
    * 1 when this agent's spend is already read from its transcripts, so its
    * log_cost rows are duplicates and are excluded from cost totals.
    *
-   * A number rather than a boolean because SQLite has no boolean type and this
-   * project uses raw SQL with no ORM layer to map it.
+   * Derived, not stored: it is true when this agent's cost identity appears in
+   * cost_observed_identities. A number rather than a boolean because SQLite has
+   * no boolean type and this project uses raw SQL with no ORM layer to map it.
    */
   cost_observed_externally: number;
 }

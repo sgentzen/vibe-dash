@@ -764,22 +764,36 @@ const MIGRATIONS: Migration[] = [
   {
     name: "021_agent_cost_observed",
     run(db) {
-      // Marks an agent whose spend we already read from its transcripts, so
-      // its self-reported log_cost rows are duplicates rather than new spend.
+      // Marks a CLIENT whose spend we already read from its transcripts, so its
+      // self-reported log_cost rows are duplicates rather than new spend.
       // Excluded at query time in server/db/costs.ts; the rows are never
       // deleted, because destroying money records to fix a reporting bug
       // removes the audit trail that makes the fix checkable.
       //
-      // Defaults to 0, so this migration moves no existing total on its own.
-      // Nothing sets it automatically: concluding that an agent is Claude Code
-      // would be exactly the guess this feature refuses to make.
+      // Keyed to the client rather than to a row in `agents` because agent
+      // identity is per-connection: server/mcp/server.ts names each connection
+      // `${clientName}-${suffix}` with a random suffix, so a mark on one row
+      // stopped applying the next time the client started. See section 14 of
+      // the design.
+      //
+      // `client_name` is recorded at registration rather than recovered later
+      // by stripping the suffix. Stripping would work on rows written before
+      // this change, which is its appeal, but it is a guess and it is wrong for
+      // an agent legitimately named that way. This feature does not guess.
       const cols = db.pragma("table_info(agents)") as { name: string }[];
       const has = (name: string): boolean => cols.some((c) => c.name === name);
-      if (!has("cost_observed_externally")) {
-        db.prepare(
-          "ALTER TABLE agents ADD COLUMN cost_observed_externally INTEGER NOT NULL DEFAULT 0"
-        ).run();
+      if (!has("client_name")) {
+        db.prepare("ALTER TABLE agents ADD COLUMN client_name TEXT").run();
       }
+
+      // NOT NULL is spelled out: SQLite permits NULLs in a non-INTEGER PRIMARY
+      // KEY, and a NULL identity would make the IN test below behave oddly.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cost_observed_identities (
+          identity  TEXT PRIMARY KEY NOT NULL,
+          marked_at TEXT NOT NULL
+        )
+      `);
     },
   },
 ];
