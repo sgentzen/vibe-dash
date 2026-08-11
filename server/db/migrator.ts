@@ -797,6 +797,30 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "022_otlp_series",
+    run(db) {
+      // Remembers the last value seen for each cumulative OTLP metric series,
+      // so an export carrying a running total contributes only its increase.
+      //
+      // Same purpose as transcript_files: a record of what has already been
+      // counted, so re-reading a source does not recount it. Without it, a
+      // cumulative sender's spend is multiplied by the number of exports and
+      // nothing fails to make that visible.
+      //
+      // start_time_nano is stored rather than folded into the key: it is what
+      // identifies a restart, and a restart must take the full new value
+      // instead of subtracting against a high-water mark that no longer exists.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS otlp_series (
+          series_key      TEXT PRIMARY KEY NOT NULL,
+          start_time_nano TEXT NOT NULL,
+          last_value      REAL NOT NULL,
+          updated_at      TEXT NOT NULL
+        )
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
