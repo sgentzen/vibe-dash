@@ -213,9 +213,10 @@ external_id = 'otlp:' || series_key || ':' || time_unix_nano
 
 `series_key` is a stable hash of the resource attributes, the scope, the metric
 name and the point attributes. It deliberately **excludes** `startTimeUnixNano`:
-that field is what identifies a restart, so folding it into the key would make
-every restarted series look like a brand new one and defeat the reset detection
-in §5.3.
+folding it into the key would give every export of the same series a different
+`series_key` whenever a sender re-stamps that field (some do, even while their
+counter climbs normally), which would lose continuity with the stored
+`last_value` that the reset detection in §5.3 depends on.
 
 Two identical exports, whether from a network retry or a duplicate send, produce
 identical `external_id` values, and `INSERT OR IGNORE` discards the second.
@@ -237,10 +238,21 @@ This is the same shape and the same purpose as `transcript_files`: a record of
 what has already been counted, so re-reading a source does not recount it.
 
 **Reset handling.** A process restart begins a new series at zero. A reset is
-detected when `startTimeUnixNano` differs from the stored value, or when the new
-value is lower than `last_value`. On reset the full new value is recorded as new
-spend and the row is replaced. Treating a reset as a negative delta would
-subtract spend that was genuinely incurred.
+detected ONLY when the new value is lower than the stored `last_value` (or when
+there is no previous row) — never from `startTimeUnixNano` changing, even
+though that field is stored alongside `last_value`. An earlier version of this
+rule also treated a changed `startTimeUnixNano` as a restart; that was wrong
+and has been corrected: a sender that re-stamps `startTimeUnixNano` on every
+export while its counter climbs normally would then have its FULL running
+total re-recorded as new spend on every export, compounding without bound. The
+two candidate errors are not symmetrical — an unbounded, compounding
+overstatement versus a bounded, one-off understatement in the rare case where a
+genuine restart's first export already exceeds the old series' total — so the
+value-only rule is the correct trade under this project's rule that a silently
+wrong figure is the worst defect available, including one wrong by being too
+low. On reset the full new value is recorded as new spend and the row is
+replaced. Treating a reset as a negative delta would subtract spend that was
+genuinely incurred.
 
 ## 6. The Codex mapper
 
