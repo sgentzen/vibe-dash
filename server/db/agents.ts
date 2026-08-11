@@ -190,13 +190,41 @@ export function closeStaleSession(db: Database.Database): number {
   return result.changes;
 }
 
+/**
+ * Remove agents that have gone quiet and hold no open session.
+ *
+ * Deleted one at a time on purpose. Several tables carry a foreign key to
+ * agents(id) with no ON DELETE clause, so SQLite refuses to remove an agent
+ * that anything still references — a cost row, a completed task, a recorded
+ * session. As a single bulk DELETE that refusal aborted the whole statement
+ * and threw, and this runs from the MCP server's oninitialized hook, so the
+ * throw took the connecting client's registration down with it: one agent that
+ * had logged cost and then gone quiet was enough to fail every later connect.
+ *
+ * Per agent, a still-referenced row is skipped instead. Keeping an agent whose
+ * work is still on record is the right outcome regardless — this is
+ * housekeeping for agents that left nothing behind, not a purge.
+ */
 export function cleanupStaleAgents(db: Database.Database): number {
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
-  const result = db.prepare(
-    `DELETE FROM agents WHERE last_seen_at < ?
+  const candidates = db.prepare(
+    `SELECT id FROM agents WHERE last_seen_at < ?
      AND id NOT IN (SELECT agent_id FROM agent_sessions WHERE ended_at IS NULL)`
-  ).run(cutoff);
-  return result.changes;
+  ).all(cutoff) as { id: string }[];
+
+  const remove = db.prepare("DELETE FROM agents WHERE id = ?");
+  let removed = 0;
+  for (const { id } of candidates) {
+    try {
+      removed += remove.run(id).changes;
+    } catch (err) {
+      // A foreign key refusal means the agent is still referenced, which is a
+      // reason to keep it. Any other error is a real fault and must surface
+      // rather than be swallowed by housekeeping.
+      if ((err as { code?: string }).code !== "SQLITE_CONSTRAINT_FOREIGNKEY") throw err;
+    }
+  }
+  return removed;
 }
 
 export function listAgentSessions(db: Database.Database, agentId: string): AgentSession[] {
