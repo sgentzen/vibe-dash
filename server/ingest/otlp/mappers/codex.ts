@@ -24,7 +24,12 @@ const TOKEN_KINDS: Record<string, MappedUsage["kind"]> = {
 export function mapCodexPoint(point: OtlpPoint): MappedUsage | null {
   if (point.metricName !== METRIC) return null;
 
-  const kind = TOKEN_KINDS[point.attributes.token_type ?? ""];
+  // Object.hasOwn, not a bare lookup: attributes come off the wire, and a
+  // token_type of "constructor" or "toString" would otherwise resolve to an
+  // inherited Object.prototype member. That member is truthy, so the guard
+  // below would pass and the point would map with a kind that is a function.
+  const tokenType = point.attributes.token_type ?? "";
+  const kind = Object.hasOwn(TOKEN_KINDS, tokenType) ? TOKEN_KINDS[tokenType] : undefined;
   if (!kind) return null;
 
   // No model means no rate, and guessing one would put a wrong number in the

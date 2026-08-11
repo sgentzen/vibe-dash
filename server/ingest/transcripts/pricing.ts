@@ -98,8 +98,18 @@ export interface TokenCounts {
  * were genuinely no tokens.
  */
 export function priceTokens(counts: TokenCounts): number | null {
+  // Looked up through Object.hasOwn rather than directly. Model names now
+  // arrive over the wire from an OTLP exporter, and a model of "constructor"
+  // resolves to an inherited Object.prototype member: truthy, so the guard
+  // below passes, and then rate.input is undefined and the cost comes out NaN.
+  // A NaN written to cost_usd is the worst available outcome for a column this
+  // project exists to make trustworthy.
+  const lookup = (table: Record<string, Rate>, model: string): Rate | undefined =>
+    Object.hasOwn(table, model) ? table[model] : undefined;
+
   const table = counts.speed === "fast" ? FAST_RATES : ALL_RATES;
-  const rate = table[counts.model] ?? (counts.speed === "fast" ? ALL_RATES[counts.model] : undefined);
+  const rate = lookup(table, counts.model)
+    ?? (counts.speed === "fast" ? lookup(ALL_RATES, counts.model) : undefined);
   if (!rate) return null;
 
   const input = counts.inputTokens * rate.input;
