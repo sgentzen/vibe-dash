@@ -78,6 +78,12 @@ app.use(helmet({
 // 3. The global 256kb parser runs last and never sees a /v1/metrics request,
 //    both because of (2) and because Express only descends into a later
 //    app.use() once the request is still unhandled.
+// Mounted with app.use rather than on the route, so the limiter covers every
+// method on this path rather than POST alone. Only POST is registered, so the
+// practical effect is that a GET or PUT here spends rate-limit budget before
+// reaching the 404. That is deliberate: the point of moving the limiter ahead
+// of the parser is to reject a flood before its body is read, and a flood is
+// not obliged to use the method we expect.
 app.use("/v1/metrics", otlpLimiter);
 app.use("/v1/metrics", express.json({ limit: "1mb" }));
 app.use(express.json({ limit: "256kb" }));
