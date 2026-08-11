@@ -83,10 +83,37 @@ describe("parseMetricsPayload", () => {
     expect(point.metricName).toBe("claude_code.token.usage");
   });
 
+  it("gives points missing startTimeUnixNano a value that does not vary with timeUnixNano", () => {
+    // startTimeUnixNano is optional in OTLP. Defaulting an absent one to the
+    // point's own timeUnixNano would make it different on every export of the
+    // same series, and seriesIncrement (series.ts) treats any change in start
+    // time as a restart -- re-recording the whole cumulative value as new
+    // spend, on every export. Two points of the same series exported at
+    // different times must resolve to the SAME startTimeUnixNano, whatever
+    // that value is -- asserting the literal "" would pass for the wrong
+    // reason if the sentinel ever changed.
+    const payload = {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{ scope: { name: "s" }, metrics: [{
+          name: "m",
+          histogram: {
+            aggregationTemporality: "AGGREGATION_TEMPORALITY_CUMULATIVE",
+            dataPoints: [
+              { attributes: [], timeUnixNano: "1000", sum: 5 },
+              { attributes: [], timeUnixNano: "2000", sum: 9 },
+            ],
+          },
+        }] }],
+      }],
+    };
+    const [first, second] = parseMetricsPayload(payload);
+    expect(first.startTimeUnixNano).toBe(second.startTimeUnixNano);
+  });
+
   it("skips a histogram point with no sum rather than treating it as zero", () => {
     const payload = histogramPayload();
     // Remove the sum field entirely.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (payload as any).resourceMetrics[0].scopeMetrics[0].metrics[0].histogram.dataPoints[0].sum;
     expect(parseMetricsPayload(payload)).toEqual([]);
   });

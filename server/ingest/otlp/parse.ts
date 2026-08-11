@@ -40,6 +40,90 @@ function asNumber(raw: unknown): number | null {
 }
 
 /**
+ * Resolve one data point's quantity.
+ *
+ * A histogram's total lives in `sum`; a Sum point's lives in `asDouble` or
+ * `asInt`. `count` is the number of observations recorded, never the
+ * quantity, so it is deliberately never read here — a missing `sum` is a
+ * skipped point, not a substituted `count`.
+ */
+function resolvePointValue(point: Record<string, unknown>, isHistogram: boolean): number | null {
+  return isHistogram ? asNumber(point.sum) : asNumber(point.asDouble) ?? asNumber(point.asInt);
+}
+
+/**
+ * Resolve a data point's time fields.
+ *
+ * `startTimeUnixNano` is optional in OTLP. Defaulting an absent one to the
+ * point's own `timeUnixNano` would make it different on every export of the
+ * same series — and `seriesIncrement` (series.ts) treats any change in start
+ * time as a process restart, re-recording the whole cumulative value as new
+ * spend on every export. A constant default ("") keeps it stable across
+ * exports of the same series instead, so restart detection falls back to the
+ * value-going-backwards rule in series.ts, which exists for exactly this
+ * case: a sender whose start time cannot be used to spot a restart.
+ *
+ * Returns null when `timeUnixNano` itself is absent — unlike the start time,
+ * that field is not optional, and a point without it cannot be placed in
+ * time at all.
+ */
+function resolvePointTimes(
+  point: Record<string, unknown>
+): { timeUnixNano: string; startTimeUnixNano: string } | null {
+  const timeUnixNano = String(point.timeUnixNano ?? "");
+  if (timeUnixNano === "") return null;
+  return { timeUnixNano, startTimeUnixNano: String(point.startTimeUnixNano ?? "") };
+}
+
+type MetricPointContainer = { aggregationTemporality?: unknown; dataPoints?: unknown };
+
+/**
+ * Parse one metric entry (a Sum or a Histogram) into its data points.
+ *
+ * Split out of `parseMetricsPayload` so each function's cognitive complexity
+ * stays low: this handles one metric's worth of dataPoints, independent of
+ * the resourceMetrics/scopeMetrics walk that finds it.
+ */
+function parseMetric(
+  metric: unknown,
+  resourceAttributes: Record<string, string>,
+  scopeName: string
+): OtlpPoint[] {
+  const metricName = (metric as { name?: unknown }).name;
+  if (typeof metricName !== "string") return [];
+
+  const histogram = (metric as { histogram?: MetricPointContainer }).histogram;
+  const sum = (metric as { sum?: MetricPointContainer }).sum;
+  const container = histogram ?? sum;
+  if (!container || !Array.isArray(container.dataPoints)) return [];
+
+  const cumulative = isCumulative(container.aggregationTemporality);
+  const points: OtlpPoint[] = [];
+
+  for (const dp of container.dataPoints) {
+    const point = dp as Record<string, unknown>;
+    const value = resolvePointValue(point, Boolean(histogram));
+    if (value === null) continue;
+
+    const times = resolvePointTimes(point);
+    if (times === null) continue;
+
+    points.push({
+      metricName,
+      resourceAttributes,
+      scopeName,
+      attributes: flattenAttributes(point.attributes),
+      timeUnixNano: times.timeUnixNano,
+      startTimeUnixNano: times.startTimeUnixNano,
+      value,
+      cumulative,
+    });
+  }
+
+  return points;
+}
+
+/**
  * Walk an OTLP/JSON ExportMetricsServiceRequest into flat points.
  *
  * Sums and histograms are both read. Histograms are what Codex sends; Sums are
@@ -72,40 +156,7 @@ export function parseMetricsPayload(body: unknown): OtlpPoint[] {
       if (!Array.isArray(metrics)) continue;
 
       for (const metric of metrics) {
-        const metricName = (metric as { name?: unknown }).name;
-        if (typeof metricName !== "string") continue;
-
-        const histogram = (metric as { histogram?: { aggregationTemporality?: unknown; dataPoints?: unknown } }).histogram;
-        const sum = (metric as { sum?: { aggregationTemporality?: unknown; dataPoints?: unknown } }).sum;
-        const container = histogram ?? sum;
-        if (!container || !Array.isArray(container.dataPoints)) continue;
-
-        const cumulative = isCumulative(container.aggregationTemporality);
-
-        for (const dp of container.dataPoints) {
-          const point = dp as Record<string, unknown>;
-          // A histogram carries its total in `sum`; a Sum point carries it in
-          // asDouble or asInt. `count` is the number of recorded observations,
-          // never the quantity, so it is deliberately not a fallback here.
-          const value = histogram
-            ? asNumber(point.sum)
-            : asNumber(point.asDouble) ?? asNumber(point.asInt);
-          if (value === null) continue;
-
-          const timeUnixNano = String(point.timeUnixNano ?? "");
-          if (timeUnixNano === "") continue;
-
-          points.push({
-            metricName,
-            resourceAttributes,
-            scopeName,
-            attributes: flattenAttributes(point.attributes),
-            timeUnixNano,
-            startTimeUnixNano: String(point.startTimeUnixNano ?? timeUnixNano),
-            value,
-            cumulative,
-          });
-        }
+        points.push(...parseMetric(metric, resourceAttributes, scopeName));
       }
     }
   }
