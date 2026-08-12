@@ -3,6 +3,17 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { CostByAgentCard, CostByModelCard } from "../../src/components/dashboard/CostCards";
 
+/**
+ * The caveat explanation used to be a `title` attribute; it is now the badge's
+ * accessible description, reachable without a hover. Read it the way a screen
+ * reader would rather than reaching for the element by hand.
+ */
+function explanationOf(badgeText: string): string {
+  const badge = screen.getByRole("button", { name: badgeText });
+  const id = badge.getAttribute("aria-describedby") ?? "";
+  return document.getElementById(id)?.textContent ?? "";
+}
+
 interface AgentRow {
   agent_id: string;
   agent_name: string;
@@ -62,8 +73,7 @@ describe("CostByAgentCard excluded entries", () => {
   it("explains in the tooltip that the spend is counted from transcripts, not lost", () => {
     render(<CostByAgentCard data={[row({ total_cost_usd: 0, excluded_entries: 7 })]} />);
 
-    const badge = screen.getByText("7 excluded");
-    const title = badge.getAttribute("title") ?? "";
+    const title = explanationOf("7 excluded");
     expect(title).toContain("counted from the transcripts");
     expect(title).toContain("not missing");
   });
@@ -71,7 +81,7 @@ describe("CostByAgentCard excluded entries", () => {
   it("uses the singular for one entry", () => {
     render(<CostByAgentCard data={[row({ excluded_entries: 1 })]} />);
 
-    const title = screen.getByText("1 excluded").getAttribute("title") ?? "";
+    const title = explanationOf("1 excluded");
     expect(title).toContain("1 self-reported entry excluded");
     expect(title).not.toContain("entries");
   });
@@ -103,10 +113,8 @@ describe("CostByAgentCard unpriced entries", () => {
   it("shows an unpriced badge when the agent has entries with no cost", () => {
     render(<CostByAgentCard data={[row({ unpriced_entries: 3 })]} />);
 
-    const badge = screen.getByText("3 unpriced");
-    expect(badge).toBeTruthy();
-    const title = badge.getAttribute("title") ?? "";
-    expect(title).toContain("floor");
+    expect(screen.getByText("3 unpriced")).toBeTruthy();
+    expect(explanationOf("3 unpriced")).toContain("floor");
   });
 
   it("says nothing when nothing is unpriced", () => {
@@ -133,10 +141,8 @@ describe("CostByModelCard unpriced entries", () => {
   it("shows an unpriced badge when the model has entries with no cost", () => {
     render(<CostByModelCard data={[modelRow({ unpriced_entries: 5 })]} />);
 
-    const badge = screen.getByText("5 unpriced");
-    expect(badge).toBeTruthy();
-    const title = badge.getAttribute("title") ?? "";
-    expect(title).toContain("floor");
+    expect(screen.getByText("5 unpriced")).toBeTruthy();
+    expect(explanationOf("5 unpriced")).toContain("floor");
   });
 
   it("says nothing when nothing is unpriced", () => {

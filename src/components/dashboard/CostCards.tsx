@@ -118,7 +118,7 @@ export const CostByModelCard = memo(function CostByModelCard({ data }: { data: C
                     <CountBadge
                       count={m.unpriced_entries}
                       label="unpriced"
-                      title={unpricedTitle(m.unpriced_entries ?? 0)}
+                      explanation={unpricedTitle(m.unpriced_entries ?? 0)}
                       tone="var(--text-muted)"
                     />
                     {" "}({formatTokens(m.total_tokens)} tok)
@@ -152,12 +152,12 @@ export const CostByAgentCard = memo(function CostByAgentCard({ data }: { data: C
                   <CountBadge
                     count={a.excluded_entries}
                     label="excluded"
-                    title={excludedTitle(a.excluded_entries ?? 0)}
+                    explanation={excludedTitle(a.excluded_entries ?? 0)}
                   />
                   <CountBadge
                     count={a.unpriced_entries}
                     label="unpriced"
-                    title={unpricedTitle(a.unpriced_entries ?? 0)}
+                    explanation={unpricedTitle(a.unpriced_entries ?? 0)}
                     tone="var(--text-muted)"
                   />
                   {" "}({formatTokens(a.total_tokens)} tok)

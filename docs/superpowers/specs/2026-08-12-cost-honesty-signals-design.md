@@ -132,9 +132,25 @@ anything that leaves the page.
 | Cost by Agent row | `excluded_entries` | `N excluded` |
 | Spend Today KPI | new unpriced count, see D4 | `N unpriced` |
 
-Each badge carries an explanation, as both a `title` and an `aria-label`,
-saying what the number means and, for unpriced, that the total is a floor
-rather than the whole figure. A `title` alone reaches a mouse and nothing else.
+Each badge carries an explanation saying what the number means and, for
+unpriced, that the total is a floor rather than the whole figure.
+
+That explanation is not a `title` attribute, and not an `aria-label` either. A
+`title` reaches a mouse and nothing else: it is announced inconsistently across
+NVDA/JAWS/VoiceOver and never opens on keyboard focus, failing WCAG 1.4.13 and
+4.1.2. An `aria-label` on the badge would replace the visible text, so a screen
+reader would hear the caveat but lose which figure it qualifies and by how much.
+
+So `CountBadge` renders a real `<button>` whose accessible name is the visible
+text (`7 unpriced`) and whose accessible description is the explanation, wired
+by `aria-describedby` to a `role="tooltip"` element. That element stays in the
+DOM, visually hidden, so the description is available without a hover; it
+becomes a visible tooltip on focus as well as hover, and Escape dismisses it
+without moving focus. This matches the existing `MetricInfoTip` pattern rather
+than introducing a second one.
+
+Every badge in the table above goes through `CountBadge`, so all six inherit
+this rather than each call site re-deciding.
 
 The shipped `excluded_entries` badge read `+N excluded`. It is unified to
 `N excluded` here so one component serves every caveat rather than the
