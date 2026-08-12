@@ -255,8 +255,18 @@ once reached, holds until `SERIES_CAP` itself changes.
 ceiling to confirm the table is the reason. A genuine install reaches perhaps a
 dozen series, so a count near 10,000 almost always means something has been
 sending varying attribute values rather than that you have outgrown the
-ceiling. Find that sender first. If you conclude you genuinely need more, the
-ceiling is a constant in the source and raising it needs a restart.
+ceiling. Find that sender first.
+
+If you conclude you genuinely need more room, or you have been flooded and
+want to admit new senders again, raise `VIBE_DASH_OTLP_SERIES_CAP` and
+restart. It defaults to 10000, and a value that is not a positive integer is
+ignored with a warning rather than accepted, because a cap of zero would
+refuse every series on an install whose owner believed they had raised it.
+
+Raising the ceiling is the only way to make room, since nothing is ever
+deleted. That is deliberate, and it does mean a flood is not self-healing: an
+install filled to the ceiling refuses every new series until someone raises
+it.
 
 Refused spend from a cumulative sender is deferred rather than lost. A
 cumulative export carries the sender's running total, not just the latest

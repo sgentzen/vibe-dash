@@ -131,6 +131,7 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 | `PORT` | `3001` | Backend port |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path. Used by the server, the stdio MCP transport, and the CLI alike — all go through the same resolver, so setting it once points all three at one file. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know (i.e. one written by a newer Vibe Dash). Only for deliberately running an older checkout against a migrated database — expect SQL errors for missing columns. |
+| `VIBE_DASH_OTLP_SERIES_CAP` | `10000` | How many distinct OTLP metric series to hold. A point that would create a new series past this is refused and counted in `otlpSeriesRefused`; a series already known keeps recording whatever the count. Raise it and restart to admit new senders on an install that has filled up. A value that is not a positive integer is ignored with a warning. |
 | `VIBE_DASH_CLAUDE_HOME` | `~/.claude/projects` | Where to look for Claude Code session transcripts. Point this elsewhere if your Claude Code install keeps them somewhere else, or at an empty directory to switch ingestion off. |
 
 > **The `VIBE_DASH_DB` default is not relative to your current directory.** With

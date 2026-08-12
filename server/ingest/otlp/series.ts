@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { logger } from "../../logger.js";
 
 /**
  * How many distinct series this table will hold.
@@ -13,11 +14,56 @@ import type Database from "better-sqlite3";
  * reaches this ceiling within seconds, after which every new key is refused
  * and the table stops growing.
  *
- * Deliberately a constant rather than a setting: nothing indicates a real user
- * anywhere near it, and a knob invites tuning a number nobody should have to
- * think about. It can become a setting the first time someone hits it in anger.
+ * The default, overridable with VIBE_DASH_OTLP_SERIES_CAP.
+ *
+ * This started as a bare constant, on the reasoning that nothing indicated a
+ * real user anywhere near it and a knob invites tuning a number nobody should
+ * think about. A security review changed that reasoning, and not because
+ * anyone hit the ceiling legitimately: because nothing is ever deleted, an
+ * install that gets flooded to the cap refuses every NEW series from then on,
+ * and with a hard-coded constant the only way back is editing this file and
+ * redeploying. That is not a remedy an operator has. The knob exists so
+ * recovery is in-band, not because the number wants tuning.
  */
-export const SERIES_CAP = 10_000;
+export const DEFAULT_SERIES_CAP = 10_000;
+
+const SERIES_CAP_ENV = "VIBE_DASH_OTLP_SERIES_CAP";
+
+// Warn once rather than per point. A misconfigured value would otherwise log
+// on every new series, which under the flood this cap exists to survive is
+// exactly when the log is least useful.
+let warnedAboutCap = false;
+
+/**
+ * How many distinct series this table will hold.
+ *
+ * Read per call rather than memoised at import: it is a single process.env
+ * lookup, and memoising would make the value untestable without a reset hook
+ * that exists purely for tests.
+ *
+ * A value that is not a positive integer falls back to the default and warns.
+ * Refusing to start would be worse: this is a diagnostic ceiling, and a typo
+ * in it should not take down a dashboard that is otherwise fine. Silently
+ * accepting nonsense would be worse still, because a cap of zero would refuse
+ * every series on an install whose owner believed they had raised it.
+ */
+export function seriesCap(): number {
+  const raw = process.env[SERIES_CAP_ENV];
+  if (raw === undefined || raw.trim() === "") return DEFAULT_SERIES_CAP;
+
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    if (!warnedAboutCap) {
+      warnedAboutCap = true;
+      logger.warn(
+        { [SERIES_CAP_ENV]: raw, using: DEFAULT_SERIES_CAP },
+        "ignoring an OTLP series cap that is not a positive integer"
+      );
+    }
+    return DEFAULT_SERIES_CAP;
+  }
+  return parsed;
+}
 
 /**
  * Parse an OTLP nanosecond timestamp string as a BigInt.
@@ -122,7 +168,7 @@ function isStrictlyNewer(timeUnixNano: string, previousTimeUnixNano: string): bo
  * only invoke this function for cumulative points in the first place.
  *
  * Returns `null` when a NEW series would be created and `otlp_series` already
- * holds `SERIES_CAP` rows or more -- the point is refused, no row is written,
+ * holds `seriesCap()` rows or more -- the point is refused, no row is written,
  * and the stored state for every other series is untouched. `null` is
  * distinct from `0` and the two must not be conflated: `0` means an existing
  * series was seen and has not moved (no spend to record); `null` means spend
@@ -151,7 +197,7 @@ export function seriesIncrement(
   // for a new one, and a flood cannot cost a legitimate sender its spend.
   if (previous === undefined) {
     const { n } = db.prepare("SELECT COUNT(*) AS n FROM otlp_series").get() as { n: number };
-    if (n >= SERIES_CAP) return null;
+    if (n >= seriesCap()) return null;
   }
 
   const restarted = previous === undefined || value < previous.last_value;
