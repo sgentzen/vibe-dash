@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CountBadge } from "../../src/components/dashboard/CountBadge";
 
@@ -112,5 +112,139 @@ describe("CountBadge accessibility", () => {
   it("keeps the visible text readable on its own", () => {
     render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
     expect(screen.getByText("3 unpriced")).toBeTruthy();
+  });
+});
+
+// Pointer and focus are separate inputs, and 1.4.13 requires the tooltip to
+// survive until the input that opened it goes away. An earlier version tracked
+// one `visible` boolean, so whichever handler fired last won and either input
+// leaving closed the tooltip out from under the other one.
+describe("CountBadge tooltip persistence", () => {
+  const FLOOR = "this figure is a floor";
+  const open = () => screen.getByRole("tooltip").style.clipPath === "";
+
+  it("stays open when the mouse leaves a badge that still has focus", async () => {
+    const user = userEvent.setup();
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    const badge = screen.getByRole("button", { name: "3 unpriced" });
+
+    await user.tab();
+    fireEvent.mouseEnter(badge.parentElement!);
+    fireEvent.mouseLeave(badge.parentElement!);
+
+    expect(badge).toBe(document.activeElement);
+    expect(open()).toBe(true);
+  });
+
+  it("stays open when focus leaves a badge the mouse is still over", () => {
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    const badge = screen.getByRole("button", { name: "3 unpriced" });
+
+    fireEvent.mouseEnter(badge.parentElement!);
+    fireEvent.focus(badge);
+    fireEvent.blur(badge);
+
+    expect(open()).toBe(true);
+  });
+
+  it("closes once both the pointer and focus have gone", () => {
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    const badge = screen.getByRole("button", { name: "3 unpriced" });
+
+    fireEvent.mouseEnter(badge.parentElement!);
+    fireEvent.focus(badge);
+    fireEvent.blur(badge);
+    fireEvent.mouseLeave(badge.parentElement!);
+
+    expect(open()).toBe(false);
+  });
+
+  it("reopens on a later hover after Escape dismissed it", async () => {
+    // Escape suppresses the tooltip for the current visit only. Leaving and
+    // coming back is a fresh request, not a dismissed one.
+    const user = userEvent.setup();
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    const badge = screen.getByRole("button", { name: "3 unpriced" });
+
+    await user.tab();
+    await user.keyboard("{Escape}");
+    expect(open()).toBe(false);
+
+    fireEvent.blur(badge);
+    fireEvent.mouseEnter(badge.parentElement!);
+
+    expect(open()).toBe(true);
+  });
+});
+
+// The Escape handler calls stopPropagation, which is only safe because it is
+// gated on the tooltip actually being open. Ungated, a badge inside a drawer
+// would swallow the drawer's own Escape-to-close whenever it held focus.
+describe("CountBadge Escape bubbling", () => {
+  const FLOOR = "this figure is a floor";
+
+  const renderInDrawer = () => {
+    const onEscape = vi.fn();
+    render(
+      <div
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onEscape();
+        }}
+      >
+        <CountBadge count={3} label="unpriced" explanation={FLOOR} />
+      </div>,
+    );
+    return onEscape;
+  };
+
+  it("swallows Escape while the tooltip is open, so it dismisses only the tooltip", async () => {
+    const user = userEvent.setup();
+    const onEscape = renderInDrawer();
+
+    await user.tab();
+    await user.keyboard("{Escape}");
+
+    expect(screen.getByRole("tooltip").style.clipPath).toBe("inset(50%)");
+    expect(onEscape).not.toHaveBeenCalled();
+  });
+
+  it("lets Escape through when the badge is only focused, so a drawer still closes", async () => {
+    const user = userEvent.setup();
+    const onEscape = renderInDrawer();
+
+    await user.tab();
+    await user.keyboard("{Escape}"); // closes the tooltip, swallowed
+    await user.keyboard("{Escape}"); // nothing open now, must reach the drawer
+
+    expect(onEscape).toHaveBeenCalledTimes(1);
+  });
+});
+
+// DashboardView renders two badges side by side in the Total Spend KPI, so the
+// per-instance wiring has to actually be per-instance.
+describe("CountBadge instances are independent", () => {
+  it("gives each badge its own description target and its own open state", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <CountBadge count={3} label="unpriced" explanation="the total is a floor" />
+        <CountBadge count={2} label="unattributed" explanation="not tied to an agent" />
+      </>,
+    );
+
+    const first = screen.getByRole("button", { name: "3 unpriced" });
+    const second = screen.getByRole("button", { name: "2 unattributed" });
+    const firstTip = first.getAttribute("aria-describedby")!;
+    const secondTip = second.getAttribute("aria-describedby")!;
+
+    expect(firstTip).not.toBe(secondTip);
+    expect(document.getElementById(firstTip)?.textContent).toBe("the total is a floor");
+    expect(document.getElementById(secondTip)?.textContent).toBe("not tied to an agent");
+
+    await user.tab();
+
+    expect(first).toBe(document.activeElement);
+    expect(document.getElementById(firstTip)!.style.clipPath).toBe("");
+    expect(document.getElementById(secondTip)!.style.clipPath).toBe("inset(50%)");
   });
 });
