@@ -61,20 +61,50 @@ mean "free" and quietly understate your spend. `GET /api/ingest/status`
 reports how many rows are unpriced, and `knownModels` in that same response
 lists every model the table can currently price.
 
-Two consequences of an unpriced row that are easy to miss. First, SQL `SUM`
+Two consequences of an unpriced row are easy to miss. First, SQL `SUM`
 skips `NULL`, so an unpriced row contributes nothing to a cost total while
 still counting as an entry. Cost responses therefore carry an
 `unpriced_entries` count beside their totals, and a total with a non-zero
-count next to it is a floor, not the whole figure. One figure is not covered
-by that: the "Spend Today" number on the dashboard comes from `GET /api/stats`
-and is a bare total with no count beside it, so it silently excludes unpriced
-rows. Plumbing the count through it is tracked as follow-up work. Second, an unpriced row
-cannot be fully repriced later: input, output and cache-write tokens are
+count next to it is a floor, not the whole figure. The "Spend Today" number is
+covered too: `GET /api/stats` still returns `spend_today` as the same bare
+total it always has, and now carries a sibling field, `spend_today_unpriced`,
+giving the count of today's unpriced rows beside it. The total itself has not
+changed shape or value; only the count next to it is new. Second, an unpriced
+row cannot be fully repriced later: input, output and cache-write tokens are
 stored, but cache-read tokens are priced and then dropped, because
 `cost_entries` has no column for them. Cache reads are usually the largest
 token component of a Claude Code turn, so repricing a stored unpriced row
 would understate it by most of its real cost. Persisting cache reads is
 tracked as follow-up work.
+
+## What the dashboard shows
+
+These counts are not only API fields. Where a count qualifies a figure
+already on screen, a small badge renders beside that figure, reading
+`N unpriced`, `N unattributed`, or `N excluded`, with an explanation reachable
+by hovering or focusing the badge, not only with a mouse. Total Spend carries
+an unpriced badge and an unattributed one, the latter combining
+`unattributed` above with `otlpUnattributed` from the OTLP section below.
+Spend Today carries an unpriced badge fed by `spend_today_unpriced`. Cost by
+Model carries an unpriced badge per model, and Cost by Agent carries both an
+unpriced badge and an excluded badge per agent.
+
+A badge is absent, not just faint, whenever its count is zero or missing, so
+an install with nothing to caveat looks exactly as it did before these badges
+existed.
+
+Three counters describe data that was discarded before it became a figure at
+all: `otlpUnmapped`, `otlpSeriesRefused`, and `otlpSeriesCount` once it
+reaches its ceiling, all covered in the OTLP section below. There is no
+total for these to sit beside, so they render instead as a short notice above
+the cost cards, listing only the conditions that currently apply, and, like
+the badges, it is absent entirely while none of the three has anything to
+report.
+
+Not every counter above reaches the screen. `GET /api/ingest/status` also
+returns `filesTracked`, `transcriptRows` and `otlpRows` with no badge, no
+notice, and no other home on the dashboard; reading those still means calling
+the endpoint directly.
 
 ## What is inferred, and how conservatively
 
