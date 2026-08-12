@@ -37,6 +37,7 @@ export interface AppState {
     activeAgents: number;
     alerts: number;
     spend_today: number;
+    spend_today_unpriced: number;
     tasks_completed_today: number;
   };
   pollGeneration: number;

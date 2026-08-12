@@ -22,6 +22,7 @@ const mockApi = vi.hoisted(() => ({
   getCostByModel: vi.fn(),
   getCostByAgent: vi.fn(),
   getAgentComparison: vi.fn(),
+  getIngestStatus: vi.fn(),
 }));
 
 vi.mock("../../src/hooks/useApi", () => ({ useApi: () => mockApi }));
@@ -37,6 +38,11 @@ function resetApiDefaults() {
   mockApi.getCostByModel.mockReset().mockResolvedValue([]);
   mockApi.getCostByAgent.mockReset().mockResolvedValue([]);
   mockApi.getAgentComparison.mockReset().mockResolvedValue(null);
+  mockApi.getIngestStatus.mockReset().mockResolvedValue({
+    filesTracked: 0, transcriptRows: 0, unpriced: 0, unattributed: 0,
+    otlpRows: 0, otlpUnmapped: 0, otlpUnattributed: 0,
+    otlpSeriesCount: 0, otlpSeriesRefused: 0,
+  });
 }
 
 describe("DashboardView", () => {

@@ -54,6 +54,7 @@ async function getStats(): Promise<{
   activeAgents: number;
   alerts: number;
   spend_today: number;
+  spend_today_unpriced: number;
   tasks_completed_today: number;
 }> {
   const res = await apiFetch("/api/stats");
@@ -366,6 +367,24 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
   return res.json();
 }
 
+// ─── Ingest Status ──────────────────────────────────────────────────
+
+// Supplementary diagnostics about what ingestion has dropped or left
+// unresolved. Callers must not let a failure here blank a cost figure — see
+// DashboardView's loadIngestStatus, which fetches this outside the
+// Promise.all guarding the cost calls for exactly that reason.
+export interface IngestStatus {
+  filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
+  otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
+  otlpSeriesCount: number; otlpSeriesRefused: number;
+}
+
+async function getIngestStatus(): Promise<IngestStatus> {
+  const res = await apiFetch("/api/ingest/status");
+  if (!res.ok) await throwApiError(res, "getIngestStatus");
+  return res.json();
+}
+
 export function useApi() {
   return useMemo(() => ({
     getStats,
@@ -404,5 +423,6 @@ export function useApi() {
     getAgentPerformance,
     getAgentComparison,
     getTaskTypeBreakdown,
+    getIngestStatus,
   }), []);
 }

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
+import type { IngestStatus } from "../hooks/useApi";
 import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
 import type { MilestoneDailyStats, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
+import { CountBadge } from "./dashboard/CountBadge";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
@@ -15,7 +17,7 @@ import { CardError } from "./dashboard/CardError";
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 type CostSetters = {
-  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number } | null) => void;
+  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number; unpriced_entries?: number } | null) => void;
   setCostTimeseries: (ts: { date: string; total_cost_usd: number }[]) => void;
   setCostByModel: (m: { model: string; provider: string; total_cost_usd: number; total_tokens: number }[]) => void;
   setCostByAgent: (a: { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; excluded_entries?: number }[]) => void;
@@ -63,6 +65,44 @@ async function loadCostData(
   }
 }
 
+// A count read through a guard rather than trusted: these cards render in a
+// tree with no ErrorBoundary, so one non-number value from an older or
+// malformed response must degrade to "no badge" rather than blank the page.
+function safeCount(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+/** Wording shared by the Total Spend unpriced badge and its tooltip. */
+function unpricedSpendTitle(count: number): string {
+  return (
+    `${count} ${count === 1 ? "entry has" : "entries have"} tokens recorded but no cost, because the model ` +
+    `is not in the price table. Nothing went wrong: this total is a floor, not the whole amount.`
+  );
+}
+
+/** Wording shared by the Total Spend unattributed badge and its tooltip. */
+function unattributedSpendTitle(count: number): string {
+  return (
+    `${count} ${count === 1 ? "entry is" : "entries are"} recorded but tied to no project, so this global ` +
+    `total exceeds the sum of the per-project figures.`
+  );
+}
+
+// Fetched separately from loadCostData's Promise.all, deliberately. This
+// endpoint is supplementary — it only feeds caveat badges — so a failure here
+// must not take the cost figures down with it. Swallow the failure, warn, and
+// leave the ingest status state as it was (null on first load).
+async function loadIngestStatus(
+  api: ReturnType<typeof useApi>,
+  setIngestStatus: (s: IngestStatus | null) => void,
+): Promise<void> {
+  try {
+    setIngestStatus(await api.getIngestStatus());
+  } catch (e) {
+    console.warn("[DashboardView] failed to load ingest status", e);
+  }
+}
+
 // Stable dependency key that changes whenever a task's milestone/status pairing
 // within the open milestones changes, used to re-fetch chart data.
 function computeMilestoneStatusKey(
@@ -83,10 +123,11 @@ export function DashboardView() {
 
   const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
-  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number } | null>(null);
+  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number; unpriced_entries?: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; excluded_entries?: number }[]>([]);
+  const [ingestStatus, setIngestStatus] = useState<IngestStatus | null>(null);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
   const [costError, setCostError] = useState(false);
   const [chartError, setChartError] = useState(false);
@@ -128,6 +169,10 @@ export function DashboardView() {
     setCostError(false);
     const ok = await loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
     if (!ok) setCostError(true);
+    // Fetched on the same refresh but outside the Promise.all above: this
+    // endpoint is supplementary, so its failure must never block or blank
+    // the cost figures fetched alongside it.
+    void loadIngestStatus(api, setIngestStatus);
   }, [api, projectId]);
 
   const reloadChart = useCallback(async () => {
@@ -169,6 +214,7 @@ export function DashboardView() {
       <div style={{ marginBottom: "var(--space-4)" }}>
         <TodayCard
           spendToday={stats.spend_today}
+          spendTodayUnpriced={stats.spend_today_unpriced}
           tasksCompletedToday={stats.tasks_completed_today}
           activeAgents={agents.filter((a) => a.health_status === "active").length}
         />
@@ -246,7 +292,25 @@ export function DashboardView() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
                 <KpiCard
                   label="Total Spend"
-                  value={`$${costSummary.total_cost_usd.toFixed(2)}`}
+                  value={
+                    <>
+                      ${costSummary.total_cost_usd.toFixed(2)}
+                      <span style={{ fontFamily: "initial", fontSize: "11px", fontWeight: 400 }}>
+                        <CountBadge
+                          count={costSummary.unpriced_entries}
+                          label="unpriced"
+                          explanation={unpricedSpendTitle(safeCount(costSummary.unpriced_entries))}
+                          tone="var(--text-muted)"
+                        />
+                        <CountBadge
+                          count={safeCount(ingestStatus?.unattributed) + safeCount(ingestStatus?.otlpUnattributed)}
+                          label="unattributed"
+                          explanation={unattributedSpendTitle(safeCount(ingestStatus?.unattributed) + safeCount(ingestStatus?.otlpUnattributed))}
+                          tone="var(--text-muted)"
+                        />
+                      </span>
+                    </>
+                  }
                   color="var(--accent-blue)"
                   tooltip={
                     (costSummary.excluded_entries ?? 0) > 0

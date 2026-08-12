@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { typeScale } from "../../styles/shared.js";
 
 export const KpiCard = memo(function KpiCard({
@@ -9,7 +9,10 @@ export const KpiCard = memo(function KpiCard({
   compact = false,
 }: {
   label: string;
-  value: string;
+  // Widened from `string` so a caveat badge can sit beside the figure
+  // (e.g. Total Spend's unpriced/unattributed counts). Every existing
+  // caller still passes a plain string, which is a ReactNode too.
+  value: string | ReactNode;
   color: string;
   tooltip?: string;
   compact?: boolean;
