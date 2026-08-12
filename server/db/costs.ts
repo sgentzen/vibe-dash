@@ -147,6 +147,30 @@ export function getSpendToday(db: Database.Database): number {
   return row.total;
 }
 
+/**
+ * How many of today's rows could not be priced.
+ *
+ * Travels beside getSpendToday rather than inside it: that function returns a
+ * bare number which the dashboard and any other client already read, and
+ * turning it into an object to carry one extra field would break them for no
+ * gain.
+ *
+ * The window and the exclusion must match getSpendToday exactly. A count over
+ * a different window would explain a figure the reader is not looking at,
+ * which is worse than no count at all.
+ */
+export function getSpendTodayUnpriced(db: Database.Database): number {
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM cost_entries
+       WHERE created_at >= ? AND cost_usd IS NULL AND ${excludeObservedCondition()}`
+    )
+    .get(todayStart.toISOString()) as { n: number };
+  return row.n;
+}
+
 export function getGlobalCostSummary(db: Database.Database): CostSummary {
   // Same conditional-aggregation shape as getCostSummaryBy, for the same
   // reason: CostSummary now carries excluded_entries, and a WHERE-clause

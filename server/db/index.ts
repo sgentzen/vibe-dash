@@ -81,6 +81,7 @@ export {
   getCostByAgent,
   getGlobalCostSummary,
   getSpendToday,
+  getSpendTodayUnpriced,
   excludeObservedCondition,
 } from "./costs.js";
 export type {
