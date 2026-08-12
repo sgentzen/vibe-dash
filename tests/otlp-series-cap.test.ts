@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { seriesIncrement, SERIES_CAP } from "../server/ingest/otlp/series.js";
+import { seriesIncrement, seriesCap } from "../server/ingest/otlp/series.js";
 import { ingestMetricsPayload, refusedSeriesPointCount } from "../server/ingest/otlp/ingest.js";
 
 let db: Database.Database;
@@ -35,14 +35,14 @@ describe("the series cap", () => {
   it("refuses a NEW series once the table is full, returning null not zero", () => {
     // null and 0 mean different things and must not be conflated: null is
     // spend we could not record, 0 is a series that has not moved.
-    fillSeries(db, SERIES_CAP);
+    fillSeries(db, seriesCap());
     expect(seriesIncrement(db, "one-too-many", "1000", "2000", 100)).toBeNull();
   });
 
   it("writes no row when it refuses, so the cap actually holds", () => {
-    fillSeries(db, SERIES_CAP);
+    fillSeries(db, seriesCap());
     seriesIncrement(db, "one-too-many", "1000", "2000", 100);
-    expect(seriesCount(db)).toBe(SERIES_CAP);
+    expect(seriesCount(db)).toBe(seriesCap());
   });
 
   it("KEEPS RECORDING an existing series at the cap", () => {
@@ -50,21 +50,21 @@ describe("the series cap", () => {
     // established sender must be unaffected by how full the table is, because
     // the alternative is losing its spend for someone else's flood.
     seriesIncrement(db, "established", "1000", "2000", 100);
-    fillSeries(db, SERIES_CAP);
+    fillSeries(db, seriesCap());
 
     expect(seriesIncrement(db, "established", "1000", "3000", 150)).toBe(50);
   });
 
   it("still refuses after the table is over the cap", () => {
-    fillSeries(db, SERIES_CAP + 50);
+    fillSeries(db, seriesCap() + 50);
     expect(seriesIncrement(db, "another", "1000", "2000", 100)).toBeNull();
   });
 
   it("creates the very last series at exactly one below the cap", () => {
-    // Boundary: create when count < SERIES_CAP, refuse when count >= SERIES_CAP.
-    fillSeries(db, SERIES_CAP - 1);
+    // Boundary: create when count < seriesCap(), refuse when count >= seriesCap().
+    fillSeries(db, seriesCap() - 1);
     expect(seriesIncrement(db, "the-last-one", "1000", "2000", 100)).toBe(100);
-    expect(seriesCount(db)).toBe(SERIES_CAP);
+    expect(seriesCount(db)).toBe(seriesCap());
   });
 });
 
@@ -91,7 +91,7 @@ describe("a refused point through the pipeline", () => {
   }
 
   it("writes no cost row and is counted as refused", () => {
-    fillSeries(db, SERIES_CAP);
+    fillSeries(db, seriesCap());
     const before = refusedSeriesPointCount();
 
     const result = ingestMetricsPayload(db, cumulativePayload("a", 500));
@@ -117,7 +117,7 @@ describe("a refused point through the pipeline", () => {
 
   it("leaves a DELTA point unaffected at the cap", () => {
     // Delta points never call seriesIncrement, so the cap cannot reach them.
-    fillSeries(db, SERIES_CAP);
+    fillSeries(db, seriesCap());
     const payload = cumulativePayload("c", 500) as {
       resourceMetrics: { scopeMetrics: { metrics: { histogram: { aggregationTemporality: string } }[] }[] }[];
     };
