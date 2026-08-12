@@ -8,6 +8,7 @@ import { openDb, backfillMilestoneDailyStats, SchemaTooNewError } from "./db/ind
 import { resolveDbPath } from "./db/path.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
+import { otlpLimiter } from "./routes/otlp.js";
 import { errorHandler, notFoundHandler } from "./routes/middleware.js";
 import { logger } from "./logger.js";
 import { syncTranscripts } from "./ingest/transcripts/sync.js";
@@ -57,6 +58,34 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
+// Three-way ordering for /v1/metrics, and it is not obvious, so each piece is
+// spelled out:
+//
+// 1. otlpLimiter runs FIRST, ahead of even this path's own body parser. An
+//    unauthenticated local endpoint that writes to the cost table is bound by
+//    two things: the size cap below and this limiter. express.json() buffers
+//    and JSON.parses the ENTIRE body before any downstream middleware runs at
+//    all, so a parser mounted ahead of the limiter would pay that cost —
+//    buffering and parsing up to 1mb — for every request, including every one
+//    the limiter exists to reject. Put the limiter first, and only the
+//    requests it actually admits ever reach a parse.
+// 2. The 1mb parser for this path runs second, still ahead of the global one
+//    below. OTLP metric batches are larger than a normal API call, and
+//    body-parser marks a request as parsed once it runs, so a second parser
+//    mounted after this one (the global 256kb line) is a no-op for this path
+//    — mounting the 1mb parser only inside the route, instead of here ahead
+//    of the global line, would silently leave the effective cap at 256kb.
+// 3. The global 256kb parser runs last and never sees a /v1/metrics request,
+//    both because of (2) and because Express only descends into a later
+//    app.use() once the request is still unhandled.
+// Mounted with app.use rather than on the route, so the limiter covers every
+// method on this path rather than POST alone. Only POST is registered, so the
+// practical effect is that a GET or PUT here spends rate-limit budget before
+// reaching the 404. That is deliberate: the point of moving the limiter ahead
+// of the parser is to reject a flood before its body is read, and a flood is
+// not obliged to use the method we expect.
+app.use("/v1/metrics", otlpLimiter);
+app.use("/v1/metrics", express.json({ limit: "1mb" }));
 app.use(express.json({ limit: "256kb" }));
 
 function openDbOrExit(): Database.Database {
