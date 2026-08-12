@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 /**
  * A caveat rendered beside the figure it qualifies.
@@ -39,12 +39,10 @@ export function CountBadge({
   count,
   label,
   explanation,
-  tone = "var(--accent-purple)",
 }: Readonly<{
   count: number | null | undefined;
   label: string;
   explanation: string;
-  tone?: string;
 }>) {
   const tipId = useId();
   // Pointer and focus are tracked apart rather than as one `visible` boolean.
@@ -57,6 +55,21 @@ export function CountBadge({
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const visible = (hovered || focused) && !dismissed;
+
+  // Escape has to reach a pointer user too. Hovering never focuses the button,
+  // so the button's own onKeyDown below only ever sees the key when a keyboard
+  // user opened the tooltip; for a mouse user the keydown lands on the body and
+  // that handler never runs. The tooltip covers the content above it, so
+  // without this the only way to be rid of it is to move the pointer, which is
+  // precisely what 1.4.13 "dismissible" says must not be required.
+  useEffect(() => {
+    if (!visible) return;
+    const onDocumentKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDismissed(true);
+    };
+    document.addEventListener("keydown", onDocumentKeyDown);
+    return () => document.removeEventListener("keydown", onDocumentKeyDown);
+  }, [visible]);
 
   if (typeof count !== "number" || !Number.isFinite(count) || count <= 0) return null;
 
@@ -89,12 +102,13 @@ export function CountBadge({
         // the tooltip would stick open with nothing left to close it.
         onClick={() => setDismissed(false)}
         onKeyDown={(e) => {
-          // Escape dismisses without moving focus (1.4.13). The handler sits on
-          // the button, not the wrapper: focus is here whenever a keyboard user
-          // has the tooltip open, and a wrapper span with a key handler is a
-          // non-native interactive element. Swallowing the key is deliberate but
-          // only while the tooltip is open, so Escape still reaches an enclosing
-          // drawer whenever the badge is merely focused.
+          // Escape dismisses without moving focus (1.4.13). The document
+          // listener above already closes the tooltip; this handler exists for
+          // the stopPropagation, which is what stops a badge inside a drawer
+          // from letting the same Escape close the drawer out from under it.
+          // Swallowing the key is deliberate but only while the tooltip is
+          // open, so Escape still reaches the drawer whenever the badge is
+          // merely focused.
           if (e.key === "Escape" && visible) {
             e.stopPropagation();
             setDismissed(true);
@@ -106,7 +120,7 @@ export function CountBadge({
           padding: 0,
           font: "inherit",
           lineHeight: "inherit",
-          color: tone,
+          color: BADGE_COLOUR,
           cursor: "help",
           whiteSpace: "nowrap",
         }}
@@ -163,6 +177,20 @@ export function CountBadge({
     </span>
   );
 }
+
+/**
+ * One colour for every badge, not a per-call-site choice.
+ *
+ * It was a `tone` prop defaulting to `--accent-purple`, and the one call site
+ * that took the default rendered #8b5cf6 on `--bg-secondary` = 4.09:1, under
+ * the 4.5:1 WCAG 1.4.3 requires of this 11px text. `--text-muted` is documented
+ * in App.css as bumped to >=7:1 precisely for micro text like this.
+ *
+ * Any replacement must clear 4.5:1 against `--bg-secondary` in BOTH themes.
+ * Check the darker of the two first: a colour can pass in light and fail in
+ * dark, which is exactly how the accent slipped through.
+ */
+const BADGE_COLOUR = "var(--text-muted)";
 
 /**
  * Off-screen but still in the accessibility tree, so `aria-describedby` has

@@ -57,7 +57,6 @@ export function TodayCard({ spendToday, spendTodayUnpriced, tasksCompletedToday,
               count={spendTodayUnpriced}
               label="unpriced"
               explanation={unpricedTodayTitle(spendTodayUnpriced ?? 0)}
-              tone="var(--text-muted)"
             />
           </span>
         </span>

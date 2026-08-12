@@ -119,7 +119,6 @@ export const CostByModelCard = memo(function CostByModelCard({ data }: { data: C
                       count={m.unpriced_entries}
                       label="unpriced"
                       explanation={unpricedTitle(m.unpriced_entries ?? 0)}
-                      tone="var(--text-muted)"
                     />
                     {" "}({formatTokens(m.total_tokens)} tok)
                   </span>
@@ -158,7 +157,6 @@ export const CostByAgentCard = memo(function CostByAgentCard({ data }: { data: C
                     count={a.unpriced_entries}
                     label="unpriced"
                     explanation={unpricedTitle(a.unpriced_entries ?? 0)}
-                    tone="var(--text-muted)"
                   />
                   {" "}({formatTokens(a.total_tokens)} tok)
                 </span>

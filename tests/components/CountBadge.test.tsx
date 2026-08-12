@@ -133,9 +133,35 @@ describe("CountBadge accessibility", () => {
     expect(screen.getByRole("button", { name: "3 unpriced" })).toBe(document.activeElement);
   });
 
+  it("dismisses on Escape for a pointer user, who never focused the badge", async () => {
+    // 1.4.13 "dismissible". Hovering does not focus the button, so a keydown
+    // handler on the button never sees a mouse user's Escape: the key lands on
+    // the body. The tooltip covers the content above it, so without a
+    // document-level listener the only escape is to move the pointer, which is
+    // the very thing 1.4.13 says must not be required.
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    const badge = screen.getByRole("button", { name: "3 unpriced" });
+
+    fireEvent.mouseEnter(badge.parentElement!);
+    expect(isOpen("3 unpriced")).toBe(true);
+    expect(document.activeElement).not.toBe(badge);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(isOpen("3 unpriced")).toBe(false);
+  });
+
   it("keeps the visible text readable on its own", () => {
     render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
     expect(screen.getByText("3 unpriced")).toBeTruthy();
+  });
+
+  it("uses the muted colour every call site needs, with no way to opt out", () => {
+    // --accent-purple, the old default, is 4.09:1 on --bg-secondary in dark
+    // mode, under the 4.5:1 this 11px text requires. --text-muted is documented
+    // in App.css as bumped to >=7:1 for exactly this size of text.
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    expect(screen.getByRole("button", { name: "3 unpriced" }).style.color).toBe("var(--text-muted)");
   });
 });
 

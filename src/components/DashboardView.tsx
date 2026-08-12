@@ -308,13 +308,11 @@ export function DashboardView() {
                           count={safeCount(costSummary.unpriced_entries)}
                           label="unpriced"
                           explanation={unpricedSpendTitle(safeCount(costSummary.unpriced_entries))}
-                          tone="var(--text-muted)"
                         />
                         <CountBadge
                           count={safeCount(ingestStatus?.unattributed) + safeCount(ingestStatus?.otlpUnattributed)}
                           label="unattributed"
                           explanation={unattributedSpendTitle(safeCount(ingestStatus?.unattributed) + safeCount(ingestStatus?.otlpUnattributed))}
-                          tone="var(--text-muted)"
                         />
                       </span>
                     </>
