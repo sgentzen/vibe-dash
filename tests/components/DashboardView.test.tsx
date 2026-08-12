@@ -7,6 +7,7 @@ import {
   screen,
   waitFor,
   userEvent,
+  fireEvent,
   resetIdSeq,
   makeProject,
   makeMilestone,
@@ -226,5 +227,84 @@ describe("DashboardView unattributed badge scope", () => {
     // The figure itself still renders; only the caveat that is not about it goes.
     await screen.findByText(/\$12\.50/);
     expect(screen.queryByText(/unattributed/)).toBeNull();
+  });
+});
+
+/**
+ * The tooltip element a badge describes itself with. Followed through
+ * aria-describedby rather than found by role, because the role is only present
+ * while the tooltip is open and these tests need it in both states.
+ */
+function tipOf(badge: HTMLElement): HTMLElement {
+  return document.getElementById(badge.getAttribute("aria-describedby") ?? "")!;
+}
+
+/** Laid out as a real tooltip rather than clipped off-screen. */
+const isOpen = (tip: HTMLElement) => tip.style.clipPath === "";
+
+// The Total Spend KPI is the only place in the app where caveat badges render
+// side by side, so it is the only place a shared id or shared open-state
+// regression can show up. CountBadge's own suite renders two in isolation;
+// this one holds the real composition, where each badge is a separate element
+// in a separate render position inside one KpiCard value.
+describe("DashboardView adjacent caveat badges", () => {
+  beforeEach(() => {
+    resetIdSeq();
+    resetApiDefaults();
+    mockApi.getCostSummary.mockResolvedValue({ ...SPENT, unpriced_entries: 3, excluded_entries: 2 });
+    mockApi.getIngestStatus.mockResolvedValue(
+      healthyStatus({ unattributed: 1, otlpUnattributed: 2, mcpUnattributed: 4 }),
+    );
+  });
+
+  /** Render, then hand back all three badges once the async cost load lands. */
+  async function totalSpendBadges() {
+    renderWithProviders(<DashboardView />);
+    const unattributed = await screen.findByRole("button", { name: "7 unattributed" });
+    return {
+      unpriced: screen.getByRole("button", { name: "3 unpriced" }),
+      unattributed,
+      excluded: screen.getByRole("button", { name: "2 excluded" }),
+    };
+  }
+
+  it("points each badge at its own explanation, not at a shared one", async () => {
+    const { unpriced, unattributed, excluded } = await totalSpendBadges();
+
+    const ids = [unpriced, unattributed, excluded].map((b) => b.getAttribute("aria-describedby"));
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(3);
+
+    // Distinct ids are not enough on their own: they could still resolve to the
+    // wrong wording, which is the failure a reader would actually meet.
+    expect(tipOf(unpriced).textContent).toContain("this total is a floor");
+    expect(tipOf(unattributed).textContent).toContain("exceeds the sum of the per-project figures");
+    expect(tipOf(excluded).textContent).toContain("counted from the transcripts");
+  });
+
+  it("opens only the badge the pointer is on, leaving its neighbours shut", async () => {
+    const { unpriced, unattributed, excluded } = await totalSpendBadges();
+    expect(isOpen(tipOf(unpriced))).toBe(false);
+
+    // The pointer handlers sit on the wrapper span, not the button.
+    fireEvent.mouseEnter(unpriced.parentElement!);
+
+    expect(isOpen(tipOf(unpriced))).toBe(true);
+    expect(isOpen(tipOf(unattributed))).toBe(false);
+    expect(isOpen(tipOf(excluded))).toBe(false);
+  });
+
+  it("closes the first badge's tooltip when the pointer moves to the next one", async () => {
+    // Two open tooltips would overlap each other in the same small region, and
+    // hoisted state would show up here as both staying open or the wrong one
+    // closing.
+    const { unpriced, unattributed } = await totalSpendBadges();
+
+    fireEvent.mouseEnter(unpriced.parentElement!);
+    fireEvent.mouseLeave(unpriced.parentElement!);
+    fireEvent.mouseEnter(unattributed.parentElement!);
+
+    expect(isOpen(tipOf(unpriced))).toBe(false);
+    expect(isOpen(tipOf(unattributed))).toBe(true);
   });
 });

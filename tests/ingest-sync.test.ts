@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { createProject, logCost } from "../server/db/index.js";
+import {
+  createProject,
+  logCost,
+  registerAgent,
+  setAgentCostObserved,
+  getGlobalCostSummary,
+} from "../server/db/index.js";
 import { linkProjectPath } from "../server/db/projectPaths.js";
 import { syncTranscripts, getIngestStatus } from "../server/ingest/transcripts/sync.js";
 
@@ -226,6 +232,39 @@ describe("syncTranscripts", () => {
     logCost(db, { model: "claude-opus-5", provider: "anthropic", input_tokens: 10, output_tokens: 5, cost_usd: 0.1 });
 
     expect(getIngestStatus(db)).toMatchObject({ mcpUnattributed: 1, unattributed: 0, otlpUnattributed: 0 });
+  });
+
+  it("does not count a self-reported row already suppressed as a duplicate", () => {
+    // Only mcp rows are ever excluded, so this counter is the only one of the
+    // three that has to say so. A marked client's row contributes to no total
+    // anywhere, and counting it here would raise "N unattributed" beside a
+    // figure it is not part of, in the configuration the observed-cost
+    // feature asks operators to adopt.
+    const agent = registerAgent(db, {
+      name: "claude-code-a1b2", client_name: "claude-code", capabilities: [], model: "claude-opus-5",
+    });
+    setAgentCostObserved(db, agent.id, true);
+    logCost(db, {
+      agent_id: agent.id,
+      model: "claude-opus-5", provider: "anthropic", input_tokens: 10, output_tokens: 5, cost_usd: 1.23,
+    });
+
+    // Suppressed everywhere else, so it must be suppressed here too.
+    expect(getGlobalCostSummary(db)).toMatchObject({ entry_count: 0, excluded_entries: 1 });
+    expect(getIngestStatus(db).mcpUnattributed).toBe(0);
+  });
+
+  it("still counts an unattributed row whose agent is not marked", () => {
+    // The guard above must not swallow the case the counter exists for.
+    const agent = registerAgent(db, {
+      name: "claude-code-c3d4", client_name: "claude-code", capabilities: [], model: "claude-opus-5",
+    });
+    logCost(db, {
+      agent_id: agent.id,
+      model: "claude-opus-5", provider: "anthropic", input_tokens: 10, output_tokens: 5, cost_usd: 1.23,
+    });
+
+    expect(getIngestStatus(db).mcpUnattributed).toBe(1);
   });
 
   it("does not count a self-reported row that named a project", () => {

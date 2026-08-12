@@ -315,7 +315,18 @@ export function getIngestStatus(db: Database.Database): {
     // reachable; without this it would be counted by nothing and the
     // dashboard's "tied to no project" caveat would stay silent while
     // exactly that was true.
-    mcpUnattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'mcp' AND project_id IS NULL`),
+    //
+    // Alone among the three this needs the exclusion, because only mcp rows
+    // are ever suppressed as observed duplicates. Without it a marked client
+    // whose agent reported spend naming no project would raise "N
+    // unattributed" beside a total that row contributes nothing to, in the
+    // very configuration the observed-cost feature asks operators to adopt.
+    // The condition is a no-op on the transcript and otlp counts, so it is
+    // not repeated there rather than being quietly load-bearing in one place.
+    mcpUnattributed: one(
+      `SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'mcp' AND project_id IS NULL` +
+      ` AND ${excludeObservedCondition()}`
+    ),
     otlpSeriesCount: one(`SELECT COUNT(*) AS n FROM otlp_series`),
     // Published rather than left for the client to assume. A client carrying
     // its own copy of the ceiling would announce "at capacity" against the
