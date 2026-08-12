@@ -376,7 +376,7 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
 export interface IngestStatus {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
-  otlpSeriesCount: number; otlpSeriesRefused: number;
+  otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
 }
 
 async function getIngestStatus(): Promise<IngestStatus> {

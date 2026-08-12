@@ -6,6 +6,7 @@ import { createTestDb } from "./setup.js";
 import { createProject } from "../server/db/index.js";
 import { otlpRoutes } from "../server/routes/otlp.js";
 import { getIngestStatus } from "../server/ingest/transcripts/sync.js";
+import { SERIES_CAP } from "../server/ingest/otlp/series.js";
 import { requestApp } from "./http-helper.js";
 
 let db: Database.Database;
@@ -177,6 +178,15 @@ describe("the ingest status reports the series cap", () => {
 
   it("reports zero series on an untouched database", () => {
     expect(getIngestStatus(db).otlpSeriesCount).toBe(0);
+  });
+
+  it("publishes the ceiling it is enforcing", () => {
+    // The dashboard renders "N of CAP" and decides whether to warn at all from
+    // this field. It has to come from the server, because the server is the
+    // only thing that knows what the cap currently is.
+    const { otlpSeriesCap } = getIngestStatus(db);
+    expect(otlpSeriesCap).toBe(SERIES_CAP);
+    expect(otlpSeriesCap).toBeGreaterThan(0);
   });
 
   it("exposes the refused count", () => {

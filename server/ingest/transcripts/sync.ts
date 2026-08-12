@@ -9,6 +9,7 @@ import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 import { excludeObservedCondition } from "../../db/costs.js";
 import { unmappedPointCount, refusedSeriesPointCount } from "../otlp/ingest.js";
+import { SERIES_CAP } from "../otlp/series.js";
 import type { CostOverlap } from "../../../shared/types.js";
 
 const PROVIDER = "anthropic";
@@ -262,7 +263,7 @@ function parseNameArray(json: string): string[] {
 export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
-  otlpSeriesCount: number; otlpSeriesRefused: number;
+  otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
   overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
@@ -310,6 +311,11 @@ export function getIngestStatus(db: Database.Database): {
     otlpUnmapped: unmappedPointCount(),
     otlpUnattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'otlp' AND project_id IS NULL`),
     otlpSeriesCount: one(`SELECT COUNT(*) AS n FROM otlp_series`),
+    // Published rather than left for the client to assume. A client carrying
+    // its own copy of the ceiling would announce "at capacity" against the
+    // wrong number the moment the cap is raised, which is precisely the remedy
+    // an operator reaches for when this figure climbs.
+    otlpSeriesCap: SERIES_CAP,
     // Process-lifetime, not a query — see refusedSeriesPointCount's own
     // comment. A refused point writes no row, so nothing survives to count.
     otlpSeriesRefused: refusedSeriesPointCount(),

@@ -277,6 +277,7 @@ export function DashboardView() {
       </div>
 
       <DroppedDataNotice
+        seriesCap={ingestStatus?.otlpSeriesCap}
         otlpUnmapped={ingestStatus?.otlpUnmapped}
         otlpSeriesRefused={ingestStatus?.otlpSeriesRefused}
         otlpSeriesCount={ingestStatus?.otlpSeriesCount}
@@ -304,7 +305,7 @@ export function DashboardView() {
                       ${costSummary.total_cost_usd.toFixed(2)}
                       <span style={{ fontFamily: "initial", fontSize: "11px", fontWeight: 400 }}>
                         <CountBadge
-                          count={costSummary.unpriced_entries}
+                          count={safeCount(costSummary.unpriced_entries)}
                           label="unpriced"
                           explanation={unpricedSpendTitle(safeCount(costSummary.unpriced_entries))}
                           tone="var(--text-muted)"

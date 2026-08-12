@@ -34,6 +34,20 @@ describe("DroppedDataNotice", () => {
     expect(screen.getByText(/10000|ceiling|full/i)).toBeTruthy();
   });
 
+  it("uses the server's ceiling, not its own, so a raised cap is not a false alarm", () => {
+    // The whole reason the cap is published rather than hardcoded here. Raising
+    // it is the documented remedy for the case above, and a client holding its
+    // own copy of 10000 would keep shouting "at ceiling" after the operator
+    // took exactly the advice this notice gave them.
+    render(<DroppedDataNotice {...healthy} otlpSeriesCount={10000} seriesCap={50000} />);
+    expect(screen.queryByText(/ceiling/i)).toBeNull();
+  });
+
+  it("reports the ceiling the server named", () => {
+    render(<DroppedDataNotice {...healthy} otlpSeriesCount={50000} seriesCap={50000} />);
+    expect(screen.getByText(/50000 of 50000/)).toBeTruthy();
+  });
+
   it("says the point counters reset on restart", () => {
     render(<DroppedDataNotice {...healthy} otlpUnmapped={1} />);
     expect(screen.getByText(/restart/i)).toBeTruthy();

@@ -28,15 +28,26 @@ function safeCount(v: number | null | undefined): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+/** Only for a server that does not publish its cap. See the prop's comment. */
+const FALLBACK_SERIES_CAP = 10_000;
+
 export function DroppedDataNotice({
   otlpUnmapped,
   otlpSeriesRefused,
   otlpSeriesCount,
-  seriesCap = 10_000,
+  seriesCap = FALLBACK_SERIES_CAP,
 }: Readonly<{
   otlpUnmapped?: number | null;
   otlpSeriesRefused?: number | null;
   otlpSeriesCount?: number | null;
+  /**
+   * The ceiling the SERVER is enforcing, from GET /api/ingest/status.
+   *
+   * Defaulted only for a server too old to publish it. Carrying a copy of the
+   * real number here would make this notice announce "at capacity" against the
+   * wrong ceiling as soon as an operator raised the cap, which is exactly the
+   * remedy they reach for when this fires.
+   */
   seriesCap?: number;
 }>) {
   const unmapped = safeCount(otlpUnmapped);
