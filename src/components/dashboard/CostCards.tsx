@@ -2,6 +2,7 @@ import { memo } from "react";
 import { CardWrapper } from "../ui/Card";
 import { EmptyState } from "../EmptyState.js";
 import { formatTokens } from "./KpiCard";
+import { CountBadge } from "./CountBadge";
 
 // Totals are typed nullable here on purpose. The API floors every aggregate
 // with COALESCE, so a null should be impossible, but these cards render inside
@@ -20,6 +21,13 @@ interface CostByModelEntry {
   provider: string;
   total_cost_usd: MaybeCost;
   total_tokens: number;
+  /**
+   * Entries with tokens recorded but no cost, because the model is not in the
+   * price table. Nullable for the same reason the totals are: an older
+   * server, or a shape this component did not expect, must degrade rather
+   * than blank the page.
+   */
+  unpriced_entries?: number | null;
 }
 
 interface CostByAgentEntry {
@@ -34,17 +42,21 @@ interface CostByAgentEntry {
    * this component did not expect, must degrade rather than blank the page.
    */
   excluded_entries?: number | null;
+  /** Same meaning as on `CostByModelEntry`, see there. */
+  unpriced_entries?: number | null;
 }
 
 /**
- * How many rows a figure leaves out, or 0 when the field is absent.
- *
- * Without this an observed agent renders as "$0.0000" and reads exactly like an
- * agent that never spent anything. Its spend is not missing, it is counted from
- * the transcripts instead, but nothing on the agent's own line said so.
+ * Wording shared by the unpriced badge and its tooltip, so the two cannot drift
+ * apart. Shared in turn by the model card and the agent card, so "here" has to
+ * mean whichever row it sits on rather than naming either one.
  */
-function excludedCount(value: number | null | undefined): number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+function unpricedTitle(count: number): string {
+  return (
+    `${count} ${count === 1 ? "entry here has" : "entries here have"} tokens recorded but no cost, ` +
+    `because the model is not in the price table. Nothing went wrong: this figure is a floor, ` +
+    `not the whole amount.`
+  );
 }
 
 /** Wording shared by the badge and its tooltip, so the two cannot drift apart. */
@@ -106,7 +118,15 @@ export const CostByModelCard = memo(function CostByModelCard({ data }: { data: C
               <div key={`${m.model}-${m.provider}`}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
                   <span style={{ color: "var(--text-primary)" }}>{m.model}</span>
-                  <span style={{ color: "var(--text-muted)" }}>{formatUsd(m.total_cost_usd)} ({formatTokens(m.total_tokens)} tok)</span>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {formatUsd(m.total_cost_usd)}
+                    <CountBadge
+                      count={m.unpriced_entries}
+                      label="unpriced"
+                      explanation={unpricedTitle(m.unpriced_entries ?? 0)}
+                    />
+                    {" "}({formatTokens(m.total_tokens)} tok)
+                  </span>
                 </div>
                 <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px" }}>
                   <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent-purple)", borderRadius: "2px" }} />
@@ -127,21 +147,22 @@ export const CostByAgentCard = memo(function CostByAgentCard({ data }: { data: C
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
         {(() => { const maxCost = Math.max(...data.map((x) => costValue(x.total_cost_usd)), 0.01); return data.map((a) => {
           const pct = (costValue(a.total_cost_usd) / maxCost) * 100;
-          const excluded = excludedCount(a.excluded_entries);
           return (
             <div key={a.agent_id}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
                 <span style={{ color: "var(--text-primary)" }}>{a.agent_name}</span>
                 <span style={{ color: "var(--text-muted)" }}>
                   {formatUsd(a.total_cost_usd)}
-                  {excluded > 0 && (
-                    <span
-                      title={excludedTitle(excluded)}
-                      style={{ color: "var(--accent-purple)", marginLeft: "4px", cursor: "help" }}
-                    >
-                      +{excluded} excluded
-                    </span>
-                  )}
+                  <CountBadge
+                    count={a.excluded_entries}
+                    label="excluded"
+                    explanation={excludedTitle(a.excluded_entries ?? 0)}
+                  />
+                  <CountBadge
+                    count={a.unpriced_entries}
+                    label="unpriced"
+                    explanation={unpricedTitle(a.unpriced_entries ?? 0)}
+                  />
                   {" "}({formatTokens(a.total_tokens)} tok)
                 </span>
               </div>

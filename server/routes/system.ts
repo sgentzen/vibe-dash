@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import { ACTIVE_THRESHOLD_MINUTES, getSpendToday, getTasksCompletedToday } from "../db/index.js";
+import { ACTIVE_THRESHOLD_MINUTES, getSpendToday, getSpendTodayUnpriced, getTasksCompletedToday } from "../db/index.js";
 import { firstRunLimiter, statsLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 
@@ -43,6 +43,7 @@ export function systemRoutes(db: Database.Database, _broadcast: BroadcastFn): Ro
       activeAgents,
       alerts,
       spend_today: getSpendToday(db),
+      spend_today_unpriced: getSpendTodayUnpriced(db),
       tasks_completed_today: getTasksCompletedToday(db),
     });
   });

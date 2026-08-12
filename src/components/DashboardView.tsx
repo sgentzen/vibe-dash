@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDataState, useNavigationState, usePollingState } from "../store";
 import { useApi } from "../hooks/useApi";
+import type { IngestStatus } from "../hooks/useApi";
 import { cardStyle, sectionHeader, typeScale } from "../styles/shared.js";
 import type { MilestoneDailyStats, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
+import { CountBadge } from "./dashboard/CountBadge";
+import { DroppedDataNotice } from "./dashboard/DroppedDataNotice";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
@@ -15,7 +18,7 @@ import { CardError } from "./dashboard/CardError";
 const headerStyle: React.CSSProperties = { ...sectionHeader, fontSize: "13px" };
 
 type CostSetters = {
-  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number } | null) => void;
+  setCostSummary: (s: { total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number; unpriced_entries?: number } | null) => void;
   setCostTimeseries: (ts: { date: string; total_cost_usd: number }[]) => void;
   setCostByModel: (m: { model: string; provider: string; total_cost_usd: number; total_tokens: number }[]) => void;
   setCostByAgent: (a: { agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; excluded_entries?: number }[]) => void;
@@ -63,6 +66,64 @@ async function loadCostData(
   }
 }
 
+// A count read through a guard rather than trusted: these cards render in a
+// tree with no ErrorBoundary, so one non-number value from an older or
+// malformed response must degrade to "no badge" rather than blank the page.
+function safeCount(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+/** Wording shared by the Total Spend unpriced badge and its tooltip. */
+function unpricedSpendTitle(count: number): string {
+  return (
+    `${count} ${count === 1 ? "entry has" : "entries have"} tokens recorded but no cost, because the model ` +
+    `is not in the price table. Nothing went wrong: this total is a floor, not the whole amount.`
+  );
+}
+
+/**
+ * Wording shared by the Total Spend unattributed badge and its tooltip.
+ *
+ * Only ever true of the global total, which is why the badge is rendered only
+ * when no project is selected. See its call site.
+ */
+function unattributedSpendTitle(count: number): string {
+  return (
+    `${count} ${count === 1 ? "entry is" : "entries are"} recorded but tied to no project, so this global ` +
+    `total exceeds the sum of the per-project figures.`
+  );
+}
+
+/**
+ * Wording shared by the Total Spend excluded badge and its tooltip.
+ *
+ * Carried over from the `title` attribute this badge replaced: a title reaches
+ * a mouse and nothing else, which is the mechanism this branch set out to
+ * remove, and it was still on the most prominent figure of the lot.
+ */
+function excludedSpendTitle(count: number): string {
+  return (
+    `Excludes ${count} self-reported ${count === 1 ? "entry" : "entries"} counted as duplicates, because ` +
+    `${count === 1 ? "its" : "their"} client is marked as observed through its transcripts. That spend is ` +
+    `counted from the transcripts instead, so this total is not missing it.`
+  );
+}
+
+// Fetched separately from loadCostData's Promise.all, deliberately. This
+// endpoint is supplementary — it only feeds caveat badges — so a failure here
+// must not take the cost figures down with it. Swallow the failure, warn, and
+// leave the ingest status state as it was (null on first load).
+async function loadIngestStatus(
+  api: ReturnType<typeof useApi>,
+  setIngestStatus: (s: IngestStatus | null) => void,
+): Promise<void> {
+  try {
+    setIngestStatus(await api.getIngestStatus());
+  } catch (e) {
+    console.warn("[DashboardView] failed to load ingest status", e);
+  }
+}
+
 // Stable dependency key that changes whenever a task's milestone/status pairing
 // within the open milestones changes, used to re-fetch chart data.
 function computeMilestoneStatusKey(
@@ -83,10 +144,11 @@ export function DashboardView() {
 
   const [dailyStats, setDailyStats] = useState<MilestoneDailyStats[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
-  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number } | null>(null);
+  const [costSummary, setCostSummary] = useState<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number; entry_count: number; excluded_entries?: number; unpriced_entries?: number } | null>(null);
   const [costTimeseries, setCostTimeseries] = useState<{ date: string; total_cost_usd: number }[]>([]);
   const [costByModel, setCostByModel] = useState<{ model: string; provider: string; total_cost_usd: number; total_tokens: number }[]>([]);
   const [costByAgent, setCostByAgent] = useState<{ agent_id: string; agent_name: string; total_cost_usd: number; total_tokens: number; excluded_entries?: number }[]>([]);
+  const [ingestStatus, setIngestStatus] = useState<IngestStatus | null>(null);
   const [agentComparison, setAgentComparison] = useState<AgentComparison | null>(null);
   const [costError, setCostError] = useState(false);
   const [chartError, setChartError] = useState(false);
@@ -128,6 +190,10 @@ export function DashboardView() {
     setCostError(false);
     const ok = await loadCostData(api, projectId, { setCostSummary, setCostTimeseries, setCostByModel, setCostByAgent });
     if (!ok) setCostError(true);
+    // Fetched on the same refresh but outside the Promise.all above: this
+    // endpoint is supplementary, so its failure must never block or blank
+    // the cost figures fetched alongside it.
+    void loadIngestStatus(api, setIngestStatus);
   }, [api, projectId]);
 
   const reloadChart = useCallback(async () => {
@@ -169,6 +235,7 @@ export function DashboardView() {
       <div style={{ marginBottom: "var(--space-4)" }}>
         <TodayCard
           spendToday={stats.spend_today}
+          spendTodayUnpriced={stats.spend_today_unpriced}
           tasksCompletedToday={stats.tasks_completed_today}
           activeAgents={agents.filter((a) => a.health_status === "active").length}
         />
@@ -229,6 +296,13 @@ export function DashboardView() {
         <OverdueTasksCard tasks={overdueTasks} />
       </div>
 
+      <DroppedDataNotice
+        seriesCap={ingestStatus?.otlpSeriesCap}
+        otlpUnmapped={ingestStatus?.otlpUnmapped}
+        otlpSeriesRefused={ingestStatus?.otlpSeriesRefused}
+        otlpSeriesCount={ingestStatus?.otlpSeriesCount}
+      />
+
       {(() => {
         if (costError) {
           return (
@@ -241,18 +315,56 @@ export function DashboardView() {
           );
         }
         if (costSummary && costSummary.entry_count > 0) {
+          // Both read off costSummary, so both describe whatever scope the
+          // figure beside them is in.
+          const unpricedCount = safeCount(costSummary.unpriced_entries);
+          const excludedCount = safeCount(costSummary.excluded_entries);
+          // These do not. Every one of them counts rows with no project,
+          // install-wide, across the three ingest sources. Such rows are not in
+          // a project-scoped total and never could be, so beside one this badge
+          // would qualify a figure it is not about, and its explanation's claim
+          // that the total "exceeds the sum of the per-project figures" would be
+          // plainly false. It is shown only when the figure is the global total.
+          const unattributedCount =
+            safeCount(ingestStatus?.unattributed) +
+            safeCount(ingestStatus?.otlpUnattributed) +
+            safeCount(ingestStatus?.mcpUnattributed);
           return (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
                 <KpiCard
                   label="Total Spend"
-                  value={`$${costSummary.total_cost_usd.toFixed(2)}`}
-                  color="var(--accent-blue)"
-                  tooltip={
-                    (costSummary.excluded_entries ?? 0) > 0
-                      ? `Excludes ${costSummary.excluded_entries} self-reported entries counted as duplicates, because their client is marked as observed through its transcripts. That spend is counted from the transcripts instead, so this total is not missing it.`
-                      : undefined
+                  value={
+                    <>
+                      ${costSummary.total_cost_usd.toFixed(2)}
+                      <span style={{ fontFamily: "initial", fontSize: "11px", fontWeight: 400 }}>
+                        <CountBadge
+                          count={unpricedCount}
+                          label="unpriced"
+                          explanation={unpricedSpendTitle(unpricedCount)}
+                        />
+                        {projectId === null && (
+                          <CountBadge
+                            count={unattributedCount}
+                            label="unattributed"
+                            explanation={unattributedSpendTitle(unattributedCount)}
+                          />
+                        )}
+                        {/* A badge rather than the `tooltip` prop below, which
+                            puts the text in a `title` attribute: it reaches a
+                            mouse and nothing else, and it was still doing so on
+                            the most prominent figure here while two proper
+                            badges sat beside it. Passing both would also stack a
+                            native tooltip over a badge's own. */}
+                        <CountBadge
+                          count={excludedCount}
+                          label="excluded"
+                          explanation={excludedSpendTitle(excludedCount)}
+                        />
+                      </span>
+                    </>
                   }
+                  color="var(--accent-blue)"
                 />
                 <KpiCard label="Input Tokens" value={formatTokens(costSummary.total_input_tokens)} color="var(--text-secondary)" />
                 <KpiCard label="Output Tokens" value={formatTokens(costSummary.total_output_tokens)} color="var(--text-secondary)" />
