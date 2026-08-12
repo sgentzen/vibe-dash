@@ -115,30 +115,50 @@ export function CountBadge({
       </button>
       <span
         id={tipId}
-        role="tooltip"
+        // Only a tooltip once it is actually showing. While closed this is just
+        // the text `aria-describedby` points at, and a permanent node announcing
+        // itself as a tooltip is one more thing for a browse-mode reader to trip
+        // over on its way past the badge.
+        role={visible ? "tooltip" : undefined}
         style={
           visible
             ? {
+                // The 4px clearance is padding rather than an offset, so the
+                // box reaches down to the button. Held apart by `bottom` it left
+                // a dead strip the pointer had to cross, and crossing it fired
+                // mouseleave on the wrapper and closed the tooltip before the
+                // pointer arrived, which is the "hoverable" half of 1.4.13.
                 position: "absolute",
-                bottom: "calc(100% + 4px)",
+                bottom: "100%",
                 left: "50%",
                 transform: "translateX(-50%)",
-                background: "var(--bg-primary)",
-                border: "1px solid var(--border)",
-                borderRadius: "6px",
-                padding: "6px 8px",
-                fontSize: "11px",
-                color: "var(--text-secondary)",
-                whiteSpace: "pre-wrap",
-                maxWidth: "220px",
+                paddingBottom: "4px",
                 zIndex: 100,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                lineHeight: "1.4",
               }
             : VISUALLY_HIDDEN
         }
       >
-        {explanation}
+        <span
+          style={
+            visible
+              ? {
+                  display: "block",
+                  background: "var(--bg-primary)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  padding: "6px 8px",
+                  fontSize: "11px",
+                  color: "var(--text-secondary)",
+                  whiteSpace: "pre-wrap",
+                  maxWidth: "220px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                  lineHeight: "1.4",
+                }
+              : undefined
+          }
+        >
+          {explanation}
+        </span>
       </span>
     </span>
   );

@@ -4,6 +4,18 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CountBadge } from "../../src/components/dashboard/CountBadge";
 
+/**
+ * Resolve the description element the way an assistive technology would, by
+ * following aria-describedby. Looking it up by its tooltip role would only work
+ * while it is open, because the role is dropped once it closes.
+ */
+function tipFor(badgeName: string): HTMLElement {
+  const badge = screen.getByRole("button", { name: badgeName });
+  return document.getElementById(badge.getAttribute("aria-describedby") ?? "")!;
+}
+
+const isOpen = (badgeName: string) => tipFor(badgeName).style.clipPath === "";
+
 describe("CountBadge", () => {
   it("renders the count and its label", () => {
     render(<CountBadge count={7} label="unpriced" explanation="seven of them" />);
@@ -71,10 +83,22 @@ describe("CountBadge accessibility", () => {
     // display:none or unmounting would take the description out of the
     // accessibility tree and leave aria-describedby pointing at nothing.
     render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
-    const tip = screen.getByRole("tooltip");
+    const tip = tipFor("3 unpriced");
     expect(tip.textContent).toBe(FLOOR);
     expect(tip.style.display).not.toBe("none");
     expect(tip.style.visibility).not.toBe("hidden");
+  });
+
+  it("only claims the tooltip role once it is actually showing", async () => {
+    // A permanently-present node announcing itself as a tooltip is one more
+    // thing for a browse-mode reader to trip over on the way past the badge.
+    const user = userEvent.setup();
+    render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    await user.tab();
+
+    expect(screen.getByRole("tooltip").textContent).toBe(FLOOR);
   });
 
   it("drops the title attribute that the tooltip replaced", () => {
@@ -86,13 +110,13 @@ describe("CountBadge accessibility", () => {
   it("reveals the tooltip on keyboard focus, not just on hover", async () => {
     const user = userEvent.setup();
     render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
-    expect(screen.getByRole("tooltip").style.position).toBe("absolute");
+    expect(isOpen("3 unpriced")).toBe(false);
 
     await user.tab();
 
     expect(screen.getByRole("button", { name: "3 unpriced" })).toBe(document.activeElement);
     // Visible now means laid out as a real tooltip rather than clipped away.
-    expect(screen.getByRole("tooltip").style.clipPath).toBe("");
+    expect(isOpen("3 unpriced")).toBe(true);
   });
 
   it("dismisses the tooltip on Escape while focus stays put", async () => {
@@ -101,11 +125,11 @@ describe("CountBadge accessibility", () => {
     render(<CountBadge count={3} label="unpriced" explanation={FLOOR} />);
 
     await user.tab();
-    expect(screen.getByRole("tooltip").style.clipPath).toBe("");
+    expect(isOpen("3 unpriced")).toBe(true);
 
     await user.keyboard("{Escape}");
 
-    expect(screen.getByRole("tooltip").style.clipPath).toBe("inset(50%)");
+    expect(isOpen("3 unpriced")).toBe(false);
     expect(screen.getByRole("button", { name: "3 unpriced" })).toBe(document.activeElement);
   });
 
@@ -121,7 +145,7 @@ describe("CountBadge accessibility", () => {
 // leaving closed the tooltip out from under the other one.
 describe("CountBadge tooltip persistence", () => {
   const FLOOR = "this figure is a floor";
-  const open = () => screen.getByRole("tooltip").style.clipPath === "";
+  const open = () => isOpen("3 unpriced");
 
   it("stays open when the mouse leaves a badge that still has focus", async () => {
     const user = userEvent.setup();
@@ -204,7 +228,7 @@ describe("CountBadge Escape bubbling", () => {
     await user.tab();
     await user.keyboard("{Escape}");
 
-    expect(screen.getByRole("tooltip").style.clipPath).toBe("inset(50%)");
+    expect(isOpen("3 unpriced")).toBe(false);
     expect(onEscape).not.toHaveBeenCalled();
   });
 
