@@ -31,11 +31,24 @@ function safeCount(v: number | null | undefined): number {
 /** Only for a server that does not publish its cap. See the prop's comment. */
 const FALLBACK_SERIES_CAP = 10_000;
 
+/**
+ * The server's ceiling when it published a usable one, the fallback otherwise.
+ *
+ * A default parameter would only cover `undefined`, and a non-finite number
+ * comes back from JSON as `null`. `seriesCount >= null` is `true` for a count
+ * of zero, so a healthy install would have announced itself at capacity: a
+ * caveat firing when it should not, which on this path is as bad as one that
+ * fails to fire.
+ */
+function safeCap(v: number | null | undefined): number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : FALLBACK_SERIES_CAP;
+}
+
 export function DroppedDataNotice({
   otlpUnmapped,
   otlpSeriesRefused,
   otlpSeriesCount,
-  seriesCap = FALLBACK_SERIES_CAP,
+  seriesCap,
 }: Readonly<{
   otlpUnmapped?: number | null;
   otlpSeriesRefused?: number | null;
@@ -43,17 +56,19 @@ export function DroppedDataNotice({
   /**
    * The ceiling the SERVER is enforcing, from GET /api/ingest/status.
    *
-   * Defaulted only for a server too old to publish it. Carrying a copy of the
-   * real number here would make this notice announce "at capacity" against the
-   * wrong ceiling as soon as an operator raised the cap, which is exactly the
-   * remedy they reach for when this fires.
+   * Falls back only for a server too old to publish it, or one that published
+   * something unusable. Carrying a copy of the real number here would make
+   * this notice announce "at capacity" against the wrong ceiling as soon as an
+   * operator raised the cap, which is exactly the remedy they reach for when
+   * this fires.
    */
-  seriesCap?: number;
+  seriesCap?: number | null;
 }>) {
   const unmapped = safeCount(otlpUnmapped);
   const refused = safeCount(otlpSeriesRefused);
   const seriesCount = safeCount(otlpSeriesCount);
-  const atCeiling = seriesCount >= seriesCap;
+  const cap = safeCap(seriesCap);
+  const atCeiling = seriesCount >= cap;
 
   if (unmapped <= 0 && refused <= 0 && !atCeiling) return null;
 
@@ -84,7 +99,7 @@ export function DroppedDataNotice({
         )}
         {atCeiling && (
           <li>
-            The OTLP series table is at its ceiling -- {seriesCount} of {seriesCap} series (
+            The OTLP series table is at its ceiling: {seriesCount} of {cap} series (
             <code>otlpSeriesCount</code> on <code>GET /api/ingest/status</code>). New senders are being refused
             until the cap is raised.
           </li>

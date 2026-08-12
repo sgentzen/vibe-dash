@@ -48,6 +48,23 @@ describe("DroppedDataNotice", () => {
     expect(screen.getByText(/50000 of 50000/)).toBeTruthy();
   });
 
+  it("falls back to its own ceiling when the server published an unusable one", () => {
+    // A non-finite number arrives over JSON as null, and a default parameter
+    // only covers undefined. `0 >= null` is true, so a healthy install would
+    // have announced "at its ceiling, 0 of  series" with nothing wrong at all.
+    for (const cap of [null, Number.NaN, 0, -1]) {
+      const { container, unmount } = render(<DroppedDataNotice {...healthy} seriesCap={cap} />);
+      expect(container.textContent).toBe("");
+      unmount();
+    }
+  });
+
+  it("still reaches its own ceiling when the server published an unusable one", () => {
+    // The fallback has to be a real ceiling, not merely a way of staying quiet.
+    render(<DroppedDataNotice {...healthy} otlpSeriesCount={10000} seriesCap={null} />);
+    expect(screen.getByText(/10000 of 10000/)).toBeTruthy();
+  });
+
   it("says the point counters reset on restart", () => {
     render(<DroppedDataNotice {...healthy} otlpUnmapped={1} />);
     expect(screen.getByText(/restart/i)).toBeTruthy();
