@@ -82,12 +82,18 @@ tracked as follow-up work.
 These counts are not only API fields. Where a count qualifies a figure
 already on screen, a small badge renders beside that figure, reading
 `N unpriced`, `N unattributed`, or `N excluded`, with an explanation reachable
-by hovering or focusing the badge, not only with a mouse. Total Spend carries
-an unpriced badge and an unattributed one, the latter combining
-`unattributed` above with `otlpUnattributed` from the OTLP section below.
-Spend Today carries an unpriced badge fed by `spend_today_unpriced`. Cost by
-Model carries an unpriced badge per model, and Cost by Agent carries both an
-unpriced badge and an excluded badge per agent.
+by hovering or focusing the badge, not only with a mouse, and dismissible with
+Escape. Total Spend carries an unpriced badge, an excluded badge, and an
+unattributed one. Spend Today carries an unpriced badge fed by
+`spend_today_unpriced`. Cost by Model carries an unpriced badge per model, and
+Cost by Agent carries both an unpriced badge and an excluded badge per agent.
+
+The unattributed badge is the one exception to "beside the figure it
+qualifies", and deliberately so. It combines `unattributed`, `otlpUnattributed`
+and `mcpUnattributed`, which between them count every row with no project
+across the three sources, install-wide. Such rows are not in a project-scoped
+total and could not be, so selecting a project hides that badge rather than
+letting it caveat a figure it says nothing about.
 
 A badge is absent, not just faint, whenever its count is zero or missing, so
 an install with nothing to caveat looks exactly as it did before these badges
@@ -95,16 +101,18 @@ existed.
 
 Three counters describe data that was discarded before it became a figure at
 all: `otlpUnmapped`, `otlpSeriesRefused`, and `otlpSeriesCount` once it
-reaches its ceiling, all covered in the OTLP section below. There is no
+reaches the `otlpSeriesCap` alongside it, all covered in the OTLP section
+below. There is no
 total for these to sit beside, so they render instead as a short notice above
 the cost cards, listing only the conditions that currently apply, and, like
 the badges, it is absent entirely while none of the three has anything to
 report.
 
 Not every counter above reaches the screen. `GET /api/ingest/status` also
-returns `filesTracked`, `transcriptRows` and `otlpRows` with no badge, no
-notice, and no other home on the dashboard; reading those still means calling
-the endpoint directly.
+returns `filesTracked`, `transcriptRows`, `otlpRows`, and its own endpoint-wide
+`unpriced`, with no badge, no notice, and no other home on the dashboard;
+reading those still means calling the endpoint directly. The per-figure
+unpriced badges come from the cost responses, not from that field.
 
 ## What is inferred, and how conservatively
 
@@ -122,6 +130,14 @@ directory yourself and calling `POST /api/ingest/paths` with it, not reading
 it back off the dashboard. Nothing is guessed and nothing is dropped, but
 matching an unattributed total back to the directory that produced it is on
 you today.
+
+`unattributed` counts transcript rows only. A row can arrive with no project
+from any of the three sources, so `GET /api/ingest/status` reports the same
+count for the other two: `otlpUnattributed` for OTLP, and `mcpUnattributed`
+for spend an agent reported through `log_cost` without naming a project, which
+`log_cost` permits. All three feed the one badge described above, because a
+reader wants to know how much spend is tied to no project, not which pipe it
+came down.
 
 ## What it does not know
 
@@ -235,7 +251,7 @@ mapped runner is Codex.
 **Only one Codex model is priced.** The rate table currently has one Codex
 entry, `gpt-5.3-codex`. A Codex session on any other model still has its
 tokens recorded, exactly as an unknown model already is for Claude Code, but
-with `cost_usd` `NULL` rather than a figure — visibly unpriced, not free.
+with `cost_usd` `NULL` rather than a figure: visibly unpriced, not free.
 `GET /api/ingest/status`'s `knownModels` lists every model, across both
 Claude and Codex, that the table can currently price.
 
@@ -281,8 +297,9 @@ room for another, and no sender's already-reported spend can be counted again
 as new. This is also why the table never has room to give back: the ceiling,
 once reached, holds until `SERIES_CAP` itself changes.
 
-**If `otlpSeriesRefused` is climbing.** Compare `otlpSeriesCount` against the
-ceiling to confirm the table is the reason. A genuine install reaches perhaps a
+**If `otlpSeriesRefused` is climbing.** Compare `otlpSeriesCount` against
+`otlpSeriesCap` in the same response to confirm the table is the reason. A
+genuine install reaches perhaps a
 dozen series, so a count near 10,000 almost always means something has been
 sending varying attribute values rather than that you have outgrown the
 ceiling. Find that sender first. If you conclude you genuinely need more, the
@@ -303,7 +320,11 @@ senders can be affected by the cap.
 
 **`otlpSeriesCount` on `GET /api/ingest/status` shows how close an install is
 to the ceiling.** It is a real count of the `otlp_series` table, so, unlike
-the counter below, it is durable and survives a restart.
+the counter below, it is durable and survives a restart. The same response
+carries `otlpSeriesCap`, the ceiling the server is actually enforcing, so
+nothing has to assume the number: the dashboard reads it rather than holding
+its own copy, which would have kept announcing "at capacity" against a
+ceiling that no longer applied the moment someone raised it.
 
 **`otlpSeriesRefused` does not survive a restart.** Like `otlpUnmapped` above,
 it is a count kept in the running server process, not a database query.
