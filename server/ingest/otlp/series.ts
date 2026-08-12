@@ -1,6 +1,25 @@
 import type Database from "better-sqlite3";
 
 /**
+ * How many distinct series this table will hold.
+ *
+ * A legitimate sender converges on a handful: Codex emits four token types
+ * across a model or two, so a real install reaches perhaps a dozen rows and
+ * never grows again. Ten thousand distinct attribute combinations is not a
+ * configuration, it is a flood.
+ *
+ * The bound holds against the traffic the endpoint permits. A 1mb body carries
+ * roughly 5,000 points, so at the route's 120 requests per minute a flooder
+ * reaches this ceiling within seconds, after which every new key is refused
+ * and the table stops growing.
+ *
+ * Deliberately a constant rather than a setting: nothing indicates a real user
+ * anywhere near it, and a knob invites tuning a number nobody should have to
+ * think about. It can become a setting the first time someone hits it in anger.
+ */
+export const SERIES_CAP = 10_000;
+
+/**
  * Parse an OTLP nanosecond timestamp string as a BigInt.
  *
  * These values sit around 1.7e18, well past Number.MAX_SAFE_INTEGER, so
@@ -101,6 +120,15 @@ function isStrictlyNewer(timeUnixNano: string, previousTimeUnixNano: string): bo
  * an interval, not a running total, so two delta points may legitimately
  * share or reorder timestamps and must reach the caller unaffected; callers
  * only invoke this function for cumulative points in the first place.
+ *
+ * Returns `null` when a NEW series would be created and `otlp_series` already
+ * holds `SERIES_CAP` rows or more -- the point is refused, no row is written,
+ * and the stored state for every other series is untouched. `null` is
+ * distinct from `0` and the two must not be conflated: `0` means an existing
+ * series was seen and has not moved (no spend to record); `null` means spend
+ * we could not record at all. Only a NEW series consults the cap -- see the
+ * comment at the check itself for why an established series must never pay
+ * for it.
  */
 export function seriesIncrement(
   db: Database.Database,
@@ -108,13 +136,22 @@ export function seriesIncrement(
   startTimeNano: string,
   timeUnixNano: string,
   value: number
-): number {
+): number | null {
   const previous = db
     .prepare("SELECT start_time_nano, last_value, last_time_unix_nano FROM otlp_series WHERE series_key = ?")
     .get(key) as { start_time_nano: string; last_value: number; last_time_unix_nano: string } | undefined;
 
   if (previous !== undefined && !isStrictlyNewer(timeUnixNano, previous.last_time_unix_nano)) {
     return 0;
+  }
+
+  // Only a NEW series consults the cap, so an established sender never pays
+  // for this count and is never refused however full the table is. That is the
+  // whole point: nothing is ever deleted, so a live series cannot be mistaken
+  // for a new one, and a flood cannot cost a legitimate sender its spend.
+  if (previous === undefined) {
+    const { n } = db.prepare("SELECT COUNT(*) AS n FROM otlp_series").get() as { n: number };
+    if (n >= SERIES_CAP) return null;
   }
 
   const restarted = previous === undefined || value < previous.last_value;

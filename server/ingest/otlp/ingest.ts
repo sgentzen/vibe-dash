@@ -14,6 +14,7 @@ export interface IngestResult {
   recorded: number;
   unmapped: number;
   unattributed: number;
+  refused: number;
 }
 
 // Process-lifetime, not a query — an unmapped point writes no row, so unlike
@@ -26,6 +27,17 @@ let unmappedPoints = 0;
 /** Read the process-lifetime count of OTLP points no mapper recognised. */
 export function unmappedPointCount(): number {
   return unmappedPoints;
+}
+
+// Process-lifetime for the same reason unmappedPoints is: a refused point
+// writes no row, so there is no table to count it from afterwards. Resets on
+// restart, which is a weaker guarantee than the query-backed counters and is
+// stated here rather than left to be discovered.
+let refusedSeriesPoints = 0;
+
+/** Read the process-lifetime count of points refused because the series cap was reached. */
+export function refusedSeriesPointCount(): number {
+  return refusedSeriesPoints;
 }
 
 /** One turn's worth of grouped token counts, still unpriced and unattributed. */
@@ -71,8 +83,12 @@ function sortedReplacer(_key: string, value: unknown): unknown {
  * attributes, including token_type, are folded into the series key, so each
  * token kind's running total is tracked as its own series even though the
  * rows they produce are later grouped back together.
+ *
+ * Returns `null` when the point belongs to a NEW series and the series cap
+ * has been reached -- see `seriesIncrement` (series.ts). A delta point never
+ * calls `seriesIncrement` at all, so it can never be refused.
  */
-function resolveQuantity(db: Database.Database, point: OtlpPoint): number {
+function resolveQuantity(db: Database.Database, point: OtlpPoint): number | null {
   if (!point.cumulative) return point.value;
   return seriesIncrement(db, seriesKey(point), point.startTimeUnixNano, point.timeUnixNano, point.value);
 }
@@ -137,9 +153,10 @@ function accumulate(
 function buildGroups(
   db: Database.Database,
   points: OtlpPoint[]
-): { groups: Map<string, Group>; unmapped: number } {
+): { groups: Map<string, Group>; unmapped: number; refused: number } {
   const groups = new Map<string, Group>();
   let unmapped = 0;
+  let refused = 0;
 
   for (const point of points) {
     const result = mapPoint(point);
@@ -159,16 +176,27 @@ function buildGroups(
 
     const mapped = result.usage;
 
+    // `null` is checked BEFORE the <= 0 guard and with ===, because
+    // `null <= 0` is true in JavaScript: null coerces to 0. Written the other
+    // way round, a refusal would be silently swallowed by the numeric guard,
+    // behave correctly by accident, and never reach the counter that exists to
+    // make it visible.
+    const quantity = resolveQuantity(db, point);
+    if (quantity === null) {
+      refusedSeriesPoints++;
+      refused++;
+      continue;
+    }
+
     // A cumulative point that has not moved yields zero. Writing a zero row
     // would inflate entry_count with a row that carries no new spend.
-    const quantity = resolveQuantity(db, point);
     if (quantity <= 0) continue;
 
     const key = `${groupKey(point, mapped.model)}:${point.timeUnixNano}`;
     accumulate(groups, key, point, mapped.model, mapped.kind, quantity);
   }
 
-  return { groups, unmapped };
+  return { groups, unmapped, refused };
 }
 
 /** Price, attribute and insert one group's row. Returns whether it was newly recorded. */
@@ -240,10 +268,12 @@ export function ingestMetricsPayload(db: Database.Database, body: unknown): Inge
   let recorded = 0;
   let unattributed = 0;
   let unmapped = 0;
+  let refused = 0;
 
   db.transaction(() => {
     const built = buildGroups(db, points);
     unmapped = built.unmapped;
+    refused = built.refused;
 
     for (const [key, group] of built.groups) {
       // Reject before pricing or inserting: an unbounded group total must
@@ -271,5 +301,5 @@ export function ingestMetricsPayload(db: Database.Database, body: unknown): Inge
     }
   })();
 
-  return { recorded, unmapped, unattributed };
+  return { recorded, unmapped, unattributed, refused };
 }
