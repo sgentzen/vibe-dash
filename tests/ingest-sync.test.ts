@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
-import { createProject } from "../server/db/index.js";
+import { createProject, logCost } from "../server/db/index.js";
 import { linkProjectPath } from "../server/db/projectPaths.js";
 import { syncTranscripts, getIngestStatus } from "../server/ingest/transcripts/sync.js";
 
@@ -216,5 +216,25 @@ describe("syncTranscripts", () => {
     writeTranscript("proj/a.jsonl", line("a-1", "C:/repos/demo", "claude-unknown-x"));
     await syncTranscripts(db, { claudeHome: home });
     expect(getIngestStatus(db)).toMatchObject({ filesTracked: 1, transcriptRows: 1, unpriced: 1, unattributed: 1 });
+  });
+
+  it("counts a self-reported row that named no project", () => {
+    // log_cost's project id is optional, so this row is reachable. Counted by
+    // neither `unattributed` (transcript) nor `otlpUnattributed` (otlp), it
+    // would leave the dashboard's "tied to no project" caveat silent while
+    // exactly that was true.
+    logCost(db, { model: "claude-opus-5", provider: "anthropic", input_tokens: 10, output_tokens: 5, cost_usd: 0.1 });
+
+    expect(getIngestStatus(db)).toMatchObject({ mcpUnattributed: 1, unattributed: 0, otlpUnattributed: 0 });
+  });
+
+  it("does not count a self-reported row that named a project", () => {
+    const project = createProject(db, { name: "demo", description: null });
+    logCost(db, {
+      project_id: project.id,
+      model: "claude-opus-5", provider: "anthropic", input_tokens: 10, output_tokens: 5, cost_usd: 0.1,
+    });
+
+    expect(getIngestStatus(db).mcpUnattributed).toBe(0);
   });
 });

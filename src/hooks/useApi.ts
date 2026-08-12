@@ -375,7 +375,7 @@ async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[
 // Promise.all guarding the cost calls for exactly that reason.
 export interface IngestStatus {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
-  otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
+  otlpRows: number; otlpUnmapped: number; otlpUnattributed: number; mcpUnattributed: number;
   otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
 }
 

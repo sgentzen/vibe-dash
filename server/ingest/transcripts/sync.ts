@@ -262,7 +262,7 @@ function parseNameArray(json: string): string[] {
 /** Counts behind GET /api/ingest/status, so skipped, unpriced and duplicated spend are all visible. */
 export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
-  otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
+  otlpRows: number; otlpUnmapped: number; otlpUnattributed: number; mcpUnattributed: number;
   otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
   overlaps: CostOverlap[];
 } {
@@ -310,6 +310,12 @@ export function getIngestStatus(db: Database.Database): {
     // count on this object.
     otlpUnmapped: unmappedPointCount(),
     otlpUnattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'otlp' AND project_id IS NULL`),
+    // The third source, counted for the same reason as its two siblings.
+    // log_cost's project id is optional, so an mcp row with no project is
+    // reachable; without this it would be counted by nothing and the
+    // dashboard's "tied to no project" caveat would stay silent while
+    // exactly that was true.
+    mcpUnattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'mcp' AND project_id IS NULL`),
     otlpSeriesCount: one(`SELECT COUNT(*) AS n FROM otlp_series`),
     // Published rather than left for the client to assume. A client carrying
     // its own copy of the ceiling would announce "at capacity" against the
