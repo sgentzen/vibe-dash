@@ -123,6 +123,14 @@ describe("CostByAgentCard unpriced entries", () => {
     expect(screen.queryByText(/unpriced/)).toBeNull();
   });
 
+  it("uses the singular for one entry", () => {
+    render(<CostByAgentCard data={[row({ unpriced_entries: 1 })]} />);
+
+    const title = explanationOf("1 unpriced");
+    expect(title).toContain("1 entry here has tokens recorded");
+    expect(title).not.toContain("entries");
+  });
+
   it("says nothing when the field is absent, as an older server would send", () => {
     render(<CostByAgentCard data={[row()]} />);
 

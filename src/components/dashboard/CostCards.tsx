@@ -46,11 +46,16 @@ interface CostByAgentEntry {
   unpriced_entries?: number | null;
 }
 
-/** Wording shared by the unpriced badge and its tooltip, so the two cannot drift apart. */
+/**
+ * Wording shared by the unpriced badge and its tooltip, so the two cannot drift
+ * apart. Shared in turn by the model card and the agent card, so "here" has to
+ * mean whichever row it sits on rather than naming either one.
+ */
 function unpricedTitle(count: number): string {
   return (
-    `${count} entries here have tokens recorded but no cost, because the model ` +
-    `is not in the price table. Nothing went wrong: this figure is a floor, not the whole amount.`
+    `${count} ${count === 1 ? "entry here has" : "entries here have"} tokens recorded but no cost, ` +
+    `because the model is not in the price table. Nothing went wrong: this figure is a floor, ` +
+    `not the whole amount.`
   );
 }
 
