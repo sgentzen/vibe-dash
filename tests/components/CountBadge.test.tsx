@@ -40,3 +40,21 @@ describe("CountBadge", () => {
     expect(screen.getByText("2.5 unpriced")).toBeTruthy();
   });
 });
+
+// A title attribute reaches a mouse and nothing else: it is not announced
+// reliably by screen readers and never appears on keyboard focus. The visible
+// text says what; the accessible name has to carry why, because that is the
+// part that decides whether a reader should trust the figure beside it.
+describe("CountBadge accessibility", () => {
+  it("exposes the explanation as its accessible name", () => {
+    render(<CountBadge count={3} label="unpriced" title="this figure is a floor" />);
+    expect(screen.getByLabelText("this figure is a floor")).toBeTruthy();
+  });
+
+  it("keeps the visible text readable on its own", () => {
+    // The accessible name replaces the visible text for a screen reader, so
+    // the visible text still has to stand alone for everyone else.
+    render(<CountBadge count={3} label="unpriced" title="this figure is a floor" />);
+    expect(screen.getByText("3 unpriced")).toBeTruthy();
+  });
+});

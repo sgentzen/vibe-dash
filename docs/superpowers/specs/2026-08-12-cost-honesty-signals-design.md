@@ -129,11 +129,16 @@ anything that leaves the page.
 | Total Spend KPI | `unattributed` + `otlpUnattributed` | `N unattributed` |
 | Cost by Model row | `unpriced_entries` | `N unpriced` |
 | Cost by Agent row | `unpriced_entries` | `N unpriced` |
-| Cost by Agent row | `excluded_entries` | `+N excluded`, unchanged |
+| Cost by Agent row | `excluded_entries` | `N excluded` |
 | Spend Today KPI | new unpriced count, see D4 | `N unpriced` |
 
-Each badge carries a `title` explaining what the number means and, for
-unpriced, that the total is a floor rather than the whole figure.
+Each badge carries an explanation, as both a `title` and an `aria-label`,
+saying what the number means and, for unpriced, that the total is a floor
+rather than the whole figure. A `title` alone reaches a mouse and nothing else.
+
+The shipped `excluded_entries` badge read `+N excluded`. It is unified to
+`N excluded` here so one component serves every caveat rather than the
+dashboard carrying two idioms for the same idea.
 
 Wording is deliberate. "Unpriced" says we recorded the tokens and could not
 price them, which is the truth. It must not read as an error, because nothing

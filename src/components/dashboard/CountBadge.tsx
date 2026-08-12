@@ -9,6 +9,17 @@
  * The count is validated rather than trusted because these cards render in a
  * tree with no ErrorBoundary. One bad value from an older server would
  * otherwise blank the whole dashboard instead of one badge.
+ *
+ * The explanation is carried on aria-label as well as title. A title attribute
+ * alone reaches a mouse and nothing else: it is not announced reliably by
+ * screen readers and never appears on keyboard focus. The visible text says
+ * what ("7 unpriced"); the label says why, which is the part that decides
+ * whether a reader should trust the figure beside it.
+ *
+ * KNOWN LIMIT: a keyboard user still cannot summon the explanation, because a
+ * native title tooltip does not open on focus. Closing that needs a real
+ * tooltip component rather than a title attribute, which is more than this
+ * badge should carry. Recorded rather than left for someone to rediscover.
  */
 export function CountBadge({
   count,
@@ -26,6 +37,7 @@ export function CountBadge({
   return (
     <span
       title={title}
+      aria-label={title}
       style={{ color: tone, marginLeft: "4px", cursor: "help", whiteSpace: "nowrap" }}
     >
       {count} {label}
