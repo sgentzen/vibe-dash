@@ -7,6 +7,7 @@ import type { MilestoneDailyStats, AgentComparison } from "../types";
 import { KpiCard, formatTokens } from "./dashboard/KpiCard";
 import { CostTimeseriesCard, CostByModelCard, CostByAgentCard } from "./dashboard/CostCards";
 import { CountBadge } from "./dashboard/CountBadge";
+import { DroppedDataNotice } from "./dashboard/DroppedDataNotice";
 import { AgentEfficiencyCard } from "./dashboard/AgentEfficiencyCard";
 import { MilestoneProgressCard, MilestoneOverviewCard } from "./dashboard/MilestoneCards";
 import { BlockersCard, OverdueTasksCard } from "./dashboard/BlockerOverdueCards";
@@ -274,6 +275,12 @@ export function DashboardView() {
         <BlockersCard blockers={unresolvedBlockers} />
         <OverdueTasksCard tasks={overdueTasks} />
       </div>
+
+      <DroppedDataNotice
+        otlpUnmapped={ingestStatus?.otlpUnmapped}
+        otlpSeriesRefused={ingestStatus?.otlpSeriesRefused}
+        otlpSeriesCount={ingestStatus?.otlpSeriesCount}
+      />
 
       {(() => {
         if (costError) {
