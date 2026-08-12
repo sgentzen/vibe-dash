@@ -8,7 +8,7 @@ import { priceRecord } from "./pricing.js";
 import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 import { excludeObservedCondition } from "../../db/costs.js";
-import { unmappedPointCount } from "../otlp/ingest.js";
+import { unmappedPointCount, refusedSeriesPointCount } from "../otlp/ingest.js";
 import type { CostOverlap } from "../../../shared/types.js";
 
 const PROVIDER = "anthropic";
@@ -262,6 +262,7 @@ function parseNameArray(json: string): string[] {
 export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number;
+  otlpSeriesCount: number; otlpSeriesRefused: number;
   overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
@@ -308,6 +309,10 @@ export function getIngestStatus(db: Database.Database): {
     // count on this object.
     otlpUnmapped: unmappedPointCount(),
     otlpUnattributed: one(`SELECT COUNT(*) AS n FROM cost_entries WHERE source = 'otlp' AND project_id IS NULL`),
+    otlpSeriesCount: one(`SELECT COUNT(*) AS n FROM otlp_series`),
+    // Process-lifetime, not a query — see refusedSeriesPointCount's own
+    // comment. A refused point writes no row, so nothing survives to count.
+    otlpSeriesRefused: refusedSeriesPointCount(),
     overlaps: rows.map((r) => ({
       project_id: r.project_id,
       project_name: r.project_name,

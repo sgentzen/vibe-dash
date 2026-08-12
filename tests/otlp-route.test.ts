@@ -156,3 +156,32 @@ describe("the ingest status reports OTLP", () => {
     expect(getIngestStatus(db).otlpUnmapped).toBe(before + 1);
   });
 });
+
+function cumulativeCodexPayload(input: number): unknown {
+  const payload = codexPayload(input) as {
+    resourceMetrics: { scopeMetrics: { metrics: { histogram: { aggregationTemporality: string } }[] }[] }[];
+  };
+  payload.resourceMetrics[0].scopeMetrics[0].metrics[0].histogram.aggregationTemporality =
+    "AGGREGATION_TEMPORALITY_CUMULATIVE";
+  return payload;
+}
+
+describe("the ingest status reports the series cap", () => {
+  it("counts the rows actually in otlp_series", async () => {
+    await requestApp(app, "POST", "/v1/metrics", cumulativeCodexPayload(100));
+
+    // Cumulative, so this creates a series row. A real query rather than a
+    // process counter: it must survive anything but a change to the table.
+    expect(getIngestStatus(db).otlpSeriesCount).toBeGreaterThan(0);
+  });
+
+  it("reports zero series on an untouched database", () => {
+    expect(getIngestStatus(db).otlpSeriesCount).toBe(0);
+  });
+
+  it("exposes the refused count", () => {
+    // Process-lifetime, so this asserts the field exists and is a number
+    // rather than a value another test in this file may have moved.
+    expect(typeof getIngestStatus(db).otlpSeriesRefused).toBe("number");
+  });
+});
