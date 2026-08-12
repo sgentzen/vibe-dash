@@ -21,6 +21,17 @@ describe("TodayCard", () => {
     expect(screen.getByText("3 unpriced")).toBeInTheDocument();
   });
 
+  it("uses the singular for one entry", () => {
+    // The last of the four caveat wording helpers to get this. The other three
+    // pluralise, so a lone unpriced entry read "1 of today's entries have".
+    render(
+      <TodayCard spendToday={2.74} spendTodayUnpriced={1} tasksCompletedToday={9} activeAgents={2} />
+    );
+    const badge = screen.getByRole("button", { name: "1 unpriced" });
+    const id = badge.getAttribute("aria-describedby") ?? "";
+    expect(document.getElementById(id)?.textContent).toContain("entries has tokens recorded");
+  });
+
   it("shows no unpriced badge when the count is zero", () => {
     render(
       <TodayCard spendToday={2.74} spendTodayUnpriced={0} tasksCompletedToday={9} activeAgents={2} />

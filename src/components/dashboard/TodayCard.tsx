@@ -36,7 +36,7 @@ const labelStyle: CSSProperties = {
 /** Wording shared by the badge and its tooltip, so the two cannot drift apart. */
 function unpricedTodayTitle(count: number): string {
   return (
-    `${count} of today's entries have tokens recorded but no cost, because the model ` +
+    `${count} of today's entries ${count === 1 ? "has" : "have"} tokens recorded but no cost, because the model ` +
     `is not in the price table. Nothing went wrong: this figure is a floor, not the whole amount.`
   );
 }
