@@ -216,7 +216,7 @@ the server resets it to zero. It is useful for confirming, right now, that a
 runner you just configured is or is not being recognised; it is not a
 durable record of how much has gone unmapped over time.
 
-**`otlp_series` holds at most 10,000 distinct series.** Vibe Dash keeps a
+**`otlp_series` never grows past 10,000 distinct series by creation.** Vibe Dash keeps a
 running total for every distinct cumulative series it sees, so it can work out
 how much of the next export is new. See `SERIES_CAP` in
 [`server/ingest/otlp/series.ts`](../server/ingest/otlp/series.ts). Once the
@@ -227,6 +227,13 @@ to the exporter still comes back `200`: the payload was well formed, and a
 `4xx` would tell a well-behaved exporter to stop retrying data that might be
 accepted later, once an operator has looked into it. Nothing about the table
 grows that room back on its own; see below.
+
+Stated as creation rather than as a size because the code refuses new rows and
+never trims existing ones. An install that was flooded before this cap existed
+arrives with however many rows it accumulated then, keeps all of them, and
+refuses every new series from that point on. The guarantee below about
+established senders still holds for it, but its table is larger than the
+ceiling and will stay that way.
 
 **A series the table already knows keeps recording normally, however full the
 table is.** The cap only ever applies to a point that would create a brand new
@@ -243,6 +250,21 @@ running total recorded as if it were new. So no row is ever removed to make
 room for another, and no sender's already-reported spend can be counted again
 as new. This is also why the table never has room to give back: the ceiling,
 once reached, holds until `SERIES_CAP` itself changes.
+
+**If `otlpSeriesRefused` is climbing.** Compare `otlpSeriesCount` against the
+ceiling to confirm the table is the reason. A genuine install reaches perhaps a
+dozen series, so a count near 10,000 almost always means something has been
+sending varying attribute values rather than that you have outgrown the
+ceiling. Find that sender first. If you conclude you genuinely need more, the
+ceiling is a constant in the source and raising it needs a restart.
+
+Refused spend from a cumulative sender is deferred rather than lost. A
+cumulative export carries the sender's running total, not just the latest
+slice, so once room exists and its series is finally admitted, its next export
+records the whole total including everything refused while it waited. Nothing
+is recovered for a sender that stops before that happens, and nothing here
+applies to delta senders, which never create a series row and so are never
+refused in the first place.
 
 **Delta points never reach the cap.** A delta point already describes an
 interval on its own and needs no stored row to interpret the next one, so it
