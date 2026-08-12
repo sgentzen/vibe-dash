@@ -216,6 +216,49 @@ the server resets it to zero. It is useful for confirming, right now, that a
 runner you just configured is or is not being recognised; it is not a
 durable record of how much has gone unmapped over time.
 
+**`otlp_series` holds at most 10,000 distinct series.** Vibe Dash keeps a
+running total for every distinct cumulative series it sees, so it can work out
+how much of the next export is new. See `SERIES_CAP` in
+[`server/ingest/otlp/series.ts`](../server/ingest/otlp/series.ts). Once the
+table holds 10,000 rows, a point belonging to a series it has never seen
+before is refused: no row is written for it, its tokens are not recorded, and
+it is counted in `otlpSeriesRefused` on `GET /api/ingest/status`. The response
+to the exporter still comes back `200`: the payload was well formed, and a
+`4xx` would tell a well-behaved exporter to stop retrying data that might be
+accepted later, once an operator has looked into it. Nothing about the table
+grows that room back on its own; see below.
+
+**A series the table already knows keeps recording normally, however full the
+table is.** The cap only ever applies to a point that would create a brand new
+row. A series that already has a row is never refused, never delayed, and
+never affected by how close the table is to the ceiling, no matter how many
+other rows have filled it up. This is the guarantee that matters most if
+you're reading this after a flood: whatever else got refused, none of your
+already-established senders lost any spend.
+
+**Nothing is ever deleted from `otlp_series`.** A cumulative point's stored
+row is how Vibe Dash knows how much of the next export is new spend; without
+it, the point would be read as a series never seen before and its whole
+running total recorded as if it were new. So no row is ever removed to make
+room for another, and no sender's already-reported spend can be counted again
+as new. This is also why the table never has room to give back: the ceiling,
+once reached, holds until `SERIES_CAP` itself changes.
+
+**Delta points never reach the cap.** A delta point already describes an
+interval on its own and needs no stored row to interpret the next one, so it
+is recorded directly and never consults `otlp_series` at all. Only cumulative
+senders can be affected by the cap.
+
+**`otlpSeriesCount` on `GET /api/ingest/status` shows how close an install is
+to the ceiling.** It is a real count of the `otlp_series` table, so, unlike
+the counter below, it is durable and survives a restart.
+
+**`otlpSeriesRefused` does not survive a restart.** Like `otlpUnmapped` above,
+it is a count kept in the running server process, not a database query.
+Restarting the server resets it to zero. It is useful for confirming, right
+now, that a flood is or is not hitting the cap; it is not a durable record of
+how much has been refused over time.
+
 ## Upgrading from an earlier version
 
 **Remove the `log_cost` step from your Claude Code instructions, or your spend
