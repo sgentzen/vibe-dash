@@ -14,17 +14,45 @@ npx lighthouse http://localhost:3000 --only-categories=accessibility --output=js
 
 ## Contrast targets
 
-| Token | Variable | Dark bg | Light bg | Requirement |
-|-------|----------|---------|----------|-------------|
-| Body text | `--text-primary` | ✓ | ✓ | ≥4.5:1 |
-| Secondary text | `--text-secondary` | ✓ ~5.96:1 | ✓ ~5.25:1 | ≥4.5:1 |
-| Muted/micro text | `--text-muted` | ✓ ~7.28:1 (bumped M8-T2) | ✓ ~7.17:1 (bumped M8-T2) | ≥7:1 |
+Always state the background a ratio was measured against. An earlier version of this
+table did not, and `--text-muted` was signed off on the strength of its `--bg-primary`
+figure while most micro text actually renders on cards (`--bg-secondary`), where it was
+still under target. Cards are the tightest common case, so treat that column as the gate.
+
+Dark theme:
+
+| Token | on `--bg-primary` | on `--bg-secondary` (cards) | on `--bg-tertiary` | Requirement |
+|-------|-------------------|------------------------------|--------------------|-------------|
+| `--text-primary` | ✓ 12.26:1 | ✓ 11.21:1 | ✓ 9.86:1 | ≥4.5:1 |
+| `--text-secondary` | ✓ 6.15:1 | ✓ 5.62:1 | ✓ 4.95:1 | ≥4.5:1 |
+| `--text-muted` | ✓ 7.77:1 | ✓ 7.10:1 | ✗ 6.25:1 | ≥7:1 |
+
+Light theme:
+
+| Token | on `--bg-primary` | on `--bg-secondary` (cards) | on `--bg-tertiary` | Requirement |
+|-------|-------------------|------------------------------|--------------------|-------------|
+| `--text-primary` | ✓ 15.80:1 | ✓ 14.84:1 | ✓ 13.31:1 | ≥4.5:1 |
+| `--text-secondary` | ✓ 5.25:1 | ✓ 4.93:1 | ✗ 4.42:1 | ≥4.5:1 |
+| `--text-muted` | ✓ 7.63:1 | ✓ 7.16:1 | ✗ 6.42:1 | ≥7:1 |
+
+Two gaps remain, both pre-existing and neither introduced by M8-T2b:
+
+- `--text-muted` on `--bg-tertiary` misses the internal ≥7:1 bar in both themes. It still
+  clears AA comfortably. Closing it would need a further bump that erodes the gap to
+  `--text-primary`, so it is left open deliberately.
+- `--text-secondary` on `--bg-tertiary` in the light theme is **4.42:1, below the AA 4.5:1
+  floor**. This is a real WCAG 1.4.3 failure wherever that pairing occurs, and unlike the
+  row above it is not merely short of an internal target.
 
 **Design note (M8-T2):** Bumping `--text-muted` to ≥7:1 brings it visually closer to
 `--text-secondary` in both themes, which reduces the visual hierarchy. This is an
-intentional trade-off: WCAG AAA compliance takes precedence. Consider using
-`--text-muted` only for non-critical decorative or supplemental text where semantically
-appropriate; use `--text-secondary` for any meaningful metadata users must read.
+intentional trade-off: WCAG AAA compliance takes precedence.
+
+The follow-on advice that used to sit here, to prefer `--text-secondary` for meaningful
+metadata, has been removed: it is now backwards. After M8-T2b, `--text-secondary` is the
+weakest text token in the palette (4.93:1 vs 7.16:1 on light cards), so steering important
+metadata towards it steers it towards the least readable option. Prefer `--text-muted` for
+anything a user must actually read, despite the name, until the tokens are renamed.
 
 ## Known violations (pre-M8 baseline)
 
@@ -67,6 +95,11 @@ appropriate; use `--text-secondary` for any meaningful metadata users must read.
 
 - [x] M8-T1a — @axe-core/react injected in `src/main.tsx` (DEV only)
 - [x] M8-T2 — `--text-muted` bumped: dark `#484f58→#9ca4ad`, light `#8b949e→#4f5960`
+- [x] M8-T2b — `--text-muted` bumped again, to `#9fa7af` dark / `#4b555c` light. The first
+  bump was measured against `--bg-primary`, but micro text overwhelmingly sits on cards
+  (`--bg-secondary`), where it only reached 6.86:1 dark / 6.73:1 light. Now 7.10:1 / 7.16:1
+  on `--bg-secondary`, and 7.77:1 / 7.63:1 on `--bg-primary`. Still short of 7:1 on
+  `--bg-tertiary` (6.25:1 / 6.42:1), which is AA-conformant but under the internal bar.
 - [x] M8-T3 — StatusPill verified: all status renders include icon + label (no color-alone)
 - [x] M8-T4 — AgentComputeHeatmap: fixed `--accent-cyan-rgb` bug, added 5-step legend, added `aria-label` per cell
 - [x] M8-T5 — `:focus-visible` global rule updated; touch targets audited
