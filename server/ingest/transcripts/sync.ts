@@ -9,7 +9,7 @@ import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 import { excludeObservedCondition } from "../../db/costs.js";
 import { unmappedPointCount, refusedSeriesPointCount } from "../otlp/ingest.js";
-import { SERIES_CAP } from "../otlp/series.js";
+import { seriesCap } from "../otlp/series.js";
 import type { CostOverlap } from "../../../shared/types.js";
 
 const PROVIDER = "anthropic";
@@ -332,7 +332,7 @@ export function getIngestStatus(db: Database.Database): {
     // its own copy of the ceiling would announce "at capacity" against the
     // wrong number the moment the cap is raised, which is precisely the remedy
     // an operator reaches for when this figure climbs.
-    otlpSeriesCap: SERIES_CAP,
+    otlpSeriesCap: seriesCap(),
     // Process-lifetime, not a query — see refusedSeriesPointCount's own
     // comment. A refused point writes no row, so nothing survives to count.
     otlpSeriesRefused: refusedSeriesPointCount(),
