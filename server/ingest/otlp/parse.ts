@@ -98,15 +98,24 @@ function boundedOrNull(value: number): number | null {
 }
 
 /**
- * Resolve one data point's quantity.
+ * Resolve a histogram data point's quantity: its total lives in `sum`.
  *
- * A histogram's total lives in `sum`; a Sum point's lives in `asDouble` or
- * `asInt`. `count` is the number of observations recorded, never the
- * quantity, so it is deliberately never read here — a missing `sum` is a
- * skipped point, not a substituted `count`.
+ * `count` is the number of observations recorded, never the quantity, so it
+ * is deliberately never read here — a missing `sum` is a skipped point, not
+ * a substituted `count`.
  */
-function resolvePointValue(point: Record<string, unknown>, isHistogram: boolean): number | null {
-  return isHistogram ? asNumber(point.sum) : asNumber(point.asDouble) ?? asNumber(point.asInt);
+function resolveHistogramPointValue(point: Record<string, unknown>): number | null {
+  return asNumber(point.sum);
+}
+
+/** Resolve a Sum data point's quantity: it lives in `asDouble` or `asInt`. */
+function resolveSumPointValue(point: Record<string, unknown>): number | null {
+  return asNumber(point.asDouble) ?? asNumber(point.asInt);
+}
+
+/** A value only safe to stringify directly: coercing an object yields "[object Object]". */
+function stringOrEmpty(raw: unknown): string {
+  return typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
 }
 
 /**
@@ -129,9 +138,9 @@ function resolvePointValue(point: Record<string, unknown>, isHistogram: boolean)
 function resolvePointTimes(
   point: Record<string, unknown>
 ): { timeUnixNano: string; startTimeUnixNano: string } | null {
-  const timeUnixNano = String(point.timeUnixNano ?? "");
+  const timeUnixNano = stringOrEmpty(point.timeUnixNano);
   if (timeUnixNano === "") return null;
-  return { timeUnixNano, startTimeUnixNano: String(point.startTimeUnixNano ?? "") };
+  return { timeUnixNano, startTimeUnixNano: stringOrEmpty(point.startTimeUnixNano) };
 }
 
 type MetricPointContainer = { aggregationTemporality?: unknown; dataPoints?: unknown };
@@ -161,7 +170,7 @@ function parseMetric(
 
   for (const dp of container.dataPoints) {
     const point = dp as Record<string, unknown>;
-    const value = resolvePointValue(point, Boolean(histogram));
+    const value = histogram ? resolveHistogramPointValue(point) : resolveSumPointValue(point);
     if (value === null) continue;
 
     const times = resolvePointTimes(point);
@@ -210,7 +219,7 @@ export function parseMetricsPayload(body: unknown): OtlpPoint[] {
     if (!Array.isArray(scopeMetrics)) continue;
 
     for (const sm of scopeMetrics) {
-      const scopeName = String((sm as { scope?: { name?: unknown } }).scope?.name ?? "");
+      const scopeName = stringOrEmpty((sm as { scope?: { name?: unknown } }).scope?.name);
       const metrics = (sm as { metrics?: unknown }).metrics;
       if (!Array.isArray(metrics)) continue;
 

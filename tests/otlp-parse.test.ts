@@ -213,6 +213,54 @@ describe("parseMetricsPayload", () => {
     };
     expect(parseMetricsPayload(payload)).toEqual([]);
   });
+
+  it("drops a point whose timeUnixNano is a non-string, non-number value rather than stringifying it", () => {
+    // A bare String(x ?? "") would turn an object into the literal string
+    // "[object Object]", which is truthy and would NOT be skipped here --
+    // producing a garbage timestamp instead of the loud failure a malformed
+    // OTLP payload deserves.
+    expect(parseMetricsPayload(histogramPayload({ timeUnixNano: {} }))).toEqual([]);
+    expect(parseMetricsPayload(histogramPayload({ timeUnixNano: [] }))).toEqual([]);
+  });
+
+  it("resolves scopeName to empty rather than stringifying a non-string scope.name", () => {
+    // scopeName feeds series identity hashing downstream, so a leaked
+    // "[object Object]" would silently merge or split unrelated series.
+    const payload = {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{ scope: { name: ["not", "a", "string"] }, metrics: [{
+          name: "m",
+          sum: {
+            aggregationTemporality: 1,
+            dataPoints: [{ attributes: [], startTimeUnixNano: "1", timeUnixNano: "2", asInt: "1" }],
+          },
+        }] }],
+      }],
+    };
+    expect(parseMetricsPayload(payload)[0].scopeName).toBe("");
+  });
+
+  it("reads a histogram point's value from sum alone, even when asInt/asDouble are also present", () => {
+    const payload = histogramPayload({ sum: 100, asInt: "999", asDouble: 888 });
+    expect(parseMetricsPayload(payload)[0].value).toBe(100);
+  });
+
+  it("reads a Sum point's value from asInt/asDouble alone, even when sum is also present", () => {
+    const payload = {
+      resourceMetrics: [{
+        resource: { attributes: [] },
+        scopeMetrics: [{ scope: { name: "s" }, metrics: [{
+          name: "m",
+          sum: {
+            aggregationTemporality: 1,
+            dataPoints: [{ attributes: [], startTimeUnixNano: "1", timeUnixNano: "2", asInt: "42", sum: 999999 }],
+          },
+        }] }],
+      }],
+    };
+    expect(parseMetricsPayload(payload)[0].value).toBe(42);
+  });
 });
 
 // A quantity has to be a number we can honestly record, not merely a finite

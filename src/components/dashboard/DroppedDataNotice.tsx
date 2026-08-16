@@ -116,8 +116,7 @@ export function DroppedDataNotice({
           style={{ color: "inherit" }}
         >
           docs/ingestion.md
-        </a>
-        .
+        </a>.
       </p>
     </div>
   );
