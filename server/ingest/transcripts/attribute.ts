@@ -14,7 +14,7 @@ import type Database from "better-sqlite3";
 const SLASH = 47;
 
 export function normalisePath(raw: string): string {
-  const forward = raw.replace(/\\/g, "/");
+  const forward = raw.replaceAll("\\", "/");
   // Strip trailing slashes, but never down to the empty string. "/" is all
   // slash, and collapsing it to "" turns the prefix test in buildAttributor
   // into `target.startsWith("/")`, which is true of every POSIX path on the
@@ -28,7 +28,7 @@ export function normalisePath(raw: string): string {
   // slashes (CodeQL js/polynomial-redos). Walking backwards is linear, and
   // stopping at index 1 gives the "never collapse to empty" floor for free.
   let end = forward.length;
-  while (end > 1 && forward.charCodeAt(end - 1) === SLASH) end--;
+  while (end > 1 && forward.codePointAt(end - 1) === SLASH) end--;
   const normalised = forward.slice(0, end);
   return process.platform === "win32" ? normalised.toLowerCase() : normalised;
 }
