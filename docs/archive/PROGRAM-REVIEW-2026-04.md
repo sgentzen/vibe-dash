@@ -5,7 +5,7 @@
 > were deliberately removed in Phases 1A–1D to refocus on a local-first
 > Dashboard + Kanban + MCP for a solo user. Read this for the earlier strategic
 > context, not as the current plan. Superseded task plans live in
-> [archive/superseded-plans/](archive/superseded-plans/).
+> [superseded-plans/](superseded-plans/).
 
 **Status**: Historical (April 2026). Superseded by the Phase 1 cuts; retained
 for context.
@@ -48,8 +48,8 @@ From `README.md` and `docs/superpowers/specs/2026-03-28-vibe-dash-design.md`:
 
 **Through R10:**
 
-- 68 MCP tools in [server/mcp/tools.ts](../server/mcp/tools.ts).
-- Dashboard views in [src/components/](../src/components): Dashboard,
+- 68 MCP tools in [server/mcp/tools.ts](../../server/mcp/tools.ts).
+- Dashboard views in [src/components/](../../src/components): Dashboard,
   Executive, AgentDashboard, TaskBoard, Timeline, Orchestration, Worktree,
   ActivityStream, AgentFeed, WebhookSettings.
 - SQLite data model with 24+ tables: projects, tasks, milestones, agents,
@@ -162,8 +162,8 @@ Ordered by leverage. Implemented as milestones R11, R12, R13 (see `§5`).
 ## 5. Milestones & Tasks
 
 These are created in the Vibe Dash database via MCP. Detailed Sonnet-ready
-implementation plans live under [`docs/plans/R11/`](plans/R11),
-[`docs/plans/R12/`](plans/R12), [`docs/plans/R13/`](plans/R13).
+implementation plans live under [`docs/plans/R11/`](../plans/R11),
+[`docs/plans/R12/`](../plans/R12), [`docs/plans/R13/`](../plans/R13).
 
 | Milestone | Theme |
 |---|---|
@@ -172,19 +172,19 @@ implementation plans live under [`docs/plans/R11/`](plans/R11),
 | **R13 — Reach** | Self-hostable team mode, docs + hero examples |
 
 **R11 tasks** (shipped — archived)
-- [R11.1 — Multi-project fleet view](archive/completed-plans/R11.1-multi-project-fleet-view.md)
-- [R11.2 — Cost intelligence v2](archive/completed-plans/R11.2-cost-intelligence-v2.md)
-- [R11.3 — Cross-platform agent ingestion](archive/completed-plans/R11.3-cross-platform-agent-ingestion.md)
-- [R11.4 — Feature deprecation audit](archive/completed-plans/R11.4-feature-deprecation-audit.md)
+- [R11.1 — Multi-project fleet view](completed-plans/R11.1-multi-project-fleet-view.md)
+- [R11.2 — Cost intelligence v2](completed-plans/R11.2-cost-intelligence-v2.md)
+- [R11.3 — Cross-platform agent ingestion](completed-plans/R11.3-cross-platform-agent-ingestion.md)
+- [R11.4 — Feature deprecation audit](completed-plans/R11.4-feature-deprecation-audit.md)
 
 **R12 tasks**
-- [R12.1 — AI-summarized digests + NL query](archive/superseded-plans/R12.1-nl-query-and-digests.md) _(superseded — cut in Phase 1C)_
-- [R12.2 — Git host sync (GitHub/GitLab)](archive/superseded-plans/R12.2-git-host-sync.md) _(superseded — cut in Phase 1B)_
-- [R12.3 — Information-density pass](plans/R12/R12.3-information-density-pass.md) _(partially shipped)_
+- [R12.1 — AI-summarized digests + NL query](superseded-plans/R12.1-nl-query-and-digests.md) _(superseded — cut in Phase 1C)_
+- [R12.2 — Git host sync (GitHub/GitLab)](superseded-plans/R12.2-git-host-sync.md) _(superseded — cut in Phase 1B)_
+- [R12.3 — Information-density pass](../plans/R12/R12.3-information-density-pass.md) _(partially shipped)_
 
 **R13 tasks**
-- [R13.1 — Self-hostable team mode](archive/superseded-plans/R13.1-self-hostable-team-mode.md) _(superseded — cut in Phase 1C)_
-- [R13.2 — Docs + hero examples + homepage reposition](plans/R13/R13.2-docs-and-repositioning.md) _(largely shipped)_
+- [R13.1 — Self-hostable team mode](superseded-plans/R13.1-self-hostable-team-mode.md) _(superseded — cut in Phase 1C)_
+- [R13.2 — Docs + hero examples + homepage reposition](../plans/R13/R13.2-docs-and-repositioning.md) _(largely shipped)_
 
 ---
 
