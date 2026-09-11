@@ -69,6 +69,8 @@ All four entry points share the same SQLite database file.
 | `PORT` | `3001` | Port the server listens on |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path — used by the server process, the stdio MCP transport and the CLI. Not relative to your working directory: left unset it resolves to the git root of the Vibe Dash install. The Docker image sets it to `/data/vibe-dash.db`. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know. Only for deliberately running an older build against a migrated database. |
+| `VIBE_DASH_OTLP_SERIES_CAP` | `10000` | Ceiling on distinct OTLP metric series. Only the creation of a new series is refused; nothing is ever deleted, so an established sender is unaffected. Raise it and restart if a flooded install needs to admit new senders. |
+| `VIBE_DASH_CLAUDE_HOME` | `~/.claude/projects` | Where transcript ingestion looks for Claude Code session files. Point it at an empty directory to switch ingestion off. |
 
 Override in `docker-compose.yml` under `environment`, or in a `.env` file.
 

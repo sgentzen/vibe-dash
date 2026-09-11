@@ -179,14 +179,19 @@ This project reports task status to Vibe Dash via MCP. When working on tasks:
 |------|---------|
 | `list_projects` | List all projects |
 | `create_project` | Register a new project |
+| `create_milestone` | Create a milestone for a project |
+| `list_milestones` | List milestones, optionally filtered by project |
+| `complete_milestone` | Mark a milestone as achieved |
 | `create_task` | Create a task (planned, in_progress, blocked, done) |
 | `get_task` | Get task details by ID |
 | `list_tasks` | List tasks with optional filters (project_id, status) |
+| `search_tasks` | Search tasks by query, project, milestone, status, priority, agent, or due date |
 | `update_task` | Update title, description, status, priority, progress |
 | `complete_task` | Mark task done (sets status=done, progress=100) |
 | `log_activity` | Log a status update (agent_name auto-registers) |
 | `report_blocker` | Flag a task as blocked with reason |
 | `resolve_blocker` | Clear a blocker |
+| `log_cost` | Log a cost/token usage entry for an LLM call |
 | `register_agent` | Register/update an agent identity |
 | `heartbeat` | Report what you're working on right now (short freeform status) |
 | `get_project_context` | Get a project's state in one call (open milestones, in-progress tasks, active blockers, recent activity) |

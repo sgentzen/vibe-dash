@@ -3,7 +3,7 @@
 **Status:** Decided
 **Date:** 2026-08-09
 **Supersedes:** [docs/decisions/2026-05-strategic-positioning.md](2026-05-strategic-positioning.md)
-**Source:** [docs/superpowers/specs/2026-08-09-transcript-ingestion-design.md](../superpowers/specs/2026-08-09-transcript-ingestion-design.md)
+**Source:** [docs/archive/completed-plans/2026-08-09-transcript-ingestion-design.md](../archive/completed-plans/2026-08-09-transcript-ingestion-design.md)
 
 ## Context
 

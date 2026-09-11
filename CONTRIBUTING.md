@@ -14,7 +14,7 @@ Thanks for your interest in contributing! Here's how to get started.
 1. Create a branch from `main`
 2. Make your changes following existing code patterns
 3. Add tests for new functionality
-4. Run `npm test` to confirm nothing is broken
+4. Run `npm run lint` and `npm test` to confirm nothing is broken
 5. Open a pull request against `main`
 
 ## Code Conventions
@@ -38,6 +38,8 @@ Thanks for your interest in contributing! Here's how to get started.
 ```bash
 npm test              # Run once
 npm run test:watch    # Watch mode
+npm run lint          # ESLint (npm run lint:fix to auto-fix)
+npm run test:e2e      # Playwright end-to-end tests
 ```
 
 Tests use Vitest with in-memory SQLite for isolation. When adding features, add corresponding tests.
