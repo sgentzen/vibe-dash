@@ -10,7 +10,7 @@ import type {
   AgentHealthStatus,
   ActivityEntry,
 } from "../types.js";
-import { now, genId, parseAgent, normalizeAgentName } from "./helpers.js";
+import { now, genId, parseAgent, normalizeAgentName, julianDaySql } from "./helpers.js";
 
 // ─── Agent CRUD ─────────────────────────────────────────────────────────────
 
@@ -360,6 +360,16 @@ export function getAgentActivity(db: Database.Database, agentId: string, limit =
     .all(agentId, limit) as ActivityEntry[];
 }
 
+/**
+ * How many tasks this agent finished inside today's UTC window.
+ *
+ * Parsed dates, not raw string order — see closeStaleSession for why comparing
+ * ISO strings fails open, and on which values. Here it inflated the count: a
+ * task whose updated_at could not be read was reported as finished today,
+ * every day, forever, while a blank one was excluded. An undatable task now
+ * falls out of the window, which is the honest answer for a figure that is
+ * only about today: the task is done, but nothing on the row says when.
+ */
 export function getAgentCompletedToday(db: Database.Database, agentId: string): number {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
@@ -367,7 +377,8 @@ export function getAgentCompletedToday(db: Database.Database, agentId: string): 
     .prepare(
       `SELECT COUNT(DISTINCT t.id) AS count FROM activity_log a
        JOIN tasks t ON a.task_id = t.id
-       WHERE a.agent_id = ? AND t.status = 'done' AND t.updated_at >= ?`
+       WHERE a.agent_id = ? AND t.status = 'done'
+         AND ${julianDaySql("t.updated_at")} >= julianday(?)`
     )
     .get(agentId, todayStart.toISOString()) as { count: number };
   return row.count;
@@ -380,11 +391,18 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
   todayStart.setUTCHours(0, 0, 0, 0);
   const todayIso = todayStart.toISOString();
 
-  // Counts query: completions, today, blocker rate
+  // Counts query: completions, today, blocker rate.
+  //
+  // today_done compares parsed dates for the reason getAgentCompletedToday
+  // documents: as a raw string comparison a task with an unreadable updated_at
+  // counted as done today on every stats read. Only the windowed count drops
+  // it; total_done still counts the task, because "is it done" is a question
+  // the timestamp is not needed to answer.
   const mainRow = db.prepare(
     `SELECT
        COUNT(DISTINCT CASE WHEN t.status = 'done' THEN t.id END) AS total_done,
-       COUNT(DISTINCT CASE WHEN t.status = 'done' AND t.updated_at >= ? THEN t.id END) AS today_done,
+       COUNT(DISTINCT CASE WHEN t.status = 'done'
+             AND ${julianDaySql("t.updated_at")} >= julianday(?) THEN t.id END) AS today_done,
        COUNT(DISTINCT t.id) AS total_tasks,
        COUNT(DISTINCT CASE WHEN EXISTS (SELECT 1 FROM blockers b WHERE b.task_id = t.id) THEN t.id END) AS blocked_tasks
      FROM activity_log a
