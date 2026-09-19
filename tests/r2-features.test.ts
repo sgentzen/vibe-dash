@@ -195,7 +195,8 @@ describe("1.3 Agent Sessions", () => {
     const agents = db.prepare("SELECT * FROM agents").all() as Array<{ id: string }>;
     const agent = agents[0];
 
-    // Insert a session with old started_at
+    // Insert a session that both started and fell quiet an hour ago.
+    // closeStaleSession reads last_activity_at, which is the one that matters.
     const oldTime = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // 1 hour ago
     db.prepare(
       "INSERT INTO agent_sessions (id, agent_id, started_at, last_activity_at, tasks_touched, activity_count) VALUES (?, ?, ?, ?, 1, 1)"

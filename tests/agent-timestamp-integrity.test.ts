@@ -166,11 +166,19 @@ describe("getAgentStats activity_frequency with unreadable session timestamps", 
  * is false because letters sort above digits — a non-date timestamp was
  * invisible to housekeeping forever, in code that runs unattended from the MCP
  * server's oninitialized hook.
+ *
+ * The helper writes the same value to both timestamps, as the public API does,
+ * so these cases say nothing about which column housekeeping reads — that is
+ * `closeStaleSession` measures idleness, not session age, and
+ * tests/agent-session-staleness.test.ts is where the two are pulled apart.
+ * What is pinned here is the parsing: whatever column is read, a value
+ * julianday() cannot make sense of has to be treated as stale rather than
+ * quietly outranking the cutoff.
  */
-describe("closeStaleSession with an unreadable started_at", () => {
-  function openSession(startedAt: string): string {
+describe("closeStaleSession with an unreadable timestamp", () => {
+  function openSession(timestamp: string): string {
     const id = newAgent(`holder-${randomUUID().slice(0, 8)}`);
-    return addSession(id, { started_at: startedAt, last_activity_at: startedAt, activity_count: 1 });
+    return addSession(id, { started_at: timestamp, last_activity_at: timestamp, activity_count: 1 });
   }
 
   function endedAtOf(sessionId: string): string | null {
@@ -179,28 +187,28 @@ describe("closeStaleSession with an unreadable started_at", () => {
     }).ended_at;
   }
 
-  it("closes a session whose started_at is not a date", () => {
+  it("closes a session whose timestamps are not dates", () => {
     const sessionId = openSession("not-a-date");
 
     expect(closeStaleSession(db)).toBe(1);
     expect(endedAtOf(sessionId)).not.toBeNull();
   });
 
-  it("closes a session whose started_at is blank", () => {
+  it("closes a session whose timestamps are blank", () => {
     const sessionId = openSession("");
 
     expect(closeStaleSession(db)).toBe(1);
     expect(endedAtOf(sessionId)).not.toBeNull();
   });
 
-  it("closes a session that started before the cutoff", () => {
+  it("closes a session whose timestamps are both before the cutoff", () => {
     const sessionId = openSession(LONG_AGO);
 
     expect(closeStaleSession(db)).toBe(1);
     expect(endedAtOf(sessionId)).not.toBeNull();
   });
 
-  it("leaves a session that started recently open", () => {
+  it("leaves a session with recent timestamps open", () => {
     const sessionId = openSession(new Date().toISOString());
 
     expect(closeStaleSession(db)).toBe(0);
