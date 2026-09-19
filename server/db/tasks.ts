@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { Task, TaskStatus, TaskPriority } from "../types.js";
-import { now, genId } from "./helpers.js";
+import { now, genId, julianDaySql } from "./helpers.js";
 import { DEFAULT_TASK_LIST_LIMIT, MAX_TASK_LIST_LIMIT } from "../constants.js";
 
 /** Clamp a caller-supplied limit to [1, MAX_TASK_LIST_LIMIT], defaulting when absent/invalid. */
@@ -212,11 +212,21 @@ export function completeTask(db: Database.Database, id: string): Task | null {
   return updateTask(db, id, { status: "done", progress: 100 });
 }
 
+/**
+ * Tasks completed inside today's UTC window, across every project.
+ *
+ * Parsed dates, not raw string order — see closeStaleSession in agents.ts for
+ * the mechanism. As a string comparison every done task carrying an unreadable
+ * updated_at padded this count on every dashboard refresh, while a blank one
+ * was dropped; an undatable task is now excluded instead.
+ */
 export function getTasksCompletedToday(db: Database.Database): number {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const row = db
-    .prepare("SELECT COUNT(*) AS n FROM tasks WHERE status = 'done' AND updated_at >= ?")
+    .prepare(
+      `SELECT COUNT(*) AS n FROM tasks WHERE status = 'done' AND ${julianDaySql("updated_at")} >= julianday(?)`
+    )
     .get(todayStart.toISOString()) as { n: number };
   return row.n;
 }

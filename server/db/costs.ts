@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { now, genId } from "./helpers.js";
+import { now, genId, julianDaySql } from "./helpers.js";
 import { buildWhere } from "./where.js";
 import type {
   CostEntry,
@@ -135,13 +135,26 @@ function getCostSummaryBy(db: Database.Database, column: CostSummaryColumn, valu
   ).get(value) as CostSummary;
 }
 
+/**
+ * Spend inside today's UTC window.
+ *
+ * Parsed dates, not raw string order — see closeStaleSession in agents.ts for
+ * the mechanism. Here a row with an unreadable created_at had its whole cost
+ * added to today's figure on every refresh, while a blank one was excluded.
+ * Leaving it out is the honest answer for a figure about today: the cost is
+ * real, but nothing on the row places it in this window, and it stays in the
+ * all-time totals, which need no timestamp.
+ *
+ * Migration 024 indexes julianday(created_at) so this stays a range scan; see
+ * it before rewriting the predicate.
+ */
 export function getSpendToday(db: Database.Database): number {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const row = db
     .prepare(
       `SELECT COALESCE(SUM(cost_usd), 0) AS total FROM cost_entries
-       WHERE created_at >= ? AND ${excludeObservedCondition()}`
+       WHERE ${julianDaySql("created_at")} >= julianday(?) AND ${excludeObservedCondition()}`
     )
     .get(todayStart.toISOString()) as { total: number };
   return row.total;
@@ -157,7 +170,10 @@ export function getSpendToday(db: Database.Database): number {
  *
  * The window and the exclusion must match getSpendToday exactly. A count over
  * a different window would explain a figure the reader is not looking at,
- * which is worse than no count at all.
+ * which is worse than no count at all. That is also why the julianday() window
+ * is here: matching means matching after the fix too, and this count showed the
+ * same inflation — an unpriced row with an unreadable created_at was reported
+ * as one of today's unpriced entries on every refresh.
  */
 export function getSpendTodayUnpriced(db: Database.Database): number {
   const todayStart = new Date();
@@ -165,7 +181,8 @@ export function getSpendTodayUnpriced(db: Database.Database): number {
   const row = db
     .prepare(
       `SELECT COUNT(*) AS n FROM cost_entries
-       WHERE created_at >= ? AND cost_usd IS NULL AND ${excludeObservedCondition()}`
+       WHERE ${julianDaySql("created_at")} >= julianday(?) AND cost_usd IS NULL
+         AND ${excludeObservedCondition()}`
     )
     .get(todayStart.toISOString()) as { n: number };
   return row.n;
@@ -215,7 +232,16 @@ export function getCostTimeseries(
     filter.agent_id ? ["agent_id = ?", filter.agent_id] : null,
     filter.milestone_id ? ["milestone_id = ?", filter.milestone_id] : null,
     filter.project_id ? ["project_id = ?", filter.project_id] : null,
-    ["created_at >= ?", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()],
+    // Parsed dates for the reason getSpendToday documents, though here the
+    // exclusion was already happening by accident rather than by intent: an
+    // unreadable created_at passed the raw string window, but DATE() is NULL
+    // for it too, so the row landed in a NULL-date group that no emitted day
+    // ever matched. Nothing visible changes, and it now holds by the same rule
+    // as every other cost query rather than by the grouping's good luck.
+    [
+      `${julianDaySql("created_at")} >= julianday(?)`,
+      new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+    ],
   ]);
 
   const rows = db.prepare(

@@ -898,6 +898,73 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "024_cost_entries_created_at_julianday_index",
+    run(db) {
+      // The cost queries that ask "inside this window" now compare
+      // julianday(created_at), not the raw string, so that a row whose
+      // timestamp cannot be read stops being counted as today's spend. That
+      // makes the predicate non-sargable: idx_cost_entries_created_at indexes
+      // the column, not the expression, so getSpendToday, getSpendTodayUnpriced
+      // and the unfiltered getCostTimeseries all went from
+      //   SEARCH cost_entries USING INDEX idx_cost_entries_created_at (created_at>?)
+      // to a full SCAN of the largest and fastest-growing table in the
+      // database. GET /api/stats runs the first two back to back and the
+      // dashboard polls it every 3 seconds, and better-sqlite3 is synchronous,
+      // so each scan blocks the event loop. (A timeseries filtered by agent,
+      // milestone or project resolves through that filter's own index and never
+      // depended on this one.)
+      //
+      // An index on the expression restores the range scan for exactly the
+      // form those queries use. Additive and IF NOT EXISTS, so it is safe on
+      // every existing database and costs only the usual per-insert index
+      // maintenance (measured: about 400ms to build over 10^6 rows, inside the
+      // per-migration transaction, before the server serves anything).
+      //
+      // Not folded into 001 or 020 alongside the plain column index: those have
+      // shipped, and CREATE TABLE/INDEX statements inside an already-recorded
+      // migration never run again, so a live database would never receive it.
+      // The same reason 023 exists. A future migration that rebuilds
+      // cost_entries the way 020 did must re-create this index, because an
+      // index lives with its table.
+      //
+      // The expression is spelled out here rather than imported from
+      // julianDaySql(), because a migration's SQL has to be frozen: a later
+      // edit to that helper would leave every existing database holding an
+      // index over the old expression, silently unused. They must stay
+      // identical, and the "cost window stays sargable" test is what enforces
+      // it by explaining the real queries.
+      //
+      // The GLOB guard is load-bearing, not defensive noise: without it a
+      // single stored value that reads the clock ('now', 'subsec') makes this
+      // CREATE INDEX throw and, because the failure repeats on every start,
+      // leaves a database nothing can open. julianDaySql() in helpers.ts is
+      // where that is explained; this migration only has to match it.
+      //
+      // A prefilter on the raw column (`created_at >= ? AND julianday(...)`)
+      // would have kept the old index without a migration, and it is wrong:
+      // '2026-09-18 05:00:00' and '2026-09-18' are both readable dates that
+      // sort BELOW an ISO cutoff, because ' ' (0x20) and the end of a short
+      // string rank under 'T' (0x54). The prefilter would drop them from today,
+      // trading a fail-open bug for a fail-closed one.
+      //
+      // Missing-table guard for the same reason 023 carries one: a database
+      // salvaged from corruption can reach here with 001 recorded but the table
+      // gone, and an unguarded CREATE INDEX would wedge startup the same way.
+      const exists = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cost_entries'")
+        .all();
+      if (exists.length === 0) return;
+
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at_jd
+          ON cost_entries(julianday(
+            CASE WHEN created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+              THEN created_at END
+          ));
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
