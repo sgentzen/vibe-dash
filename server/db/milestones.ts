@@ -151,6 +151,39 @@ export function backfillMilestoneDailyStats(db: Database.Database): number {
 
 // ─── Time Estimates ─────────────────────────────────────────────────────────
 
+/**
+ * Seconds between a task's first logged activity and its completion, or null
+ * when there is no span to report.
+ *
+ * The parse guard fails closed on a timestamp that cannot be read. `new Date()`
+ * yields an Invalid Date for a garbage string and NaN survives every step that
+ * follows, because `end - start`, `Math.round(NaN)` and `Math.max(0, NaN)` are
+ * all NaN. So this returned NaN, a value its own `number | null` signature does
+ * not allow. The route hid that: `JSON.stringify(NaN)` is `null`, so
+ * `/api/tasks/:id/time-spent` already served a plausible-looking response while
+ * any in-process caller doing arithmetic on the result got NaN. The falsy check
+ * covered only half the inputs, catching a blank `first.ts` by luck of it being
+ * falsy while nothing at all looked at `updated_at`, blank or otherwise.
+ *
+ * Null rather than a throw or a distinct "unreadable" signal. Null is already
+ * this function's answer for "no elapsed time to report" — it says that for a
+ * task with no activity and for one that is not done — and a span that cannot
+ * be measured belongs in the same bucket, because there is no honest number to
+ * put in its place. Throwing would fail a task detail read over one bad row,
+ * and a read-only estimate is the wrong place to raise a data-integrity alarm.
+ * The accepted trade-off is that an unreadable timestamp is indistinguishable
+ * from the ordinary null cases; the value exists to be displayed, not audited.
+ *
+ * What this does not close: `new Date()` is lenient, so a wrong-but-parseable
+ * string still yields a number. `'0'` is a valid date literal reading as
+ * 2000-01-01 and `'2026'` reads as that year's 1 January — both finite, neither
+ * distinguishable from a date someone meant to store. A stored value that
+ * precedes the first activity then hits the `Math.max` clamp and reports a span
+ * of zero, which looks like a task finished instantly rather than like an
+ * absence. Closing that would take a format check rather than a parse check,
+ * and would risk rejecting rows this codebase did not write, so it is left
+ * open deliberately. tests/task-timestamp-integrity.test.ts pins the boundary.
+ */
 export function getTimeSpent(db: Database.Database, taskId: string): number | null {
   const first = db
     .prepare("SELECT MIN(timestamp) AS ts FROM activity_log WHERE task_id = ?")
@@ -159,5 +192,6 @@ export function getTimeSpent(db: Database.Database, taskId: string): number | nu
   if (!first?.ts || task?.status !== "done") return null;
   const start = new Date(first.ts).getTime();
   const end = new Date(task.updated_at).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
   return Math.max(0, Math.round((end - start) / 1000));
 }
