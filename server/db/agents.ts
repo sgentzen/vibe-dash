@@ -250,10 +250,24 @@ export function closeAgentSessions(db: Database.Database, agentId: string): void
   db.prepare("UPDATE agent_sessions SET ended_at = ? WHERE agent_id = ? AND ended_at IS NULL").run(now(), agentId);
 }
 
+/**
+ * Close every open session that has outlived the session timeout.
+ *
+ * Staleness is decided on parsed dates, not on raw string order. Comparing the
+ * ISO strings directly failed open on exactly the values worth catching: `''`
+ * sorts below any cutoff so a blank started_at was closed by luck, but
+ * `'not-a-date'` sorts above it because letters outrank digits, so a session
+ * carrying a non-date timestamp stayed open forever and was invisible to
+ * housekeeping. julianday() is NULL for anything it cannot read, and a session
+ * whose age cannot be measured is not a session we can call live — so it is
+ * closed, same as one that is provably old.
+ */
 export function closeStaleSession(db: Database.Database): number {
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
   const result = db.prepare(
-    "UPDATE agent_sessions SET ended_at = ? WHERE ended_at IS NULL AND started_at < ?"
+    `UPDATE agent_sessions SET ended_at = ?
+     WHERE ended_at IS NULL
+       AND (julianday(started_at) IS NULL OR julianday(started_at) < julianday(?))`
   ).run(now(), cutoff);
   return result.changes;
 }
@@ -275,8 +289,20 @@ export function closeStaleSession(db: Database.Database): number {
  */
 export function cleanupStaleAgents(db: Database.Database): number {
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
+  // Parsed dates, not raw string order — see closeStaleSession for why the
+  // string comparison caught a blank last_seen_at but never a non-date one.
+  // An agent whose last sighting cannot be read is treated as gone, which is
+  // the same answer a blank value already got.
+  //
+  // The open-session guard below is not what protects such an agent, because
+  // closeStaleSession runs first in the same housekeeping pass and can close
+  // the very session the guard relies on. What holds is the foreign key: the
+  // session row it just closed still references agents(id), so the delete is
+  // refused and the agent is kept. An agent reaches the DELETE only if it has
+  // no session row at all, which means it has nothing on record to lose.
   const candidates = db.prepare(
-    `SELECT id FROM agents WHERE last_seen_at < ?
+    `SELECT id FROM agents
+     WHERE (julianday(last_seen_at) IS NULL OR julianday(last_seen_at) < julianday(?))
      AND id NOT IN (SELECT agent_id FROM agent_sessions WHERE ended_at IS NULL)`
   ).all(cutoff) as { id: string }[];
 
@@ -374,14 +400,33 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
   ).get(agentId) as { avg_sec: number | null } | undefined;
   const avgCompletionTime = avgRow?.avg_sec == null ? null : Math.round(avgRow.avg_sec);
 
-  // Session activity frequency via SQL aggregation
+  // Session activity frequency via SQL aggregation.
+  //
+  // The WHERE gate keeps a session out of BOTH sides of the rate when its span
+  // cannot be measured. julianday() returns NULL for a string it cannot read,
+  // two-argument MAX(NULL, 0.01) is NULL (unlike the aggregate MAX), and SUM
+  // skips a NULL — so an unreadable row used to drop out of the hours
+  // denominator while its activity_count stayed in the numerator. A session
+  // with 500 activities and a corrupt started_at, next to a real 5-activity
+  // hour, reported 505/hr; on its own it reported 500/0.01 = 50000/hr. No
+  // error, just a fabricated number on the agent's stats.
+  //
+  // Dropping the row rather than surfacing it is deliberate. An unmeasurable
+  // session is not evidence of a rate, and there is no honest number to put in
+  // its place; stats are for reading, not for auditing the database. The
+  // corruption is not hidden either, because closeStaleSession now closes such
+  // a session instead of leaving it open forever, so the row stops
+  // accumulating rather than silently distorting the rate.
   const sessionRow = db.prepare(
     `SELECT
        COALESCE(SUM(activity_count), 0) AS total_activity,
        COALESCE(SUM(
          MAX((julianday(COALESCE(ended_at, last_activity_at)) - julianday(started_at)) * 24, 0.01)
        ), 0.01) AS total_hours
-     FROM agent_sessions WHERE agent_id = ?`
+     FROM agent_sessions
+     WHERE agent_id = ?
+       AND julianday(started_at) IS NOT NULL
+       AND julianday(COALESCE(ended_at, last_activity_at)) IS NOT NULL`
   ).get(agentId) as { total_activity: number; total_hours: number };
   const activityFrequency = sessionRow.total_hours > 0
     ? Math.round((sessionRow.total_activity / sessionRow.total_hours) * 10) / 10 : 0;
