@@ -257,23 +257,35 @@ export function closeAgentSessions(db: Database.Database, agentId: string): void
 }
 
 /**
- * Close every open session that has outlived the session timeout.
+ * Close every open session that has gone quiet for longer than the session
+ * timeout.
+ *
+ * Idleness, not session age. This used to test `started_at`, while
+ * startOrGetSession tested `last_activity_at` against the same timeout, so the
+ * two disagreed about what "stale" means: a session busy all afternoon was
+ * closed by the next client's housekeeping pass purely because it had begun
+ * more than the timeout ago, and the agent's work was split across a new
+ * session row for no reason. The timeout is a measure of silence, so the
+ * column that records the last sign of life is the one to read.
+ *
+ * `ended_at` is not consulted because the WHERE clause has already restricted
+ * this to rows where it is NULL; a COALESCE over it here would be dead.
  *
  * Staleness is decided on parsed dates, not on raw string order. Comparing the
  * ISO strings directly failed open on exactly the values worth catching: `''`
- * sorts below any cutoff so a blank started_at was closed by luck, but
+ * sorts below any cutoff so a blank timestamp was closed by luck, but
  * `'not-a-date'` sorts above it because letters outrank digits, so a session
  * carrying a non-date timestamp stayed open forever and was invisible to
  * housekeeping. julianday() is NULL for anything it cannot read, and a session
- * whose age cannot be measured is not a session we can call live — so it is
- * closed, same as one that is provably old.
+ * whose idleness cannot be measured is not a session we can call live — so it
+ * is closed, same as one that is provably quiet.
  */
 export function closeStaleSession(db: Database.Database): number {
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
   const result = db.prepare(
     `UPDATE agent_sessions SET ended_at = ?
      WHERE ended_at IS NULL
-       AND (julianday(started_at) IS NULL OR julianday(started_at) < julianday(?))`
+       AND (julianday(last_activity_at) IS NULL OR julianday(last_activity_at) < julianday(?))`
   ).run(now(), cutoff);
   return result.changes;
 }
@@ -420,9 +432,10 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
   // Dropping the row rather than surfacing it is deliberate. An unmeasurable
   // session is not evidence of a rate, and there is no honest number to put in
   // its place; stats are for reading, not for auditing the database. The
-  // corruption is not hidden either, because closeStaleSession now closes such
-  // a session instead of leaving it open forever, so the row stops
-  // accumulating rather than silently distorting the rate.
+  // corruption is not hidden either, because closeStaleSession closes such a
+  // session instead of leaving it open forever — at once if last_activity_at
+  // is the unreadable field, otherwise as soon as it falls quiet — so the row
+  // stops accumulating rather than silently distorting the rate.
   const sessionRow = db.prepare(
     `SELECT
        COALESCE(SUM(activity_count), 0) AS total_activity,
