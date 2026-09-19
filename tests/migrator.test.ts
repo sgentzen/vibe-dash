@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { runMigrations, SchemaTooNewError } from "../server/db/migrator.js";
-import { initDb } from "../server/db/index.js";
+import { initDb, startOrGetSession } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
 
 function tableNames(db: Database.Database): Set<string> {
@@ -212,5 +212,175 @@ describe("newer-database guard", () => {
     // initDb() is openDb()'s second half; call it directly since openDb takes a path.
     expect(() => initDb(file)).toThrow(SchemaTooNewError);
     file.close();
+  });
+});
+
+describe("agent_sessions.last_activity_at on a pre-column database", () => {
+  const MIGRATION_NAME = "023_agent_sessions_last_activity_at";
+
+  /**
+   * A database whose `agent_sessions` table was created before
+   * `last_activity_at` was part of the CREATE TABLE statement.
+   *
+   * The column has only ever been created by CREATE TABLE — first in
+   * `schema.ts`, later in `001_initial_schema` — and CREATE TABLE IF NOT EXISTS
+   * never touches a table that already exists. So a database created by the
+   * first release that had `agent_sessions` at all keeps the column-less table
+   * through every later migration, and every code path that writes the column
+   * fails on it with "table agent_sessions has no column named
+   * last_activity_at".
+   */
+  function preColumnDb(): Database.Database {
+    const raw = new Database(":memory:");
+    raw.exec(`
+      CREATE TABLE agents (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, model TEXT,
+        capabilities TEXT NOT NULL DEFAULT '[]',
+        registered_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+      );
+      CREATE TABLE agent_sessions (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL REFERENCES agents(id),
+        started_at TEXT NOT NULL, ended_at TEXT,
+        tasks_touched INTEGER NOT NULL DEFAULT 0,
+        activity_count INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    raw
+      .prepare(
+        "INSERT INTO agents (id, name, model, capabilities, registered_at, last_seen_at) VALUES (?, ?, NULL, '[]', ?, ?)"
+      )
+      .run("agent-1", "legacy-agent", "2026-04-24T02:14:41.888Z", "2026-04-24T02:14:41.888Z");
+    const insertSession = raw.prepare(
+      "INSERT INTO agent_sessions (id, agent_id, started_at, ended_at, tasks_touched, activity_count) VALUES (?, ?, ?, ?, 1, 1)"
+    );
+    insertSession.run("session-1", "agent-1", "2026-04-24T02:14:41.888Z", null);
+    // A closed session too: the backfill must not care whether a session ended.
+    insertSession.run("session-2", "agent-1", "2026-05-01T09:00:00.000Z", "2026-05-01T10:00:00.000Z");
+    return raw;
+  }
+
+  it("adds the column the CREATE TABLE could never reach", () => {
+    const db = preColumnDb();
+    expect(columnNames(db, "agent_sessions")).not.toContain("last_activity_at");
+
+    runMigrations(db);
+
+    expect(columnNames(db, "agent_sessions")).toContain("last_activity_at");
+    db.close();
+  });
+
+  it("backfills every existing row from started_at, open or closed", () => {
+    const db = preColumnDb();
+    runMigrations(db);
+
+    const rows = db
+      .prepare("SELECT id, started_at, ended_at, last_activity_at FROM agent_sessions ORDER BY id")
+      .all() as { id: string; started_at: string; ended_at: string | null; last_activity_at: string }[];
+
+    expect(rows.map((r) => r.id)).toEqual(["session-1", "session-2"]);
+    for (const row of rows) {
+      expect(row.last_activity_at, `row ${row.id}`).toBe(row.started_at);
+    }
+    // The closed row is in there, so the backfill is not quietly scoped to open
+    // sessions.
+    expect(rows.some((r) => r.ended_at !== null)).toBe(true);
+    db.close();
+  });
+
+  it("leaves session tracking working, which is what every MCP tool call needs", () => {
+    const db = preColumnDb();
+    runMigrations(db);
+
+    // The seeded session is far older than SESSION_TIMEOUT_MS, so this reads
+    // last_activity_at, closes the stale session and INSERTs a new one. The
+    // backfill must not resurrect a months-old session: that is the property
+    // that makes started_at the safe value to backfill from, so assert it
+    // directly rather than inferring it from the activity counter.
+    const first = startOrGetSession(db, "agent-1");
+    expect(first.id).not.toBe("session-1");
+    expect(first.last_activity_at).not.toBe("");
+    const legacy = db
+      .prepare("SELECT ended_at FROM agent_sessions WHERE id = ?")
+      .get("session-1") as { ended_at: string | null };
+    expect(legacy.ended_at).not.toBeNull();
+
+    // Immediately again, which is what a second tool call in one connection
+    // does: the fresh session is still live, so this takes the UPDATE ...
+    // RETURNING branch and writes the column rather than inserting it.
+    const second = startOrGetSession(db, "agent-1");
+    expect(second.id).toBe(first.id);
+    expect(second.activity_count).toBe(2);
+    expect(second.last_activity_at).not.toBe("");
+    db.close();
+  });
+
+  it("does not re-add the column when the table already has it", () => {
+    const db = createTestDb();
+    expect(columnNames(db, "agent_sessions")).toContain("last_activity_at");
+    const before = columnNames(db, "agent_sessions").size;
+
+    // A session row with a value already in the column, as an operator's hand
+    // patch would leave behind.
+    const ts = "2026-09-19T00:46:47.122Z";
+    db.prepare(
+      "INSERT INTO agents (id, name, model, capabilities, registered_at, last_seen_at) VALUES (?, ?, NULL, '[]', ?, ?)"
+    ).run("agent-live", "live-agent", ts, ts);
+    db.prepare(
+      "INSERT INTO agent_sessions (id, agent_id, started_at, last_activity_at, tasks_touched, activity_count) VALUES (?, ?, ?, ?, 1, 1)"
+    ).run("session-live", "agent-live", "2026-09-19T00:40:00.000Z", ts);
+
+    // Forget that 023 ran, so runMigrations actually executes its body again
+    // instead of skipping it by name. This is the path the live database takes
+    // on the next rebuild, having been patched by hand. Without the
+    // column-presence guard it is a "duplicate column name" error.
+    db.prepare("DELETE FROM _migrations WHERE name = ?").run(MIGRATION_NAME);
+    expect(() => runMigrations(db)).not.toThrow();
+
+    expect(columnNames(db, "agent_sessions").size).toBe(before);
+    // Recorded again, so the database stops looking behind.
+    const recorded = db
+      .prepare("SELECT COUNT(*) AS n FROM _migrations WHERE name = ?")
+      .get(MIGRATION_NAME) as { n: number };
+    expect(recorded.n).toBe(1);
+    // And the value already in the column is left alone, not re-backfilled to
+    // started_at.
+    const row = db
+      .prepare("SELECT last_activity_at FROM agent_sessions WHERE id = ?")
+      .get("session-live") as { last_activity_at: string };
+    expect(row.last_activity_at).toBe(ts);
+    db.close();
+  });
+
+  it("does nothing on a salvaged database that has no agent_sessions table", () => {
+    const db = createTestDb();
+    // A salvaged database: the table is gone, and nothing will recreate it
+    // because 001 is already recorded as applied.
+    db.exec("DROP TABLE agent_sessions");
+    db.prepare("DELETE FROM _migrations WHERE name = ?").run(MIGRATION_NAME);
+
+    expect(() => runMigrations(db)).not.toThrow();
+    expect(tableNames(db)).not.toContain("agent_sessions");
+    db.close();
+  });
+
+  it("leaves a migrated legacy database schema-identical to a fresh one", () => {
+    // The regression this whole migration exists for was a single column that
+    // no migration reached. This asserts the general property rather than that
+    // one column, so the next such omission fails here instead of in
+    // production.
+    const migrated = preColumnDb();
+    runMigrations(migrated);
+    const fresh = createTestDb();
+
+    const byName = (a: string, b: string) => a.localeCompare(b);
+    expect([...tableNames(migrated)].sort(byName)).toEqual([...tableNames(fresh)].sort(byName));
+    for (const table of [...tableNames(fresh)].sort(byName)) {
+      expect([...columnNames(migrated, table)].sort(byName), `columns of "${table}"`).toEqual(
+        [...columnNames(fresh, table)].sort(byName)
+      );
+    }
+    migrated.close();
+    fresh.close();
   });
 });
