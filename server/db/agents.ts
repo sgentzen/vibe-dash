@@ -232,8 +232,14 @@ export function startOrGetSession(db: Database.Database, agentId: string): Agent
     .get(agentId) as AgentSession | undefined;
 
   if (open) {
-    const elapsed = Date.now() - new Date(open.last_activity_at).getTime();
-    if (elapsed > SESSION_TIMEOUT_MS) {
+    const lastActivity = new Date(open.last_activity_at).getTime();
+    // Expiry fails closed on a timestamp we cannot read. NaN > SESSION_TIMEOUT_MS
+    // is false, so a blank or corrupt last_activity_at used to take the reuse
+    // branch: the expiry check was skipped and the session clock reset to now,
+    // however old the session really was. Whatever wrote the unreadable value
+    // could do it again, and each time bought the session another full timeout.
+    // A value we cannot measure means we cannot claim the session is live.
+    if (!Number.isFinite(lastActivity) || Date.now() - lastActivity > SESSION_TIMEOUT_MS) {
       db.prepare("UPDATE agent_sessions SET ended_at = ? WHERE id = ?").run(ts, open.id);
     } else {
       return db.prepare("UPDATE agent_sessions SET activity_count = activity_count + 1, last_activity_at = ? WHERE id = ? RETURNING *").get(ts, open.id) as AgentSession;
