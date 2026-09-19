@@ -845,6 +845,59 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "023_agent_sessions_last_activity_at",
+    run(db) {
+      // `agent_sessions.last_activity_at` has only ever been created by a
+      // CREATE TABLE statement -- first in `schema.ts`, then in
+      // `001_initial_schema` -- and it was added to that statement AFTER the
+      // table already existed in live databases (the first release with
+      // `agent_sessions` did not have the column). CREATE TABLE IF NOT EXISTS
+      // never alters an existing table, so those databases could never receive
+      // it: 001 is recorded as applied, the CREATE is skipped, and no migration
+      // ever reached the column.
+      //
+      // It stays invisible until a build that writes the column is deployed
+      // over such a database, at which point `startOrGetSession()` fails with
+      // "table agent_sessions has no column named last_activity_at". That call
+      // sits in the MCP per-tool-call wrapper, so EVERY tool fails, reads
+      // included -- the failure looks nothing like a schema problem.
+      //
+      // Guarded ALTER rather than an amendment to 001, because 001 has shipped:
+      // renaming or re-running a shipped migration is what the newer-database
+      // guard in runMigrations() exists to prevent.
+      //
+      // DEFAULT '' is required for a NOT NULL ADD COLUMN in SQLite; the UPDATE
+      // below immediately replaces it with the row's own start time, which is
+      // the most truthful value available for a session nobody was tracking.
+      // A fresh database's column carries no default, which is a harmless DDL
+      // difference as long as every writer names the column: a fresh database
+      // rejects an INSERT that omits it, a migrated one silently stores ''.
+      // startOrGetSession is the only insert path and it names the column, and
+      // tests run on fresh databases -- the stricter variant -- so an omission
+      // added later fails there rather than only in a migrated database.
+      //
+      // A salvaged database can reach here without the table at all, with 001
+      // already recorded as applied so nothing will create it. pragma
+      // table_info returns an empty list for a missing table, which is
+      // indistinguishable from a table with no matching column, so ask
+      // sqlite_master directly before trusting it -- same guard shape as 004.
+      const exists = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agent_sessions'")
+        .all();
+      if (exists.length === 0) return;
+
+      const cols = db.pragma("table_info(agent_sessions)") as { name: string }[];
+      if (!cols.some((c) => c.name === "last_activity_at")) {
+        db.prepare(
+          "ALTER TABLE agent_sessions ADD COLUMN last_activity_at TEXT NOT NULL DEFAULT ''"
+        ).run();
+        db.prepare(
+          "UPDATE agent_sessions SET last_activity_at = started_at WHERE last_activity_at = ''"
+        ).run();
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
