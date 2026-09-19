@@ -235,3 +235,142 @@ describe("an idle connection's agent survives the housekeeping pass", () => {
     expect(session.ended_at).toBeNull();
   });
 });
+
+/**
+ * The timeout is a window, not a floor.
+ *
+ * Both checks read `last_activity_at` now, which is the right column but
+ * concentrates the risk: one bad value defeats housekeeping and the reuse
+ * check at once, where a bad `started_at` used to defeat only housekeeping. A
+ * value dated ahead of the present satisfies both — `closeStaleSession` never
+ * reaps the row and `startOrGetSession` keeps handing it back — so the session
+ * stays open forever and its span keeps inflating the agent's
+ * `activity_frequency`.
+ *
+ * Nothing user-controlled reaches the column: `startOrGetSession` binds
+ * `now()` and migration 023 copies `started_at`. The realistic source is clock
+ * skew between the server, the stdio MCP and the CLI, which VIBE_DASH_DB is
+ * documented as letting share one database. So the bound tolerates ordinary
+ * skew and rejects only what skew cannot explain: the far side is
+ * SESSION_TIMEOUT_MS ahead, the same distance the past side already uses.
+ */
+describe("closeStaleSession bounds the future as well as the past", () => {
+  const AHEAD = (ms: number) => new Date(Date.now() + ms).toISOString();
+
+  it("leaves a session open when it is dated ahead by less than the timeout", () => {
+    const agentId = newAgent("skewed-clock");
+    const sessionId = openSession(agentId, NOW(), AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS));
+
+    expect(closeStaleSession(db)).toBe(0);
+    expect(endedAtOf(sessionId)).toBeNull();
+    expect(startOrGetSession(db, agentId).id).toBe(sessionId);
+  });
+
+  it("closes a session dated further ahead than the timeout", () => {
+    const agentId = newAgent("from-the-future");
+    const sessionId = openSession(agentId, NOW(), AHEAD(SESSION_TIMEOUT_MS + MARGIN_MS));
+
+    expect(closeStaleSession(db)).toBe(1);
+    expect(endedAtOf(sessionId)).not.toBeNull();
+    expect(startOrGetSession(db, agentId).id).not.toBe(sessionId);
+  });
+
+  it("closes a session dated years ahead", () => {
+    // The shape the review described: a value far enough ahead that no cutoff
+    // built from the present will ever overtake it.
+    const agentId = newAgent("never-stale");
+    const sessionId = openSession(agentId, NOW(), "2099-01-01T00:00:00.000Z");
+
+    expect(closeStaleSession(db)).toBe(1);
+    expect(endedAtOf(sessionId)).not.toBeNull();
+    expect(startOrGetSession(db, agentId).id).not.toBe(sessionId);
+  });
+
+  it("does not reap a session merely because it was active a moment ago", () => {
+    // Guards the bound against being drawn at the present instant. The two
+    // writers stamp `now()` and are read back microseconds later by a
+    // different process; a zero-tolerance future bound would churn them.
+    const agentId = newAgent("just-wrote");
+    const sessionId = openSession(agentId, NOW(), AHEAD(50));
+
+    expect(closeStaleSession(db)).toBe(0);
+    expect(startOrGetSession(db, agentId).id).toBe(sessionId);
+  });
+});
+
+/**
+ * `julianday()` and `new Date()` both read more than the ISO instants `now()`
+ * writes, and they do not read the same set.
+ *
+ * `julianday('now')` is not a stored moment — it re-evaluates to the current
+ * instant on every pass, so a row literally carrying `'now'` is never older
+ * than any cutoff and never further ahead than any horizon. No bound can catch
+ * it, because it moves with the clock the bounds are built from. Other forms
+ * are worse than unreadable, they are ambiguous: SQLite reads a date-time with
+ * no zone as UTC and ECMAScript reads it as local, so the two checks disagree
+ * about which instant the row names and one calls it live while the other
+ * calls it stale. That is the split this whole change exists to close.
+ *
+ * So the guard is not a bound but a shape check, applied on both sides: the
+ * column has to hold the exact instant `now()` produces, and anything else is
+ * a value whose idleness cannot be measured — which the existing fail-closed
+ * rule already says to treat as stale. Matching the writer exactly, rather
+ * than surveying what the two parsers happen to tolerate, is what keeps the
+ * sides from drifting apart again when either parser changes.
+ */
+describe("closeStaleSession treats a relative or ambiguous timestamp as unreadable", () => {
+  const zoned = () => new Date().toISOString();
+
+  const shapes: [name: string, value: string][] = [
+    ["the literal string 'now'", "now"],
+    ["a bare date with no time", "2099-01-01"],
+    ["a bare time with no date", "12:00"],
+    ["a date-time naming no zone", zoned().replace(/\.\d+Z$/, "")],
+    ["a space in place of the T", zoned().replace("T", " ").replace(/\.\d+Z$/, "")],
+    ["a numeric UTC offset", "2026-09-18T23:00:00+05:00"],
+    ["seconds but no milliseconds", zoned().replace(/\.\d+Z$/, "Z")],
+    // A well-formed instant, a NUL, then anything at all. SQLite's string
+    // functions stop at the NUL — GLOB, julianday() and even length() all read
+    // only the first 24 bytes and pronounce the row live — while ECMAScript
+    // sees the whole string and rejects it. The two checks therefore split on
+    // this one: housekeeping leaves the row open, the next tool call abandons
+    // it. Nothing writes a NUL today, so this is a latent divergence rather
+    // than a live bug, but the invariant this file exists to defend is that
+    // the two checks agree, and a known class where they do not is a hole.
+    ["a NUL byte hiding a trailing garbage suffix", `${zoned()} not-a-timestamp`],
+  ];
+
+  it.each(shapes)("closes a session whose last_activity_at is %s", (_name, value) => {
+    const sessionId = openSession(newAgent(`close-${_name}`), NOW(), value);
+
+    expect(closeStaleSession(db)).toBe(1);
+    expect(endedAtOf(sessionId)).not.toBeNull();
+  });
+
+  it("still accepts the ISO instant now() actually writes", () => {
+    // The shape check has to admit the only format the two writers produce,
+    // or housekeeping closes every live session on the next pass.
+    const agentId = newAgent("well-formed");
+    const sessionId = startOrGetSession(db, agentId).id;
+
+    expect(closeStaleSession(db)).toBe(0);
+    expect(endedAtOf(sessionId)).toBeNull();
+  });
+
+  /**
+   * Each case gets its own row, and `closeStaleSession` is never called first.
+   *
+   * Asserting reuse on a row housekeeping has already closed proves nothing:
+   * `startOrGetSession` skips a closed row whatever it thinks of the
+   * timestamp, so the assertion passes even if the two disagree completely.
+   * The disagreement only shows on a row housekeeping has not touched — which
+   * is also the real case, since housekeeping runs on connect and the reuse
+   * check runs on every tool call after it.
+   */
+  it.each(shapes)("refuses to reuse a session whose last_activity_at is %s", (_name, value) => {
+    const agentId = newAgent(`reuse-${_name}`);
+    const sessionId = openSession(agentId, NOW(), value);
+
+    expect(startOrGetSession(db, agentId).id).not.toBe(sessionId);
+  });
+});

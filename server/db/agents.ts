@@ -224,6 +224,33 @@ export function getAgentHealthStatus(lastSeenAt: string): AgentHealthStatus {
 
 // ─── Agent Sessions ─────────────────────────────────────────────────────────
 
+/**
+ * The one timestamp shape a session column is allowed to hold: exactly what
+ * `now()` writes, which is `Date.prototype.toISOString`.
+ *
+ * Deliberately an exact match for the writer rather than a survey of what the
+ * readers tolerate, because there are two readers and they disagree. SQLite's
+ * `julianday()` and ECMAScript's `new Date()` accept overlapping but different
+ * sets, and on the strings only one accepts, the two staleness checks reach
+ * opposite answers about the same row. Worse, on a date-time naming no zone
+ * they both succeed and still disagree: SQLite reads it as UTC, ECMAScript as
+ * local time, hours apart. Pinning the shape to the writer is what keeps the
+ * checks from drifting apart again when either parser changes.
+ *
+ * `ISO_INSTANT_GLOB` and `ISO_INSTANT` describe the same strings, one for each
+ * reader. `.` is a literal in GLOB; only `*`, `?` and `[...]` are special.
+ */
+const ISO_INSTANT_GLOB =
+  "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z";
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/**
+ * Milliseconds since the epoch for a stored timestamp, or NaN when the column
+ * does not hold one we can measure. Callers fail closed on NaN.
+ */
+function instantMs(value: string): number {
+  return ISO_INSTANT.test(value) ? new Date(value).getTime() : Number.NaN;
+}
 
 export function startOrGetSession(db: Database.Database, agentId: string): AgentSession {
   const ts = now();
@@ -232,14 +259,23 @@ export function startOrGetSession(db: Database.Database, agentId: string): Agent
     .get(agentId) as AgentSession | undefined;
 
   if (open) {
-    const lastActivity = new Date(open.last_activity_at).getTime();
+    const lastActivity = instantMs(open.last_activity_at);
     // Expiry fails closed on a timestamp we cannot read. NaN > SESSION_TIMEOUT_MS
     // is false, so a blank or corrupt last_activity_at used to take the reuse
     // branch: the expiry check was skipped and the session clock reset to now,
     // however old the session really was. Whatever wrote the unreadable value
     // could do it again, and each time bought the session another full timeout.
     // A value we cannot measure means we cannot claim the session is live.
-    if (!Number.isFinite(lastActivity) || Date.now() - lastActivity > SESSION_TIMEOUT_MS) {
+    //
+    // The timeout is a window, not a floor, so the distance is measured
+    // unsigned. A last_activity_at dated ahead of the present used to satisfy
+    // both this check and closeStaleSession — the row was never reaped and was
+    // handed back forever — and since the fix that pointed housekeeping at
+    // this same column, one bad value defeats both at once. Ordinary skew
+    // between the processes sharing a VIBE_DASH_DB is tolerated; a value
+    // further ahead than the whole timeout is not something skew explains.
+    const drift = Date.now() - lastActivity;
+    if (!Number.isFinite(drift) || Math.abs(drift) > SESSION_TIMEOUT_MS) {
       db.prepare("UPDATE agent_sessions SET ended_at = ? WHERE id = ?").run(ts, open.id);
     } else {
       return db.prepare("UPDATE agent_sessions SET activity_count = activity_count + 1, last_activity_at = ? WHERE id = ? RETURNING *").get(ts, open.id) as AgentSession;
@@ -279,14 +315,51 @@ export function closeAgentSessions(db: Database.Database, agentId: string): void
  * housekeeping. julianday() is NULL for anything it cannot read, and a session
  * whose idleness cannot be measured is not a session we can call live — so it
  * is closed, same as one that is provably quiet.
+ *
+ * Two further ways a row can be neither quiet nor readable, both of which left
+ * a session open forever:
+ *
+ * A `last_activity_at` dated in the future outruns every cutoff built from the
+ * present. It also satisfies startOrGetSession, so since both checks came to
+ * read this one column, a single such value defeats housekeeping and the reuse
+ * check together. The far edge of the window is therefore the same
+ * SESSION_TIMEOUT_MS as the near one: skew between the processes sharing a
+ * VIBE_DASH_DB is tolerated, anything beyond it is not skew.
+ *
+ * And `julianday()` accepts relative and partial forms that `now()` never
+ * writes. `julianday('now')` is not a stored moment at all — it re-evaluates
+ * to the current instant on every pass, so a row literally carrying `'now'`
+ * is never past the cutoff and never past the horizon either. No bound can
+ * catch it, because it moves with the clock the bounds are built from. The
+ * shape check is what does: ISO_INSTANT_GLOB admits only what `now()` writes,
+ * and everything else falls into the fail-closed branch above. That hole
+ * predates the move to this column; it used to live on `started_at`.
+ *
+ * `julianday(...) IS NULL` stays even though the GLOB already rejects every
+ * form SQLite cannot read, because the GLOB checks shape and not validity: a
+ * string like `9999-99-99T99:99:99.999Z` matches it and still parses to NULL.
+ *
+ * The `instr(..., char(0))` term covers the one class the GLOB cannot see.
+ * SQLite's string functions stop at a NUL byte, so a well-formed instant
+ * followed by NUL and any amount of garbage satisfies the GLOB, parses, and
+ * even reports `length()` 24 — while `instantMs` reads the whole string and
+ * rejects it. That is a row housekeeping calls live and the reuse check calls
+ * unreadable, which is the disagreement this function was just realigned to
+ * prevent. Nothing writes a NUL today; the term is here so the two readers
+ * cannot be split by one if anything ever does.
  */
 export function closeStaleSession(db: Database.Database): number {
-  const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
+  const quietSince = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
+  const noLaterThan = new Date(Date.now() + SESSION_TIMEOUT_MS).toISOString();
   const result = db.prepare(
     `UPDATE agent_sessions SET ended_at = ?
      WHERE ended_at IS NULL
-       AND (julianday(last_activity_at) IS NULL OR julianday(last_activity_at) < julianday(?))`
-  ).run(now(), cutoff);
+       AND (last_activity_at NOT GLOB ?
+            OR instr(last_activity_at, char(0)) > 0
+            OR julianday(last_activity_at) IS NULL
+            OR julianday(last_activity_at) < julianday(?)
+            OR julianday(last_activity_at) > julianday(?))`
+  ).run(now(), ISO_INSTANT_GLOB, quietSince, noLaterThan);
   return result.changes;
 }
 
