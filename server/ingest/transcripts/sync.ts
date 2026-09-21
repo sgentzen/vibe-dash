@@ -8,6 +8,7 @@ import { priceRecord } from "./pricing.js";
 import { buildAttributor } from "./attribute.js";
 import type { SyncOptions, SyncResult, UsageRecord } from "./types.js";
 import { excludeObservedCondition } from "../../db/costs.js";
+import { createTimestampNormaliser, julianDaySql } from "../../db/helpers.js";
 import { unmappedPointCount, refusedSeriesPointCount } from "../otlp/ingest.js";
 import { seriesCap } from "../otlp/series.js";
 import type { CostOverlap } from "../../../shared/types.js";
@@ -121,6 +122,7 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
   if (files.length === 0) return result;
 
   const attribute = buildAttributor(db);
+  const normaliseTimestamp = createTimestampNormaliser(db);
 
   const selectCursor = db.prepare(`SELECT size, byte_offset, mtime, last_uuid FROM transcript_files WHERE path = ?`);
   const upsertCursor = db.prepare(`
@@ -205,7 +207,7 @@ export async function syncTranscripts(db: Database.Database, opts: SyncOptions =
         continue;
       }
 
-      const parsed = parseTranscript(text);
+      const parsed = parseTranscript(text, normaliseTimestamp);
       result.recordsSkipped += parsed.skippedLines;
 
       const counts = ingestFile(parsed.records);
@@ -264,6 +266,7 @@ export function getIngestStatus(db: Database.Database): {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number; mcpUnattributed: number;
   otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
+  undated: number;
   overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
@@ -336,6 +339,25 @@ export function getIngestStatus(db: Database.Database): {
     // Process-lifetime, not a query — see refusedSeriesPointCount's own
     // comment. A refused point writes no row, so nothing survives to count.
     otlpSeriesRefused: refusedSeriesPointCount(),
+    // Rows in the all-time total that no dated figure can place: today's
+    // spend and the timeseries both compare through julianDaySql and drop
+    // them, so the global total exceeds the chart by exactly these rows and
+    // nothing else said why. Every source, not one, because the figure it
+    // qualifies is every source's total.
+    //
+    // A backlog, not a live rate: parseTranscript refuses an undatable
+    // timestamp and every other writer stamps its own, so nothing adds to this
+    // any more. It counts rows stored before that check, which are real spend
+    // and are kept rather than deleted or given a made-up date.
+    //
+    // Carries the observed-duplicate exclusion for the same reason as
+    // mcpUnattributed: a suppressed row is in no total, so it is no gap.
+    // Migration 024's index on this exact expression makes it a search on the
+    // NULL key rather than a scan, so it is cheap on every cost refresh.
+    undated: one(
+      `SELECT COUNT(*) AS n FROM cost_entries WHERE ${julianDaySql("created_at")} IS NULL` +
+      ` AND ${excludeObservedCondition()}`
+    ),
     overlaps: rows.map((r) => ({
       project_id: r.project_id,
       project_name: r.project_name,

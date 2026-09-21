@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type Database from "better-sqlite3";
 import type { Agent } from "../types.js";
 
 export function now(): string {
@@ -57,6 +58,44 @@ export function genId(): string {
  */
 export const julianDaySql = (column: string): string =>
   `julianday(CASE WHEN ${column} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*' THEN ${column} END)`;
+
+/**
+ * The write-side twin of julianDaySql: turns a timestamp from outside into the
+ * canonical ISO-8601 Z text every other writer produces, or null when the
+ * read side would not be able to date it.
+ *
+ * For a writer that copies a timestamp rather than generating one, which today
+ * means transcript ingestion alone. A null is a record to refuse, never a value
+ * to store.
+ *
+ * Readability is decided by SQLite through julianDaySql itself, not by
+ * Date.parse, because SQLite is the only reader of the stored column and the
+ * two disagree in both directions: Date.parse reads RFC 2822 dates SQLite
+ * cannot, and SQLite reads a bare number as a Julian day and 'now' as the
+ * clock. Going through the same expression means a row this accepts is exactly
+ * a row every window query can place, and a clock word is refused here for the
+ * same reason the whitelist refuses it there.
+ *
+ * Normalising what is kept means the column holds one format whoever wrote it,
+ * so an offset such as +10:00 is stored as the UTC instant it names and the
+ * text alone no longer has to be trusted to sort or group correctly.
+ *
+ * One check is stricter than the read side. julianday() does its arithmetic
+ * without consulting the calendar, so '2026-02-30' reads as 2 March. A reader
+ * can live with that, but storing it would turn a malformed date into a
+ * plausible wrong one for good, so a date part that does not survive its own
+ * round trip through date() is refused. Only the date part is compared: the
+ * instant as a whole legitimately moves when an offset is converted to UTC.
+ */
+export function createTimestampNormaliser(db: Database.Database): (raw: string) => string | null {
+  const stmt = db
+    .prepare(
+      `SELECT CASE WHEN date(substr(@raw, 1, 10)) = substr(@raw, 1, 10)
+                   THEN strftime('%Y-%m-%dT%H:%M:%fZ', ${julianDaySql("@raw")}) END`
+    )
+    .pluck();
+  return (raw) => stmt.get({ raw }) as string | null;
+}
 
 export function normalizeAgentName(name: string): string {
   return name.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");

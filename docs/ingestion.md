@@ -23,7 +23,12 @@ From each transcript record, only these fields are read:
 - `model`: which model produced the turn
 - `cwd`: the working directory the session ran in, used for project attribution
 - `sessionId` and `uuid`: identifiers, the latter doubling as the idempotency key
-- `timestamp`: when the turn happened
+- `timestamp`: when the turn happened. Stored as canonical ISO-8601 UTC
+  (`2026-08-09T10:00:00.000Z`), with any offset converted. A record whose
+  timestamp SQLite cannot read as a date, including clock words such as `now`
+  and calendar dates that do not exist such as `2026-02-30`, is skipped and
+  counted rather than stored, because a row nothing can place on
+  a day would sit in the all-time total while missing from every dated figure.
 - `gitBranch`: the branch checked out at the time
 - `isSidechain`: whether the turn was a subagent call
 
@@ -81,10 +86,10 @@ tracked as follow-up work.
 
 These counts are not only API fields. Where a count qualifies a figure
 already on screen, a small badge renders beside that figure, reading
-`N unpriced`, `N unattributed`, or `N excluded`, with an explanation reachable
+`N unpriced`, `N unattributed`, `N undated`, or `N excluded`, with an explanation reachable
 by hovering or focusing the badge, not only with a mouse, and dismissible with
-Escape. Total Spend carries an unpriced badge, an excluded badge, and an
-unattributed one. Spend Today carries an unpriced badge fed by
+Escape. Total Spend carries an unpriced badge, an excluded badge, an unattributed
+one, and an undated one. Spend Today carries an unpriced badge fed by
 `spend_today_unpriced`. Cost by Model carries an unpriced badge per model, and
 Cost by Agent carries both an unpriced badge and an excluded badge per agent.
 
@@ -94,6 +99,13 @@ and `mcpUnattributed`, which between them count every row with no project
 across the three sources, install-wide. Such rows are not in a project-scoped
 total and could not be, so selecting a project hides that badge rather than
 letting it caveat a figure it says nothing about.
+
+The undated badge is install-wide for the same reason, and hidden beside a
+project-scoped total the same way. It is fed by `undated`, which counts rows
+whose `created_at` cannot be read as a date. Those rows stay in the all-time
+total but fall out of Spend Today and the cost timeseries, so the total exceeds
+the chart by exactly these rows. Ingestion now refuses such timestamps, so the
+count only covers rows stored before that check, and it stops growing.
 
 A badge is absent, not just faint, whenever its count is zero or missing, so
 an install with nothing to caveat looks exactly as it did before these badges
