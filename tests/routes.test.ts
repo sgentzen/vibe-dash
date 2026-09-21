@@ -61,6 +61,22 @@ describe("GET /api/stats", () => {
     expect(body).toMatchObject({ projects: 1, tasks: 1, activeAgents: 1, alerts: 1 });
   });
 
+  it("counts only top-level agents seen within the active window as activeAgents", async () => {
+    // Pins the route to countActiveAgents: the old inline datetime('now') query
+    // counted anything seen today (UTC), so the hour-old agent below was active.
+    const fresh = registerAgent(db, { name: "fresh", model: null, capabilities: [] });
+    const stale = registerAgent(db, { name: "stale", model: null, capabilities: [] });
+    const child = registerAgent(db, { name: "child", model: null, capabilities: [] });
+    db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(
+      new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      stale.id
+    );
+    db.prepare("UPDATE agents SET parent_agent_id = ? WHERE id = ?").run(fresh.id, child.id);
+
+    const { body } = await request("GET", "/api/stats");
+    expect(body).toMatchObject({ activeAgents: 1 });
+  });
+
   it("does not count resolved blockers as alerts", async () => {
     const p = createProject(db, { name: "P", description: null });
     const t = createTask(db, {

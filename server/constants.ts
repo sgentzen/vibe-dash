@@ -24,7 +24,6 @@ export function clampLimit(raw: unknown, fallback: number, max: number): number 
 
 export const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
 export const IDLE_THRESHOLD_MS = 30 * 60 * 1000;
-export const ACTIVE_THRESHOLD_MINUTES = ACTIVE_THRESHOLD_MS / 60_000;
 
 // ─── Session ────────────────────────────────────────────────────────────────
 

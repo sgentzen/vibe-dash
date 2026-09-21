@@ -1,7 +1,6 @@
 import type Database from "better-sqlite3";
 import { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS, SESSION_TIMEOUT_MS } from "../constants.js";
 export { ACTIVE_THRESHOLD_MS, IDLE_THRESHOLD_MS };
-export { ACTIVE_THRESHOLD_MINUTES } from "../constants.js";
 import type {
   Agent,
   AgentSession,
@@ -220,6 +219,38 @@ export function getAgentHealthStatus(lastSeenAt: string): AgentHealthStatus {
   if (elapsed < ACTIVE_THRESHOLD_MS) return "active";
   if (elapsed < IDLE_THRESHOLD_MS) return "idle";
   return "offline";
+}
+
+/**
+ * How many top-level agents are active right now, by the same rule
+ * getAgentHealthStatus applies to the per-agent badge: seen within
+ * ACTIVE_THRESHOLD_MS. Sub-agents are excluded, as they are not shown as
+ * separate agents on the dashboard.
+ *
+ * This lived inline in /api/stats as `last_seen_at >= datetime('now', '-5
+ * minutes')`, which compared an ISO string ('T' separator, 'Z') against
+ * datetime()'s 'YYYY-MM-DD HH:MM:SS'. The two first differ at offset 10, where
+ * 'T' (0x54) outranks ' ' (0x20), so every agent last seen on the current UTC
+ * date compared greater than the cutoff: one seen an hour ago counted as
+ * active, so "active in the last 5 minutes" really meant "seen today (UTC)".
+ * It also failed open on an unreadable timestamp, since 'not-a-date' >= the
+ * cutoff is true, which is the defect family fixed in 530c2d9 (#203).
+ *
+ * The comparison is on parsed dates through julianDaySql, which is NULL for
+ * text it cannot read, so an agent whose last sighting is unreadable fails the
+ * comparison and is not counted. getAgentHealthStatus reaches the same answer
+ * for such a value (NaN elapsed passes no threshold, so "offline"). The
+ * cutoff is bound from JS rather than computed by datetime('now') so the
+ * window is the very ACTIVE_THRESHOLD_MS the badge uses. The comparison is
+ * strict, matching the badge's `elapsed < threshold`.
+ */
+export function countActiveAgents(db: Database.Database): number {
+  const cutoff = new Date(Date.now() - ACTIVE_THRESHOLD_MS).toISOString();
+  const row = db.prepare(
+    `SELECT COUNT(*) AS count FROM agents
+     WHERE ${julianDaySql("last_seen_at")} > julianday(?) AND parent_agent_id IS NULL`
+  ).get(cutoff) as { count: number };
+  return row.count;
 }
 
 // ─── Agent Sessions ─────────────────────────────────────────────────────────
