@@ -50,23 +50,14 @@ describe("getActivityStream since filter with an unreadable timestamp", () => {
     expect(messages(SINCE)).toEqual([]);
   });
 
-  it("drops a row whose timestamp is not a date", () => {
+  it.each([
+    ["is not a date", "not-a-date"],
+    ["is blank", ""],
+    // Read off the clock by julianday() if it reached it, i.e. "this instant".
+    ["reads the clock rather than a date", "now"],
+  ])("drops a row whose timestamp %s", (_label, corrupt) => {
     addActivity("real", "2026-09-19T12:00:00.000Z");
-    addActivity("corrupt", "not-a-date");
-
-    expect(messages(SINCE)).toEqual(["real"]);
-  });
-
-  it("drops a row whose timestamp is blank", () => {
-    addActivity("real", "2026-09-19T12:00:00.000Z");
-    addActivity("blank", "");
-
-    expect(messages(SINCE)).toEqual(["real"]);
-  });
-
-  it("drops a clock-reading timestamp rather than treating it as this instant", () => {
-    addActivity("real", "2026-09-19T12:00:00.000Z");
-    addActivity("clock", "now");
+    addActivity("corrupt", corrupt);
 
     expect(messages(SINCE)).toEqual(["real"]);
   });
