@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import { ACTIVE_THRESHOLD_MINUTES, getSpendToday, getSpendTodayUnpriced, getTasksCompletedToday } from "../db/index.js";
+import { countActiveAgents, getSpendToday, getSpendTodayUnpriced, getTasksCompletedToday } from "../db/index.js";
 import { firstRunLimiter, statsLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 
@@ -28,12 +28,7 @@ export function systemRoutes(db: Database.Database, _broadcast: BroadcastFn): Ro
     const tasks = (
       db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status != 'done'").get() as { count: number }
     ).count;
-    const activeAgents = (
-      db.prepare(
-        // Safe interpolation: ACTIVE_THRESHOLD_MINUTES is a module-level numeric constant, not user input
-        `SELECT COUNT(*) AS count FROM agents WHERE last_seen_at >= datetime('now', '-${ACTIVE_THRESHOLD_MINUTES} minutes') AND parent_agent_id IS NULL`
-      ).get() as { count: number }
-    ).count;
+    const activeAgents = countActiveAgents(db);
     const alerts = (
       db.prepare("SELECT COUNT(*) AS count FROM blockers WHERE resolved_at IS NULL").get() as { count: number }
     ).count;

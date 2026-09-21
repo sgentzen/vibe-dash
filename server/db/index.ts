@@ -43,6 +43,7 @@ export {
   costObservedSql,
   isCostObservedIdentity,
   getAgentHealthStatus,
+  countActiveAgents,
   getAgentActivity,
   getAgentCompletedToday,
   getAgentCurrentProject,
@@ -56,7 +57,6 @@ export {
   listAgentSessions,
   ACTIVE_THRESHOLD_MS,
   IDLE_THRESHOLD_MS,
-  ACTIVE_THRESHOLD_MINUTES,
 } from "./agents.js";
 export type { RegisterAgentInput } from "./agents.js";
 export {
