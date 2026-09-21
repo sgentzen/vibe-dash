@@ -10,6 +10,7 @@ import {
   getCostByModel,
   getCostByAgent,
 } from "../db/index.js";
+import { MAX_COST_DAYS } from "../constants.js";
 import { makeReadLimiter } from "./middleware.js";
 import type { BroadcastFn } from "./types.js";
 import { handleMutation } from "./handlers.js";
@@ -51,6 +52,8 @@ export function costRoutes(db: Database.Database, broadcast: BroadcastFn): Route
     if (rawDays !== undefined) {
       days = Number.parseInt(rawDays, 10);
       if (Number.isNaN(days)) { res.status(400).json({ error: "days must be a number" }); return; }
+      // getCostTimeseries allocates one object per day in a synchronous loop.
+      days = Math.min(Math.max(days, 1), MAX_COST_DAYS);
     }
 
     switch (groupBy as GroupBy) {

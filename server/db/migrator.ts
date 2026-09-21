@@ -965,6 +965,39 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "025_activity_log_timestamp_julianday_index",
+    run(db) {
+      // getActivityStream's `since` filter compares julianday(timestamp), not
+      // the raw string, so an activity row with an unreadable timestamp stops
+      // passing every `since` (see julianDaySql in helpers.ts). That makes the
+      // predicate non-sargable against idx_activity_log_timestamp, which indexes
+      // the column, not the expression: `since` went from
+      //   SEARCH a USING INDEX idx_activity_log_timestamp (timestamp>?)
+      // to a SCAN, and a `since` matching few rows walks all of activity_log on
+      // an unauthenticated route, blocking the event loop. Same problem and same
+      // remedy as 024, whose comments explain the reasoning in full: an
+      // expression index spelled out here (frozen, not imported from
+      // julianDaySql), guarded by the date-shaped GLOB so one stored 'now' or
+      // 'subsec' cannot make this CREATE INDEX throw and wedge startup, plus the
+      // missing-table guard for salvaged databases. The two expressions must
+      // stay identical; the "since window stays sargable" test enforces it.
+      // A future migration that rebuilds activity_log must re-create this index,
+      // because an index lives with its table (see 024).
+      const exists = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'activity_log'")
+        .all();
+      if (exists.length === 0) return;
+
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp_jd
+          ON activity_log(julianday(
+            CASE WHEN timestamp GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+              THEN timestamp END
+          ));
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -7,6 +7,8 @@ export const DEFAULT_TASK_LIST_LIMIT = 200;
 export const MAX_TASK_LIST_LIMIT = 500;
 export const DEFAULT_ACTIVITY_LIMIT = 100;
 export const MAX_ACTIVITY_LIMIT = 500;
+/** Ceiling on the caller-supplied `days` of the cost timeseries, which allocates one object per day. */
+export const MAX_COST_DAYS = 365;
 
 /**
  * Clamp a caller-supplied list limit into [1, max]. Absent, non-numeric,

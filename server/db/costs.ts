@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { now, genId, julianDaySql } from "./helpers.js";
 import { buildWhere } from "./where.js";
+import { MAX_COST_DAYS } from "../constants.js";
 import type {
   CostEntry,
   CostSummary,
@@ -227,7 +228,10 @@ export function getCostTimeseries(
   db: Database.Database,
   filter: { agent_id?: string; milestone_id?: string; project_id?: string; days?: number } = {}
 ): CostTimeseriesEntry[] {
-  const days = filter.days ?? 30;
+  // Clamped here as well as at the route: the loop below allocates one object
+  // per day, so any caller (route, MCP tool, CLI) must be bounded by the loop
+  // itself rather than by each caller remembering to be.
+  const days = Math.min(Math.max(Math.trunc(filter.days ?? 30) || 1, 1), MAX_COST_DAYS);
   const { sql: where, params } = buildWhere([
     filter.agent_id ? ["agent_id = ?", filter.agent_id] : null,
     filter.milestone_id ? ["milestone_id = ?", filter.milestone_id] : null,
