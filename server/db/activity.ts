@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { ActivityEntry, ActivityHeatmapEntry } from "../types.js";
-import { now, genId } from "./helpers.js";
+import { now, genId, julianDaySql } from "./helpers.js";
 import { buildWhere } from "./where.js";
 
 export interface LogActivityInput {
@@ -75,9 +75,21 @@ export function getActivityStream(db: Database.Database, filter: ActivityStreamF
     filter.project_id
       ? ["a.task_id IN (SELECT id FROM tasks WHERE project_id = ?)", filter.project_id]
       : null,
-    filter.since ? ["a.timestamp >= ?", filter.since] : null,
+    // Parsed dates, not string order, for the reason getSpendToday documents:
+    // as text 'not-a-date' >= '2026-...' is true, so an unreadable timestamp
+    // passed every `since`. This changes what a `since` query returns for a
+    // corrupt row: it is now left out. Without `since` it is still listed.
+    // A `since` that itself cannot be read matches nothing.
+    filter.since ? [`${julianDaySql("a.timestamp")} >= julianday(?)`, filter.since] : null,
   ]);
 
+  // With `since`, every surviving row has a readable timestamp, so order by
+  // the same expression the filter uses: the expression index (migration 025)
+  // then serves range and order together. Ordered by the raw column instead,
+  // the planner walks idx_activity_log_timestamp in order to satisfy LIMIT and
+  // a `since` matching few rows scans the whole table. For ISO timestamps the
+  // two orders agree.
+  const order = filter.since ? `${julianDaySql("a.timestamp")} DESC, a.timestamp DESC` : "a.timestamp DESC";
   const sql = `SELECT a.id, a.task_id, a.agent_id, a.message, a.timestamp, a.source,
        ag.name AS agent_name, t.title AS task_title,
        p.name AS project_name, p.id AS project_id,
@@ -88,7 +100,7 @@ export function getActivityStream(db: Database.Database, filter: ActivityStreamF
      LEFT JOIN tasks t ON a.task_id = t.id
      LEFT JOIN projects p ON t.project_id = p.id
      ${where}
-     ORDER BY a.timestamp DESC LIMIT ?`;
+     ORDER BY ${order} LIMIT ?`;
   params.push(filter.limit ?? 100);
 
   return db.prepare(sql).all(...params) as ActivityEntry[];
