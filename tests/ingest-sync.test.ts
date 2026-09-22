@@ -10,6 +10,7 @@ import {
   registerAgent,
   setAgentCostObserved,
   getGlobalCostSummary,
+  getCostTimeseries,
 } from "../server/db/index.js";
 import { linkProjectPath } from "../server/db/projectPaths.js";
 import { syncTranscripts, getIngestStatus } from "../server/ingest/transcripts/sync.js";
@@ -275,5 +276,91 @@ describe("syncTranscripts", () => {
     });
 
     expect(getIngestStatus(db).mcpUnattributed).toBe(0);
+  });
+});
+
+// A transcript's timestamp is the one created_at no writer here generates for
+// itself, so it is checked where it enters rather than left for every reader to
+// survive.
+describe("syncTranscripts timestamps", () => {
+  const stamped = (uuid: string, timestamp: string): string =>
+    JSON.stringify({
+      type: "assistant", uuid, sessionId: "s-1", timestamp, cwd: "C:/repos/demo",
+      message: { model: "claude-opus-5", usage: { input_tokens: 1_000_000, output_tokens: 0 } },
+    }) + "\n";
+
+  const createdAt = (uuid: string): string | undefined =>
+    (db.prepare(`SELECT created_at FROM cost_entries WHERE external_id = ?`).get(uuid) as
+      { created_at: string } | undefined)?.created_at;
+
+  it("refuses a record SQLite cannot date, and says so in recordsSkipped", async () => {
+    writeTranscript("proj/a.jsonl", stamped("ok", "2026-08-09T10:00:00.000Z") + stamped("bad", "not-a-date"));
+    const result = await syncTranscripts(db, { claudeHome: home });
+
+    expect(result).toMatchObject({ recordsIngested: 1, recordsSkipped: 1 });
+    expect(createdAt("bad")).toBeUndefined();
+  });
+
+  it("refuses 'now' rather than filing the row under the day it was ingested", async () => {
+    writeTranscript("proj/a.jsonl", stamped("clock", "now"));
+    const result = await syncTranscripts(db, { claudeHome: home });
+
+    expect(result).toMatchObject({ recordsIngested: 0, recordsSkipped: 1 });
+    expect(rowCount()).toBe(0);
+  });
+
+  it("stores a readable but non-canonical timestamp in canonical form", async () => {
+    writeTranscript("proj/a.jsonl", stamped("tz", "2026-08-09T20:00:00+10:00"));
+    await syncTranscripts(db, { claudeHome: home });
+
+    expect(createdAt("tz")).toBe("2026-08-09T10:00:00.000Z");
+  });
+});
+
+// Rows stored before the boundary check existed can still carry a created_at no
+// query can place on a day. They stay in the all-time total, which needs no
+// date, and drop out of every dated figure, so the total exceeds the chart by
+// exactly these rows. `undated` is what says so.
+describe("getIngestStatus undated", () => {
+  /** A self-reported row whose created_at is then overwritten, as legacy data would carry it. */
+  function legacyRow(createdAt: string, agentId?: string): void {
+    const entry = logCost(db, {
+      agent_id: agentId,
+      model: "claude-opus-5", provider: "anthropic", input_tokens: 10, output_tokens: 5, cost_usd: 1,
+    });
+    db.prepare(`UPDATE cost_entries SET created_at = ? WHERE id = ?`).run(createdAt, entry.id);
+  }
+
+  it("is zero on a database where every row is dated", () => {
+    legacyRow("2026-08-09T10:00:00.000Z");
+    expect(getIngestStatus(db).undated).toBe(0);
+  });
+
+  it("counts every row julianDaySql cannot read, including the clock words", () => {
+    for (const bad of ["not-a-date", "", "now", "2451545"]) legacyRow(bad);
+    expect(getIngestStatus(db).undated).toBe(4);
+  });
+
+  it("accounts for exactly the rows the chart leaves out of the total", () => {
+    legacyRow(new Date().toISOString());
+    legacyRow("not-a-date");
+    legacyRow("now");
+
+    const total = getGlobalCostSummary(db).entry_count;
+    const charted = getCostTimeseries(db).reduce((n, day) => n + day.entry_count, 0);
+    expect(total - charted).toBe(2);
+    expect(getIngestStatus(db).undated).toBe(2);
+  });
+
+  it("does not count a row already suppressed as an observed duplicate", () => {
+    // It qualifies the total, so it matches the total's scope: a suppressed
+    // row is in no total and is no discrepancy.
+    const agent = registerAgent(db, {
+      name: "claude-code-e5f6", client_name: "claude-code", capabilities: [], model: "claude-opus-5",
+    });
+    setAgentCostObserved(db, agent.id, true);
+    legacyRow("not-a-date", agent.id);
+
+    expect(getIngestStatus(db).undated).toBe(0);
   });
 });

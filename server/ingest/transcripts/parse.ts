@@ -1,4 +1,4 @@
-import type { ParseResult, UsageRecord } from "./types.js";
+import type { ParseResult, TimestampNormaliser, UsageRecord } from "./types.js";
 
 // The transcript format is undocumented and can change without notice, so this
 // parser is tolerant by construction: unknown fields are ignored, and any line
@@ -15,7 +15,7 @@ function asString(value: unknown): string | null {
 }
 
 /** Extract a usage record from one parsed line, or null if the line is not one. */
-function toUsageRecord(row: Record<string, unknown>): UsageRecord | null {
+function toUsageRecord(row: Record<string, unknown>, normaliseTimestamp: TimestampNormaliser): UsageRecord | null {
   if (row.type !== "assistant") return null;
 
   const message = row.message as Record<string, unknown> | undefined;
@@ -26,9 +26,17 @@ function toUsageRecord(row: Record<string, unknown>): UsageRecord | null {
   // double-counted on the next scan. Refuse it rather than risk that.
   const uuid = asString(row.uuid);
   const sessionId = asString(row.sessionId);
-  const timestamp = asString(row.timestamp);
+  const rawTimestamp = asString(row.timestamp);
   const model = asString(message?.model);
-  if (!uuid || !sessionId || !timestamp || !model) return null;
+  if (!uuid || !sessionId || !rawTimestamp || !model) return null;
+
+  // Copied into cost_entries.created_at, the one timestamp in the database no
+  // writer here generates for itself. A value SQLite cannot date would sit in
+  // the all-time total while dropping out of every dated figure, so it is
+  // refused like a missing uuid: the line is counted as skipped, which is
+  // already surfaced, instead of stored as a number nothing can place.
+  const timestamp = normaliseTimestamp(rawTimestamp);
+  if (!timestamp) return null;
 
   const cacheCreation = usage.cache_creation as Record<string, unknown> | undefined;
 
@@ -49,8 +57,13 @@ function toUsageRecord(row: Record<string, unknown>): UsageRecord | null {
   };
 }
 
-/** Parse a whole transcript body. Never throws on malformed content. */
-export function parseTranscript(text: string): ParseResult {
+/**
+ * Parse a whole transcript body. Never throws on malformed content.
+ *
+ * The normaliser is required rather than defaulted: a fallback that did not
+ * ask SQLite would reintroduce the disagreement it exists to remove.
+ */
+export function parseTranscript(text: string, normaliseTimestamp: TimestampNormaliser): ParseResult {
   const records: UsageRecord[] = [];
   let skippedLines = 0;
   let lastUuid: string | null = null;
@@ -75,7 +88,7 @@ export function parseTranscript(text: string): ParseResult {
       continue;
     }
 
-    const record = toUsageRecord(row);
+    const record = toUsageRecord(row, normaliseTimestamp);
     if (record === null) {
       // Most lines legitimately lack usage (user turns, attachments). Only
       // count a skip for assistant rows, so the counter tracks real trouble.

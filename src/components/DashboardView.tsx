@@ -95,6 +95,19 @@ function unattributedSpendTitle(count: number): string {
 }
 
 /**
+ * Wording shared by the Total Spend undated badge and its tooltip.
+ *
+ * Global-only for the reason unattributedSpendTitle gives: the count is
+ * install-wide.
+ */
+function undatedSpendTitle(count: number): string {
+  return (
+    `${count} ${count === 1 ? "entry has" : "entries have"} no readable date, so ${count === 1 ? "it is" : "they are"} ` +
+    `in this total but on no day of the chart and not in today's spend.`
+  );
+}
+
+/**
  * Wording shared by the Total Spend excluded badge and its tooltip.
  *
  * Carried over from the `title` attribute this badge replaced: a title reaches
@@ -329,6 +342,7 @@ export function DashboardView() {
             safeCount(ingestStatus?.unattributed) +
             safeCount(ingestStatus?.otlpUnattributed) +
             safeCount(ingestStatus?.mcpUnattributed);
+          const undatedCount = safeCount(ingestStatus?.undated);
           return (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
@@ -344,11 +358,18 @@ export function DashboardView() {
                           explanation={unpricedSpendTitle(unpricedCount)}
                         />
                         {projectId === null && (
-                          <CountBadge
-                            count={unattributedCount}
-                            label="unattributed"
-                            explanation={unattributedSpendTitle(unattributedCount)}
-                          />
+                          <>
+                            <CountBadge
+                              count={unattributedCount}
+                              label="unattributed"
+                              explanation={unattributedSpendTitle(unattributedCount)}
+                            />
+                            <CountBadge
+                              count={undatedCount}
+                              label="undated"
+                              explanation={undatedSpendTitle(undatedCount)}
+                            />
+                          </>
                         )}
                         {/* A badge rather than the `tooltip` prop below, which
                             puts the text in a `title` attribute: it reaches a

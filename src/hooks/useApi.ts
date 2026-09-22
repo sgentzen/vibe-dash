@@ -377,6 +377,7 @@ export interface IngestStatus {
   filesTracked: number; transcriptRows: number; unpriced: number; unattributed: number;
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number; mcpUnattributed: number;
   otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
+  undated: number;
 }
 
 async function getIngestStatus(): Promise<IngestStatus> {

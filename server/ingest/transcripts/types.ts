@@ -19,6 +19,12 @@ export interface UsageRecord {
   cacheReadTokens: number;
 }
 
+/**
+ * Canonical ISO-8601 Z text for a timestamp, or null when it cannot be dated.
+ * Built by createTimestampNormaliser (server/db/helpers.ts), which asks SQLite.
+ */
+export type TimestampNormaliser = (raw: string) => string | null;
+
 export interface ParseResult {
   records: UsageRecord[];
   /** Lines that could not be used. Surfaced so a format change is visible. */

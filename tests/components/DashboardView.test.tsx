@@ -53,7 +53,7 @@ function healthyStatus(overrides: Partial<IngestStatus> = {}): IngestStatus {
   return {
     filesTracked: 0, transcriptRows: 0, unpriced: 0, unattributed: 0,
     otlpRows: 0, otlpUnmapped: 0, otlpUnattributed: 0, mcpUnattributed: 0,
-    otlpSeriesCount: 0, otlpSeriesRefused: 0, otlpSeriesCap: 10_000,
+    otlpSeriesCount: 0, otlpSeriesRefused: 0, otlpSeriesCap: 10_000, undated: 0,
     ...overrides,
   };
 }
@@ -227,6 +227,63 @@ describe("DashboardView unattributed badge scope", () => {
     // The figure itself still renders; only the caveat that is not about it goes.
     await screen.findByText(/\$12\.50/);
     expect(screen.queryByText(/unattributed/)).toBeNull();
+  });
+});
+
+// `undated` is install-wide too, and qualifies the same figure the same way:
+// rows in the global total that no dated figure (the chart, today's spend) can
+// place on a day.
+describe("DashboardView undated badge", () => {
+  beforeEach(() => {
+    resetIdSeq();
+    resetApiDefaults();
+    mockApi.getCostSummary.mockResolvedValue(SPENT);
+    mockApi.getIngestStatus.mockResolvedValue(healthyStatus({ undated: 2 }));
+  });
+
+  it("explains why the global total exceeds the chart", async () => {
+    renderWithProviders(<DashboardView />);
+
+    const badge = await screen.findByRole("button", { name: "2 undated" });
+    expect(tipOf(badge).textContent).toContain("on no day of the chart");
+  });
+
+  it("words a single entry in the singular", async () => {
+    mockApi.getIngestStatus.mockResolvedValue(healthyStatus({ undated: 1 }));
+    renderWithProviders(<DashboardView />);
+
+    const badge = await screen.findByRole("button", { name: "1 undated" });
+    expect(tipOf(badge).textContent).toContain("1 entry has no readable date, so it is in this total");
+  });
+
+  it("sits beside the unattributed badge, each with its own explanation", async () => {
+    // Both are gated on the global view, inside one fragment.
+    mockApi.getIngestStatus.mockResolvedValue(healthyStatus({ undated: 2, unattributed: 3 }));
+    renderWithProviders(<DashboardView />);
+
+    const undated = await screen.findByRole("button", { name: "2 undated" });
+    const unattributed = screen.getByRole("button", { name: "3 unattributed" });
+    expect(undated.getAttribute("aria-describedby")).not.toBe(unattributed.getAttribute("aria-describedby"));
+    expect(tipOf(undated).textContent).toContain("on no day of the chart");
+    expect(tipOf(unattributed).textContent).toContain("exceeds the sum of the per-project figures");
+  });
+
+  it("says nothing when every row is dated", async () => {
+    mockApi.getIngestStatus.mockResolvedValue(healthyStatus());
+    renderWithProviders(<DashboardView />);
+
+    await screen.findByText(/\$12\.50/);
+    expect(screen.queryByText(/undated/)).toBeNull();
+  });
+
+  it("hides it beside a per-project total, on the same counts", async () => {
+    const project = makeProject();
+    renderWithProviders(<DashboardView />, {
+      seed: { projects: [project], selectedProjectId: project.id },
+    });
+
+    await screen.findByText(/\$12\.50/);
+    expect(screen.queryByText(/undated/)).toBeNull();
   });
 });
 
