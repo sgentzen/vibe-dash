@@ -1,6 +1,8 @@
 import type { APIRequestContext } from "@playwright/test";
+import { E2E_API_BASE } from "../e2e-env.js";
 
-const API_BASE = "http://localhost:3001";
+// Always the dedicated e2e port, never :3001 — see e2e/e2e-env.ts.
+const API_BASE = E2E_API_BASE;
 
 export interface Project {
   id: string;

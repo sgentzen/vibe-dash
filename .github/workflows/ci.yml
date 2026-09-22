@@ -94,13 +94,16 @@ jobs:
         run: npm run test:e2e:install
 
       # Build the client so the express server can serve the production bundle.
-      # In CI, playwright.config.ts targets that single server on :3001 (no vite
-      # dev server / proxy), which removes the dev-server warmup flakiness.
+      # In CI, playwright.config.ts targets that single server on its dedicated
+      # e2e port (no vite dev server / proxy), which removes the dev-server
+      # warmup flakiness.
       - name: Build client
         run: npm run build:client
 
-      # Playwright's webServer boots the express server (:3001) serving the
-      # prebuilt SPA + API + WS. CI=true (set by GitHub) enables the 2 retries.
+      # Playwright's webServer boots the express server (on the dedicated e2e
+      # port, isolated VIBE_DASH_DB and VIBE_DASH_CLAUDE_HOME — see
+      # playwright.config.ts and e2e/e2e-env.ts) serving the prebuilt SPA +
+      # API + WS. CI=true (set by GitHub) enables the 2 retries.
       - name: Run e2e tests
         run: npm run test:e2e
 
