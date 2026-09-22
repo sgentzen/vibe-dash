@@ -283,6 +283,24 @@ function instantMs(value: string): number {
   return ISO_INSTANT.test(value) ? new Date(value).getTime() : Number.NaN;
 }
 
+/**
+ * SQL for "this expression does not hold an instant we can measure", the one
+ * shape check every SQL-side reader of these columns shares so the terms cannot
+ * drift apart between call sites. Each term earns its place; the reasoning is
+ * on closeStaleSession.
+ *
+ * It is a predicate over `expr`, which must be a trusted SQL fragment (a column
+ * name or a COALESCE of columns), never caller input. The GLOB is inlined as a
+ * literal because it contains no quote and is a compile-time constant.
+ * It is never NULL: a NULL column is caught by the final term.
+ */
+type InstantExpr = "last_activity_at" | "last_seen_at" | "started_at" | "COALESCE(ended_at, last_activity_at)";
+function unreadableInstantSql(expr: InstantExpr): string {
+  return `(${expr} NOT GLOB '${ISO_INSTANT_GLOB}'
+            OR instr(${expr}, char(0)) > 0
+            OR julianday(${expr}) IS NULL)`;
+}
+
 export function startOrGetSession(db: Database.Database, agentId: string): AgentSession {
   const ts = now();
   const open = db
@@ -385,12 +403,10 @@ export function closeStaleSession(db: Database.Database): number {
   const result = db.prepare(
     `UPDATE agent_sessions SET ended_at = ?
      WHERE ended_at IS NULL
-       AND (last_activity_at NOT GLOB ?
-            OR instr(last_activity_at, char(0)) > 0
-            OR julianday(last_activity_at) IS NULL
+       AND (${unreadableInstantSql("last_activity_at")}
             OR julianday(last_activity_at) < julianday(?)
             OR julianday(last_activity_at) > julianday(?))`
-  ).run(now(), ISO_INSTANT_GLOB, quietSince, noLaterThan);
+  ).run(now(), quietSince, noLaterThan);
   return result.changes;
 }
 
@@ -411,6 +427,7 @@ export function closeStaleSession(db: Database.Database): number {
  */
 export function cleanupStaleAgents(db: Database.Database): number {
   const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MS).toISOString();
+  const noLaterThan = new Date(Date.now() + SESSION_TIMEOUT_MS).toISOString();
   // Parsed dates, not raw string order — see closeStaleSession for why the
   // string comparison caught a blank last_seen_at but never a non-date one.
   // An agent whose last sighting cannot be read is treated as gone, which is
@@ -422,11 +439,20 @@ export function cleanupStaleAgents(db: Database.Database): number {
   // session row it just closed still references agents(id), so the delete is
   // refused and the agent is kept. An agent reaches the DELETE only if it has
   // no session row at all, which means it has nothing on record to lose.
+  //
+  // last_seen_at gets the same two guards closeStaleSession applies to
+  // last_activity_at, for the same reasons: the shape check, because
+  // julianday('now') re-evaluates every pass and so a row carrying that literal
+  // is never past any cutoff; and a far bound, because a value dated ahead
+  // outruns every cutoff built from the present. Skew inside the timeout is
+  // tolerated, so an agent stamped a moment ago by another process is kept.
   const candidates = db.prepare(
     `SELECT id FROM agents
-     WHERE (julianday(last_seen_at) IS NULL OR julianday(last_seen_at) < julianday(?))
+     WHERE (${unreadableInstantSql("last_seen_at")}
+            OR julianday(last_seen_at) < julianday(?)
+            OR julianday(last_seen_at) > julianday(?))
      AND id NOT IN (SELECT agent_id FROM agent_sessions WHERE ended_at IS NULL)`
-  ).all(cutoff) as { id: string }[];
+  ).all(cutoff, noLaterThan) as { id: string }[];
 
   const remove = db.prepare("DELETE FROM agents WHERE id = ?");
   let removed = 0;
@@ -558,6 +584,24 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
   // session instead of leaving it open forever — at once if last_activity_at
   // is the unreadable field, otherwise as soon as it falls quiet — so the row
   // stops accumulating rather than silently distorting the rate.
+  //
+  // "Cannot be measured" covers the same ground closeStaleSession closes on,
+  // for the window before it runs: a span end that is not the instant now()
+  // writes, or that is dated further ahead than the timeout (which would
+  // inflate total_hours and dilute the rate), and a started_at that is either,
+  // since a start after the end makes the span negative, the MAX() clamps it
+  // to 0.01h, and the row's whole activity_count lands on a hundredth of an
+  // hour. That last case needs no bad value at all, only two sane ones in the
+  // wrong order (a process with a slow clock stamping last_activity_at behind
+  // a start another process wrote), so it is a relation between the columns
+  // rather than a bound on either. A zero-length span is fine and stays; it is
+  // only the unmeasurable, future-dated or backwards spans above that are
+  // dropped from both sides rather than surfaced, for the reason already
+  // given. The span end is COALESCE(ended_at, last_activity_at), so a closed
+  // session is judged on ended_at alone and a bad last_activity_at on it costs
+  // nothing.
+  const noLaterThan = new Date(Date.now() + SESSION_TIMEOUT_MS).toISOString();
+  const spanEnd = "COALESCE(ended_at, last_activity_at)" as const;
   const sessionRow = db.prepare(
     `SELECT
        COALESCE(SUM(activity_count), 0) AS total_activity,
@@ -566,9 +610,12 @@ export function getAgentStats(db: Database.Database, agentId: string, milestoneI
        ), 0.01) AS total_hours
      FROM agent_sessions
      WHERE agent_id = ?
-       AND julianday(started_at) IS NOT NULL
-       AND julianday(COALESCE(ended_at, last_activity_at)) IS NOT NULL`
-  ).get(agentId) as { total_activity: number; total_hours: number };
+       AND NOT ${unreadableInstantSql("started_at")}
+       AND NOT ${unreadableInstantSql(spanEnd)}
+       AND julianday(started_at) <= julianday(?)
+       AND julianday(${spanEnd}) <= julianday(?)
+       AND julianday(started_at) <= julianday(${spanEnd})`
+  ).get(agentId, noLaterThan, noLaterThan) as { total_activity: number; total_hours: number };
   const activityFrequency = sessionRow.total_hours > 0
     ? Math.round((sessionRow.total_activity / sessionRow.total_hours) * 10) / 10 : 0;
 

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
+import { NON_INSTANT_SHAPES } from "./timestamp-shapes.js";
+import { SESSION_TIMEOUT_MS } from "../server/constants.js";
 import {
   registerAgent,
   getAgentById,
@@ -117,3 +119,113 @@ describe("cleanupStaleAgents", () => {
     expect(getAgentById(db, id)).not.toBeNull();
   });
 });
+
+/**
+ * cleanupStaleAgents reads last_seen_at, and had neither of the guards
+ * closeStaleSession carries on last_activity_at. `julianday('now')`
+ * re-evaluates on every pass, so an agent whose last_seen_at was the literal
+ * string 'now' was never past the cutoff and was invisible to housekeeping for
+ * good; a value dated ahead of the present outran every cutoff the same way.
+ * Agents here have no session rows, so the open-session guard and the foreign
+ * key are out of the picture and only the timestamp decides.
+ */
+describe("cleanupStaleAgents bounds last_seen_at on both sides of the present", () => {
+  const AHEAD = (ms: number) => new Date(Date.now() + ms).toISOString();
+  const MARGIN_MS = 5_000;
+
+  function agentSeenAt(name: string, lastSeenAt: string): string {
+    const id = newAgent(db, name);
+    db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(lastSeenAt, id);
+    return id;
+  }
+
+  it.each(NON_INSTANT_SHAPES)("removes an agent whose last_seen_at is %s", (name, value) => {
+    const id = agentSeenAt(`shape-${name}`, value);
+
+    expect(cleanupStaleAgents(db)).toBe(1);
+    expect(getAgentById(db, id)).toBeNull();
+  });
+
+  it("removes an agent dated further ahead than the timeout", () => {
+    const id = agentSeenAt("from-the-future", AHEAD(SESSION_TIMEOUT_MS + MARGIN_MS));
+
+    expect(cleanupStaleAgents(db)).toBe(1);
+    expect(getAgentById(db, id)).toBeNull();
+  });
+
+  it("removes an agent dated years ahead", () => {
+    const id = agentSeenAt("never-stale", "2099-01-01T00:00:00.000Z");
+
+    expect(cleanupStaleAgents(db)).toBe(1);
+    expect(getAgentById(db, id)).toBeNull();
+  });
+
+  it("keeps an agent dated ahead by less than the timeout", () => {
+    // Skew between the processes sharing a VIBE_DASH_DB, not a fault.
+    const id = agentSeenAt("skewed-clock", AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS));
+
+    expect(cleanupStaleAgents(db)).toBe(0);
+    expect(getAgentById(db, id)).not.toBeNull();
+  });
+
+  it("keeps an agent stamped a moment ago by another process", () => {
+    const id = agentSeenAt("just-wrote", AHEAD(50));
+
+    expect(cleanupStaleAgents(db)).toBe(0);
+    expect(getAgentById(db, id)).not.toBeNull();
+  });
+
+  it("still keeps a badly stamped agent that something references", () => {
+    // The foreign-key refusal is deliberate and must survive the wider net.
+    const id = agentSeenAt("spender", "now");
+    logCost(db, {
+      agent_id: id,
+      model: "claude-opus-5",
+      provider: "anthropic",
+      input_tokens: 1,
+      output_tokens: 1,
+      cost_usd: 1,
+    });
+
+    expect(() => cleanupStaleAgents(db)).not.toThrow();
+    expect(getAgentById(db, id)).not.toBeNull();
+  });
+
+  it("sorts a mixed batch in one sweep", () => {
+    const kept = [newAgent(db, "busy"), agentSeenAt("skewed", AHEAD(MARGIN_MS))];
+    const gone = [
+      agentSeenAt("literal-now", "now"),
+      agentSeenAt("future", "2099-01-01T00:00:00.000Z"),
+      agentSeenAt("long-ago", LONG_AGO),
+    ];
+
+    expect(cleanupStaleAgents(db)).toBe(gone.length);
+    kept.forEach((id) => expect(getAgentById(db, id)).not.toBeNull());
+    gone.forEach((id) => expect(getAgentById(db, id)).toBeNull());
+  });
+
+  it("leaves a badly stamped agent alone while it holds an open session", () => {
+    const id = agentSeenAt("mid-session", "now");
+    startOrGetSession(db, id);
+
+    expect(cleanupStaleAgents(db)).toBe(0);
+    expect(getAgentById(db, id)).not.toBeNull();
+  });
+
+  it("removes an agent whose last_seen_at is blank", () => {
+    const id = agentSeenAt("blank", "");
+
+    expect(cleanupStaleAgents(db)).toBe(1);
+    expect(getAgentById(db, id)).toBeNull();
+  });
+
+  it("keeps an agent just inside the past cutoff and removes one just outside", () => {
+    const inside = agentSeenAt("just-inside", new Date(Date.now() - SESSION_TIMEOUT_MS + MARGIN_MS).toISOString());
+    const outside = agentSeenAt("just-outside", new Date(Date.now() - SESSION_TIMEOUT_MS - MARGIN_MS).toISOString());
+
+    expect(cleanupStaleAgents(db)).toBe(1);
+    expect(getAgentById(db, inside)).not.toBeNull();
+    expect(getAgentById(db, outside)).toBeNull();
+  });
+});
+

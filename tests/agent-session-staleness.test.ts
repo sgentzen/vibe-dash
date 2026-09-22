@@ -9,6 +9,7 @@ import {
   cleanupStaleAgents,
 } from "../server/db/index.js";
 import { SESSION_TIMEOUT_MS } from "../server/constants.js";
+import { NON_INSTANT_SHAPES } from "./timestamp-shapes.js";
 
 let db: Database.Database;
 beforeEach(() => {
@@ -319,26 +320,7 @@ describe("closeStaleSession bounds the future as well as the past", () => {
  * sides from drifting apart again when either parser changes.
  */
 describe("closeStaleSession treats a relative or ambiguous timestamp as unreadable", () => {
-  const zoned = () => new Date().toISOString();
-
-  const shapes: [name: string, value: string][] = [
-    ["the literal string 'now'", "now"],
-    ["a bare date with no time", "2099-01-01"],
-    ["a bare time with no date", "12:00"],
-    ["a date-time naming no zone", zoned().replace(/\.\d+Z$/, "")],
-    ["a space in place of the T", zoned().replace("T", " ").replace(/\.\d+Z$/, "")],
-    ["a numeric UTC offset", "2026-09-18T23:00:00+05:00"],
-    ["seconds but no milliseconds", zoned().replace(/\.\d+Z$/, "Z")],
-    // A well-formed instant, a NUL, then anything at all. SQLite's string
-    // functions stop at the NUL — GLOB, julianday() and even length() all read
-    // only the first 24 bytes and pronounce the row live — while ECMAScript
-    // sees the whole string and rejects it. The two checks therefore split on
-    // this one: housekeeping leaves the row open, the next tool call abandons
-    // it. Nothing writes a NUL today, so this is a latent divergence rather
-    // than a live bug, but the invariant this file exists to defend is that
-    // the two checks agree, and a known class where they do not is a hole.
-    ["a NUL byte hiding a trailing garbage suffix", `${zoned()} not-a-timestamp`],
-  ];
+  const shapes = NON_INSTANT_SHAPES;
 
   it.each(shapes)("closes a session whose last_activity_at is %s", (_name, value) => {
     const sessionId = openSession(newAgent(`close-${_name}`), NOW(), value);
