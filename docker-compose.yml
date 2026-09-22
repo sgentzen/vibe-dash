@@ -26,6 +26,14 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
+      # 0.0.0.0 here is inside the container's own network namespace, not a
+      # LAN exposure: the "127.0.0.1:3001:3001" port publish above is what
+      # actually keeps the host-visible boundary loopback-only. The server's
+      # own default is now 127.0.0.1 (SEC-4), which if left unset here would
+      # make it unreachable through the published port at all, since that
+      # traffic arrives on the container's bridge interface, not its
+      # loopback.
+      - HOST=0.0.0.0
       - VIBE_DASH_DB=/data/vibe-dash.db
     restart: unless-stopped
     healthcheck:

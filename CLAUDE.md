@@ -23,6 +23,8 @@ Local-first real-time dashboard for monitoring AI-driven development projects vi
 | Variable | Default | Used by |
 |----------|---------|---------|
 | `PORT` | `3001` | Express server (`server/index.ts`) |
+| `HOST` | `127.0.0.1` | Interface the Express server binds (`server/index.ts`). Vibe Dash has no authentication, so this stays loopback-only by default; `HOST=0.0.0.0` is the deliberate opt-in for operators fronting it with their own reverse proxy or firewall (the Docker image sets it internally — see `docker-compose.yml`, which keeps the *host-visible* boundary loopback via its port publish instead). |
+| `VIBE_DASH_ALLOWED_HOSTS` | unset | Comma-separated `host[:port]` values, exactly as a reverse proxy forwards them in `Host`, added to the loopback allow-list that `server/security/origin.ts` enforces on `/api`, `/mcp`, `/v1/metrics` and the `/ws` upgrade. Both `http://` and `https://` are accepted as the matching `Origin`. See `docs/self-hosting.md`, "Access control". |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | SQLite path for the server, stdio MCP, and CLI alike (all go through `resolveDbPath()`). Set it once to share one DB across all three. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a DB carrying migrations this build doesn't know (i.e. one written by a newer Vibe Dash). Only for running an older checkout against a migrated DB on purpose — expect SQL errors for missing columns. |
 | `VIBE_DASH_OTLP_SERIES_CAP` | `10000` | Ceiling on rows in `otlp_series` (`server/ingest/otlp/series.ts`). Only the CREATION of a new series is refused; nothing is ever deleted, so an established sender is never affected. Exists so a flooded install can recover without a rebuild. |

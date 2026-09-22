@@ -35,9 +35,17 @@ EXPOSE 3001
 # DB is stored in a volume so data survives container restarts
 VOLUME ["/data"]
 
+# HOST=0.0.0.0 here is a container-internal default, not a change to the
+# security boundary: the server itself now defaults to binding loopback only
+# (SEC-4), which inside this container's own network namespace would make it
+# unreachable even from docker-compose.yml's port publish. docker-compose.yml
+# is what still keeps the boundary loopback-only on the HOST machine, by
+# publishing "127.0.0.1:3001:3001" rather than "3001:3001" — see the comment
+# there.
 ENV NODE_ENV=production \
     VIBE_DASH_DB=/data/vibe-dash.db \
-    PORT=3001
+    PORT=3001 \
+    HOST=0.0.0.0
 
 # su-exec lets the entrypoint drop from root to `node` after fixing volume ownership
 RUN apk add --no-cache su-exec && mkdir -p /data && chown -R node:node /app
