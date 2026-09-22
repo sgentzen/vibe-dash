@@ -126,7 +126,7 @@ See [docs/MCP-SETUP.md](docs/MCP-SETUP.md) for the full tool reference.
 
 ## Configuration
 
-Environment variables (`PORT`, `VIBE_DASH_DB`, `VIBE_DASH_ALLOW_SCHEMA_DRIFT`, `VIBE_DASH_OTLP_SERIES_CAP`, `VIBE_DASH_CLAUDE_HOME`) are documented in [CLAUDE.md](CLAUDE.md#environment-variables).
+Environment variables (`PORT`, `HOST`, `VIBE_DASH_ALLOWED_HOSTS`, `VIBE_DASH_DB`, `VIBE_DASH_ALLOW_SCHEMA_DRIFT`, `VIBE_DASH_OTLP_SERIES_CAP`, `VIBE_DASH_CLAUDE_HOME`) are documented in [CLAUDE.md](CLAUDE.md#environment-variables).
 
 > **The `VIBE_DASH_DB` default is not relative to your current directory.** With
 > the variable unset, the path resolves to `vibe-dash.db` at the root of the git

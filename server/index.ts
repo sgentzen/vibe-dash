@@ -17,6 +17,7 @@ import { createMcpServer } from "./mcp/server.js";
 import { randomUUID } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { buildAllowedNetwork, hostValidationMiddleware, crossSiteMutationGuard, resolveListenHost } from "./security/origin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,7 +43,34 @@ const mcpLimiter = rateLimit({
 });
 
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
+// Loopback by default — Vibe Dash has no authentication, so binding every
+// interface (the old bare `server.listen(PORT)` below) would hand an
+// unauthenticated read/write API and every MCP tool to the whole LAN the
+// moment the process starts on a shared network. HOST=0.0.0.0 is the
+// documented, deliberate opt-in (docs/self-hosting.md) for operators who are
+// putting a reverse proxy or firewall in front of it themselves — the Docker
+// image sets it internally because docker-compose.yml already pins the
+// *published* port to the host's loopback interface.
+const HOST = resolveListenHost();
 const DB_PATH = resolveDbPath();
+
+// The one shared trust boundary for every entry point on this server: /api,
+// /mcp, /v1/metrics and the /ws upgrade in websocket.ts all consult this same
+// allow-list. See server/security/origin.ts for why Host/Origin checking is
+// what actually enforces "loopback only" against DNS rebinding.
+//
+// includeDevPort is opt-in on NODE_ENV === "development" specifically (not
+// "not literally production"), matching the scriptSrc check just below. None
+// of this project's own documented self-host paths (`npm start`, the pm2 and
+// systemd examples in docs/self-hosting.md) set NODE_ENV at all, so an
+// "anything but production" test would silently widen the allow-list on
+// every one of them, not just `npm run dev` — the opposite of this file's
+// purpose. `npm run dev` sets NODE_ENV=development itself (see package.json)
+// specifically so this stays narrow.
+const allowedNetwork = buildAllowedNetwork(PORT, {
+  extraHosts: process.env.VIBE_DASH_ALLOWED_HOSTS,
+  includeDevPort: process.env.NODE_ENV === "development",
+});
 
 const app = express();
 app.use(helmet({
@@ -52,12 +80,24 @@ app.use(helmet({
       scriptSrc: ["'self'", ...(process.env.NODE_ENV === "development" ? ["'unsafe-eval'"] : [])],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "ws:", "wss:"],
+      // CSP3 'self' already covers a same-origin WebSocket upgrade — the bare
+      // "ws:"/"wss:" this used to list matched a WebSocket to ANY host, which
+      // is broader than the same-origin policy every other directive here
+      // enforces (SEC-7). In dev, the page is served from Vite on :3000 and
+      // connects to a relative "/ws", which Vite proxies to :3001 — still
+      // same-origin from the page's own perspective, so 'self' holds there
+      // too; see vite.config.ts's proxy block.
+      connectSrc: ["'self'"],
       frameAncestors: ["'none'"],
     },
   },
   crossOriginEmbedderPolicy: false,
 }));
+// Ahead of everything else — body parsers, the OTLP limiter, both routers —
+// so a request outside the trust boundary is rejected before any of its
+// content is even read, let alone acted on.
+app.use(hostValidationMiddleware(allowedNetwork));
+app.use(crossSiteMutationGuard(allowedNetwork));
 // Three-way ordering for /v1/metrics, and it is not obvious, so each piece is
 // spelled out:
 //
@@ -164,10 +204,10 @@ app.get("/{*splat}", spaLimiter, (_req, res) => {
 app.use(errorHandler);
 
 const server = createServer(app);
-initWebSocket(server);
+initWebSocket(server, allowedNetwork);
 
-server.listen(PORT, () => {
-  logger.info({ port: PORT }, "Vibe Dash running");
+server.listen(PORT, HOST, () => {
+  logger.info({ port: PORT, host: HOST }, "Vibe Dash running");
   logger.info({ port: PORT, path: "/ws" }, "WebSocket available");
   logger.info({ port: PORT, path: "/mcp" }, "MCP (Streamable HTTP) available");
   // Backfill milestone daily stats so the dashboard has data immediately

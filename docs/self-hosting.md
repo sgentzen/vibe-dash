@@ -67,6 +67,8 @@ All four entry points share the same SQLite database file.
 | Environment variable | Default | Description |
 |---------------------|---------|-------------|
 | `PORT` | `3001` | Port the server listens on |
+| `HOST` | `127.0.0.1` | Interface the server binds. Vibe Dash has no built-in authentication, so this stays loopback-only unless you deliberately opt in with `HOST=0.0.0.0` — see [Access control](#access-control) before you do. The Docker image sets it to `0.0.0.0` internally; that is not a LAN exposure by itself, because `docker-compose.yml` still publishes the port on the host's loopback interface only. |
+| `VIBE_DASH_ALLOWED_HOSTS` | unset | Comma-separated `host[:port]` values to accept in the `Host` header, in addition to `localhost`, `127.0.0.1` and `[::1]` on `PORT`. **Required if you put a reverse proxy in front of Vibe Dash** — without it, every proxied request is rejected with `421` because its `Host` is your public hostname, not `localhost`. Set it to that hostname, e.g. `VIBE_DASH_ALLOWED_HOSTS=vibe-dash.example.com`. Both `http://` and `https://` are then accepted as `Origin`. |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path — used by the server process, the stdio MCP transport and the CLI. Not relative to your working directory: left unset it resolves to the git root of the Vibe Dash install. The Docker image sets it to `/data/vibe-dash.db`. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know. Only for deliberately running an older build against a migrated database. |
 | `VIBE_DASH_OTLP_SERIES_CAP` | `10000` | Ceiling on distinct OTLP metric series. Only the creation of a new series is refused; nothing is ever deleted, so an established sender is unaffected. Raise it and restart if a flooded install needs to admit new senders. |
@@ -84,8 +86,14 @@ Requires **Node.js 20+**.
 git clone https://github.com/sgentzen/vibe-dash.git
 cd vibe-dash
 npm install
-npm start          # builds frontend + starts server on :3001
+npm start          # builds frontend + starts server on 127.0.0.1:3001
 ```
+
+The server binds loopback only by default (`HOST=127.0.0.1`) — reachable from
+this machine, not the rest of your network. Put a reverse proxy in front of it
+for team access (below) rather than setting `HOST=0.0.0.0`: Vibe Dash has no
+built-in authentication, so binding every interface hands an unauthenticated
+read/write API, and every MCP tool, to anything that can reach this host.
 
 To run as a persistent background service, use systemd, pm2, or your OS service manager:
 
@@ -102,6 +110,10 @@ pm2 start "npm run serve" --name vibe-dash   # starts server only; no rebuild on
 pm2 save && pm2 startup
 ```
 
+`HOST` defaults to `127.0.0.1` whether or not pm2 sets it; add `HOST=0.0.0.0`
+to pm2's environment only if you understand the [Access control](#access-control)
+trade-off and are not fronting this with a reverse proxy.
+
 **systemd** (`/etc/systemd/system/vibe-dash.service`):
 ```ini
 [Unit]
@@ -115,11 +127,15 @@ WorkingDirectory=/opt/vibe-dash
 ExecStart=npm run serve
 Restart=on-failure
 Environment=PORT=3001
+Environment=HOST=127.0.0.1
 Environment=VIBE_DASH_DB=/opt/vibe-dash/data/vibe-dash.db
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+`Environment=HOST=127.0.0.1` above is the default — spelled out so the unit
+file stays correct as documentation even if that default ever changes.
 
 ```bash
 systemctl enable --now vibe-dash
@@ -132,6 +148,13 @@ systemctl enable --now vibe-dash
 ## Reverse proxy + TLS
 
 Never expose the Node.js process directly on port 443. Use a reverse proxy to terminate TLS and optionally enforce access control.
+
+Whichever proxy you use, also set `VIBE_DASH_ALLOWED_HOSTS=vibe-dash.example.com`
+(your real hostname) on the Vibe Dash process itself. The server validates the
+`Host` header on every request to close the DNS-rebinding hole that a bare
+loopback bind leaves open (see [Configuration](#configuration)); a proxied
+request arrives with `Host: vibe-dash.example.com`, not `localhost`, and is
+rejected with `421` unless that hostname is on the allow-list.
 
 ### Caddy (simplest — auto TLS)
 
@@ -176,6 +199,14 @@ server {
 ## Access control
 
 Vibe Dash does not currently have built-in user authentication. Restrict access at the network or proxy layer:
+
+The server itself enforces the loopback boundary in code, not just by binding
+address: it rejects any request whose `Host` header isn't `localhost`,
+`127.0.0.1`, `[::1]` (on its own port) or an entry in `VIBE_DASH_ALLOWED_HOSTS`,
+and rejects cross-site state-changing requests the same way, so a browser tab
+on an unrelated site can't reach it via DNS rebinding even while it's running.
+That is a floor, not a substitute for the options below — it stops the
+specific network-layer attack, not general access.
 
 ### Option 1: VPN / private network (recommended)
 
@@ -319,3 +350,9 @@ Data in the volume is preserved. The server runs database migrations automatical
 **Database locked errors:**
 - Only one Vibe Dash process should write to the SQLite file
 - If running multiple containers, mount the same volume to exactly one container; use the HTTP MCP transport for all agents instead of stdio
+
+**`421` responses (`{"error":"Invalid Host header: ..."}`) behind a reverse proxy:**
+- Set `VIBE_DASH_ALLOWED_HOSTS` to your public hostname on the Vibe Dash process — see [Reverse proxy + TLS](#reverse-proxy--tls). This is the most common setup mistake once a proxy is added.
+
+**`403` responses (`{"error":"Invalid Origin header: ..."}`) or WebSocket connections refused from the browser:**
+- Same cause as the `421` case above: the browser's `Origin` is your public hostname, which also needs to be in `VIBE_DASH_ALLOWED_HOSTS`.

@@ -36,8 +36,15 @@ export function requestApp(
   method: string,
   path: string,
   body?: unknown,
-): Promise<{ status: number; body: unknown }> {
-  return requestAppRaw(app, method, path, body === undefined ? undefined : JSON.stringify(body));
+  extraHeaders?: Record<string, string>,
+): Promise<{ status: number; body: unknown; headers: http.IncomingHttpHeaders }> {
+  return requestAppRaw(
+    app,
+    method,
+    path,
+    body === undefined ? undefined : JSON.stringify(body),
+    extraHeaders,
+  );
 }
 
 /**
@@ -60,13 +67,21 @@ export function requestApp(
  * Awaiting each step keeps the callback nesting shallow — the previous
  * inline version nested five deep (promise -> listen -> request -> response
  * -> stream events), which Sonar flags as S2004.
+ *
+ * `extraHeaders` overrides or adds request headers, including `Host` and
+ * `Origin` — both of which Node's http.request would otherwise derive from
+ * `hostname`/`port` (`Host`) or omit entirely (`Origin`). That is what lets
+ * the network-boundary tests exercise a foreign `Host`/`Origin` against a
+ * server actually listening on 127.0.0.1: the two are independent inputs at
+ * the HTTP layer, same as a real DNS-rebinding or reverse-proxy request.
  */
 export async function requestAppRaw(
   app: Express,
   method: string,
   path: string,
   payload?: string,
-): Promise<{ status: number; body: unknown }> {
+  extraHeaders?: Record<string, string>,
+): Promise<{ status: number; body: unknown; headers: http.IncomingHttpHeaders }> {
   const server = createServer(app);
   const port = await listen(server);
   try {
@@ -79,6 +94,7 @@ export async function requestAppRaw(
         headers: {
           "Content-Type": "application/json",
           ...(payload === undefined ? {} : { "Content-Length": String(Buffer.byteLength(payload)) }),
+          ...extraHeaders,
         },
       },
       payload,
@@ -86,9 +102,9 @@ export async function requestAppRaw(
     const data = await readBody(res);
     const status = res.statusCode ?? 0;
     try {
-      return { status, body: JSON.parse(data) };
+      return { status, body: JSON.parse(data), headers: res.headers };
     } catch {
-      return { status, body: data };
+      return { status, body: data, headers: res.headers };
     }
   } finally {
     server.close();
