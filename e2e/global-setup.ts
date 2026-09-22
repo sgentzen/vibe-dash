@@ -1,4 +1,5 @@
 import { request } from "@playwright/test";
+import { E2E_API_BASE } from "./e2e-env.js";
 
 // The app renders a fixed, full-screen OnboardingWizard overlay whenever the
 // database has zero projects (see src/App.tsx: `projects.length === 0`). On a
@@ -7,7 +8,11 @@ import { request } from "@playwright/test";
 // failures seen in CI (`board: shows three kanban columns`, the `agents`
 // preset-tab clicks). Seed one project up front so first-run onboarding never
 // appears; tests that need their own project still create it themselves.
-const API_BASE = "http://localhost:3001";
+//
+// Always talk to the express server directly (not via the vite proxy), and
+// always on the dedicated e2e port — never :3001 — so this can never touch a
+// maintainer's live instance (see e2e/e2e-env.ts).
+const API_BASE = E2E_API_BASE;
 
 export default async function globalSetup(): Promise<void> {
   const ctx = await request.newContext();
