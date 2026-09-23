@@ -19,7 +19,35 @@ cd /path/to/vibe-dash && npm start
 
 ## Step 2 — Add the MCP server
 
-**Option A: Workspace config** (project-level) — create `.vscode/mcp.json`:
+**Option A: Streamable HTTP (recommended)**: requires the Vibe Dash server running. Workspace config, create `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "vibe-dash": {
+      "type": "http",
+      "url": "http://localhost:3001/mcp"
+    }
+  }
+}
+```
+
+Or user settings (global): add to `settings.json` (`Ctrl+Shift+P` → "Open User Settings (JSON)"):
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "vibe-dash": {
+        "type": "http",
+        "url": "http://localhost:3001/mcp"
+      }
+    }
+  }
+}
+```
+
+**Option B: Stdio (fallback, one session at a time)**: only when you cannot run the server. Running more than one stdio process at once, or stdio alongside a running server, has corrupted this project's database before; see the transport comparison and corruption warning in [docs/MCP-SETUP.md](../MCP-SETUP.md#step-2-configure-claude-code-to-use-the-mcp-server). Workspace config (`.vscode/mcp.json`):
 
 ```json
 {
@@ -33,34 +61,7 @@ cd /path/to/vibe-dash && npm start
 }
 ```
 
-**Option B: User settings** (global) — add to `settings.json` (`Ctrl+Shift+P` → "Open User Settings (JSON)"):
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "vibe-dash": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["tsx", "/absolute/path/to/vibe-dash/server/mcp/stdio.ts"]
-      }
-    }
-  }
-}
-```
-
-**Option C: Remote server** (Streamable HTTP)
-
-```json
-{
-  "servers": {
-    "vibe-dash": {
-      "type": "http",
-      "url": "http://localhost:3001/mcp"
-    }
-  }
-}
-```
+Or user settings (global), the same shape nested under `"mcp": { "servers": { ... } }` in `settings.json`.
 
 Reload VS Code (or restart the MCP server from the Copilot panel) after editing.
 

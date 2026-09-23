@@ -19,29 +19,7 @@ cd /path/to/vibe-dash && npm start
 
 ## Step 2 — Add the MCP server
 
-**Option A: `~/.aider.conf.yml`** (global)
-
-```yaml
-mcp_servers:
-  - name: vibe-dash
-    command: npx
-    args:
-      - tsx
-      - /absolute/path/to/vibe-dash/server/mcp/stdio.ts
-```
-
-**Option B: `aider.conf.yml`** at the project root (project-level)
-
-```yaml
-mcp_servers:
-  - name: vibe-dash
-    command: npx
-    args:
-      - tsx
-      - /absolute/path/to/vibe-dash/server/mcp/stdio.ts
-```
-
-**Option C: Remote server** (Streamable HTTP, requires Vibe Dash server running)
+**Option A: Streamable HTTP (recommended)**: requires the Vibe Dash server running, in `~/.aider.conf.yml` (global) or `aider.conf.yml` at the project root:
 
 ```yaml
 mcp_servers:
@@ -49,10 +27,21 @@ mcp_servers:
     url: http://localhost:3001/mcp
 ```
 
-**Option D: Command-line flag** (per-session)
+**Option B: Stdio (fallback, one session at a time)**: only when you cannot run the server. Running more than one stdio process at once, or stdio alongside a running server, has corrupted this project's database before; see the transport comparison and corruption warning in [docs/MCP-SETUP.md](../MCP-SETUP.md#step-2-configure-claude-code-to-use-the-mcp-server). Works the same in `~/.aider.conf.yml` or `aider.conf.yml`:
+
+```yaml
+mcp_servers:
+  - name: vibe-dash
+    command: npx
+    args:
+      - tsx
+      - /absolute/path/to/vibe-dash/server/mcp/stdio.ts
+```
+
+**Option C: Command-line flag** (per-session, either transport)
 
 ```bash
-aider --mcp-server '{"name":"vibe-dash","command":"npx","args":["tsx","/absolute/path/to/vibe-dash/server/mcp/stdio.ts"]}'
+aider --mcp-server '{"name":"vibe-dash","url":"http://localhost:3001/mcp"}'
 ```
 
 ---
@@ -89,4 +78,4 @@ Open `http://localhost:3001` — the activity should appear in the feed.
 
 - **"No MCP tools available"** — confirm Aider version (`aider --version`); upgrade if below 0.67
 - **Config not loaded** — Aider reads `.aider.conf.yml` from the working directory, then `~/.aider.conf.yml`
-- **stdio path issues** — use an absolute path; `~/` is not always expanded
+- **stdio path issues** (Option B): use an absolute path; `~/` is not always expanded

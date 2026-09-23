@@ -63,12 +63,16 @@ Every agent connects the same way — over **MCP**. Pick your agent, follow its 
 
 > **Maturity:** ✅ **Tested** — verified end-to-end. 🧪 **Preview** — a standard MCP setup that should work, but the Vibe Dash integration hasn't been independently verified (and some clients' MCP support is still stabilizing).
 
-Two MCP transports are available:
+Two MCP transports are available. Lead with Streamable HTTP: it is the only one that
+keeps the dashboard live and the only one that does not risk corrupting the database
+with concurrent writers. Stdio is a fallback for when no server is running, one
+session at a time: see the corruption warning in
+[docs/MCP-SETUP.md](docs/MCP-SETUP.md#step-2-configure-claude-code-to-use-the-mcp-server).
 
 | Transport | URL / Command | Best for |
 |-----------|--------------|---------|
-| **Stdio** | `npx tsx /path/to/vibe-dash/server/mcp/stdio.ts` | Single-machine, offline-first |
-| **Streamable HTTP** | `http://localhost:3001/mcp` | Multi-agent, remote, modern clients |
+| **Streamable HTTP** | `http://localhost:3001/mcp` | Everyday use; multi-agent, remote, modern clients |
+| **Stdio** | `npx tsx /path/to/vibe-dash/server/mcp/stdio.ts` | Fallback when no server is running, one session at a time |
 
 Full setup guide with task import, CLAUDE.md snippets, and troubleshooting: [docs/MCP-SETUP.md](docs/MCP-SETUP.md).
 

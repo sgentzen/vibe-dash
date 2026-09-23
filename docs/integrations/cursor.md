@@ -19,19 +19,31 @@ cd /path/to/vibe-dash && npm start
 
 ## Step 2 — Add the MCP server
 
-**Option A: Cursor Settings UI** (recommended)
+**Option A: Streamable HTTP (recommended)**: requires the Vibe Dash server running.
+
+Via the Cursor Settings UI:
 
 1. Open Cursor → **Settings** → **Cursor Settings** → **MCP**
 2. Click **+ Add new MCP server**
 3. Fill in:
    - **Name**: `vibe-dash`
-   - **Type**: `command`
-   - **Command**: `npx tsx /absolute/path/to/vibe-dash/server/mcp/stdio.ts`
+   - **Type**: `url`
+   - **URL**: `http://localhost:3001/mcp`
 4. Click **Save**
 
-**Option B: Edit `~/.cursor/mcp.json` directly**
+Or edit `~/.cursor/mcp.json` directly (note: Cursor uses the key `"mcpServers"`, VS Code uses `"servers"`; they are different formats, don't mix them up):
 
-> Note: Cursor uses the key `"mcpServers"` — VS Code uses `"servers"`. They are different formats; don't mix them up.
+```json
+{
+  "mcpServers": {
+    "vibe-dash": {
+      "url": "http://localhost:3001/mcp"
+    }
+  }
+}
+```
+
+**Option B: Stdio (fallback, one session at a time)**: only when you cannot run the server. Running more than one stdio process at once, or stdio alongside a running server, has corrupted this project's database before; see the transport comparison and corruption warning in [docs/MCP-SETUP.md](../MCP-SETUP.md#step-2-configure-claude-code-to-use-the-mcp-server).
 
 ```json
 {
@@ -39,18 +51,6 @@ cd /path/to/vibe-dash && npm start
     "vibe-dash": {
       "command": "npx",
       "args": ["tsx", "/absolute/path/to/vibe-dash/server/mcp/stdio.ts"]
-    }
-  }
-}
-```
-
-**Option C: Remote server** (Streamable HTTP)
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "url": "http://localhost:3001/mcp"
     }
   }
 }
@@ -92,4 +92,4 @@ The activity should appear in the feed within a second.
 
 - **Server not showing** — check Cursor Settings → MCP; the server should appear with a green dot
 - **"Unknown tool"** — Cursor caches the tool list; reload via Settings → MCP → Refresh
-- **stdio path issues** — use an absolute path; `~/` is not always expanded
+- **stdio path issues** (Option B): use an absolute path; `~/` is not always expanded
