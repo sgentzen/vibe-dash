@@ -3,6 +3,9 @@ import {
   registerAgent,
   createProject,
   listProjects,
+  getProject,
+  archiveProject,
+  unarchiveProject,
   createTask,
   getTask,
   listTasks,
@@ -27,6 +30,7 @@ import type { ListTasksFilter } from "../db/index.js";
 import { registerAgentSchema } from "../../shared/schemas.js";
 import { DEFAULT_TASK_LIST_LIMIT } from "../constants.js";
 import { broadcast } from "../websocket.js";
+import { logger } from "../logger.js";
 
 /** Auto-log activity and broadcast it for any mutation */
 function autoLog(
@@ -83,6 +87,31 @@ function handleCreateProject(db: Database.Database, args: Args): ToolResult {
   });
   broadcast({ type: "project_created", payload: project });
   return ok({ project_id: project.id });
+}
+
+function handleArchiveProject(db: Database.Database, args: Args): ToolResult {
+  const projectId = args.project_id as string;
+  if (!getProject(db, projectId)) return ok({ success: false, error: "Project not found" });
+  const archived = archiveProject(db, projectId);
+  if (archived) {
+    broadcast({ type: "project_archived", payload: archived });
+    // activity_log is task-scoped (NOT NULL task_id); this is a project-level
+    // action with no task, so it's recorded via the server logger instead —
+    // same choice made in the REST route (server/routes/projects.ts).
+    logger.info({ project_id: archived.id }, "project archived");
+  }
+  return ok({ success: true });
+}
+
+function handleUnarchiveProject(db: Database.Database, args: Args): ToolResult {
+  const projectId = args.project_id as string;
+  if (!getProject(db, projectId)) return ok({ success: false, error: "Project not found" });
+  const unarchived = unarchiveProject(db, projectId);
+  if (unarchived) {
+    broadcast({ type: "project_unarchived", payload: unarchived });
+    logger.info({ project_id: unarchived.id }, "project unarchived");
+  }
+  return ok({ success: true });
 }
 
 function handleCreateMilestone(db: Database.Database, args: Args): ToolResult {
@@ -299,7 +328,9 @@ type Handler = (db: Database.Database, args: Args, agentName?: string) => ToolRe
 const HANDLERS: Record<string, Handler> = {
   register_agent: handleRegisterAgent,
   create_project: handleCreateProject,
-  list_projects: (db) => ok({ projects: listProjects(db) }),
+  list_projects: (db, args) => ok({ projects: listProjects(db, { includeArchived: args.include_archived as boolean | undefined }) }),
+  archive_project: handleArchiveProject,
+  unarchive_project: handleUnarchiveProject,
   create_milestone: handleCreateMilestone,
   list_milestones: (db, args) => ok({ milestones: listMilestones(db, args.project_id as string | undefined) }),
   complete_milestone: handleCompleteMilestone,

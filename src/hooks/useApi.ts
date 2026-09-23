@@ -62,9 +62,28 @@ async function getStats(): Promise<{
   return res.json();
 }
 
-async function getProjects(): Promise<Project[]> {
-  const res = await apiFetch("/api/projects");
+async function getProjects(options: { includeArchived?: boolean } = {}): Promise<Project[]> {
+  const url = options.includeArchived ? "/api/projects?include_archived=true" : "/api/projects";
+  const res = await apiFetch(url);
   if (!res.ok) await throwApiError(res, "getProjects");
+  return res.json();
+}
+
+async function archiveProject(id: string): Promise<Project> {
+  const res = await apiFetch(`/api/projects/${encodeURIComponent(id)}/archive`, {
+    method: "POST",
+    headers: jsonHeaders(),
+  });
+  if (!res.ok) await throwApiError(res, "archiveProject");
+  return res.json();
+}
+
+async function unarchiveProject(id: string): Promise<Project> {
+  const res = await apiFetch(`/api/projects/${encodeURIComponent(id)}/unarchive`, {
+    method: "POST",
+    headers: jsonHeaders(),
+  });
+  if (!res.ok) await throwApiError(res, "unarchiveProject");
   return res.json();
 }
 
@@ -391,6 +410,8 @@ export function useApi() {
     getStats,
     getProjects,
     createProject,
+    archiveProject,
+    unarchiveProject,
     getTasks,
     createTask,
     updateTask,

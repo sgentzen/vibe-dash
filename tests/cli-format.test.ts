@@ -86,6 +86,7 @@ describe("cli/format: row formatters", () => {
     description: "a test project",
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    archived_at: null,
   };
 
   it("formatProjectRow contains name, short id, description", () => {

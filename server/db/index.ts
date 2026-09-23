@@ -4,7 +4,14 @@
 export { initDb, openDb } from "./schema.js";
 export { SchemaTooNewError } from "./migrator.js";
 export { normalizeAgentName } from "./helpers.js";
-export { createProject, updateProject, listProjects } from "./projects.js";
+export {
+  createProject,
+  updateProject,
+  listProjects,
+  getProject,
+  archiveProject,
+  unarchiveProject,
+} from "./projects.js";
 export {
   createMilestone,
   updateMilestone,

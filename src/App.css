@@ -21,6 +21,12 @@
   --status-info: var(--accent-blue);
   --status-neutral: var(--text-muted);
   --text-on-yellow: #1a1a1a;
+  /* Solid danger-button fill, distinct from --status-danger (used for small
+     text/icons on the page background, not as a fill under white button
+     text). White text on --accent-red (#f85149) here is only 3.35:1 — this
+     is a darker red chosen to clear WCAG AA's 4.5:1 for normal text
+     (measured ~4.61:1) while staying visibly "danger" red. */
+  --danger-button-bg: #da3633;
   --green-bg: #0d1f0d;
   --green-border: #238636;
   --yellow-bg: #2a1a0a;
@@ -73,6 +79,10 @@
   --status-info: var(--accent-blue);
   --status-neutral: var(--text-muted);
   --text-on-yellow: #1a1a1a;
+  /* --accent-red (#cf222e) already clears 4.5:1 with white text here
+     (~5.35:1), unlike the dark-theme value — see the :root definition of
+     this token for the contrast reasoning. */
+  --danger-button-bg: var(--accent-red);
   --green-bg: #dafbe1;
   --green-border: #1a7f37;
   --yellow-bg: #fff8c5;

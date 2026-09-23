@@ -998,6 +998,49 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "026_projects_archived_at",
+    run(db) {
+      // Soft archive for projects: cost rows are never deleted (020's doc
+      // comment), and the same principle applies here — archiving hides a
+      // project from default listings and top-bar counts without destroying
+      // its tasks, milestones or cost history. NULL means active; a non-null
+      // ISO timestamp records when it was archived, so "archived" and "when"
+      // are the same column instead of a separate boolean plus a timestamp
+      // that could disagree with each other.
+      //
+      // Two guard patterns, both already established elsewhere in this file:
+      //   - missing-table guard (SELECT ... FROM sqlite_master), the same as
+      //     023/024/025, for a salvaged database where `projects` itself is
+      //     gone despite 001 being recorded as applied;
+      //   - table_info + has() column guard, the same idempotent pattern
+      //     002/003/016/021 use, so re-running (or a database already patched
+      //     by hand) never throws "duplicate column name".
+      const exists = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'projects'")
+        .all();
+      if (exists.length === 0) return;
+
+      const cols = db.pragma("table_info(projects)") as { name: string }[];
+      if (!cols.some((c) => c.name === "archived_at")) {
+        db.prepare("ALTER TABLE projects ADD COLUMN archived_at TEXT").run();
+      }
+
+      // Default project listings filter on `archived_at IS NULL`. This index
+      // is a small, defensive addition rather than a measured fix (contrast
+      // with 024/025, which cite before/after query plans): `projects` is a
+      // low-row-count table, and whether SQLite's planner actually chooses
+      // this index over a full scan depends on what fraction of rows end up
+      // archived. It costs almost nothing to maintain and gives the planner
+      // the option, which matters more as an install's archived population
+      // grows (see CI-1/PROD-2 in docs/analysis/2026-09-18-project-audit.md
+      // — the live database already carries dozens of junk projects this
+      // feature exists to let an operator hide).
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_projects_archived_at ON projects(archived_at);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

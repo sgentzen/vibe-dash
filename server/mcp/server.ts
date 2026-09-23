@@ -99,10 +99,34 @@ export function createMcpServer(db: Database.Database, connectionId?: string): M
   server.registerTool(
     "list_projects",
     {
-      description: "List all projects",
-      inputSchema: {},
+      description: "List projects. Excludes archived projects by default; pass include_archived to see them too.",
+      inputSchema: {
+        include_archived: z.boolean().optional(),
+      },
     },
     call("list_projects")
+  );
+
+  server.registerTool(
+    "archive_project",
+    {
+      description: "Soft-archive a project. Its tasks, milestones and cost history are kept; it is just hidden from default listings and counts.",
+      inputSchema: {
+        project_id: z.string().min(1),
+      },
+    },
+    call("archive_project")
+  );
+
+  server.registerTool(
+    "unarchive_project",
+    {
+      description: "Restore a project archived with archive_project",
+      inputSchema: {
+        project_id: z.string().min(1),
+      },
+    },
+    call("unarchive_project")
   );
 
   server.registerTool(
