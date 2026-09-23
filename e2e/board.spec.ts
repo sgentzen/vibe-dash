@@ -23,7 +23,7 @@ test.describe("Board view", () => {
 
     await page.goto("/");
     await page.getByRole("button", { name: "Board", exact: true }).click();
-    await page.getByRole("button", { name: projectName }).click();
+    await page.getByRole("button", { name: projectName, exact: true }).click();
 
     // Verify task is inside the PLANNED column, not just anywhere on the page
     const plannedColumn = page
@@ -42,7 +42,7 @@ test.describe("Board view", () => {
 
     await page.goto("/");
     await page.getByRole("button", { name: "Board", exact: true }).click();
-    await page.getByRole("button", { name: projectName }).click();
+    await page.getByRole("button", { name: projectName, exact: true }).click();
 
     const taskTitle = `UI Task ${Date.now()}`;
     await page.getByLabel("Add task to PLANNED").fill(taskTitle);
@@ -67,7 +67,7 @@ test.describe("Board view", () => {
     // Verify task starts in PLANNED
     await page.goto("/");
     await page.getByRole("button", { name: "Board", exact: true }).click();
-    await page.getByRole("button", { name: projectName }).click();
+    await page.getByRole("button", { name: projectName, exact: true }).click();
     const plannedColumn = page
       .getByText("PLANNED", { exact: true })
       .locator("../..");
@@ -79,7 +79,7 @@ test.describe("Board view", () => {
     // Reload and verify task is now in the IN PROGRESS column (not PLANNED)
     await page.reload();
     await page.getByRole("button", { name: "Board", exact: true }).click();
-    await page.getByRole("button", { name: projectName }).click();
+    await page.getByRole("button", { name: projectName, exact: true }).click();
 
     const inProgressColumn = page
       .getByText("IN PROGRESS", { exact: true })
@@ -99,7 +99,7 @@ test.describe("Board view", () => {
 
     await page.goto("/");
     await page.getByRole("button", { name: "Board", exact: true }).click();
-    await page.getByRole("button", { name: projectName }).click();
+    await page.getByRole("button", { name: projectName, exact: true }).click();
 
     const taskCard = page.locator("[draggable]", { hasText: taskTitle });
     await expect(taskCard).toBeVisible();
