@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 import type Database from "better-sqlite3";
-import { openDb, backfillMilestoneDailyStats, SchemaTooNewError } from "./db/index.js";
+import { openDb, backfillMilestoneDailyStats, SchemaTooNewError, DbOwnershipError } from "./db/index.js";
 import { resolveDbPath } from "./db/path.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
@@ -130,13 +130,15 @@ app.use(express.json({ limit: "256kb" }));
 
 function openDbOrExit(): Database.Database {
   try {
-    return openDb(DB_PATH);
+    return openDb(DB_PATH, "server");
   } catch (err) {
     if (err instanceof SchemaTooNewError) {
       logger.error(
         { DB_PATH, unknownMigrations: err.unknownMigrations },
         `${err.message} — aborting startup`
       );
+    } else if (err instanceof DbOwnershipError) {
+      logger.error({ DB_PATH, holder: err.holder }, `${err.message} — aborting startup`);
     } else {
       logger.error({ err, DB_PATH }, "Failed to open database — aborting startup");
     }

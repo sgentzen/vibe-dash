@@ -15,6 +15,15 @@ interface Migration {
 const DRIFT_OVERRIDE_ENV = "VIBE_DASH_ALLOW_SCHEMA_DRIFT";
 
 /**
+ * Explicit `busy_timeout`, in milliseconds, applied to every SQLite connection
+ * this codebase opens (server, stdio MCP, CLI, tests). better-sqlite3's own
+ * default happens to be the same 5000ms, but spelling it out here means it no
+ * longer depends on that default holding across a driver upgrade, and gives
+ * one named place to change it (DATA-15).
+ */
+export const DB_BUSY_TIMEOUT_MS = 5000;
+
+/**
  * Thrown when the database records migrations this build has never heard of,
  * which means it was written by a NEWER Vibe Dash than the one now opening it.
  *
@@ -34,6 +43,27 @@ export class SchemaTooNewError extends Error {
     );
     this.name = "SchemaTooNewError";
     this.unknownMigrations = unknownMigrations;
+  }
+}
+
+/**
+ * Thrown when a caller that must never run migrations (the CLI — DATA-5,
+ * ARCH-11) finds the database behind the build's own migration list. Distinct
+ * from `SchemaTooNewError` so the message points the user the opposite way:
+ * start the server (which does own migration authority) rather than update.
+ */
+export class SchemaBehindError extends Error {
+  readonly pendingMigrations: string[];
+
+  constructor(pendingMigrations: string[]) {
+    const count = pendingMigrations.length;
+    super(
+      `Database schema is behind this build: ${count} pending migration${count === 1 ? "" : "s"} ` +
+        `(${pendingMigrations.join(", ")}) have not been applied. The CLI never runs migrations ` +
+        `itself — start the vibe-dash server once (it applies them on startup), then re-run this command.`
+    );
+    this.name = "SchemaBehindError";
+    this.pendingMigrations = pendingMigrations;
   }
 }
 
@@ -1043,6 +1073,19 @@ const MIGRATIONS: Migration[] = [
   },
 ];
 
+/**
+ * Migration names recorded in `_migrations` that this build's `MIGRATIONS`
+ * list has never heard of — the signature of a database written by a newer
+ * Vibe Dash. Locale pinned in the sort so the message order is identical on
+ * every runtime; the default locale varies with the host and Node's ICU
+ * build. Shared by `runMigrations()` and `assertSchemaCurrent()` so the two
+ * checks can't drift apart.
+ */
+function findUnknownMigrations(ran: ReadonlySet<string>): string[] {
+  const known = new Set(MIGRATIONS.map((m) => m.name));
+  return [...ran].filter((name) => !known.has(name)).sort((a, b) => a.localeCompare(b, "en"));
+}
+
 export function runMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -1064,23 +1107,61 @@ export function runMigrations(db: Database.Database): void {
   // we do. This is why migration names are append-only and MUST NOT be renamed
   // once shipped: a rename makes every existing database look like the future.
   if (!process.env[DRIFT_OVERRIDE_ENV]) {
-    const known = new Set(MIGRATIONS.map((m) => m.name));
-    // Locale pinned so the message order is identical on every runtime; the
-    // default locale varies with the host and Node's ICU build.
-    const unknown = [...ran]
-      .filter((name) => !known.has(name))
-      .sort((a, b) => a.localeCompare(b, "en"));
+    const unknown = findUnknownMigrations(ran);
     if (unknown.length > 0) throw new SchemaTooNewError(unknown);
   }
 
   const insert = db.prepare("INSERT INTO _migrations (name, run_at) VALUES (?, ?)");
+  const alreadyRan = db.prepare("SELECT 1 FROM _migrations WHERE name = ?");
 
   for (const m of MIGRATIONS) {
     if (ran.has(m.name)) continue;
+    // BEGIN IMMEDIATE (rather than the default deferred BEGIN) takes the write
+    // lock up front, so two processes starting together serialise on it —
+    // combined with the explicit busy_timeout above, the loser blocks and
+    // waits instead of racing to read the same "not yet applied" state. The
+    // re-check of `alreadyRan` *inside* the transaction is what actually
+    // avoids the crash: once the loser's BEGIN IMMEDIATE finally acquires the
+    // lock, the winner has already committed the INSERT into `_migrations`,
+    // so without this guard the loser would still hit the UNIQUE constraint
+    // on `name`. The outer `ran` set is only a fast-path skip; this is the
+    // check that matters under contention (DATA-15).
     db.transaction(() => {
+      if (alreadyRan.get(m.name)) return;
       m.run(db);
       insert.run(m.name, new Date().toISOString());
-    })();
+    }).immediate();
+  }
+}
+
+/**
+ * Verify the database carries every migration this build knows about,
+ * without applying any of them. For callers that must never run migrations
+ * themselves (the CLI — DATA-5, ARCH-11): they should fail loudly and
+ * actionably instead of either silently skipping columns or, worse, racing
+ * the server to apply migrations concurrently.
+ *
+ * Throws `SchemaBehindError` if migrations are pending, or `SchemaTooNewError`
+ * if the database has migrations this build doesn't know (same check as
+ * `runMigrations`, respecting the same `VIBE_DASH_ALLOW_SCHEMA_DRIFT` escape
+ * hatch).
+ */
+export function assertSchemaCurrent(db: Database.Database): void {
+  const tableExists = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_migrations'")
+    .get();
+  const ran = new Set(
+    tableExists
+      ? (db.prepare("SELECT name FROM _migrations").all() as { name: string }[]).map((r) => r.name)
+      : []
+  );
+
+  const pending = MIGRATIONS.filter((m) => !ran.has(m.name)).map((m) => m.name);
+  if (pending.length > 0) throw new SchemaBehindError(pending);
+
+  if (!process.env[DRIFT_OVERRIDE_ENV]) {
+    const unknown = findUnknownMigrations(ran);
+    if (unknown.length > 0) throw new SchemaTooNewError(unknown);
   }
 }
 
@@ -1100,6 +1181,5 @@ export function getUnknownMigrations(db: Database.Database): string[] {
   const ran = new Set(
     (db.prepare("SELECT name FROM _migrations").all() as { name: string }[]).map((r) => r.name)
   );
-  const known = new Set(MIGRATIONS.map((m) => m.name));
-  return [...ran].filter((name) => !known.has(name)).sort((a, b) => a.localeCompare(b, "en"));
+  return findUnknownMigrations(ran);
 }

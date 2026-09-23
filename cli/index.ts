@@ -11,7 +11,21 @@
  */
 
 import Database from "better-sqlite3";
-import { initDb, listProjects, listTasks, listMilestones, createTask, listAgents, getAgentHealthStatus, getMilestoneProgress, getActiveBlockers, SchemaTooNewError } from "../server/db/index.js";
+import {
+  listProjects,
+  listTasks,
+  listMilestones,
+  createTask,
+  listAgents,
+  getAgentHealthStatus,
+  getMilestoneProgress,
+  getActiveBlockers,
+  logActivity,
+  openReadOnlyDb,
+  openWritableForCli,
+  SchemaTooNewError,
+  SchemaBehindError,
+} from "../server/db/index.js";
 import { resolveDbPath } from "../server/db/path.js";
 import {
   RESET,
@@ -53,14 +67,23 @@ const command = positional[0] ?? "help";
 const subcommand = positional[1] ?? "";
 
 // ─── Open DB ─────────────────────────────────────────────────────────────────
+// The CLI is never a migration authority (DATA-5, ARCH-11) — only the server
+// and stdio MCP process run migrations, in `openDb()`. `add-task` is the
+// CLI's one writer, so it opens read-write but still without migrating;
+// every other command opens strictly read-only. Either path fails loudly if
+// the schema is behind the build instead of racing the server to apply
+// migrations concurrently.
+const isWriteCommand = command === "add-task";
 
 let db!: Database.Database;
 try {
-  db = new Database(dbPath);
-  initDb(db);
+  db = isWriteCommand ? openWritableForCli(dbPath) : openReadOnlyDb(dbPath);
 } catch (e) {
   if (e instanceof SchemaTooNewError) {
     // Not a path problem — suggesting --db would send the user the wrong way.
+    console.error(`${RED}Error:${RESET} ${e.message}`);
+    console.error(`Database: ${dbPath}`);
+  } else if (e instanceof SchemaBehindError) {
     console.error(`${RED}Error:${RESET} ${e.message}`);
     console.error(`Database: ${dbPath}`);
   } else {
@@ -144,6 +167,17 @@ function cmdAddTask() {
     description: null,
     priority: priority as "low" | "medium" | "high" | "urgent",
     milestone_id: milestoneId ?? null,
+  });
+
+  // The REST and MCP write paths both leave an activity row behind theirs;
+  // the CLI didn't (ARCH-11). It can't broadcast over WebSocket — there's no
+  // server in this process — but the audit trail itself is cheap to keep
+  // consistent.
+  logActivity(db, {
+    task_id: task.id,
+    agent_id: null,
+    message: `Created "${task.title}"`,
+    source: "cli",
   });
 
   console.log(`${GREEN}Created task:${RESET} ${task.title} ${DIM}(${task.id.slice(0, 8)})${RESET}`);
