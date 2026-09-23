@@ -69,4 +69,24 @@ describe("DroppedDataNotice", () => {
     render(<DroppedDataNotice {...healthy} otlpUnmapped={1} />);
     expect(screen.getByText(/restart/i)).toBeTruthy();
   });
+
+  // LIVE-2: a missing transcript directory (typically the Docker no-mount
+  // case) must not read as a silent, healthy $0.00.
+  describe("claudeHomeFound", () => {
+    it("warns when the transcript directory was not found", () => {
+      render(<DroppedDataNotice {...healthy} claudeHomeFound={false} />);
+      expect(screen.getByText(/no transcript directory/i)).toBeTruthy();
+      expect(screen.getByText(/VIBE_DASH_CLAUDE_HOME/)).toBeTruthy();
+    });
+
+    it("stays silent when the directory was found", () => {
+      const { container } = render(<DroppedDataNotice {...healthy} claudeHomeFound={true} />);
+      expect(container.textContent).toBe("");
+    });
+
+    it("stays silent when the status hasn't loaded yet (undefined, not false)", () => {
+      const { container } = render(<DroppedDataNotice {...healthy} />);
+      expect(container.textContent).toBe("");
+    });
+  });
 });

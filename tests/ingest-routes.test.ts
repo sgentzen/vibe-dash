@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type Database from "better-sqlite3";
 import express from "express";
 import type { Express } from "express";
@@ -49,6 +52,34 @@ describe("GET /api/ingest/status", () => {
     expect(knownModels.length).toBeGreaterThan(0);
     expect(knownModels.every((m) => typeof m === "string")).toBe(true);
     expect(knownModels).toContain("claude-opus-5");
+  });
+});
+
+// LIVE-2: the UI state that replaces a silent $0.00 when there is no
+// transcript directory to ingest from at all (as opposed to an empty one).
+describe("GET /api/ingest/status — claudeHomeFound", () => {
+  const ORIGINAL_ENV = process.env.VIBE_DASH_CLAUDE_HOME;
+
+  afterEach(() => {
+    if (ORIGINAL_ENV === undefined) delete process.env.VIBE_DASH_CLAUDE_HOME;
+    else process.env.VIBE_DASH_CLAUDE_HOME = ORIGINAL_ENV;
+  });
+
+  it("is true when VIBE_DASH_CLAUDE_HOME resolves to a directory that exists", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-dash-claude-home-"));
+    try {
+      process.env.VIBE_DASH_CLAUDE_HOME = dir;
+      const res = await request("GET", "/api/ingest/status");
+      expect((res.body as { claudeHomeFound: boolean }).claudeHomeFound).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("is false when VIBE_DASH_CLAUDE_HOME points nowhere — the Docker-no-mount case", async () => {
+    process.env.VIBE_DASH_CLAUDE_HOME = path.join(os.tmpdir(), "vibe-dash-does-not-exist-9f2a1c");
+    const res = await request("GET", "/api/ingest/status");
+    expect((res.body as { claudeHomeFound: boolean }).claudeHomeFound).toBe(false);
   });
 });
 

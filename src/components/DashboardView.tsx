@@ -314,6 +314,7 @@ export function DashboardView() {
         otlpUnmapped={ingestStatus?.otlpUnmapped}
         otlpSeriesRefused={ingestStatus?.otlpSeriesRefused}
         otlpSeriesCount={ingestStatus?.otlpSeriesCount}
+        claudeHomeFound={ingestStatus?.claudeHomeFound}
       />
 
       {(() => {

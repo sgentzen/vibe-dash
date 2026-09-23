@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
-import { runMigrations, SchemaTooNewError } from "../server/db/migrator.js";
+import { runMigrations, SchemaTooNewError, getUnknownMigrations } from "../server/db/migrator.js";
 import { initDb, startOrGetSession } from "../server/db/index.js";
 import { createTestDb } from "./setup.js";
 
@@ -168,6 +168,23 @@ describe("newer-database guard", () => {
 
   it("does not fire on a database this build is fully up to date with", () => {
     expect(() => runMigrations(db)).not.toThrow();
+  });
+
+  // LIVE-3's optional /api/health schemaDrift field: getUnknownMigrations()
+  // computes the same set runMigrations() throws on, without throwing, so a
+  // database opened with VIBE_DASH_ALLOW_SCHEMA_DRIFT can still surface the
+  // drift after startup instead of the guard's information being lost the
+  // moment the override lets it through.
+  describe("getUnknownMigrations", () => {
+    it("is empty on a database this build is fully up to date with", () => {
+      expect(getUnknownMigrations(db)).toEqual([]);
+    });
+
+    it("names unknown migrations, sorted, without throwing", () => {
+      recordFutureMigration(db, "999_later_future");
+      recordFutureMigration(db, "998_earlier_future");
+      expect(getUnknownMigrations(db)).toEqual(["998_earlier_future", "999_later_future"]);
+    });
   });
 
   it("does not fire when the database is OLDER — migrations still run forward", () => {

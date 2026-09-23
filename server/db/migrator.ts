@@ -1083,3 +1083,23 @@ export function runMigrations(db: Database.Database): void {
     })();
   }
 }
+
+/**
+ * Names in `_migrations` that this build doesn't know, without throwing.
+ *
+ * `runMigrations()` throws `SchemaTooNewError` for exactly this condition
+ * unless `VIBE_DASH_ALLOW_SCHEMA_DRIFT` is set — which means the only way this
+ * function can ever find a non-empty result at runtime is that the override
+ * was used to open the database anyway (LIVE-3's optional "warn when the
+ * database carries newer migrations than the build expects" — the guard
+ * already knows this, it just never told anyone once startup let it through).
+ * Cheap: one query against a table `runMigrations()` already guarantees
+ * exists by the time any caller can reach this.
+ */
+export function getUnknownMigrations(db: Database.Database): string[] {
+  const ran = new Set(
+    (db.prepare("SELECT name FROM _migrations").all() as { name: string }[]).map((r) => r.name)
+  );
+  const known = new Set(MIGRATIONS.map((m) => m.name));
+  return [...ran].filter((name) => !known.has(name)).sort((a, b) => a.localeCompare(b, "en"));
+}

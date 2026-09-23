@@ -1,6 +1,5 @@
 services:
   vibe-dash:
-    build: .
     image: vibe-dash:latest
     ports:
       # Bound to loopback deliberately. Vibe Dash has NO built-in authentication:
@@ -9,6 +8,16 @@ services:
       # For remote access, terminate at a reverse proxy on this host and add
       # access control there — see docs/self-hosting.md, "Access control".
       - "127.0.0.1:3001:3001"
+    build:
+      context: .
+      args:
+        # Baked into the image so /api/health can report what is actually
+        # running without a .git directory in the runtime layer (LIVE-3). Left
+        # unset these default to "unknown" server-side (server/version.ts) —
+        # a `docker compose build` with no override still produces a working,
+        # just less identifiable, image.
+        VIBE_DASH_COMMIT_SHA: ${VIBE_DASH_COMMIT_SHA:-}
+        VIBE_DASH_BUILD_TIME: ${VIBE_DASH_BUILD_TIME:-}
     volumes:
       # A named volume holding the DB *directory*, matching the Dockerfile's
       # VOLUME ["/data"] and the backup/restore procedure in docs/self-hosting.md.
@@ -23,6 +32,21 @@ services:
       # companion to it. SQLite tolerates exactly one owning process — running
       # both against one database is what corrupts it.
       - vibe-dash-data:/data
+      # Read-only: transcript ingestion only ever reads these files (LIVE-2).
+      # Without this mount there is no ~/.claude/projects inside the
+      # container, so cost observed from Claude Code transcripts silently
+      # reads $0.00 — see the claudeHomeFound notice this task also added to
+      # GET /api/ingest/status and the dashboard.
+      #
+      # Compose does not expand a bare "~" in a volume path (it is passed to
+      # the Docker Engine literally, which does not expand it either), so the
+      # default below uses $HOME instead, which is a real exported variable
+      # on Linux and macOS. Windows has no equivalent auto-populated variable
+      # in the environment docker compose reads from, so Windows users MUST
+      # set VIBE_DASH_TRANSCRIPTS_DIR explicitly (e.g. in a .env file next to
+      # this compose file) — see docs/self-hosting.md, "Docker Compose and
+      # transcript ingestion".
+      - ${VIBE_DASH_TRANSCRIPTS_DIR:-$HOME/.claude/projects}:/transcripts:ro
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -35,9 +59,17 @@ services:
       # loopback.
       - HOST=0.0.0.0
       - VIBE_DASH_DB=/data/vibe-dash.db
+      # Matches the bind mount's container-side path above, not the host path
+      # — the host path varies per operator and is set via
+      # VIBE_DASH_TRANSCRIPTS_DIR, but wherever it is mounted, this is always
+      # /transcripts inside the container.
+      - VIBE_DASH_CLAUDE_HOME=/transcripts
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/projects').then(r => process.exit(r.ok ? 0 : 1))"]
+      # /api/health, not /api/projects: a liveness probe should not depend on
+      # the database layer at all (OPS-3) — it now also reports version,
+      # commit and build time, which /api/projects never did.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r => process.exit(r.ok ? 0 : 1))"]
       interval: 30s
       timeout: 5s
       retries: 3

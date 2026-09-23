@@ -49,6 +49,7 @@ export function DroppedDataNotice({
   otlpSeriesRefused,
   otlpSeriesCount,
   seriesCap,
+  claudeHomeFound,
 }: Readonly<{
   otlpUnmapped?: number | null;
   otlpSeriesRefused?: number | null;
@@ -63,14 +64,25 @@ export function DroppedDataNotice({
    * this fires.
    */
   seriesCap?: number | null;
+  /**
+   * `claudeHomeFound` from GET /api/ingest/status: whether the directory
+   * VIBE_DASH_CLAUDE_HOME (or its default) resolves to actually exists.
+   *
+   * Only `false` triggers the notice below. `undefined` covers both "the
+   * status call hasn't returned yet" and "an older server that doesn't
+   * publish this field" — either way there is nothing to warn about yet, so
+   * this stays silent rather than flashing a false alarm on every load.
+   */
+  claudeHomeFound?: boolean;
 }>) {
   const unmapped = safeCount(otlpUnmapped);
   const refused = safeCount(otlpSeriesRefused);
   const seriesCount = safeCount(otlpSeriesCount);
   const cap = safeCap(seriesCap);
   const atCeiling = seriesCount >= cap;
+  const missingHome = claudeHomeFound === false;
 
-  if (unmapped <= 0 && refused <= 0 && !atCeiling) return null;
+  if (unmapped <= 0 && refused <= 0 && !atCeiling && !missingHome) return null;
 
   return (
     <div
@@ -85,6 +97,14 @@ export function DroppedDataNotice({
       }}
     >
       <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
+        {missingHome && (
+          <li>
+            No transcript directory was found, so observed cost from Claude Code transcripts reads $0.00 rather
+            than reporting that nothing could be read. Set <code>VIBE_DASH_CLAUDE_HOME</code> to a real directory
+            (<code>claudeHomeFound</code> on <code>GET /api/ingest/status</code>); under Docker this also needs a
+            bind mount of that directory into the container (see docs/self-hosting.md).
+          </li>
+        )}
         {unmapped > 0 && (
           <li>
             {unmapped} {unmapped === 1 ? "point was" : "points were"} ignored because no mapper recognised the

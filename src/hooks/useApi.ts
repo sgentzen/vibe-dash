@@ -397,11 +397,33 @@ export interface IngestStatus {
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number; mcpUnattributed: number;
   otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
   undated: number;
+  claudeHomeFound: boolean;
 }
 
 async function getIngestStatus(): Promise<IngestStatus> {
   const res = await apiFetch("/api/ingest/status");
   if (!res.ok) await throwApiError(res, "getIngestStatus");
+  return res.json();
+}
+
+// ─── Health / build identity ────────────────────────────────────────────
+
+/**
+ * GET /api/health's shape (LIVE-3). `ok` is the only field every caller could
+ * rely on before this task; the rest are additions kept optional so an older
+ * server (or a response shape a future change narrows) still parses.
+ */
+export interface HealthInfo {
+  ok: boolean;
+  version?: string;
+  commit?: string;
+  buildTime?: string;
+  schemaDrift?: string[];
+}
+
+async function getHealth(): Promise<HealthInfo> {
+  const res = await apiFetch("/api/health");
+  if (!res.ok) await throwApiError(res, "getHealth");
   return res.json();
 }
 
@@ -446,5 +468,6 @@ export function useApi() {
     getAgentComparison,
     getTaskTypeBreakdown,
     getIngestStatus,
+    getHealth,
   }), []);
 }

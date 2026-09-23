@@ -72,9 +72,48 @@ All four entry points share the same SQLite database file.
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path — used by the server process, the stdio MCP transport and the CLI. Not relative to your working directory: left unset it resolves to the git root of the Vibe Dash install. The Docker image sets it to `/data/vibe-dash.db`. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know. Only for deliberately running an older build against a migrated database. |
 | `VIBE_DASH_OTLP_SERIES_CAP` | `10000` | Ceiling on distinct OTLP metric series. Only the creation of a new series is refused; nothing is ever deleted, so an established sender is unaffected. Raise it and restart if a flooded install needs to admit new senders. |
-| `VIBE_DASH_CLAUDE_HOME` | `~/.claude/projects` | Where transcript ingestion looks for Claude Code session files. Point it at an empty directory to switch ingestion off. |
+| `VIBE_DASH_CLAUDE_HOME` | `~/.claude/projects` | Where transcript ingestion looks for Claude Code session files. Point it at an empty directory to switch ingestion off. **Under Docker this must be a path *inside the container***: `docker-compose.yml` sets it to `/transcripts` and separately bind-mounts the real host directory there; see [Docker Compose and transcript ingestion](#docker-compose-and-transcript-ingestion) below. Without that mount the directory does not exist inside the container, observed cost silently reads $0.00, and `GET /api/ingest/status` reports `claudeHomeFound: false` (surfaced in the dashboard as a notice, not a silent gap). |
+| `VIBE_DASH_TRANSCRIPTS_DIR` | `$HOME/.claude/projects` | Docker Compose only: the **host** directory bind-mounted read-only into the container at `/transcripts` (see below). Not read by the server itself; it only ever sees `VIBE_DASH_CLAUDE_HOME=/transcripts`. |
 
 Override in `docker-compose.yml` under `environment`, or in a `.env` file.
+
+### Docker Compose and transcript ingestion
+
+`docker-compose.yml` mounts a host directory into the container read-only and
+points `VIBE_DASH_CLAUDE_HOME` at it:
+
+```yaml
+volumes:
+  - ${VIBE_DASH_TRANSCRIPTS_DIR:-$HOME/.claude/projects}:/transcripts:ro
+environment:
+  - VIBE_DASH_CLAUDE_HOME=/transcripts
+```
+
+This mount is required for observed cost under Docker. Without it, `~/.claude/projects`
+does not exist inside the container at all, so transcript ingestion finds nothing,
+`spend_today` reads `$0.00`, and the dashboard shows a "no transcript directory was
+found" notice rather than a false all-clear.
+
+The default (`$HOME/.claude/projects`) works out of the box on Linux and macOS,
+where `$HOME` is a real environment variable. **Compose does not expand `~` in a
+volume path**: the string is passed through to the Docker Engine literally,
+which does not expand it either, and Windows has no equivalent
+automatically-populated `HOME` variable in the environment `docker compose`
+reads from. Windows users must set `VIBE_DASH_TRANSCRIPTS_DIR` explicitly, most
+conveniently in a `.env` file next to `docker-compose.yml`:
+
+```
+# .env, Windows (Docker Desktop): forward slashes, even for a Windows path
+VIBE_DASH_TRANSCRIPTS_DIR=C:/Users/<you>/.claude/projects
+```
+
+```
+# .env, Linux or macOS: only needed if $HOME isn't right for some reason
+VIBE_DASH_TRANSCRIPTS_DIR=/home/<you>/.claude/projects
+```
+
+Restart with `docker compose up -d` after changing `.env`; Compose does not
+pick up `.env` changes in an already-running container.
 
 ---
 
@@ -330,6 +369,21 @@ docker compose up -d
 ```
 
 Data in the volume is preserved. The server runs database migrations automatically on startup.
+
+After upgrading, check `GET /api/health` (or the version shown in the app's
+keyboard-shortcuts overlay) to confirm the running container actually picked
+up the new image. This is what LIVE-1/LIVE-3 exist to make visible, after an
+instance was found running a build over a month stale with no way to tell
+from the outside. Optionally set `VIBE_DASH_COMMIT_SHA` and
+`VIBE_DASH_BUILD_TIME` as build args to have that identity be exact rather
+than "unknown":
+
+```bash
+docker compose build \
+  --build-arg VIBE_DASH_COMMIT_SHA=$(git rev-parse HEAD) \
+  --build-arg VIBE_DASH_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+docker compose up -d
+```
 
 ---
 
