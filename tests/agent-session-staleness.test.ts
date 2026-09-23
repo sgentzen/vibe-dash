@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
@@ -354,5 +354,45 @@ describe("closeStaleSession treats a relative or ambiguous timestamp as unreadab
     const sessionId = openSession(agentId, NOW(), value);
 
     expect(startOrGetSession(db, agentId).id).not.toBe(sessionId);
+  });
+});
+
+/**
+ * Exact equality at both bounds, on a frozen clock.
+ *
+ * quietSince and noLaterThan are both built from Date.now() inside
+ * closeStaleSession itself, so hitting either exactly from the test needs the
+ * same instant on both sides — a real clock tick between the test computing
+ * the bound and the function recomputing it would otherwise nudge the row off
+ * the line. Both comparisons are strict (`<` / `>`), so a last_activity_at
+ * landing exactly on either bound must stay open, not be closed.
+ */
+describe("closeStaleSession at exact boundary equality (frozen clock)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("leaves a session open whose last_activity_at exactly equals the past cutoff", () => {
+    const fixedNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    const quietSince = new Date(fixedNow - SESSION_TIMEOUT_MS).toISOString();
+    const sessionId = openSession(newAgent("exact-quiet-cutoff"), LONG_AGO, quietSince);
+
+    expect(closeStaleSession(db)).toBe(0);
+    expect(endedAtOf(sessionId)).toBeNull();
+  });
+
+  it("leaves a session open whose last_activity_at exactly equals noLaterThan", () => {
+    const fixedNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    const noLaterThan = new Date(fixedNow + SESSION_TIMEOUT_MS).toISOString();
+    const sessionId = openSession(newAgent("exact-nolaterthan"), NOW(), noLaterThan);
+
+    expect(closeStaleSession(db)).toBe(0);
+    expect(endedAtOf(sessionId)).toBeNull();
   });
 });

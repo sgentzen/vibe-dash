@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
@@ -143,6 +143,22 @@ describe("getAgentStats drops a session whose span end is not a usable instant",
 
     expect(frequency(agentId)).toBe(0);
   });
+
+  it("ignores a session whose started_at is unreadable and whose span end is future-dated at once", () => {
+    // Two independently bad columns on the same row: an unreadable started_at
+    // (fails the shape check) and a span end dated further ahead than the
+    // timeout (fails the noLaterThan bound). Either alone already excludes the
+    // row; together they must not cancel out or otherwise slip past the gate,
+    // and the baseline must read exactly as if the row were not there at all.
+    const agentId = agentWithOneRealHour("double-bad");
+    session(agentId, {
+      startedAt: "not-a-date",
+      lastActivityAt: AHEAD(SESSION_TIMEOUT_MS + MARGIN_MS),
+      activityCount: 500,
+    });
+
+    expect(frequency(agentId)).toBe(10);
+  });
 });
 
 describe("getAgentStats still counts sessions the gate has no quarrel with", () => {
@@ -195,6 +211,80 @@ describe("getAgentStats still counts sessions the gate has no quarrel with", () 
     const agentId = newAgent("fresh");
     const ts = NOW();
     session(agentId, { startedAt: ts, lastActivityAt: ts, activityCount: 1 });
+
+    expect(frequency(agentId)).toBe(100);
+  });
+
+  it("counts a session whose started_at sits just inside the far bound", () => {
+    // Mirrors the near-boundary case closeStaleSession/startOrGetSession pin for
+    // last_activity_at (AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS)), but for the
+    // started_at <= noLaterThan comparison getAgentStats does on its own.
+    // Started_at itself is only MARGIN_MS below noLaterThan, so the span end has
+    // to land inside that same margin to stay in bound too — hence the 1s span,
+    // which clamps to the 0.01h floor.
+    const agentId = newAgent("started-far-boundary");
+    session(agentId, {
+      startedAt: AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS),
+      lastActivityAt: AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS + 1_000),
+      activityCount: 1,
+    });
+
+    expect(frequency(agentId)).toBe(100);
+  });
+
+  it("counts a session whose span end sits just inside the far bound", () => {
+    // Same boundary, isolating the spanEnd <= noLaterThan comparison instead:
+    // started_at sits a second earlier, still comfortably inside its own bound.
+    const agentId = newAgent("spanend-far-boundary");
+    session(agentId, {
+      startedAt: AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS - 1_000),
+      lastActivityAt: AHEAD(SESSION_TIMEOUT_MS - MARGIN_MS),
+      activityCount: 1,
+    });
+
+    expect(frequency(agentId)).toBe(100);
+  });
+});
+
+/**
+ * Exact equality at the far bound, on a frozen clock.
+ *
+ * noLaterThan is built from Date.now() inside getAgentStats itself, so hitting
+ * it exactly from the test needs the same clock reading both sides consult —
+ * otherwise a real clock tick between the test computing the bound and the
+ * query recomputing it would nudge the row to one side or the other and the
+ * exact-equality case could never be pinned. The comparisons are `<=`, so a
+ * value landing exactly on noLaterThan must still be counted.
+ */
+describe("getAgentStats at the exact far boundary (frozen clock)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("counts a session whose span end lands exactly on noLaterThan", () => {
+    const fixedNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    const noLaterThan = new Date(fixedNow + SESSION_TIMEOUT_MS).toISOString();
+    const startedAt = new Date(fixedNow + SESSION_TIMEOUT_MS - HOUR_MS).toISOString();
+    const agentId = newAgent("spanend-exact-bound");
+    session(agentId, { startedAt, lastActivityAt: noLaterThan, activityCount: 10 });
+
+    expect(frequency(agentId)).toBe(10);
+  });
+
+  it("counts a zero-length session whose started_at and span end both land exactly on noLaterThan", () => {
+    // started_at <= noLaterThan pins started_at to the same instant, and
+    // started_at <= spanEnd then forces spanEnd to it too: the only way to sit
+    // started_at exactly on the far bound is a zero-length session there.
+    const fixedNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    const noLaterThan = new Date(fixedNow + SESSION_TIMEOUT_MS).toISOString();
+    const agentId = newAgent("started-exact-bound");
+    session(agentId, { startedAt: noLaterThan, lastActivityAt: noLaterThan, activityCount: 1 });
 
     expect(frequency(agentId)).toBe(100);
   });
