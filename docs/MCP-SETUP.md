@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-Vibe Dash must be running for the dashboard UI and WebSocket to work. The MCP stdio transport does NOT require the server to be running (it connects directly to SQLite), but you won't see real-time updates in the browser without the server.
+Start Vibe Dash and point your agent at it over Streamable HTTP (Step 2). That is the recommended setup: it is the only transport that keeps the dashboard live, and it is the only one that does not risk corrupting the database (see the transport comparison below). The stdio transport is a fallback for when no server is running.
 
 ## Step 1: Start Vibe Dash
 
@@ -28,61 +28,40 @@ Leave this running in a terminal.
 
 ## Step 2: Configure Claude Code to use the MCP server
 
-Two transports are available, and they trade off against each other. Pick deliberately:
+Two transports are available. They are not a free choice between equals: lead with
+Streamable HTTP, and treat stdio as a single-session fallback for when no server is
+running.
 
-| | **Stdio** | **Streamable HTTP** |
+| | **Streamable HTTP** | **Stdio** |
 |---|---|---|
-| Works when the server is down | Yes | No |
-| Dashboard updates live on agent writes | **No** — see below | Yes |
-| Best for | Single machine, offline-first | Multi-agent or remote; keeping the UI live |
+| Works when the server is down | No | Yes |
+| Dashboard updates live on agent writes | Yes | **No** (see below) |
+| Safe with more than one agent session at a time | Yes | **No** (see the corruption warning below) |
+| Best for | Everyday use; multi-agent or remote | Fallback when no server is running, one session at a time |
 
-The live-update row is the one that surprises people. Both transports run the same
-tool code, and that code calls `broadcast()` after every mutation — but `broadcast()`
-only reaches browsers through the WebSocket server that lives inside the Vibe Dash
-server process. A stdio MCP server is a separate process with no WebSocket server in
-it, so the broadcast is a silent no-op (`server/websocket.ts`, `broadcast()` returns
-early when `wss` is null). Agent writes land in SQLite correctly; the open dashboard
-just won't know about them until you reload.
+**Corruption warning.** The server, every stdio process, and the CLI each open the
+SQLite database read-write and run migrations on startup. Running more than one
+stdio process at a time, or running stdio alongside a running server, means more
+than one process can open the file and run migrations concurrently: this is the
+shape of an incident that has already corrupted this project's database. Treat
+stdio as strictly one session at a time, and never run it while the server is also
+pointed at the same database file, unless you have deliberately set `VIBE_DASH_DB`
+to keep them apart.
 
-Choose stdio if you want tools that work whether or not the server is up. Choose
-Streamable HTTP if you want the dashboard to stay live. This repo's own `.mcp.json`
-uses Streamable HTTP for that reason.
+The live-update row is the other thing that surprises people. Both transports run
+the same tool code, and that code calls `broadcast()` after every mutation, but
+`broadcast()` only reaches browsers through the WebSocket server that lives inside
+the Vibe Dash server process. A stdio MCP server is a separate process with no
+WebSocket server in it, so the broadcast is a silent no-op (`server/websocket.ts`,
+`broadcast()` returns early when `wss` is null). Agent writes land in SQLite
+correctly; the open dashboard just won't know about them until you reload.
 
-### Option A: Stdio (recommended for local use)
+Choose Streamable HTTP so the dashboard stays live and so only the server process
+ever writes to SQLite. This repo's own `.mcp.json` uses Streamable HTTP for that
+reason. Fall back to stdio only when you cannot run the server, and only for one
+session at a time.
 
-Stdio spawns the MCP server as a child process. Each Claude Code session gets its own instance that writes directly to the shared SQLite database. This is the simplest setup and works offline.
-
-Add to your **project-level** `.mcp.json` in each project that should report to Vibe Dash:
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
-    }
-  }
-}
-```
-
-Or add it **globally** (all projects get it) in `~/.claude/settings.json` under `mcpServers`:
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
-    }
-  }
-}
-```
-
-The stdio transport defaults to `<git-root>/vibe-dash.db` (same database the server reads — `resolveDbPath()` resolves every worktree of a repo to the one root database). Override with the `VIBE_DASH_DB` environment variable if needed.
-
-Remember the tradeoff above: an open dashboard will not reflect stdio writes until it is reloaded.
-
-### Option B: Streamable HTTP (recommended for multi-agent/remote)
+### Option A: Streamable HTTP (recommended)
 
 Streamable HTTP is the modern MCP transport. All communication goes through the running Vibe Dash server at `/mcp`. Supported by Claude Code, Cursor, Copilot (VS Code), and other up-to-date clients.
 
@@ -126,6 +105,40 @@ data: {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listCh
 The Vite dev server (port 3000) also proxies `/mcp` through to 3001, so a client
 pointed at either port reaches the same endpoint — swap the port in the command above
 and the reply is identical.
+
+### Option B: Stdio (fallback, one session at a time)
+
+Stdio spawns the MCP server as a child process. It writes directly to the shared SQLite database, which is what makes it work without the Vibe Dash server running. Use it only when you cannot run the server, and only for one session at a time. See the corruption warning above.
+
+Add to your **project-level** `.mcp.json` in each project that should report to Vibe Dash:
+
+```json
+{
+  "mcpServers": {
+    "vibe-dash": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
+    }
+  }
+}
+```
+
+Or add it **globally** (all projects get it) in `~/.claude/settings.json` under `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "vibe-dash": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/vibe-dash/server/mcp/stdio.ts"]
+    }
+  }
+}
+```
+
+The stdio transport defaults to `<git-root>/vibe-dash.db` (same database the server reads: `resolveDbPath()` resolves every worktree of a repo to the one root database). Override with the `VIBE_DASH_DB` environment variable if needed.
+
+Remember the corruption warning and the live-update tradeoff above: an open dashboard will not reflect stdio writes until it is reloaded, and stdio must never run concurrently with another writer against the same database file.
 
 ---
 

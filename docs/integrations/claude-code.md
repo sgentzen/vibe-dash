@@ -17,43 +17,33 @@ cd /path/to/vibe-dash && npm start
 
 ## Step 2 — Add the MCP server
 
-**Project-level** (one project reports to Vibe Dash) — add `.mcp.json` at your project root:
+**Streamable HTTP (recommended)**: points at the running Vibe Dash server, keeps the dashboard live, and is the only transport safe for more than one session at a time. Add `.mcp.json` at your project root, or the same block to `~/.claude/settings.json` for all projects:
 
 ```json
 {
   "mcpServers": {
     "vibe-dash": {
-      "command": "npx",
-      "args": ["tsx", "/absolute/path/to/vibe-dash/server/mcp/stdio.ts"]
-    }
-  }
-}
-```
-
-**Global** (all projects report to Vibe Dash) — add to `~/.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
-      "command": "npx",
-      "args": ["tsx", "/absolute/path/to/vibe-dash/server/mcp/stdio.ts"]
-    }
-  }
-}
-```
-
-**Remote server** (Streamable HTTP — useful for shared/team dashboards):
-
-```json
-{
-  "mcpServers": {
-    "vibe-dash": {
+      "type": "http",
       "url": "http://localhost:3001/mcp"
     }
   }
 }
 ```
+
+**Stdio (fallback, one session at a time)**: only when you cannot run the server. Running more than one stdio process at once, or stdio alongside a running server, has corrupted this project's database before; see the transport comparison and corruption warning in [docs/MCP-SETUP.md](../MCP-SETUP.md#step-2-configure-claude-code-to-use-the-mcp-server).
+
+```json
+{
+  "mcpServers": {
+    "vibe-dash": {
+      "command": "npx",
+      "args": ["tsx", "/absolute/path/to/vibe-dash/server/mcp/stdio.ts"]
+    }
+  }
+}
+```
+
+The same block works project-level (`.mcp.json`) or globally (`~/.claude/settings.json`).
 
 Restart Claude Code after editing. Claude Code discovers MCP servers at session start.
 
@@ -97,5 +87,5 @@ You should see the activity appear in the feed within a second.
 ## Troubleshooting
 
 - **"Tool not found"** — restart Claude Code; it loads MCP servers at startup
-- **Tasks not appearing** — stdio writes directly to SQLite; refresh the browser if the WebSocket disconnected
+- **Tasks not appearing**: on stdio this is expected, see [docs/MCP-SETUP.md](../MCP-SETUP.md); on Streamable HTTP, refresh the browser if the WebSocket disconnected
 - **Path issues** — use the absolute path to `stdio.ts`; `~/` expansion is not supported in all contexts
