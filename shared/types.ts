@@ -11,6 +11,8 @@ export interface Project {
   description: string | null;
   created_at: string;
   updated_at: string;
+  /** ISO timestamp when archived, or null while active. Soft-archive only — never deleted. */
+  archived_at: string | null;
 }
 
 export interface Milestone {
@@ -338,7 +340,9 @@ export type WsEventType =
   | "worktree_updated"
   | "cost_ingested"
   | "project_path_linked"
-  | "project_path_unlinked";
+  | "project_path_unlinked"
+  | "project_archived"
+  | "project_unarchived";
 
 type WsEventOf<T extends WsEventType, P> = { type: T; payload: P };
 
@@ -370,7 +374,9 @@ export type WsEvent =
   | WsEventOf<"worktree_updated", TaskWorktree>
   | WsEventOf<"cost_ingested", { filesScanned: number; recordsIngested: number; recordsSkipped: number; unpriced: number; unattributed: number }>
   | WsEventOf<"project_path_linked", { id: string; project_id: string }>
-  | WsEventOf<"project_path_unlinked", { id: string }>;
+  | WsEventOf<"project_path_unlinked", { id: string }>
+  | WsEventOf<"project_archived", Project>
+  | WsEventOf<"project_unarchived", Project>;
 
 // ─── Agent Cost ───────────────────────────────────────────────────────────────
 

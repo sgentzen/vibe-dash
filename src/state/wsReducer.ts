@@ -1,7 +1,35 @@
 import type {
+  Project,
   WsEvent,
 } from "../types";
 import type { AppState } from "./types";
+
+// Default project list excludes archived (matches GET /api/projects'
+// default), so drop it from state; a "show archived" view fetches its own
+// list separately rather than reading state.projects. Idempotent: a project
+// already absent (e.g. another tab already applied this event) leaves stats
+// untouched. Extracted out of wsReducer's switch to keep that function's
+// cognitive complexity down (sonarjs/cognitive-complexity).
+function applyProjectArchived(state: AppState, archived: Project): AppState {
+  const wasPresent = state.projects.some((p) => p.id === archived.id);
+  if (!wasPresent) return state;
+  return {
+    ...state,
+    projects: state.projects.filter((p) => p.id !== archived.id),
+    selectedProjectId: state.selectedProjectId === archived.id ? null : state.selectedProjectId,
+    stats: { ...state.stats, projects: Math.max(0, state.stats.projects - 1) },
+  };
+}
+
+function applyProjectUnarchived(state: AppState, unarchived: Project): AppState {
+  const alreadyPresent = state.projects.some((p) => p.id === unarchived.id);
+  if (alreadyPresent) return state;
+  return {
+    ...state,
+    projects: [...state.projects, unarchived],
+    stats: { ...state.stats, projects: state.stats.projects + 1 },
+  };
+}
 
 export function wsReducer(state: AppState, event: WsEvent): AppState {
   switch (event.type) {
@@ -69,6 +97,10 @@ export function wsReducer(state: AppState, event: WsEvent): AppState {
         },
       };
     }
+    case "project_archived":
+      return applyProjectArchived(state, event.payload);
+    case "project_unarchived":
+      return applyProjectUnarchived(state, event.payload);
     case "milestone_created":
       return {
         ...state,

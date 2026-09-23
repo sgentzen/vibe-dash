@@ -39,6 +39,36 @@ describe("useApi", () => {
     expect(getFetchMock().mock.calls[0][0]).toBe("/api/projects");
   });
 
+  it("getProjects includes ?include_archived=true when requested", async () => {
+    getFetchMock().mockResolvedValue(mockRes([]));
+    const { result } = renderHook(() => useApi());
+
+    await result.current.getProjects({ includeArchived: true });
+    expect(getFetchMock().mock.calls[0][0]).toBe("/api/projects?include_archived=true");
+  });
+
+  it("archiveProject POSTs to /api/projects/:id/archive", async () => {
+    const archived = { id: "p1", name: "Demo", archived_at: "2026-01-01T00:00:00.000Z" };
+    getFetchMock().mockResolvedValue(mockRes(archived));
+    const { result } = renderHook(() => useApi());
+
+    await expect(result.current.archiveProject("p1")).resolves.toEqual(archived);
+    const [url, init] = getFetchMock().mock.calls[0];
+    expect(url).toBe("/api/projects/p1/archive");
+    expect(init.method).toBe("POST");
+  });
+
+  it("unarchiveProject POSTs to /api/projects/:id/unarchive", async () => {
+    const unarchived = { id: "p1", name: "Demo", archived_at: null };
+    getFetchMock().mockResolvedValue(mockRes(unarchived));
+    const { result } = renderHook(() => useApi());
+
+    await expect(result.current.unarchiveProject("p1")).resolves.toEqual(unarchived);
+    const [url, init] = getFetchMock().mock.calls[0];
+    expect(url).toBe("/api/projects/p1/unarchive");
+    expect(init.method).toBe("POST");
+  });
+
   it("getTasks encodes the project_id query param", async () => {
     getFetchMock().mockResolvedValue(mockRes([]));
     const { result } = renderHook(() => useApi());

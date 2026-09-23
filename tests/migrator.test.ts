@@ -80,6 +80,11 @@ describe("runMigrations", () => {
     expect(cols).toContain("current_status_at");
   });
 
+  it("applies migration 026 (projects.archived_at)", () => {
+    const cols = columnNames(db, "projects");
+    expect(cols).toContain("archived_at");
+  });
+
   it("records each migration exactly once", () => {
     const names = (
       db.prepare("SELECT name FROM _migrations").all() as { name: string }[]
@@ -382,5 +387,52 @@ describe("agent_sessions.last_activity_at on a pre-column database", () => {
     }
     migrated.close();
     fresh.close();
+  });
+});
+
+describe("migration 026 — projects.archived_at", () => {
+  const MIGRATION_NAME = "026_projects_archived_at";
+
+  it("does not re-add the column when the table already has it", () => {
+    const db = createTestDb();
+    expect(columnNames(db, "projects")).toContain("archived_at");
+    const before = columnNames(db, "projects").size;
+
+    // Forget that 026 ran, so runMigrations actually executes its body again
+    // instead of skipping it by name — the path a hand-patched or
+    // hand-rolled-ahead database takes. Without the column-presence guard
+    // this is a "duplicate column name" error.
+    db.prepare("DELETE FROM _migrations WHERE name = ?").run(MIGRATION_NAME);
+    expect(() => runMigrations(db)).not.toThrow();
+
+    expect(columnNames(db, "projects").size).toBe(before);
+    const recorded = db
+      .prepare("SELECT COUNT(*) AS n FROM _migrations WHERE name = ?")
+      .get(MIGRATION_NAME) as { n: number };
+    expect(recorded.n).toBe(1);
+  });
+
+  it("does nothing on a salvaged database that has no projects table", () => {
+    const db = createTestDb();
+    // A salvaged database: the table is gone, and nothing will recreate it
+    // because 001 is already recorded as applied. DROP TABLE succeeds under
+    // foreign_keys=ON here because the database is otherwise empty — SQLite
+    // performs an implicit DELETE FROM projects first, which deletes zero
+    // rows, so no other table's FK reference is actually violated.
+    db.exec("DROP TABLE projects");
+    db.prepare("DELETE FROM _migrations WHERE name = ?").run(MIGRATION_NAME);
+
+    expect(() => runMigrations(db)).not.toThrow();
+    expect(tableNames(db)).not.toContain("projects");
+    db.close();
+  });
+
+  it("creates idx_projects_archived_at", () => {
+    const db = createTestDb();
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'projects'")
+      .all() as { name: string }[];
+    expect(indexes.map((i) => i.name)).toContain("idx_projects_archived_at");
+    db.close();
   });
 });

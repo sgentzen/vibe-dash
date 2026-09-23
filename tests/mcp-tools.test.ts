@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { handleTool } from "../server/mcp/tools.js";
 import { createMcpServer } from "../server/mcp/server.js";
+import { broadcast } from "../server/websocket.js";
 
 // Mock websocket broadcast — we don't need a live WebSocket server in tests
 vi.mock("../server/websocket.js", () => ({
@@ -192,6 +193,27 @@ describe("list operations", () => {
     expect(data.projects.map((p: { name: string }) => p.name)).toContain("Alpha");
   });
 
+  it("list_projects excludes archived projects by default", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "Alpha" }));
+    await handleTool(db, "create_project", { name: "Beta" });
+    await handleTool(db, "archive_project", { project_id });
+
+    const result = await handleTool(db, "list_projects", {});
+    const data = parse(result);
+    expect(data.projects).toHaveLength(1);
+    expect(data.projects[0].name).toBe("Beta");
+  });
+
+  it("list_projects includes archived projects when include_archived is true", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "Alpha" }));
+    await handleTool(db, "archive_project", { project_id });
+
+    const result = await handleTool(db, "list_projects", { include_archived: true });
+    const data = parse(result);
+    expect(data.projects).toHaveLength(1);
+    expect(data.projects[0].archived_at).not.toBeNull();
+  });
+
   it("list_tasks returns tasks with filters", async () => {
     const { project_id } = parse(await handleTool(db, "create_project", { name: "P" }));
     await handleTool(db, "create_task", { project_id, title: "Task 1", priority: "low" });
@@ -200,6 +222,52 @@ describe("list operations", () => {
     const result = await handleTool(db, "list_tasks", { project_id });
     const data = parse(result);
     expect(data.tasks).toHaveLength(2);
+  });
+});
+
+// ─── archive_project / unarchive_project ───────────────────────────────────────
+
+describe("archive_project / unarchive_project", () => {
+  it("archives a project", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    const result = await handleTool(db, "archive_project", { project_id });
+    expect(parse(result).success).toBe(true);
+
+    const listed = parse(await handleTool(db, "list_projects", {}));
+    expect(listed.projects).toHaveLength(0);
+  });
+
+  it("returns success=false for an unknown project", async () => {
+    const result = await handleTool(db, "archive_project", { project_id: "no-such-id" });
+    const data = parse(result);
+    expect(data.success).toBe(false);
+    expect(data.error).toBeTruthy();
+  });
+
+  it("is idempotent: archiving an already-archived project succeeds without a duplicate broadcast", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    await handleTool(db, "archive_project", { project_id });
+    vi.mocked(broadcast).mockClear();
+    const result = await handleTool(db, "archive_project", { project_id });
+    expect(parse(result).success).toBe(true);
+    expect(broadcast).not.toHaveBeenCalled();
+  });
+
+  it("unarchive_project restores a project to the default list", async () => {
+    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+    await handleTool(db, "archive_project", { project_id });
+
+    const result = await handleTool(db, "unarchive_project", { project_id });
+    expect(parse(result).success).toBe(true);
+
+    const listed = parse(await handleTool(db, "list_projects", {}));
+    expect(listed.projects).toHaveLength(1);
+    expect(listed.projects[0].archived_at).toBeNull();
+  });
+
+  it("unarchive_project returns success=false for an unknown project", async () => {
+    const result = await handleTool(db, "unarchive_project", { project_id: "no-such-id" });
+    expect(parse(result).success).toBe(false);
   });
 });
 
@@ -374,5 +442,11 @@ describe("advertised MCP tool surface", () => {
     expect(names).toContain("create_milestone");
     expect(names).toContain("list_milestones");
     expect(names).toContain("complete_milestone");
+  });
+
+  it("exposes project archive lifecycle tools", () => {
+    const names = registeredToolNames();
+    expect(names).toContain("archive_project");
+    expect(names).toContain("unarchive_project");
   });
 });

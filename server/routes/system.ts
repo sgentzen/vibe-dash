@@ -22,11 +22,18 @@ export function systemRoutes(db: Database.Database, _broadcast: BroadcastFn): Ro
   });
 
   router.get("/api/stats", statsLimiter, (_req, res) => {
+    // Both counts exclude archived projects (and their tasks) so the top-bar
+    // isn't inflated by hidden-by-design junk — see UX-2 in
+    // docs/analysis/2026-09-18-project-audit.md.
     const projects = (
-      db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number }
+      db.prepare("SELECT COUNT(*) AS count FROM projects WHERE archived_at IS NULL").get() as { count: number }
     ).count;
     const tasks = (
-      db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status != 'done'").get() as { count: number }
+      db.prepare(
+        `SELECT COUNT(*) AS count FROM tasks t
+           JOIN projects p ON p.id = t.project_id
+          WHERE t.status != 'done' AND p.archived_at IS NULL`
+      ).get() as { count: number }
     ).count;
     const activeAgents = countActiveAgents(db);
     const alerts = (
