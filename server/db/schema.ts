@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
-import { runMigrations } from "./migrator.js";
+import { runMigrations, assertSchemaCurrent, DB_BUSY_TIMEOUT_MS } from "./migrator.js";
+import { acquireOwnerLock } from "./ownerLock.js";
 
 // ─── Stale FK Guard ───────────────────────────────────────────────────────────
 // Retained for legacy databases where tasks.milestone_id still points at
@@ -51,6 +52,10 @@ function rebuildTasksIfFkStale(db: Database.Database): void {
 }
 
 export function initDb(db: Database.Database): void {
+  // Explicit rather than relying on the driver default (DATA-15): see
+  // DB_BUSY_TIMEOUT_MS's own comment for why this matters for concurrent
+  // migration runs specifically.
+  db.pragma(`busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   runMigrations(db);
@@ -58,8 +63,67 @@ export function initDb(db: Database.Database): void {
   rebuildTasksIfFkStale(db);
 }
 
-export function openDb(path: string): Database.Database {
-  const db = new Database(path);
-  initDb(db);
-  return db;
+/**
+ * Open the database read-write and bring it up to date, taking the advisory
+ * owner lock first (ARCH-1). This is migration authority: only the server and
+ * the stdio MCP process should call it. `entryPoint` names the caller in the
+ * lock file and in any `DbOwnershipError` a second caller hits.
+ */
+export function openDb(path: string, entryPoint: string): Database.Database {
+  const releaseLock = acquireOwnerLock(path, entryPoint);
+  let db: Database.Database | undefined;
+  try {
+    db = new Database(path);
+    initDb(db);
+    return db;
+  } catch (err) {
+    db?.close();
+    releaseLock();
+    throw err;
+  }
+}
+
+/**
+ * Open the database read-only for the CLI's read commands (DATA-5, ARCH-11).
+ * Never migrates and never takes the owner lock — a reader is not a writer,
+ * and better-sqlite3 refuses migration DDL against a readonly connection
+ * anyway. Throws `SchemaBehindError` if migrations are pending (the fix is to
+ * start the server once) or `SchemaTooNewError` if the database is ahead of
+ * this build.
+ */
+export function openReadOnlyDb(path: string): Database.Database {
+  const db = new Database(path, { readonly: true, fileMustExist: true });
+  try {
+    db.pragma(`busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
+    assertSchemaCurrent(db);
+    return db;
+  } catch (err) {
+    db.close();
+    throw err;
+  }
+}
+
+/**
+ * Open the database read-write for the CLI's one writer, `add-task`
+ * (DATA-5, ARCH-11), without running migrations and without taking the
+ * owner lock — the CLI is a short-lived process making one write, not a
+ * long-lived owner, and the lock is scoped to the server and stdio MCP.
+ * Throws the same schema errors as `openReadOnlyDb`.
+ */
+export function openWritableForCli(path: string): Database.Database {
+  // fileMustExist: a mistyped --db path with no existing database would
+  // otherwise fail with SchemaBehindError as soon as assertSchemaCurrent()
+  // runs anyway (an empty file has no _migrations table, so every migration
+  // reads as pending) — but not before better-sqlite3 has already created and
+  // left behind an empty .db file at the wrong path. Fail before that happens.
+  const db = new Database(path, { fileMustExist: true });
+  try {
+    db.pragma(`busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
+    assertSchemaCurrent(db);
+    db.pragma("foreign_keys = ON");
+    return db;
+  } catch (err) {
+    db.close();
+    throw err;
+  }
 }

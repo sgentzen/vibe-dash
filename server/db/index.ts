@@ -1,8 +1,9 @@
 // Barrel re-export — all consumers import from "./db.js" or "../server/db.js"
 // and get the same public API as the original monolithic db.ts.
 
-export { initDb, openDb } from "./schema.js";
-export { SchemaTooNewError, getUnknownMigrations } from "./migrator.js";
+export { initDb, openDb, openReadOnlyDb, openWritableForCli } from "./schema.js";
+export { SchemaTooNewError, SchemaBehindError, getUnknownMigrations } from "./migrator.js";
+export { DbOwnershipError } from "./ownerLock.js";
 export { normalizeAgentName } from "./helpers.js";
 export {
   createProject,
