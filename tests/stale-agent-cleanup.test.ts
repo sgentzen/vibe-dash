@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type Database from "better-sqlite3";
 import { createTestDb } from "./setup.js";
 import { NON_INSTANT_SHAPES } from "./timestamp-shapes.js";
@@ -191,6 +191,25 @@ describe("cleanupStaleAgents bounds last_seen_at on both sides of the present", 
     expect(getAgentById(db, id)).not.toBeNull();
   });
 
+  it("keeps a badly stamped agent dated far in the future that something references", () => {
+    // The FK-referenced test above covers the shape reason (last_seen_at
+    // 'now'); this covers the other candidate reason on this same widened net,
+    // julianday(last_seen_at) > julianday(noLaterThan), so both paths into the
+    // candidates query are proven to hit the same skip-if-referenced guard.
+    const id = agentSeenAt("future-spender", "2099-01-01T00:00:00.000Z");
+    logCost(db, {
+      agent_id: id,
+      model: "claude-opus-5",
+      provider: "anthropic",
+      input_tokens: 1,
+      output_tokens: 1,
+      cost_usd: 1,
+    });
+
+    expect(() => cleanupStaleAgents(db)).not.toThrow();
+    expect(getAgentById(db, id)).not.toBeNull();
+  });
+
   it("sorts a mixed batch in one sweep", () => {
     const kept = [newAgent(db, "busy"), agentSeenAt("skewed", AHEAD(MARGIN_MS))];
     const gone = [
@@ -226,6 +245,52 @@ describe("cleanupStaleAgents bounds last_seen_at on both sides of the present", 
     expect(cleanupStaleAgents(db)).toBe(1);
     expect(getAgentById(db, inside)).not.toBeNull();
     expect(getAgentById(db, outside)).toBeNull();
+  });
+});
+
+/**
+ * Exact equality at both bounds, on a frozen clock.
+ *
+ * cutoff and noLaterThan are both built from Date.now() inside
+ * cleanupStaleAgents itself, so landing on them exactly needs the test and the
+ * function to read the same instant — a real clock tick between computing the
+ * expected bound here and the function recomputing it would otherwise nudge
+ * the row off the line. Both comparisons are strict (`<` / `>`), so a
+ * last_seen_at exactly on either bound must be kept, not removed.
+ */
+describe("cleanupStaleAgents at exact boundary equality (frozen clock)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function agentSeenAt(name: string, lastSeenAt: string): string {
+    const id = newAgent(db, name);
+    db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(lastSeenAt, id);
+    return id;
+  }
+
+  it("keeps an agent whose last_seen_at exactly equals the past cutoff", () => {
+    const fixedNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    const cutoff = new Date(fixedNow - SESSION_TIMEOUT_MS).toISOString();
+    const id = agentSeenAt("exact-past-cutoff", cutoff);
+
+    expect(cleanupStaleAgents(db)).toBe(0);
+    expect(getAgentById(db, id)).not.toBeNull();
+  });
+
+  it("keeps an agent whose last_seen_at exactly equals noLaterThan", () => {
+    const fixedNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    const noLaterThan = new Date(fixedNow + SESSION_TIMEOUT_MS).toISOString();
+    const id = agentSeenAt("exact-nolaterthan", noLaterThan);
+
+    expect(cleanupStaleAgents(db)).toBe(0);
+    expect(getAgentById(db, id)).not.toBeNull();
   });
 });
 
