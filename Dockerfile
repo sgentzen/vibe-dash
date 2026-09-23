@@ -29,6 +29,18 @@ COPY --from=builder /app/dist ./dist
 COPY server ./server
 COPY shared ./shared
 
+# Commit SHA and build timestamp, threaded through by docker-compose.yml's
+# build.args (LIVE-3). The runtime image carries no .git directory, so
+# server/version.ts cannot fall back to `git rev-parse` the way a native run
+# does — these ARGs are the only way it can know either value. Left unset
+# (e.g. a bare `docker build .` with no --build-arg) both ENV values are
+# empty strings, and server/version.ts treats an empty string the same as
+# unset, falling back to "unknown" rather than reporting a wrong answer.
+ARG VIBE_DASH_COMMIT_SHA=""
+ARG VIBE_DASH_BUILD_TIME=""
+ENV VIBE_DASH_COMMIT_SHA=${VIBE_DASH_COMMIT_SHA} \
+    VIBE_DASH_BUILD_TIME=${VIBE_DASH_BUILD_TIME}
+
 # Default port; override with PORT env var
 EXPOSE 3001
 
@@ -58,6 +70,17 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint -- root is required to chown /data; the entrypoint drops to `node` via su-exec
 ENTRYPOINT ["docker-entrypoint.sh"]
+
+# HEALTHCHECK lives in the image too, not only in docker-compose.yml (OPS-3):
+# anyone running this image directly (a bare `docker run`, a different
+# orchestrator) gets the same liveness probe compose users do. node, not
+# curl: the runtime image installs neither curl nor wget, and node is already
+# guaranteed to be present since it's what runs the server. Hits /api/health,
+# not /api/projects — a liveness probe should not depend on the database
+# layer having opened cleanly, and /api/health now reports version, commit
+# and build time on top of `ok: true`.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "fetch('http://localhost:3001/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
 
 # Server reads dist/ for static assets; vite build put them there already
 # nosemgrep: dockerfile.security.missing-user.missing-user -- root is required to chown /data; the entrypoint drops to `node` via su-exec

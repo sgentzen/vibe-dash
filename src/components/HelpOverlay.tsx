@@ -1,6 +1,8 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState, useEffect } from "react";
 import { FocusTrap } from "focus-trap-react";
 import { sectionHeader } from "../styles/shared.js";
+import { useApi } from "../hooks/useApi";
+import type { HealthInfo } from "../hooks/useApi";
 
 interface HelpOverlayProps {
   onClose: () => void;
@@ -51,8 +53,33 @@ const kbdStyle: React.CSSProperties = {
   lineHeight: "18px",
 };
 
+/** Short build identity line for the footer below. "unknown" collapses to
+ * nothing rather than printing the literal word three times. */
+function formatBuildLine(health: HealthInfo | null): string | null {
+  if (!health) return null;
+  const parts: string[] = [];
+  if (health.version) parts.push(`v${health.version}`);
+  if (health.commit && health.commit !== "unknown") parts.push(health.commit.slice(0, 7));
+  if (health.buildTime && health.buildTime !== "unknown") parts.push(`built ${health.buildTime}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const api = useApi();
+  const [health, setHealth] = useState<HealthInfo | null>(null);
+
+  // Fetched on open rather than polled: this is build identity, which cannot
+  // change while the process the browser is talking to keeps running. A
+  // failure here (older server, network hiccup) leaves the footer absent
+  // rather than blocking the shortcuts list it sits below.
+  useEffect(() => {
+    let cancelled = false;
+    api.getHealth()
+      .then((h) => { if (!cancelled) setHealth(h); })
+      .catch(() => { /* footer stays absent; shortcuts remain usable */ });
+    return () => { cancelled = true; };
+  }, [api]);
 
   // Native <dialog> (rather than a div with role="dialog") for built-in modal
   // semantics/backdrop. showModal() isn't implemented in jsdom, so fall back to
@@ -66,6 +93,8 @@ export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
       dialog.setAttribute("open", "");
     }
   }, []);
+
+  const buildLine = formatBuildLine(health);
 
   return (
     <FocusTrap focusTrapOptions={{ escapeDeactivates: true, onDeactivate: onClose, clickOutsideDeactivates: true, tabbableOptions: { displayCheck: "none" } }}>
@@ -133,6 +162,29 @@ export function HelpOverlay({ onClose }: Readonly<HelpOverlayProps>) {
               </div>
             </div>
           ))}
+
+          {buildLine && (
+            // role="status"/aria-live="polite": this text arrives after the
+            // dialog is already open and focus is elsewhere (the close
+            // button), from an async fetch with no user action or focus
+            // change to cue it — WCAG 4.1.3 Status Messages. Polite, not
+            // assertive: it is not worth interrupting a screen reader user
+            // already reading the shortcut list above.
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                marginTop: "4px",
+                paddingTop: "12px",
+                borderTop: "1px solid var(--border)",
+                color: "var(--text-muted)",
+                fontSize: "11px",
+                textAlign: "center",
+              }}
+            >
+              Vibe Dash {buildLine}
+            </div>
+          )}
         </div>
       </dialog>
     </FocusTrap>

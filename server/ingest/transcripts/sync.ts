@@ -267,6 +267,7 @@ export function getIngestStatus(db: Database.Database): {
   otlpRows: number; otlpUnmapped: number; otlpUnattributed: number; mcpUnattributed: number;
   otlpSeriesCount: number; otlpSeriesRefused: number; otlpSeriesCap: number;
   undated: number;
+  claudeHomeFound: boolean;
   overlaps: CostOverlap[];
 } {
   const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
@@ -358,6 +359,18 @@ export function getIngestStatus(db: Database.Database): {
       `SELECT COUNT(*) AS n FROM cost_entries WHERE ${julianDaySql("created_at")} IS NULL` +
       ` AND ${excludeObservedCondition()}`
     ),
+    // Whether the directory VIBE_DASH_CLAUDE_HOME (or its default) resolves to
+    // actually exists. discoverTranscripts() already treats a missing
+    // directory as "found nothing" rather than an error, which is correct for
+    // scanning but indistinguishable from "found everything, there was
+    // nothing new" once it reaches spend_today. Under Docker in particular the
+    // directory is absent unless the operator adds the transcripts bind mount
+    // (see docker-compose.yml and docs/self-hosting.md), and without this flag
+    // that reads as an honest $0.00 rather than "ingestion cannot see anything
+    // at all". The path itself is never returned here — PII-5 already flags
+    // absolute paths leaking OS usernames and directory names over
+    // unauthenticated endpoints, and a boolean is all the UI needs to act on.
+    claudeHomeFound: fs.existsSync(resolveClaudeHome()),
     overlaps: rows.map((r) => ({
       project_id: r.project_id,
       project_name: r.project_name,

@@ -54,6 +54,7 @@ function healthyStatus(overrides: Partial<IngestStatus> = {}): IngestStatus {
     filesTracked: 0, transcriptRows: 0, unpriced: 0, unattributed: 0,
     otlpRows: 0, otlpUnmapped: 0, otlpUnattributed: 0, mcpUnattributed: 0,
     otlpSeriesCount: 0, otlpSeriesRefused: 0, otlpSeriesCap: 10_000, undated: 0,
+    claudeHomeFound: true,
     ...overrides,
   };
 }
@@ -170,6 +171,15 @@ describe("DashboardView ingest status", () => {
 
     await screen.findByText(/no mapper recognised/i);
     expect(screen.getByText(/40/)).toBeTruthy();
+  });
+
+  // LIVE-2: wired all the way from the API mock through to the dashboard, not
+  // just unit-tested on DroppedDataNotice in isolation.
+  it("warns when the ingest status reports no transcript directory was found", async () => {
+    mockApi.getIngestStatus.mockResolvedValue(healthyStatus({ claudeHomeFound: false }));
+    renderWithProviders(<DashboardView />);
+
+    await screen.findByText(/no transcript directory/i);
   });
 
   it("renders the Total Spend caveat badges from the status and the summary", async () => {
