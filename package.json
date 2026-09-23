@@ -24,6 +24,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "start": "vite build && tsx server/index.ts",
+    "serve": "tsx server/index.ts",
     "mcp:stdio": "tsx server/mcp/stdio.ts",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
