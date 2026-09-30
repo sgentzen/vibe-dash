@@ -10,6 +10,7 @@ Patterns for `server/` — the Express API, SQLite layer, WebSocket broadcast, a
 - JSON columns for complex data (capabilities, event_types, template_json)
 - All DB functions accept `db: Database.Database` as first parameter
 - Activity logging: call `logActivity()` after mutations, then `broadcast()` the WebSocket event
+- Schema changes are new numbered migrations in `server/db/migrator.ts`. A shipped migration's effect never changes: databases that recorded it will not run it again. The one kind of edit allowed is a guard that turns a guaranteed failure into the same end state, as 019's column guards did (DATA-11). Read the `Migration` interface and the guards in 023-028 before adding one; a migration that rebuilds a table other tables reference needs `foreignKeysOff` and `isNeeded`
 
 ## Route Patterns
 

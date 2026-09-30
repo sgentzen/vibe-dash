@@ -146,6 +146,7 @@ function openDbOrExit(): Database.Database {
           logger.warn({ error }, "Could not remove an old pre-migration snapshot");
         }
       },
+      onWarning: (warning) => logger.warn({ DB_PATH }, warning),
     });
   } catch (err) {
     if (err instanceof SchemaTooNewError) {

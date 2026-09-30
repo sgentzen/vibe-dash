@@ -7,9 +7,33 @@ import {
   type PreMigrationSnapshot,
 } from "./snapshot.js";
 
-interface Migration {
+export interface Migration {
   name: string;
-  run: (db: Database.Database) => void;
+  /**
+   * Run with foreign-key enforcement switched off: for a migration that
+   * rebuilds a table other tables reference, SQLite's documented procedure
+   * for a change ALTER TABLE cannot make ("Making Other Kinds Of Table Schema
+   * Changes", https://www.sqlite.org/lang_altertable.html). DROP TABLE on a
+   * referenced table fails under enforcement, and the pragma is inert inside
+   * a transaction, which is where every migration runs, so the runner turns
+   * it off before BEGIN and back on after COMMIT. In exchange it rolls the
+   * migration back if foreign_key_check then finds a violation that was not
+   * there before (DATA-7). Violations that were already there are left
+   * alone: refusing to start over them would make the database unopenable,
+   * the failure 020's comment describes. The comparison is row by row, so
+   * such a migration must keep every row's rowid (027 copies it explicitly).
+   */
+  foreignKeysOff?: boolean;
+  /**
+   * For a foreignKeysOff migration: whether it has anything to do on this
+   * database. When this returns false the migration is recorded without
+   * switching enforcement off or running foreign_key_check, which reads every
+   * table and throws outright on some salvaged schemas, so a migration with
+   * nothing to do can never be what stops an install from starting.
+   */
+  isNeeded?: (db: Database.Database) => boolean;
+  /** May return warnings for the entry point to log; the db layer never logs itself. */
+  run: (db: Database.Database) => string[] | void;
 }
 
 /**
@@ -126,6 +150,204 @@ export interface MigrationReport {
   applied: string[];
   /** The snapshot taken before applying them, or null when none was needed. */
   snapshot: PreMigrationSnapshot | null;
+  /**
+   * Warnings for the entry point to log: from the migrations applied, each
+   * prefixed with its migration's name, and from the unique-index check that
+   * runs on every open, which names the index instead.
+   */
+  warnings: string[];
+}
+
+/**
+ * The tasks columns as migrations 001-026 leave them (015 dropped
+ * recurrence_rule). Frozen, like every migration's SQL: 027 rebuilds tasks at
+ * this fixed point in the sequence, so any column a later migration adds is
+ * added after the rebuild and can never be dropped by it.
+ */
+const TASKS_COLUMNS_AT_026 = [
+  "id", "project_id", "parent_task_id", "milestone_id", "assigned_agent_id",
+  "title", "description", "status", "priority", "progress",
+  "due_date", "start_date", "estimate", "task_type", "created_at", "updated_at",
+];
+
+interface ExpectedIndex {
+  name: string;
+  table: string;
+  /** Columns the definition reads; the index is skipped if any is missing. */
+  columns: string[];
+  sql: string;
+  /**
+   * For a unique index: `count` returns { n }, how many values appear more
+   * than once and would make creating it fail; `find` is the query to give an
+   * operator for listing them.
+   */
+  duplicates?: { count: string; find: string };
+}
+
+/**
+ * Every index migrations 001-026 create, with each definition copied verbatim
+ * from the migration that made it, so a restored index is the same index
+ * (024 and 025 explain why the julianday expressions must match exactly).
+ * Frozen for the same reason TASKS_COLUMNS_AT_026 is.
+ */
+const INDEXES_AT_026: ExpectedIndex[] = [
+  { name: "idx_activity_log_agent_id", table: "activity_log", columns: ["agent_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_activity_log_agent_id ON activity_log(agent_id)" },
+  { name: "idx_activity_log_source", table: "activity_log", columns: ["source"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_activity_log_source ON activity_log(source)" },
+  { name: "idx_activity_log_task_id", table: "activity_log", columns: ["task_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_activity_log_task_id ON activity_log(task_id)" },
+  { name: "idx_activity_log_timestamp", table: "activity_log", columns: ["timestamp"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp)" },
+  { name: "idx_activity_log_timestamp_jd", table: "activity_log", columns: ["timestamp"],
+    sql: `CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp_jd
+          ON activity_log(julianday(
+            CASE WHEN timestamp GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+              THEN timestamp END
+          ))` },
+  { name: "idx_agent_sessions_agent_id", table: "agent_sessions", columns: ["agent_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_agent_sessions_agent_id ON agent_sessions(agent_id)" },
+  { name: "idx_agents_name_normalized", table: "agents", columns: ["name_normalized"],
+    sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_name_normalized ON agents(name_normalized)",
+    duplicates: {
+      count:
+        "SELECT COUNT(*) AS n FROM (SELECT 1 FROM agents WHERE name_normalized IS NOT NULL GROUP BY name_normalized HAVING COUNT(*) > 1)",
+      find: "SELECT name_normalized, COUNT(*) FROM agents WHERE name_normalized IS NOT NULL GROUP BY name_normalized HAVING COUNT(*) > 1",
+    } },
+  { name: "idx_blockers_resolved_at", table: "blockers", columns: ["resolved_at"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_blockers_resolved_at ON blockers(resolved_at)" },
+  { name: "idx_blockers_task_id", table: "blockers", columns: ["task_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_blockers_task_id ON blockers(task_id)" },
+  { name: "idx_completion_metrics_agent_id", table: "completion_metrics", columns: ["agent_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_completion_metrics_agent_id ON completion_metrics(agent_id)" },
+  { name: "idx_completion_metrics_created_at", table: "completion_metrics", columns: ["created_at"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_completion_metrics_created_at ON completion_metrics(created_at)" },
+  { name: "idx_completion_metrics_task_id", table: "completion_metrics", columns: ["task_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_completion_metrics_task_id ON completion_metrics(task_id)" },
+  { name: "idx_cost_entries_agent_id", table: "cost_entries", columns: ["agent_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_cost_entries_agent_id ON cost_entries(agent_id)" },
+  { name: "idx_cost_entries_created_at", table: "cost_entries", columns: ["created_at"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at ON cost_entries(created_at)" },
+  { name: "idx_cost_entries_created_at_jd", table: "cost_entries", columns: ["created_at"],
+    sql: `CREATE INDEX IF NOT EXISTS idx_cost_entries_created_at_jd
+          ON cost_entries(julianday(
+            CASE WHEN created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+              THEN created_at END
+          ))` },
+  { name: "idx_cost_entries_external_id", table: "cost_entries", columns: ["external_id"],
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_entries_external_id
+          ON cost_entries(external_id) WHERE external_id IS NOT NULL`,
+    duplicates: {
+      count:
+        "SELECT COUNT(*) AS n FROM (SELECT 1 FROM cost_entries WHERE external_id IS NOT NULL GROUP BY external_id HAVING COUNT(*) > 1)",
+      find: "SELECT external_id, COUNT(*) FROM cost_entries WHERE external_id IS NOT NULL GROUP BY external_id HAVING COUNT(*) > 1",
+    } },
+  { name: "idx_cost_entries_milestone_id", table: "cost_entries", columns: ["milestone_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_cost_entries_milestone_id ON cost_entries(milestone_id)" },
+  { name: "idx_cost_entries_project_id", table: "cost_entries", columns: ["project_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_cost_entries_project_id ON cost_entries(project_id)" },
+  { name: "idx_cost_entries_source", table: "cost_entries", columns: ["source"],
+    sql: `CREATE INDEX IF NOT EXISTS idx_cost_entries_source
+          ON cost_entries(source)` },
+  { name: "idx_cost_entries_task_id", table: "cost_entries", columns: ["task_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_cost_entries_task_id ON cost_entries(task_id)" },
+  { name: "idx_milestones_project_id", table: "milestones", columns: ["project_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id)" },
+  { name: "idx_project_paths_project", table: "project_paths", columns: ["project_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_project_paths_project ON project_paths(project_id)" },
+  { name: "idx_projects_archived_at", table: "projects", columns: ["archived_at"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_projects_archived_at ON projects(archived_at)" },
+  { name: "idx_task_dependencies_depends_on", table: "task_dependencies", columns: ["depends_on_task_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id)" },
+  { name: "idx_task_worktrees_status", table: "task_worktrees", columns: ["status"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_task_worktrees_status ON task_worktrees(status)" },
+  { name: "idx_task_worktrees_task_id", table: "task_worktrees", columns: ["task_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_task_worktrees_task_id ON task_worktrees(task_id)" },
+  { name: "idx_tasks_assigned_agent_id", table: "tasks", columns: ["assigned_agent_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent_id ON tasks(assigned_agent_id)" },
+  { name: "idx_tasks_milestone_id", table: "tasks", columns: ["milestone_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_tasks_milestone_id ON tasks(milestone_id)" },
+  { name: "idx_tasks_priority", table: "tasks", columns: ["priority"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority)" },
+  { name: "idx_tasks_project_id", table: "tasks", columns: ["project_id"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)" },
+  { name: "idx_tasks_status", table: "tasks", columns: ["status"],
+    sql: "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)" },
+];
+
+/** Columns of `table` that are missing, or null when the table itself is. */
+function missingColumns(db: Database.Database, table: string, columns: string[]): string[] | null {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+  if (!exists) return null;
+  const present = new Set((db.pragma(`table_info(${table})`) as { name: string }[]).map((c) => c.name));
+  return columns.filter((c) => !present.has(c));
+}
+
+/**
+ * Create `index` if it is missing and can be. Returns why it could not be,
+ * or undefined when it exists afterwards.
+ */
+function restoreIndex(db: Database.Database, index: ExpectedIndex): string | undefined {
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(index.name)) {
+    return undefined;
+  }
+  const missing = missingColumns(db, index.table, index.columns);
+  if (missing === null) return `${index.name} not created: table ${index.table} does not exist`;
+  if (missing.length > 0) return `${index.name} not created: ${index.table} has no ${missing.join(", ")} column`;
+  if (index.duplicates) {
+    const { n } = db.prepare(index.duplicates.count).get() as { n: number };
+    if (n > 0) {
+      return (
+        `${index.name} is missing: ${n} value${n === 1 ? "" : "s"} in ${index.table}.${index.columns.join(", ")} ` +
+        `${n === 1 ? "appears" : "appear"} more than once, so it cannot be created. It will be, on the first start ` +
+        `after that is resolved; find them with: ${index.duplicates.find}`
+      );
+    }
+  }
+  db.prepare(index.sql).run();
+  return undefined;
+}
+
+/**
+ * The two unique indexes guard correctness, not only speed: without
+ * idx_cost_entries_external_id, INSERT OR IGNORE no longer stops a transcript
+ * that is read again from being counted twice, and without
+ * idx_agents_name_normalized one agent can be registered twice. They are
+ * ensured on every open rather than once by a migration, because the one thing
+ * that can block them, duplicate values, can be put right by hand later, and
+ * the index should then come back by itself. Until it does, every start warns.
+ * When the index is there this is one catalogue lookup each.
+ */
+function ensureUniqueIndexes(db: Database.Database): string[] {
+  const warnings: string[] = [];
+  for (const index of INDEXES_AT_026.filter((i) => i.duplicates)) {
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(index.name)) continue;
+    // Best effort, and never a reason to refuse to start: the count and the
+    // create share one write transaction so nothing can slip in between them,
+    // and anything that goes wrong (a busy database, a full disk) is reported
+    // and tried again next time.
+    try {
+      const warning = db.transaction(() => restoreIndex(db, index)).immediate();
+      if (warning) warnings.push(warning);
+    } catch (err) {
+      warnings.push(
+        `${index.name} is missing and could not be created this time ` +
+          `(${err instanceof Error ? err.message : String(err)}); it will be tried again on the next start`
+      );
+    }
+  }
+  return warnings;
+}
+
+/**
+ * Whether tasks.milestone_id still carries the foreign key to sprints that
+ * 002's RENAME COLUMN left behind: 027's precondition. Case-insensitive,
+ * because SQLite keeps whatever spelling the REFERENCES clause was written in.
+ */
+function tasksMilestoneKeyIsStale(db: Database.Database): boolean {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tasks'").get()) return false;
+  const fks = db.pragma("foreign_key_list(tasks)") as { from: string; table: string }[];
+  return fks.some((fk) => fk.from === "milestone_id" && fk.table.toLowerCase() === "sprints");
 }
 
 const MIGRATIONS: Migration[] = [
@@ -730,12 +952,29 @@ const MIGRATIONS: Migration[] = [
       // (1.25x input for 5-minute, 2x for 1-hour) and the transcript reports
       // them separately. Folding them together would make cost_usd
       // unauditable.
-      db.exec(`
-        ALTER TABLE cost_entries ADD COLUMN source TEXT NOT NULL DEFAULT 'mcp';
-        ALTER TABLE cost_entries ADD COLUMN external_id TEXT;
-        ALTER TABLE cost_entries ADD COLUMN cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0;
-        ALTER TABLE cost_entries ADD COLUMN cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0;
+      //
+      // Each column is guarded the way 002, 003, 016 and 021 guard theirs
+      // (DATA-11, added after 019 shipped). Unguarded, a database that already
+      // has these columns but not 019's record, such as one patched by hand or
+      // salvaged, failed "duplicate column name" on every start, in every
+      // entry point. The guard changes nothing for any database 019 could
+      // already migrate, which is why amending a shipped migration is safe here.
+      const costCols = db.pragma("table_info(cost_entries)") as { name: string }[];
+      const hasCostCol = (name: string): boolean => costCols.some((c) => c.name === name);
+      if (!hasCostCol("source")) {
+        db.prepare("ALTER TABLE cost_entries ADD COLUMN source TEXT NOT NULL DEFAULT 'mcp'").run();
+      }
+      if (!hasCostCol("external_id")) {
+        db.prepare("ALTER TABLE cost_entries ADD COLUMN external_id TEXT").run();
+      }
+      if (!hasCostCol("cache_creation_5m_tokens")) {
+        db.prepare("ALTER TABLE cost_entries ADD COLUMN cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0").run();
+      }
+      if (!hasCostCol("cache_creation_1h_tokens")) {
+        db.prepare("ALTER TABLE cost_entries ADD COLUMN cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0").run();
+      }
 
+      db.exec(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_entries_external_id
           ON cost_entries(external_id) WHERE external_id IS NOT NULL;
 
@@ -1132,6 +1371,138 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "027_tasks_milestone_fk_to_milestones",
+    foreignKeysOff: true,
+    isNeeded: tasksMilestoneKeyIsStale,
+    run(db) {
+      // 002 renamed tasks.sprint_id to milestone_id with ALTER TABLE RENAME
+      // COLUMN, which keeps the column's foreign key pointing at sprints. On a
+      // database old enough to have had sprints, every write of a milestone_id
+      // is then checked against the wrong table. SQLite cannot change a
+      // foreign key in place, so the table is rebuilt.
+      //
+      // This replaces rebuildTasksIfFkStale(), which schema.ts ran after the
+      // migrations on every open. As a post-migration step it copied a literal
+      // column list, so any tasks column a later migration added would have
+      // been dropped from a legacy database with that migration already
+      // recorded (DATA-2); it dropped all five tasks indexes without recreating
+      // them (DATA-3); it ran a raw BEGIN/COMMIT that could leave foreign keys
+      // off and a write lock held on failure (DATA-6); and it never ran
+      // foreign_key_check (DATA-7). As a numbered migration it runs once, at a
+      // fixed point in the sequence, inside the runner's transaction, and
+      // foreignKeysOff gives it the documented rebuild procedure, including the
+      // check. It is a no-op on every database whose key is already right, and
+      // isNeeded lets the runner skip the check there too.
+      if (!tasksMilestoneKeyIsStale(db)) return;
+
+      // The column list is frozen at 026, so a tasks table that differs from it
+      // is refused rather than rebuilt: copying the known columns would drop
+      // any other one along with its data. Only a hand-altered table can get
+      // here, so the way forward is by hand too.
+      const columns = (db.pragma("table_info(tasks)") as { name: string }[]).map((c) => c.name);
+      const unknown = columns.filter((c) => !TASKS_COLUMNS_AT_026.includes(c));
+      const missing = TASKS_COLUMNS_AT_026.filter((c) => !columns.includes(c));
+      if (unknown.length > 0 || missing.length > 0) {
+        throw new Error(
+          `027_tasks_milestone_fk_to_milestones: the tasks table has columns this rebuild does not know ` +
+            `(${unknown.join(", ") || "none"}) or lacks some it needs (${missing.join(", ") || "none"}), ` +
+            `so rebuilding it could lose data. This migration has changed nothing. Copy out any data in the ` +
+            `unknown columns and drop them, or add the missing ones back, then start again.`
+        );
+      }
+
+      // Indexes live with their table: note them to recreate afterwards.
+      const indexes = (
+        db
+          .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'tasks' AND sql IS NOT NULL")
+          .all() as { sql: string }[]
+      ).map((r) => r.sql);
+      // Views and triggers are parsed again when tasks_new is renamed, and one
+      // that names tasks while it does not exist makes that rename fail. The
+      // documented procedure drops them first and recreates them afterwards;
+      // doing it for all of them, in the order they were made, covers views
+      // built on other views. This codebase defines none: these are anyone's own.
+      const dependents = db
+        .prepare("SELECT type, name, sql FROM sqlite_master WHERE type IN ('view', 'trigger') AND sql IS NOT NULL ORDER BY rowid")
+        .all() as { type: "view" | "trigger"; name: string; sql: string }[];
+      for (const d of dependents) {
+        db.prepare(`DROP ${d.type === "view" ? "VIEW" : "TRIGGER"} IF EXISTS "${d.name.replace(/"/g, '""')}"`).run();
+      }
+
+      // A milestone_id naming a sprint that 004 never copied into milestones
+      // (it copies only into an empty milestones table) has nothing to point
+      // at under the new key. It is nulled, as 020 nulls a dangling cost
+      // reference: the task stays, and only a pointer no milestone answers to
+      // goes. The sprints table itself is not touched, and the warning says so.
+      const cleared = db
+        .prepare(
+          "UPDATE tasks SET milestone_id = NULL WHERE milestone_id IS NOT NULL AND milestone_id NOT IN (SELECT id FROM milestones)"
+        )
+        .run().changes;
+
+      // rowid is copied explicitly so every row keeps it.
+      const list = TASKS_COLUMNS_AT_026.join(", ");
+      db.exec(`
+        CREATE TABLE tasks_new (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id),
+          parent_task_id TEXT REFERENCES tasks(id),
+          milestone_id TEXT REFERENCES milestones(id),
+          assigned_agent_id TEXT REFERENCES agents(id),
+          title TEXT NOT NULL, description TEXT,
+          status TEXT NOT NULL DEFAULT 'planned',
+          priority TEXT NOT NULL DEFAULT 'medium',
+          progress INTEGER NOT NULL DEFAULT 0,
+          due_date TEXT,
+          start_date TEXT,
+          estimate INTEGER,
+          task_type TEXT,
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        INSERT INTO tasks_new (rowid, ${list}) SELECT rowid, ${list} FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+      `);
+      // prepare() takes exactly one statement, so DDL read back from the file
+      // can only ever recreate that one object, however the file was edited.
+      for (const sql of indexes) db.prepare(sql).run();
+      for (const d of dependents) db.prepare(d.sql).run();
+
+      return cleared > 0
+        ? [
+            `${cleared} task${cleared === 1 ? "" : "s"} pointed at a sprint that never became a milestone; ` +
+              `that link was cleared, and the sprint is still in the sprints table`,
+          ]
+        : [];
+    },
+  },
+  {
+    name: "028_restore_missing_indexes",
+    run(db) {
+      // Every migration's indexes are created with IF NOT EXISTS inside a
+      // migration that runs once, so an index that goes missing afterwards
+      // never comes back: the same bug class as 023's column, for indexes.
+      // They do go missing. The old post-migration tasks rebuild dropped all
+      // five tasks indexes (DATA-3), and a database recovered from corruption
+      // by copying rows into freshly created tables has none at all: the
+      // maintainer's live database was missing 20 of the 31 below across nine
+      // tables, including the unique index on agents.name_normalized, when
+      // this migration was written. Nothing errors without them; every
+      // lookup just scans.
+      //
+      // Each index is created only where its table and columns exist (a
+      // salvaged database can lack a table), with a warning for any that
+      // cannot be. The two unique indexes are not handled here but by
+      // ensureUniqueIndexes() on every open: duplicate values can block them,
+      // which duplicate row is the right one is not something a migration can
+      // know, and once someone resolves them the index has to come back
+      // without a migration left to run.
+      return INDEXES_AT_026.filter((index) => !index.duplicates)
+        .map((index) => restoreIndex(db, index))
+        .filter((warning): warning is string => warning !== undefined);
+    },
+  },
 ];
 
 /**
@@ -1142,8 +1513,11 @@ const MIGRATIONS: Migration[] = [
  * build. Shared by `runMigrations()` and `assertSchemaCurrent()` so the two
  * checks can't drift apart.
  */
-function findUnknownMigrations(ran: ReadonlySet<string>): string[] {
-  const known = new Set(MIGRATIONS.map((m) => m.name));
+function findUnknownMigrations(
+  ran: ReadonlySet<string>,
+  migrations: readonly Migration[] = MIGRATIONS
+): string[] {
+  const known = new Set(migrations.map((m) => m.name));
   return [...ran].filter((name) => !known.has(name)).sort((a, b) => a.localeCompare(b, "en"));
 }
 
@@ -1192,7 +1566,96 @@ function snapshotBeforeMigrating(
   }
 }
 
-export function runMigrations(db: Database.Database, options: MigrationOptions = {}): MigrationReport {
+/**
+ * Every current foreign-key violation, one entry per violating row and key,
+ * as "child#rowid.column->parent". The key is named by its child column(s),
+ * not by SQLite's fkid, because a rebuild that declares its keys in another
+ * order renumbers the fkids, which would make old violations look new.
+ * SQLite cannot run the check at all on a schema where a foreign key names a
+ * parent column that is not its primary key or unique; that is reported as
+ * what it is rather than as a raw "foreign key mismatch".
+ */
+function foreignKeyViolations(db: Database.Database, migration: string): Set<string> {
+  try {
+    const rows = db.pragma("foreign_key_check") as { table: string; rowid: number; parent: string; fkid: number }[];
+    const keyColumns = new Map<string, Map<number, string>>();
+    const columnsOf = (table: string, fkid: number): string => {
+      let keys = keyColumns.get(table);
+      if (!keys) {
+        keys = new Map();
+        // The table name comes from this database's own schema, quoted.
+        const fks = db.pragma(`foreign_key_list("${table.replace(/"/g, '""')}")`) as { id: number; from: string }[];
+        for (const fk of fks) keys.set(fk.id, keys.has(fk.id) ? `${keys.get(fk.id)},${fk.from}` : fk.from);
+        keyColumns.set(table, keys);
+      }
+      return keys.get(fkid) ?? `#${fkid}`;
+    };
+    return new Set(rows.map((r) => `${r.table}#${r.rowid}.${columnsOf(r.table, r.fkid)}->${r.parent}`));
+  } catch (err) {
+    throw new Error(
+      `Migration ${migration} rebuilds a table with foreign-key enforcement off and needs foreign_key_check to ` +
+        `prove it lost nothing, but SQLite cannot run that check on this database ` +
+        `(${err instanceof Error ? err.message : String(err)}). A foreign key there names a parent column that is ` +
+        `not its primary key or unique; repair that table's definition, then start again.`,
+      { cause: err }
+    );
+  }
+}
+
+/**
+ * Throws, rolling the enclosing migration back, if foreign_key_check reports
+ * a violating row that it did not report before the migration ran. Row by
+ * row, so fixing one violation cannot hide creating another.
+ */
+function assertNoNewViolations(db: Database.Database, before: Set<string>, migration: string): void {
+  const added = [...foreignKeyViolations(db, migration)].filter((v) => !before.has(v));
+  if (added.length > 0) {
+    throw new Error(
+      `Migration ${migration} left ${added.length} foreign-key violation${added.length === 1 ? "" : "s"} that ` +
+        `were not there before (${added.slice(0, 5).join(", ")}), so it has been rolled back.`
+    );
+  }
+}
+
+/**
+ * Run `work` with foreign-key enforcement off, restoring it afterwards. The
+ * pragma is silently ignored inside a transaction, so an open one would leave
+ * enforcement on and the rebuild failing, or worse, half-reasoned about:
+ * refuse rather than guess. `work` has committed or rolled back its own
+ * transaction by the time the pragma is restored, so the restore takes effect
+ * (DATA-6: the old rebuild restored it while its own transaction could still
+ * be open, where the pragma is a no-op).
+ */
+function withForeignKeysOff(db: Database.Database, migration: string, work: () => void): void {
+  if (db.inTransaction) {
+    throw new Error(
+      `Migration ${migration} must run with foreign-key enforcement off, which SQLite cannot switch inside ` +
+        `the transaction already open on this connection. Apply migrations outside a transaction.`
+    );
+  }
+  const enforced = db.pragma("foreign_keys", { simple: true }) === 1;
+  if (enforced) db.pragma("foreign_keys = OFF");
+  try {
+    work();
+  } finally {
+    if (enforced) db.pragma("foreign_keys = ON");
+  }
+  if (enforced && db.pragma("foreign_keys", { simple: true }) !== 1) {
+    throw new Error(`Foreign-key enforcement did not come back on after migration ${migration}.`);
+  }
+}
+
+/**
+ * Apply `migrations` in order to `db`: the runner behind runMigrations(),
+ * which passes this build's list. Exported so the runner's own behaviour
+ * (foreignKeysOff in particular) can be exercised with purpose-built
+ * migrations.
+ */
+export function applyMigrations(
+  db: Database.Database,
+  migrations: readonly Migration[],
+  options: MigrationOptions = {}
+): MigrationReport {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1213,11 +1676,11 @@ export function runMigrations(db: Database.Database, options: MigrationOptions =
   // we do. This is why migration names are append-only and MUST NOT be renamed
   // once shipped: a rename makes every existing database look like the future.
   if (!process.env[DRIFT_OVERRIDE_ENV]) {
-    const unknown = findUnknownMigrations(ran);
+    const unknown = findUnknownMigrations(ran, migrations);
     if (unknown.length > 0) throw new SchemaTooNewError(unknown);
   }
 
-  const pending = MIGRATIONS.filter((m) => !ran.has(m.name));
+  const pending = migrations.filter((m) => !ran.has(m.name));
 
   // Snapshot before touching anything (DATA-1). Migrations 008, 010-013, 015,
   // 017 and 018 drop tables or merge rows and none of them can be reversed, so
@@ -1237,27 +1700,46 @@ export function runMigrations(db: Database.Database, options: MigrationOptions =
   const insert = db.prepare("INSERT INTO _migrations (name, run_at) VALUES (?, ?)");
   const alreadyRan = db.prepare("SELECT 1 FROM _migrations WHERE name = ?");
   const applied: string[] = [];
+  const warnings: string[] = [];
 
-  for (const m of pending) {
-    // BEGIN IMMEDIATE (rather than the default deferred BEGIN) takes the write
-    // lock up front, so two processes starting together serialise on it —
-    // combined with the explicit busy_timeout above, the loser blocks and
-    // waits instead of racing to read the same "not yet applied" state. The
-    // re-check of `alreadyRan` *inside* the transaction is what actually
-    // avoids the crash: once the loser's BEGIN IMMEDIATE finally acquires the
-    // lock, the winner has already committed the INSERT into `_migrations`,
-    // so without this guard the loser would still hit the UNIQUE constraint
-    // on `name`. The outer `ran` set is only a fast-path skip; this is the
-    // check that matters under contention (DATA-15).
+  // BEGIN IMMEDIATE (rather than the default deferred BEGIN) takes the write
+  // lock up front, so two processes starting together serialise on it —
+  // combined with the explicit busy_timeout above, the loser blocks and
+  // waits instead of racing to read the same "not yet applied" state. The
+  // re-check of `alreadyRan` *inside* the transaction is what actually
+  // avoids the crash: once the loser's BEGIN IMMEDIATE finally acquires the
+  // lock, the winner has already committed the INSERT into `_migrations`,
+  // so without this guard the loser would still hit the UNIQUE constraint
+  // on `name`. The outer `ran` set is only a fast-path skip; this is the
+  // check that matters under contention (DATA-15).
+  const applyOne = (m: Migration, checkForeignKeys: boolean): void =>
     db.transaction(() => {
       if (alreadyRan.get(m.name)) return;
-      m.run(db);
+      const violationsBefore = checkForeignKeys ? foreignKeyViolations(db, m.name) : undefined;
+      const result = m.run(db);
+      const migrationWarnings = Array.isArray(result) ? result : [];
+      if (violationsBefore) assertNoNewViolations(db, violationsBefore, m.name);
       insert.run(m.name, new Date().toISOString());
       applied.push(m.name);
+      warnings.push(...migrationWarnings.map((w) => `${m.name}: ${w}`));
     }).immediate();
+
+  for (const m of pending) {
+    const rebuilds = m.foreignKeysOff === true && (m.isNeeded?.(db) ?? true);
+    if (rebuilds) withForeignKeysOff(db, m.name, () => applyOne(m, true));
+    else applyOne(m, false);
   }
 
-  return { applied, snapshot };
+  return { applied, snapshot, warnings };
+}
+
+export function runMigrations(db: Database.Database, options: MigrationOptions = {}): MigrationReport {
+  const report = applyMigrations(db, MIGRATIONS, options);
+  // With VIBE_DASH_ALLOW_SCHEMA_DRIFT a newer build's database can be open
+  // here, and its schema is not this build's to repair: an index a later
+  // release dropped on purpose must not come back.
+  if (getUnknownMigrations(db).length === 0) report.warnings.push(...ensureUniqueIndexes(db));
+  return report;
 }
 
 /**
