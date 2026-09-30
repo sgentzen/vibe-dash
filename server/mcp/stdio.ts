@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { openDb, SchemaTooNewError, DbOwnershipError } from "../db/index.js";
+import { openDb, SchemaTooNewError, DbOwnershipError, MigrationSnapshotError } from "../db/index.js";
 import { createMcpServer } from "./server.js";
 import { resolveDbPath } from "../db/path.js";
 
@@ -11,9 +11,18 @@ const DB_PATH = resolveDbPath();
 // client's log with no indication of what to actually do about it.
 function openDbOrExit(): ReturnType<typeof openDb> {
   try {
-    return openDb(DB_PATH, "stdio-mcp");
+    return openDb(DB_PATH, "stdio-mcp", {
+      onSnapshot: (snapshot) => {
+        console.error(
+          `vibe-dash: snapshot of the database taken before applying ${snapshot.pending.join(", ")}: ${snapshot.path}`
+        );
+        for (const error of snapshot.pruneErrors) {
+          console.error(`vibe-dash: could not remove an old pre-migration snapshot: ${error}`);
+        }
+      },
+    });
   } catch (err) {
-    if (err instanceof SchemaTooNewError) {
+    if (err instanceof SchemaTooNewError || err instanceof MigrationSnapshotError) {
       console.error(`vibe-dash: ${err.message}`);
       console.error(`vibe-dash: database at ${DB_PATH}`);
     } else if (err instanceof DbOwnershipError) {

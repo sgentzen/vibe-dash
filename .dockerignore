@@ -1,8 +1,9 @@
 node_modules
 dist
-*.db
-*.db-shm
-*.db-wal
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.bak
 .claude
 .git
 docs

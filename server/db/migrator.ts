@@ -1,4 +1,11 @@
 import Database from "better-sqlite3";
+import {
+  preMigrationFolder,
+  preMigrationSnapshotDir,
+  SnapshotError,
+  takePreMigrationSnapshot,
+  type PreMigrationSnapshot,
+} from "./snapshot.js";
 
 interface Migration {
   name: string;
@@ -65,6 +72,60 @@ export class SchemaBehindError extends Error {
     this.name = "SchemaBehindError";
     this.pendingMigrations = pendingMigrations;
   }
+}
+
+/**
+ * Thrown when migrations are pending but the snapshot that must precede them
+ * could not be written or verified (DATA-1). No migration has been applied
+ * when it is thrown: several migrations drop tables or merge rows, so
+ * migrating without a way back is exactly what the snapshot exists to prevent.
+ *
+ * The message points at whichever side actually failed. When the database
+ * itself fails `quick_check`, telling the operator to free space in the backup
+ * folder would send them after the wrong problem.
+ */
+export class MigrationSnapshotError extends Error {
+  readonly snapshotDir: string;
+  readonly pendingMigrations: string[];
+  /** `quick_check` findings on the database itself; empty unless it is the database that is damaged. */
+  readonly databaseProblems: string[];
+
+  constructor(
+    snapshotDir: string,
+    pendingMigrations: string[],
+    cause: unknown,
+    databaseProblems: string[] = []
+  ) {
+    const count = pendingMigrations.length;
+    const refusing = `Refusing to apply ${count} pending migration${count === 1 ? "" : "s"} (${pendingMigrations.join(", ")})`;
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    const message =
+      databaseProblems.length > 0
+        ? `${refusing}: the database itself is damaged (quick_check: ${databaseProblems.slice(0, 3).join(" | ")}), ` +
+          `so the snapshot that must be taken first failed (${reason}). No migration has been applied. ` +
+          `Copy it as it is with \`npm run backup\`, which backs up damaged databases on purpose, then repair it ` +
+          `before starting again.`
+        : `${refusing}: the snapshot that must be taken first could not be written to ${snapshotDir} (${reason}). ` +
+          `No migration has been applied. Free space there, fix its permissions, or set VIBE_DASH_BACKUP_DIR to a ` +
+          `writable directory, then start again.`;
+    super(message, { cause });
+    this.name = "MigrationSnapshotError";
+    this.snapshotDir = snapshotDir;
+    this.pendingMigrations = pendingMigrations;
+    this.databaseProblems = databaseProblems;
+  }
+}
+
+export interface MigrationOptions {
+  /** Where the pre-migration snapshot goes. Defaults to VIBE_DASH_BACKUP_DIR/pre-migration. */
+  snapshotDir?: string;
+}
+
+export interface MigrationReport {
+  /** The migrations this call applied, in order. */
+  applied: string[];
+  /** The snapshot taken before applying them, or null when none was needed. */
+  snapshot: PreMigrationSnapshot | null;
 }
 
 const MIGRATIONS: Migration[] = [
@@ -1086,7 +1147,52 @@ function findUnknownMigrations(ran: ReadonlySet<string>): string[] {
   return [...ran].filter((name) => !known.has(name)).sort((a, b) => a.localeCompare(b, "en"));
 }
 
-export function runMigrations(db: Database.Database): void {
+/**
+ * Whether `db` holds anything a snapshot would protect. An in-memory database
+ * cannot be restored from a file anyway, and a file with no tables beyond
+ * `_migrations` is a brand-new install whose first migration is about to
+ * create them all.
+ */
+function hasDataToProtect(db: Database.Database): boolean {
+  if (db.memory) return false;
+  const table = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_migrations' LIMIT 1"
+    )
+    .get();
+  return table !== undefined;
+}
+
+/**
+ * `quick_check` findings for the database being migrated, empty when it is
+ * healthy. Run only after copying or verifying the snapshot has failed, to
+ * tell a damaged database apart from a bad backup folder. It reads the whole
+ * file, so it is skipped when the failure was creating the folder or file,
+ * which the database cannot have caused.
+ */
+function databaseProblems(db: Database.Database, err: unknown): string[] {
+  if (!(err instanceof SnapshotError) || err.stage === "destination") return [];
+  try {
+    const findings = (db.pragma("quick_check") as { quick_check: string }[]).map((r) => r.quick_check);
+    return findings.length === 1 && findings[0] === "ok" ? [] : findings;
+  } catch (checkErr) {
+    return [checkErr instanceof Error ? checkErr.message : String(checkErr)];
+  }
+}
+
+function snapshotBeforeMigrating(
+  db: Database.Database,
+  pending: string[],
+  root: string
+): PreMigrationSnapshot {
+  try {
+    return takePreMigrationSnapshot(db, pending, root);
+  } catch (err) {
+    throw new MigrationSnapshotError(preMigrationFolder(root, db.name), pending, err, databaseProblems(db, err));
+  }
+}
+
+export function runMigrations(db: Database.Database, options: MigrationOptions = {}): MigrationReport {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1111,11 +1217,28 @@ export function runMigrations(db: Database.Database): void {
     if (unknown.length > 0) throw new SchemaTooNewError(unknown);
   }
 
+  const pending = MIGRATIONS.filter((m) => !ran.has(m.name));
+
+  // Snapshot before touching anything (DATA-1). Migrations 008, 010-013, 015,
+  // 017 and 018 drop tables or merge rows and none of them can be reversed, so
+  // every upgrade that has something to lose gets a verified copy first, and
+  // one that cannot get a copy does not happen. This covers every pending
+  // migration rather than a hand-kept list of destructive ones, which is one
+  // more thing a future migration could forget to join.
+  const snapshot =
+    pending.length > 0 && hasDataToProtect(db)
+      ? snapshotBeforeMigrating(
+          db,
+          pending.map((m) => m.name),
+          options.snapshotDir ?? preMigrationSnapshotDir()
+        )
+      : null;
+
   const insert = db.prepare("INSERT INTO _migrations (name, run_at) VALUES (?, ?)");
   const alreadyRan = db.prepare("SELECT 1 FROM _migrations WHERE name = ?");
+  const applied: string[] = [];
 
-  for (const m of MIGRATIONS) {
-    if (ran.has(m.name)) continue;
+  for (const m of pending) {
     // BEGIN IMMEDIATE (rather than the default deferred BEGIN) takes the write
     // lock up front, so two processes starting together serialise on it —
     // combined with the explicit busy_timeout above, the loser blocks and
@@ -1130,8 +1253,11 @@ export function runMigrations(db: Database.Database): void {
       if (alreadyRan.get(m.name)) return;
       m.run(db);
       insert.run(m.name, new Date().toISOString());
+      applied.push(m.name);
     }).immediate();
   }
+
+  return { applied, snapshot };
 }
 
 /**

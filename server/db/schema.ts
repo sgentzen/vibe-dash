@@ -1,6 +1,13 @@
 import Database from "better-sqlite3";
-import { runMigrations, assertSchemaCurrent, DB_BUSY_TIMEOUT_MS } from "./migrator.js";
+import {
+  runMigrations,
+  assertSchemaCurrent,
+  DB_BUSY_TIMEOUT_MS,
+  type MigrationOptions,
+  type MigrationReport,
+} from "./migrator.js";
 import { acquireOwnerLock } from "./ownerLock.js";
+import type { PreMigrationSnapshot } from "./snapshot.js";
 
 // ─── Stale FK Guard ───────────────────────────────────────────────────────────
 // Retained for legacy databases where tasks.milestone_id still points at
@@ -51,16 +58,27 @@ function rebuildTasksIfFkStale(db: Database.Database): void {
   }
 }
 
-export function initDb(db: Database.Database): void {
+export function initDb(db: Database.Database, options: MigrationOptions = {}): MigrationReport {
   // Explicit rather than relying on the driver default (DATA-15): see
   // DB_BUSY_TIMEOUT_MS's own comment for why this matters for concurrent
   // migration runs specifically.
   db.pragma(`busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  runMigrations(db);
+  const report = runMigrations(db, options);
   // Fix stale tasks.milestone_id FK after column rename migration may have run
   rebuildTasksIfFkStale(db);
+  return report;
+}
+
+export interface OpenDbOptions extends MigrationOptions {
+  /**
+   * Called when a snapshot was taken before migrating, so the entry point can
+   * say where it went. The db layer does not log it itself: the stdio MCP
+   * process speaks JSON-RPC on stdout and must keep diagnostics on stderr,
+   * while the server logs through pino.
+   */
+  onSnapshot?: (snapshot: PreMigrationSnapshot) => void;
 }
 
 /**
@@ -69,12 +87,13 @@ export function initDb(db: Database.Database): void {
  * the stdio MCP process should call it. `entryPoint` names the caller in the
  * lock file and in any `DbOwnershipError` a second caller hits.
  */
-export function openDb(path: string, entryPoint: string): Database.Database {
+export function openDb(path: string, entryPoint: string, options: OpenDbOptions = {}): Database.Database {
   const releaseLock = acquireOwnerLock(path, entryPoint);
   let db: Database.Database | undefined;
   try {
     db = new Database(path);
-    initDb(db);
+    const { snapshot } = initDb(db, { snapshotDir: options.snapshotDir });
+    if (snapshot) options.onSnapshot?.(snapshot);
     return db;
   } catch (err) {
     db?.close();

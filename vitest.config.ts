@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   test: {
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    // Points VIBE_DASH_BACKUP_DIR at a per-run temp folder; see the file.
+    globalSetup: ["tests/global-setup.ts"],
     environmentMatchGlobs: [
       // Component tests (.tsx) use jsdom; everything else uses node (default)
       ["tests/**/*.test.tsx", "jsdom"],

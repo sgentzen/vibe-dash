@@ -4,7 +4,13 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 import type Database from "better-sqlite3";
-import { openDb, backfillMilestoneDailyStats, SchemaTooNewError, DbOwnershipError } from "./db/index.js";
+import {
+  openDb,
+  backfillMilestoneDailyStats,
+  SchemaTooNewError,
+  DbOwnershipError,
+  MigrationSnapshotError,
+} from "./db/index.js";
 import { resolveDbPath } from "./db/path.js";
 import { initWebSocket } from "./websocket.js";
 import { createRouter } from "./routes/index.js";
@@ -130,7 +136,17 @@ app.use(express.json({ limit: "256kb" }));
 
 function openDbOrExit(): Database.Database {
   try {
-    return openDb(DB_PATH, "server");
+    return openDb(DB_PATH, "server", {
+      onSnapshot: (snapshot) => {
+        logger.info(
+          { DB_PATH, snapshot: snapshot.path, bytes: snapshot.bytes, pending: snapshot.pending, pruned: snapshot.pruned },
+          "Snapshot of the database taken before applying migrations"
+        );
+        for (const error of snapshot.pruneErrors) {
+          logger.warn({ error }, "Could not remove an old pre-migration snapshot");
+        }
+      },
+    });
   } catch (err) {
     if (err instanceof SchemaTooNewError) {
       logger.error(
@@ -139,6 +155,16 @@ function openDbOrExit(): Database.Database {
       );
     } else if (err instanceof DbOwnershipError) {
       logger.error({ DB_PATH, holder: err.holder }, `${err.message} — aborting startup`);
+    } else if (err instanceof MigrationSnapshotError) {
+      logger.error(
+        {
+          DB_PATH,
+          snapshotDir: err.snapshotDir,
+          pendingMigrations: err.pendingMigrations,
+          databaseProblems: err.databaseProblems,
+        },
+        `${err.message} — aborting startup`
+      );
     } else {
       logger.error({ err, DB_PATH }, "Failed to open database — aborting startup");
     }
