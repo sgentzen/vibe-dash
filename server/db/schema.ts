@@ -9,55 +9,6 @@ import {
 import { acquireOwnerLock } from "./ownerLock.js";
 import type { PreMigrationSnapshot } from "./snapshot.js";
 
-// ─── Stale FK Guard ───────────────────────────────────────────────────────────
-// Retained for legacy databases where tasks.milestone_id still points at
-// the now-dropped sprints table. Runs once per open; is a no-op for healthy DBs.
-
-interface ForeignKeyRow { id: number; seq: number; table: string; from: string; to: string; on_update: string; on_delete: string; match: string }
-
-function rebuildTasksIfFkStale(db: Database.Database): void {
-  const fks = db.pragma("foreign_key_list(tasks)") as ForeignKeyRow[];
-  const hasStaleSprintFk = fks.some((fk) => fk.from === "milestone_id" && fk.table === "sprints");
-  if (!hasStaleSprintFk) return;
-
-  const fkWasOn = (db.pragma("foreign_keys", { simple: true }) as number) === 1;
-  if (fkWasOn) db.pragma("foreign_keys = OFF");
-  try {
-    db.exec(`
-      BEGIN;
-      CREATE TABLE tasks_new (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL REFERENCES projects(id),
-        parent_task_id TEXT REFERENCES tasks(id),
-        milestone_id TEXT REFERENCES milestones(id),
-        assigned_agent_id TEXT REFERENCES agents(id),
-        title TEXT NOT NULL, description TEXT,
-        status TEXT NOT NULL DEFAULT 'planned',
-        priority TEXT NOT NULL DEFAULT 'medium',
-        progress INTEGER NOT NULL DEFAULT 0,
-        due_date TEXT,
-        start_date TEXT,
-        estimate INTEGER,
-        task_type TEXT,
-        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-      );
-      INSERT INTO tasks_new
-        (id, project_id, parent_task_id, milestone_id, assigned_agent_id,
-         title, description, status, priority, progress,
-         due_date, start_date, estimate, task_type, created_at, updated_at)
-      SELECT id, project_id, parent_task_id, milestone_id, assigned_agent_id,
-         title, description, status, priority, progress,
-         due_date, start_date, estimate, task_type, created_at, updated_at
-      FROM tasks;
-      DROP TABLE tasks;
-      ALTER TABLE tasks_new RENAME TO tasks;
-      COMMIT;
-    `);
-  } finally {
-    if (fkWasOn) db.pragma("foreign_keys = ON");
-  }
-}
-
 export function initDb(db: Database.Database, options: MigrationOptions = {}): MigrationReport {
   // Explicit rather than relying on the driver default (DATA-15): see
   // DB_BUSY_TIMEOUT_MS's own comment for why this matters for concurrent
@@ -65,10 +16,7 @@ export function initDb(db: Database.Database, options: MigrationOptions = {}): M
   db.pragma(`busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  const report = runMigrations(db, options);
-  // Fix stale tasks.milestone_id FK after column rename migration may have run
-  rebuildTasksIfFkStale(db);
-  return report;
+  return runMigrations(db, options);
 }
 
 export interface OpenDbOptions extends MigrationOptions {
@@ -79,6 +27,8 @@ export interface OpenDbOptions extends MigrationOptions {
    * while the server logs through pino.
    */
   onSnapshot?: (snapshot: PreMigrationSnapshot) => void;
+  /** Called once per warning in the migration report; see MigrationReport.warnings. */
+  onWarning?: (warning: string) => void;
 }
 
 /**
@@ -92,8 +42,9 @@ export function openDb(path: string, entryPoint: string, options: OpenDbOptions 
   let db: Database.Database | undefined;
   try {
     db = new Database(path);
-    const { snapshot } = initDb(db, { snapshotDir: options.snapshotDir });
+    const { snapshot, warnings } = initDb(db, { snapshotDir: options.snapshotDir });
     if (snapshot) options.onSnapshot?.(snapshot);
+    for (const warning of warnings) options.onWarning?.(warning);
     return db;
   } catch (err) {
     db?.close();

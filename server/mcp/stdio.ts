@@ -20,6 +20,7 @@ function openDbOrExit(): ReturnType<typeof openDb> {
           console.error(`vibe-dash: could not remove an old pre-migration snapshot: ${error}`);
         }
       },
+      onWarning: (warning) => console.error(`vibe-dash: ${warning}`),
     });
   } catch (err) {
     if (err instanceof SchemaTooNewError || err instanceof MigrationSnapshotError) {
