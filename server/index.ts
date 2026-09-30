@@ -198,6 +198,10 @@ app.all("/mcp", mcpLimiter, async (req, res) => {
 
   // New session — only POST (initialize) creates one
   if (req.method === "POST") {
+    // No enableDnsRebindingProtection/allowedHosts/allowedOrigins here: the SDK
+    // deprecates them in favour of external middleware, which is what the Host
+    // check and cross-site guard mounted above are (SEC-2). They cover /mcp
+    // because they come first; tests/mcp-network-boundary.test.ts pins that.
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
     });
