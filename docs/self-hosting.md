@@ -71,6 +71,7 @@ All four entry points share the same SQLite database file.
 | `VIBE_DASH_ALLOWED_HOSTS` | unset | Comma-separated `host[:port]` values to accept in the `Host` header, in addition to `localhost`, `127.0.0.1` and `[::1]` on `PORT`. **Required if you put a reverse proxy in front of Vibe Dash** — without it, every proxied request is rejected with `421` because its `Host` is your public hostname, not `localhost`. Set it to that hostname, e.g. `VIBE_DASH_ALLOWED_HOSTS=vibe-dash.example.com`. Both `http://` and `https://` are then accepted as `Origin`. |
 | `VIBE_DASH_DB` | `<git-root>/vibe-dash.db` | Database path — used by the server process, the stdio MCP transport and the CLI. Not relative to your working directory: left unset it resolves to the git root of the Vibe Dash install. The Docker image sets it to `/data/vibe-dash.db`. |
 | `VIBE_DASH_ALLOW_SCHEMA_DRIFT` | unset | Bypasses the guard that refuses to open a database carrying migrations this build does not know. Only for deliberately running an older build against a migrated database. |
+| `VIBE_DASH_BACKUP_DIR` | `~/.vibe-dash-backups` | Where `npm run backup` writes, and where the server writes the snapshot it takes before applying migrations (in a `pre-migration` subfolder). The Docker image sets it to `/data/backups`, inside the data volume. See [Backup and restore](#backup-and-restore). |
 | `VIBE_DASH_OTLP_SERIES_CAP` | `10000` | Ceiling on distinct OTLP metric series. Only the creation of a new series is refused; nothing is ever deleted, so an established sender is unaffected. Raise it and restart if a flooded install needs to admit new senders. |
 | `VIBE_DASH_CLAUDE_HOME` | `~/.claude/projects` | Where transcript ingestion looks for Claude Code session files. Point it at an empty directory to switch ingestion off. **Under Docker this must be a path *inside the container***: `docker-compose.yml` sets it to `/transcripts` and separately bind-mounts the real host directory there; see [Docker Compose and transcript ingestion](#docker-compose-and-transcript-ingestion) below. Without that mount the directory does not exist inside the container, observed cost silently reads $0.00, and `GET /api/ingest/status` reports `claudeHomeFound: false` (surfaced in the dashboard as a notice, not a silent gap). |
 | `VIBE_DASH_TRANSCRIPTS_DIR` | `$HOME/.claude/projects` | Docker Compose only: the **host** directory bind-mounted read-only into the container at `/transcripts` (see below). Not read by the server itself; it only ever sees `VIBE_DASH_CLAUDE_HOME=/transcripts`. |
@@ -332,29 +333,44 @@ Set `VIBE_DASH_PASSWORD` in your shell profile or CI secrets store; the MCP clie
 
 ## Backup and restore
 
-The entire Vibe Dash state is a single SQLite file.
+The entire Vibe Dash state is a single SQLite file, and `npm run backup` is the way to copy it. It uses SQLite's `VACUUM INTO`, which takes a consistent copy even while the server is writing, checks the copy with `integrity_check` before keeping it, and keeps the newest 14 (set `VIBE_DASH_BACKUP_KEEP` to change that) in `VIBE_DASH_BACKUP_DIR`.
 
-**Docker volume backup:**
+**Native install:**
 ```bash
-docker run --rm \
-  -v vibe-dash-data:/data \
-  -v $(pwd)/backups:/backups \
-  alpine tar czf /backups/vibe-dash-$(date +%Y%m%d).tar.gz /data
+npm run backup
 ```
 
-**Direct file backup:**
+**Docker:** the image sets `VIBE_DASH_BACKUP_DIR=/data/backups`, so backups land in the data volume:
 ```bash
-# While the server is running — SQLite WAL mode makes this safe
-cp /opt/vibe-dash/data/vibe-dash.db backups/vibe-dash-$(date +%Y%m%d).db
+docker compose exec -u node vibe-dash npm run backup
+```
+A copy inside the volume protects against a bad upgrade or a mistake, not against losing the volume itself, so copy the backups somewhere outside this checkout as well:
+```bash
+docker compose cp vibe-dash:/data/backups "$HOME/vibe-dash-backups"
 ```
 
-**Restore:**
+Do not copy `vibe-dash.db` with `cp` or `tar` while the server is running. In WAL mode, recent writes live in `vibe-dash.db-wal` until a checkpoint moves them into the main file, so a copy of the main file alone can be missing them, and copying the files one after another does not give a consistent set either.
+
+**Snapshot before every upgrade.** Before the server applies a database migration, it writes a verified snapshot to its own folder for that database inside `VIBE_DASH_BACKUP_DIR/pre-migration`, named after the first migration it is about to apply, for example `/data/backups/pre-migration/vibe-dash-3f2a9c1b0d4e/vibe-dash-2026-09-29T21-00-00-000-pre-027.db` under Docker. The server's log names the exact file. If the snapshot cannot be written, the server applies nothing and refuses to start, saying whether the backup folder or the database itself is the problem. Identical copies, such as a container stuck restarting takes each time, are kept once, so if the file an earlier log line named has gone, the newest file in the same folder holds the same data. Beyond that, the newest 10 per database stay. The folder is keyed to the database's full path, so moving the database starts a new folder; old folders are never cleaned up automatically.
+
+Backups and snapshots are full copies of the database and keep everything that was in it until rotation removes them. If you delete data from Vibe Dash for good, or remove Vibe Dash, delete `VIBE_DASH_BACKUP_DIR` (and any copies you made of it) too.
+
+**Restore**, from a backup or a pre-migration snapshot. Restoring throws away every change made after that copy was taken.
+
+1. Stop everything that has the database open: the server, and any Claude Code session using the stdio MCP transport.
+2. Back up the current state, so the restore itself can be undone: `npm run backup`. It only reads the database, and works with the server stopped.
+3. Delete `vibe-dash.db-wal` and `vibe-dash.db-shm` next to the database. They belong to the file you are replacing, and if they are left behind SQLite applies them to the restored copy and corrupts it.
+4. Copy the backup over `vibe-dash.db`.
+5. Start the server. After restoring a pre-migration snapshot, start the build you were upgrading from: a newer build simply applies the same migrations again.
+
+Under Docker, with the backup's full path in place of `<backup>`: the path the server logged for a pre-migration snapshot, or `/data/backups/vibe-dash-<timestamp>.db` for an `npm run backup` copy. These steps work even when the container keeps restarting because the server will not start, which is when a restore is most likely:
 ```bash
-docker compose down
-docker run --rm \
-  -v vibe-dash-data:/data \
-  -v $(pwd)/backups:/backups \
-  alpine tar xzf /backups/vibe-dash-20260401.tar.gz -C /
+docker compose stop vibe-dash
+docker compose run --rm --no-deps vibe-dash npm run backup
+docker compose run --rm --no-deps -u node --entrypoint sh vibe-dash -c \
+  'rm -f /data/vibe-dash.db-wal /data/vibe-dash.db-shm && cp "<backup>" /data/vibe-dash.db'
+# For a pre-migration snapshot, rebuild the version you upgraded from before starting:
+#   git checkout <previous commit or tag> && docker compose build
 docker compose up -d
 ```
 
@@ -368,7 +384,7 @@ docker compose build
 docker compose up -d
 ```
 
-Data in the volume is preserved. The server runs database migrations automatically on startup.
+Data in the volume is preserved. The server runs database migrations automatically on startup, and takes a verified snapshot first (see [Backup and restore](#backup-and-restore)); its log names the file.
 
 After upgrading, check `GET /api/health` (or the version shown in the app's
 keyboard-shortcuts overlay) to confirm the running container actually picked

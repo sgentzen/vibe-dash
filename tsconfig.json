@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["shared/**/*", "server/**/*", "cli/**/*", "src/**/*", "tests/**/*"],
+  "include": ["shared/**/*", "server/**/*", "cli/**/*", "scripts/**/*.ts", "src/**/*", "tests/**/*"],
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",

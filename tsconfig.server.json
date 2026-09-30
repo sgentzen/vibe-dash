@@ -8,7 +8,9 @@
     "shared/**/*",
     "server/**/*",
     "cli/**/*",
+    "scripts/**/*.ts",
     "tests/setup.ts",
+    "tests/global-setup.ts",
     "tests/*.test.ts"
   ],
   "exclude": [

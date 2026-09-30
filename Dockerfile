@@ -28,6 +28,10 @@ RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3 esbuild
 COPY --from=builder /app/dist ./dist
 COPY server ./server
 COPY shared ./shared
+# So `npm run backup` works inside the container too (docs/self-hosting.md,
+# "Backup and restore"). It is a thin wrapper over server/db/snapshot.ts, run
+# by the same tsx the server runs under.
+COPY scripts/backup-db.ts ./scripts/backup-db.ts
 
 # Commit SHA and build timestamp, threaded through by docker-compose.yml's
 # build.args (LIVE-3). The runtime image carries no .git directory, so
@@ -54,8 +58,15 @@ VOLUME ["/data"]
 # is what still keeps the boundary loopback-only on the HOST machine, by
 # publishing "127.0.0.1:3001:3001" rather than "3001:3001" — see the comment
 # there.
+#
+# VIBE_DASH_BACKUP_DIR keeps backups, including the snapshot the server takes
+# before applying migrations, in the volume beside the database. The default,
+# ~/.vibe-dash-backups, would be this container's home directory, which is
+# thrown away whenever the container is recreated: on exactly the upgrade a
+# pre-migration snapshot exists to undo.
 ENV NODE_ENV=production \
     VIBE_DASH_DB=/data/vibe-dash.db \
+    VIBE_DASH_BACKUP_DIR=/data/backups \
     PORT=3001 \
     HOST=0.0.0.0
 

@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "backup": "node scripts/backup-db.mjs",
+    "backup": "tsx scripts/backup-db.ts",
     "dev": "concurrently \"cross-env NODE_ENV=development PORT=3001 tsx watch server/index.ts\" \"vite\"",
     "dev:server": "cross-env NODE_ENV=development tsx watch server/index.ts",
     "dev:client": "vite",
