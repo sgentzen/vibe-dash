@@ -26,7 +26,7 @@ describe("CLI never runs migrations (DATA-5, ARCH-11)", () => {
     const rows = setup
       .prepare("SELECT name FROM _migrations ORDER BY id DESC LIMIT 1")
       .all() as { name: string }[];
-    expect(rows.length).toBe(1);
+    expect(rows).toHaveLength(1);
     const lastMigration = rows[0].name;
     setup.prepare("DELETE FROM _migrations WHERE name = ?").run(lastMigration);
     setup.close();

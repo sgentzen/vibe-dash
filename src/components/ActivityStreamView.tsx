@@ -41,7 +41,7 @@ export function ActivityStreamView() {
         // ignore
       }
     }
-    load();
+    void load();
   }, [api, filterAgent, filterProject, showSince, lastVisit, pollGeneration]);
 
   // Group by date

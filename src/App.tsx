@@ -248,7 +248,7 @@ export function App() {
       dispatch({ type: "SET_LOAD_ERROR", payload: `Could not load data after ${retries} attempts: ${message}` });
     }
 
-    loadInitialData();
+    void loadInitialData();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

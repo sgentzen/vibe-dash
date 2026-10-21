@@ -23,8 +23,8 @@ function parse(result: { content: [{ type: string; text: string }] }) {
 // ─── register_agent ───────────────────────────────────────────────────────────
 
 describe("register_agent", () => {
-  it("creates an agent and returns agent_id", async () => {
-    const result = await handleTool(db, "register_agent", {
+  it("creates an agent and returns agent_id", () => {
+    const result = handleTool(db, "register_agent", {
       name: "test-agent",
       model: "claude-3-5-sonnet",
       capabilities: ["read", "write"],
@@ -34,9 +34,9 @@ describe("register_agent", () => {
     expect(typeof data.agent_id).toBe("string");
   });
 
-  it("upserts an existing agent", async () => {
-    const first = parse(await handleTool(db, "register_agent", { name: "agent-x", model: "model-a" }));
-    const second = parse(await handleTool(db, "register_agent", { name: "agent-x", model: "model-b" }));
+  it("upserts an existing agent", () => {
+    const first = parse(handleTool(db, "register_agent", { name: "agent-x", model: "model-a" }));
+    const second = parse(handleTool(db, "register_agent", { name: "agent-x", model: "model-b" }));
     expect(second.agent_id).toBe(first.agent_id);
   });
 });
@@ -44,10 +44,10 @@ describe("register_agent", () => {
 // ─── create_task ──────────────────────────────────────────────────────────────
 
 describe("create_task", () => {
-  it("creates a task and returns task_id", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
+  it("creates a task and returns task_id", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
 
-    const result = await handleTool(db, "create_task", {
+    const result = handleTool(db, "create_task", {
       project_id,
       title: "Do the thing",
       priority: "high",
@@ -60,11 +60,11 @@ describe("create_task", () => {
 // ─── update_task ──────────────────────────────────────────────────────────────
 
 describe("update_task", () => {
-  it("updates task fields and returns success", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Original", priority: "low" }));
+  it("updates task fields and returns success", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Original", priority: "low" }));
 
-    const result = await handleTool(db, "update_task", {
+    const result = handleTool(db, "update_task", {
       task_id,
       title: "Updated Title",
       status: "in_progress",
@@ -74,7 +74,7 @@ describe("update_task", () => {
     expect(data.success).toBe(true);
 
     // Verify with get_task
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    const fetched = parse(handleTool(db, "get_task", { task_id }));
     expect(fetched.task.title).toBe("Updated Title");
     expect(fetched.task.status).toBe("in_progress");
     expect(fetched.task.progress).toBe(50);
@@ -84,15 +84,15 @@ describe("update_task", () => {
 // ─── complete_task ────────────────────────────────────────────────────────────
 
 describe("complete_task", () => {
-  it("marks task as done with 100% progress", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Finish me", priority: "medium" }));
+  it("marks task as done with 100% progress", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Finish me", priority: "medium" }));
 
-    const result = await handleTool(db, "complete_task", { task_id });
+    const result = handleTool(db, "complete_task", { task_id });
     const data = parse(result);
     expect(data.success).toBe(true);
 
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    const fetched = parse(handleTool(db, "get_task", { task_id }));
     expect(fetched.task.status).toBe("done");
     expect(fetched.task.progress).toBe(100);
   });
@@ -101,11 +101,11 @@ describe("complete_task", () => {
 // ─── log_activity ─────────────────────────────────────────────────────────────
 
 describe("log_activity", () => {
-  it("auto-registers agent and logs activity", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "low" }));
+  it("auto-registers agent and logs activity", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Task", priority: "low" }));
 
-    const result = await handleTool(db, "log_activity", {
+    const result = handleTool(db, "log_activity", {
       task_id,
       agent_name: "new-agent",
       message: "Started working on this",
@@ -114,11 +114,11 @@ describe("log_activity", () => {
     expect(data.success).toBe(true);
   });
 
-  it("logs activity without an agent", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "low" }));
+  it("logs activity without an agent", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Task", priority: "low" }));
 
-    const result = await handleTool(db, "log_activity", {
+    const result = handleTool(db, "log_activity", {
       task_id,
       message: "System event",
     });
@@ -126,18 +126,18 @@ describe("log_activity", () => {
     expect(data.success).toBe(true);
   });
 
-  it("reuses existing agent without duplicating", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Task", priority: "low" }));
+  it("reuses existing agent without duplicating", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Task", priority: "low" }));
 
     // Register agent first
-    const { agent_id } = parse(await handleTool(db, "register_agent", { name: "existing-agent" }));
+    const { agent_id } = parse(handleTool(db, "register_agent", { name: "existing-agent" }));
 
     // log_activity should reuse the existing agent
-    await handleTool(db, "log_activity", { task_id, agent_name: "existing-agent", message: "Hello" });
+    handleTool(db, "log_activity", { task_id, agent_name: "existing-agent", message: "Hello" });
 
     // Register again — should still be same ID
-    const { agent_id: after_id } = parse(await handleTool(db, "register_agent", { name: "existing-agent" }));
+    const { agent_id: after_id } = parse(handleTool(db, "register_agent", { name: "existing-agent" }));
     expect(after_id).toBe(agent_id);
   });
 });
@@ -145,11 +145,11 @@ describe("log_activity", () => {
 // ─── report_blocker ───────────────────────────────────────────────────────────
 
 describe("report_blocker", () => {
-  it("reports a blocker on a task and returns blocker_id", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Blocked task", priority: "medium" }));
+  it("reports a blocker on a task and returns blocker_id", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Blocked task", priority: "medium" }));
 
-    const result = await handleTool(db, "report_blocker", {
+    const result = handleTool(db, "report_blocker", {
       task_id,
       reason: "Waiting on external API",
     });
@@ -157,7 +157,7 @@ describe("report_blocker", () => {
     expect(data.blocker_id).toBeTruthy();
 
     // Task should now be blocked
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    const fetched = parse(handleTool(db, "get_task", { task_id }));
     expect(fetched.task.status).toBe("blocked");
   });
 });
@@ -165,17 +165,17 @@ describe("report_blocker", () => {
 // ─── resolve_blocker ──────────────────────────────────────────────────────────
 
 describe("resolve_blocker", () => {
-  it("resolves a blocker, reverts task to in_progress, and returns success", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: "Blocked task", priority: "medium" }));
-    const { blocker_id } = parse(await handleTool(db, "report_blocker", { task_id, reason: "API down" }));
+  it("resolves a blocker, reverts task to in_progress, and returns success", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const { task_id } = parse(handleTool(db, "create_task", { project_id, title: "Blocked task", priority: "medium" }));
+    const { blocker_id } = parse(handleTool(db, "report_blocker", { task_id, reason: "API down" }));
 
-    const result = await handleTool(db, "resolve_blocker", { blocker_id });
+    const result = handleTool(db, "resolve_blocker", { blocker_id });
     const data = parse(result);
     expect(data.success).toBe(true);
 
     // Task should revert to in_progress after blocker is resolved
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    const fetched = parse(handleTool(db, "get_task", { task_id }));
     expect(fetched.task.status).toBe("in_progress");
   });
 });
@@ -183,43 +183,43 @@ describe("resolve_blocker", () => {
 // ─── list_projects / list_tasks ───────────────────────────────────────────────
 
 describe("list operations", () => {
-  it("list_projects returns all projects", async () => {
-    await handleTool(db, "create_project", { name: "Alpha" });
-    await handleTool(db, "create_project", { name: "Beta" });
+  it("list_projects returns all projects", () => {
+    handleTool(db, "create_project", { name: "Alpha" });
+    handleTool(db, "create_project", { name: "Beta" });
 
-    const result = await handleTool(db, "list_projects", {});
+    const result = handleTool(db, "list_projects", {});
     const data = parse(result);
     expect(data.projects).toHaveLength(2);
     expect(data.projects.map((p: { name: string }) => p.name)).toContain("Alpha");
   });
 
-  it("list_projects excludes archived projects by default", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "Alpha" }));
-    await handleTool(db, "create_project", { name: "Beta" });
-    await handleTool(db, "archive_project", { project_id });
+  it("list_projects excludes archived projects by default", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "Alpha" }));
+    handleTool(db, "create_project", { name: "Beta" });
+    handleTool(db, "archive_project", { project_id });
 
-    const result = await handleTool(db, "list_projects", {});
+    const result = handleTool(db, "list_projects", {});
     const data = parse(result);
     expect(data.projects).toHaveLength(1);
     expect(data.projects[0].name).toBe("Beta");
   });
 
-  it("list_projects includes archived projects when include_archived is true", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "Alpha" }));
-    await handleTool(db, "archive_project", { project_id });
+  it("list_projects includes archived projects when include_archived is true", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "Alpha" }));
+    handleTool(db, "archive_project", { project_id });
 
-    const result = await handleTool(db, "list_projects", { include_archived: true });
+    const result = handleTool(db, "list_projects", { include_archived: true });
     const data = parse(result);
     expect(data.projects).toHaveLength(1);
     expect(data.projects[0].archived_at).not.toBeNull();
   });
 
-  it("list_tasks returns tasks with filters", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P" }));
-    await handleTool(db, "create_task", { project_id, title: "Task 1", priority: "low" });
-    await handleTool(db, "create_task", { project_id, title: "Task 2", priority: "low" });
+  it("list_tasks returns tasks with filters", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P" }));
+    handleTool(db, "create_task", { project_id, title: "Task 1", priority: "low" });
+    handleTool(db, "create_task", { project_id, title: "Task 2", priority: "low" });
 
-    const result = await handleTool(db, "list_tasks", { project_id });
+    const result = handleTool(db, "list_tasks", { project_id });
     const data = parse(result);
     expect(data.tasks).toHaveLength(2);
   });
@@ -228,45 +228,45 @@ describe("list operations", () => {
 // ─── archive_project / unarchive_project ───────────────────────────────────────
 
 describe("archive_project / unarchive_project", () => {
-  it("archives a project", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const result = await handleTool(db, "archive_project", { project_id });
+  it("archives a project", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const result = handleTool(db, "archive_project", { project_id });
     expect(parse(result).success).toBe(true);
 
-    const listed = parse(await handleTool(db, "list_projects", {}));
+    const listed = parse(handleTool(db, "list_projects", {}));
     expect(listed.projects).toHaveLength(0);
   });
 
-  it("returns success=false for an unknown project", async () => {
-    const result = await handleTool(db, "archive_project", { project_id: "no-such-id" });
+  it("returns success=false for an unknown project", () => {
+    const result = handleTool(db, "archive_project", { project_id: "no-such-id" });
     const data = parse(result);
     expect(data.success).toBe(false);
     expect(data.error).toBeTruthy();
   });
 
-  it("is idempotent: archiving an already-archived project succeeds without a duplicate broadcast", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    await handleTool(db, "archive_project", { project_id });
+  it("is idempotent: archiving an already-archived project succeeds without a duplicate broadcast", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    handleTool(db, "archive_project", { project_id });
     vi.mocked(broadcast).mockClear();
-    const result = await handleTool(db, "archive_project", { project_id });
+    const result = handleTool(db, "archive_project", { project_id });
     expect(parse(result).success).toBe(true);
     expect(broadcast).not.toHaveBeenCalled();
   });
 
-  it("unarchive_project restores a project to the default list", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    await handleTool(db, "archive_project", { project_id });
+  it("unarchive_project restores a project to the default list", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    handleTool(db, "archive_project", { project_id });
 
-    const result = await handleTool(db, "unarchive_project", { project_id });
+    const result = handleTool(db, "unarchive_project", { project_id });
     expect(parse(result).success).toBe(true);
 
-    const listed = parse(await handleTool(db, "list_projects", {}));
+    const listed = parse(handleTool(db, "list_projects", {}));
     expect(listed.projects).toHaveLength(1);
     expect(listed.projects[0].archived_at).toBeNull();
   });
 
-  it("unarchive_project returns success=false for an unknown project", async () => {
-    const result = await handleTool(db, "unarchive_project", { project_id: "no-such-id" });
+  it("unarchive_project returns success=false for an unknown project", () => {
+    const result = handleTool(db, "unarchive_project", { project_id: "no-such-id" });
     expect(parse(result).success).toBe(false);
   });
 });
@@ -274,12 +274,12 @@ describe("archive_project / unarchive_project", () => {
 // ─── search_tasks ─────────────────────────────────────────────────────────────
 
 describe("search_tasks", () => {
-  it("returns tasks matching query", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    await handleTool(db, "create_task", { project_id, title: "Implement auth", priority: "high" });
-    await handleTool(db, "create_task", { project_id, title: "Write tests", priority: "low" });
+  it("returns tasks matching query", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    handleTool(db, "create_task", { project_id, title: "Implement auth", priority: "high" });
+    handleTool(db, "create_task", { project_id, title: "Write tests", priority: "low" });
 
-    const result = await handleTool(db, "search_tasks", { query: "auth" });
+    const result = handleTool(db, "search_tasks", { query: "auth" });
     const data = parse(result);
     expect(data.tasks.length).toBeGreaterThanOrEqual(1);
     expect(data.tasks.some((t: { title: string }) => t.title.includes("auth"))).toBe(true);
@@ -289,15 +289,15 @@ describe("search_tasks", () => {
 // ─── list_milestones / complete_milestone ─────────────────────────────────────
 
 describe("milestones", () => {
-  it("list_milestones returns empty when none exist", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "P1" }));
-    const result = await handleTool(db, "list_milestones", { project_id });
+  it("list_milestones returns empty when none exist", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "P1" }));
+    const result = handleTool(db, "list_milestones", { project_id });
     const data = parse(result);
     expect(data.milestones).toEqual([]);
   });
 
-  it("complete_milestone returns success=false for unknown id", async () => {
-    const result = await handleTool(db, "complete_milestone", { milestone_id: "no-such-id" });
+  it("complete_milestone returns success=false for unknown id", () => {
+    const result = handleTool(db, "complete_milestone", { milestone_id: "no-such-id" });
     const data = parse(result);
     expect(data.success).toBe(false);
   });
@@ -306,11 +306,11 @@ describe("milestones", () => {
 // ─── onboarding wizard flow ───────────────────────────────────────────────────
 
 describe("onboarding wizard flow", () => {
-  it("supports full wizard path: project → task", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "My First Project", description: "Onboarding test" }));
+  it("supports full wizard path: project → task", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "My First Project", description: "Onboarding test" }));
     expect(project_id).toBeTruthy();
 
-    const { task_id } = parse(await handleTool(db, "create_task", {
+    const { task_id } = parse(handleTool(db, "create_task", {
       project_id,
       title: "My first task",
       description: "Created during onboarding",
@@ -318,13 +318,13 @@ describe("onboarding wizard flow", () => {
     }));
     expect(task_id).toBeTruthy();
 
-    const fetched = parse(await handleTool(db, "get_task", { task_id }));
+    const fetched = parse(handleTool(db, "get_task", { task_id }));
     expect(fetched.task.project_id).toBe(project_id);
     expect(fetched.task.status).toBe("planned");
   });
 
-  it("supports demo project seeding: multiple tasks in varied states", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "Demo Project" }));
+  it("supports demo project seeding: multiple tasks in varied states", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "Demo Project" }));
 
     const demoTasks = [
       { title: "Task A", priority: "high" },
@@ -334,16 +334,16 @@ describe("onboarding wizard flow", () => {
 
     const taskIds: string[] = [];
     for (const t of demoTasks) {
-      const { task_id } = parse(await handleTool(db, "create_task", { project_id, ...t }));
+      const { task_id } = parse(handleTool(db, "create_task", { project_id, ...t }));
       taskIds.push(task_id);
     }
 
     // Update statuses to simulate a realistic board
-    await handleTool(db, "update_task", { task_id: taskIds[0], status: "done", progress: 100 });
-    await handleTool(db, "update_task", { task_id: taskIds[1], status: "in_progress", progress: 50 });
+    handleTool(db, "update_task", { task_id: taskIds[0], status: "done", progress: 100 });
+    handleTool(db, "update_task", { task_id: taskIds[1], status: "in_progress", progress: 50 });
 
     // Default list_tasks hides finished work so an agent sees only actionable tasks.
-    const listed = parse(await handleTool(db, "list_tasks", { project_id }));
+    const listed = parse(handleTool(db, "list_tasks", { project_id }));
     expect(listed.tasks).toHaveLength(2);
     const statuses = listed.tasks.map((t: { status: string }) => t.status);
     expect(statuses).toContain("in_progress");
@@ -351,7 +351,7 @@ describe("onboarding wizard flow", () => {
     expect(statuses).not.toContain("done");
 
     // An explicit status filter still surfaces completed tasks.
-    const doneList = parse(await handleTool(db, "list_tasks", { project_id, status: "done" }));
+    const doneList = parse(handleTool(db, "list_tasks", { project_id, status: "done" }));
     expect(doneList.tasks).toHaveLength(1);
     expect(doneList.tasks[0].status).toBe("done");
   });
@@ -360,56 +360,56 @@ describe("onboarding wizard flow", () => {
 // ─── list_tasks pagination + default status filter ────────────────────────────
 
 describe("list_tasks pagination + defaults", () => {
-  async function seed(count: number) {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "Big" }));
+  function seed(count: number) {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "Big" }));
     for (let i = 0; i < count; i++) {
-      await handleTool(db, "create_task", { project_id, title: `Task ${i}`, priority: "low" });
+      handleTool(db, "create_task", { project_id, title: `Task ${i}`, priority: "low" });
     }
     return project_id;
   }
 
-  it("caps the response at the default limit (200) and reports has_more", async () => {
-    const project_id = await seed(250);
-    const data = parse(await handleTool(db, "list_tasks", { project_id }));
+  it("caps the response at the default limit (200) and reports has_more", () => {
+    const project_id = seed(250);
+    const data = parse(handleTool(db, "list_tasks", { project_id }));
     expect(data.tasks).toHaveLength(200);
     expect(data.total).toBe(250);
     expect(data.has_more).toBe(true);
     expect(data.next_offset).toBe(200);
   });
 
-  it("honors limit + offset and clears has_more on the last page", async () => {
-    const project_id = await seed(10);
-    const page1 = parse(await handleTool(db, "list_tasks", { project_id, limit: 4 }));
+  it("honors limit + offset and clears has_more on the last page", () => {
+    const project_id = seed(10);
+    const page1 = parse(handleTool(db, "list_tasks", { project_id, limit: 4 }));
     expect(page1.tasks).toHaveLength(4);
     expect(page1.has_more).toBe(true);
     expect(page1.next_offset).toBe(4);
 
-    const lastPage = parse(await handleTool(db, "list_tasks", { project_id, limit: 4, offset: 8 }));
+    const lastPage = parse(handleTool(db, "list_tasks", { project_id, limit: 4, offset: 8 }));
     expect(lastPage.tasks).toHaveLength(2);
     expect(lastPage.has_more).toBe(false);
     expect(lastPage.next_offset).toBeNull();
   });
 
-  it("clamps an oversized limit to the maximum (500)", async () => {
-    const project_id = await seed(50);
-    const data = parse(await handleTool(db, "list_tasks", { project_id, limit: 100000 }));
+  it("clamps an oversized limit to the maximum (500)", () => {
+    const project_id = seed(50);
+    const data = parse(handleTool(db, "list_tasks", { project_id, limit: 100000 }));
     // Only 50 exist, but the clamp means an absurd limit never returns unbounded rows.
     expect(data.tasks).toHaveLength(50);
     expect(data.has_more).toBe(false);
   });
 
-  it("excludes done/cancelled by default but includes them on explicit status", async () => {
-    const { project_id } = parse(await handleTool(db, "create_project", { name: "Mixed" }));
+  it("excludes done/cancelled by default but includes them on explicit status", () => {
+    const { project_id } = parse(handleTool(db, "create_project", { name: "Mixed" }));
     for (const s of ["planned", "in_progress", "done", "cancelled"]) {
-      const { task_id } = parse(await handleTool(db, "create_task", { project_id, title: s, priority: "low" }));
-      if (s !== "planned") await handleTool(db, "update_task", { task_id, status: s });
+      const { task_id } = parse(handleTool(db, "create_task", { project_id, title: s, priority: "low" }));
+      if (s !== "planned") handleTool(db, "update_task", { task_id, status: s });
     }
 
-    const def = parse(await handleTool(db, "list_tasks", { project_id }));
+    const def = parse(handleTool(db, "list_tasks", { project_id }));
     expect(def.total).toBe(2);
     expect(def.tasks.map((t: { status: string }) => t.status).sort()).toEqual(["in_progress", "planned"]);
 
-    const cancelled = parse(await handleTool(db, "list_tasks", { project_id, status: "cancelled" }));
+    const cancelled = parse(handleTool(db, "list_tasks", { project_id, status: "cancelled" }));
     expect(cancelled.tasks).toHaveLength(1);
     expect(cancelled.tasks[0].status).toBe("cancelled");
   });
@@ -418,8 +418,8 @@ describe("list_tasks pagination + defaults", () => {
 // ─── error handling ───────────────────────────────────────────────────────────
 
 describe("error handling", () => {
-  it("throws on unknown tool name", async () => {
-    await expect(handleTool(db, "unknown_tool", {})).rejects.toThrow("Unknown tool: unknown_tool");
+  it("throws on unknown tool name", () => {
+    expect(() => handleTool(db, "unknown_tool", {})).toThrow("Unknown tool: unknown_tool");
   });
 });
 

@@ -64,7 +64,7 @@ export function AgentDashboard() {
       }
       setDetails(results);
     }
-    if (agents.length > 0) loadDetails();
+    if (agents.length > 0) void loadDetails();
   }, [agents, api]);
 
   const selectedDetail = selectedAgentId ? details[selectedAgentId] : null;
@@ -320,7 +320,7 @@ function AgentDetailView({ detail, onBack }: Readonly<{ detail: AgentDetail; onB
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const [p, bd] = await Promise.all([
           api.getAgentPerformance(agent.id),

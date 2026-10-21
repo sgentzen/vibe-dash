@@ -179,7 +179,7 @@ describe("DashboardView ingest status", () => {
     mockApi.getIngestStatus.mockResolvedValue(healthyStatus({ claudeHomeFound: false }));
     renderWithProviders(<DashboardView />);
 
-    await screen.findByText(/no transcript directory/i);
+    expect(await screen.findByText(/no transcript directory/i)).toBeTruthy();
   });
 
   it("renders the Total Spend caveat badges from the status and the summary", async () => {

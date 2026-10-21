@@ -82,9 +82,9 @@ export function usePolling() {
       return false;
     }
 
-    waitForServer().then((ready) => {
+    void waitForServer().then((ready) => {
       if (ready && !cancelled) {
-        poll();
+        void poll();
         timer.current = setInterval(poll, POLL_INTERVAL_MS);
       }
     });

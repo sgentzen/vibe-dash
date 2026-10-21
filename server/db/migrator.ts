@@ -1427,7 +1427,7 @@ const MIGRATIONS: Migration[] = [
         .prepare("SELECT type, name, sql FROM sqlite_master WHERE type IN ('view', 'trigger') AND sql IS NOT NULL ORDER BY rowid")
         .all() as { type: "view" | "trigger"; name: string; sql: string }[];
       for (const d of dependents) {
-        db.prepare(`DROP ${d.type === "view" ? "VIEW" : "TRIGGER"} IF EXISTS "${d.name.replace(/"/g, '""')}"`).run();
+        db.prepare(`DROP ${d.type === "view" ? "VIEW" : "TRIGGER"} IF EXISTS "${d.name.replaceAll('"', '""')}"`).run();
       }
 
       // A milestone_id naming a sprint that 004 never copied into milestones
@@ -1584,7 +1584,7 @@ function foreignKeyViolations(db: Database.Database, migration: string): Set<str
       if (!keys) {
         keys = new Map();
         // The table name comes from this database's own schema, quoted.
-        const fks = db.pragma(`foreign_key_list("${table.replace(/"/g, '""')}")`) as { id: number; from: string }[];
+        const fks = db.pragma(`foreign_key_list("${table.replaceAll('"', '""')}")`) as { id: number; from: string }[];
         for (const fk of fks) keys.set(fk.id, keys.has(fk.id) ? `${keys.get(fk.id)},${fk.from}` : fk.from);
         keyColumns.set(table, keys);
       }

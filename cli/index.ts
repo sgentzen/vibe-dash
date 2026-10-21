@@ -79,11 +79,8 @@ let db!: Database.Database;
 try {
   db = isWriteCommand ? openWritableForCli(dbPath) : openReadOnlyDb(dbPath);
 } catch (e) {
-  if (e instanceof SchemaTooNewError) {
+  if (e instanceof SchemaTooNewError || e instanceof SchemaBehindError) {
     // Not a path problem — suggesting --db would send the user the wrong way.
-    console.error(`${RED}Error:${RESET} ${e.message}`);
-    console.error(`Database: ${dbPath}`);
-  } else if (e instanceof SchemaBehindError) {
     console.error(`${RED}Error:${RESET} ${e.message}`);
     console.error(`Database: ${dbPath}`);
   } else {
@@ -257,7 +254,7 @@ function cmdHelp() {
 
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
-async function main() {
+function main() {
   switch (command) {
     case "list": cmdList(); break;
     case "add-task": cmdAddTask(); break;
@@ -268,7 +265,7 @@ async function main() {
 }
 
 try {
-  await main();
+  main();
 } catch (err) {
   console.error(`${RED}Error:${RESET} ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
