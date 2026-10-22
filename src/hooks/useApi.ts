@@ -36,7 +36,7 @@ function parseRetryAfter(res: Response): number | null {
   return null;
 }
 
-async function throwApiError(res: Response, op: string): Promise<never> {
+function throwApiError(res: Response, op: string): never {
   throw new ApiError(`${op} failed: ${res.status}`, res.status, parseRetryAfter(res));
 }
 
@@ -58,14 +58,14 @@ async function getStats(): Promise<{
   tasks_completed_today: number;
 }> {
   const res = await apiFetch("/api/stats");
-  if (!res.ok) await throwApiError(res, "getStats");
+  if (!res.ok) throwApiError(res, "getStats");
   return res.json();
 }
 
 async function getProjects(options: { includeArchived?: boolean } = {}): Promise<Project[]> {
   const url = options.includeArchived ? "/api/projects?include_archived=true" : "/api/projects";
   const res = await apiFetch(url);
-  if (!res.ok) await throwApiError(res, "getProjects");
+  if (!res.ok) throwApiError(res, "getProjects");
   return res.json();
 }
 
@@ -74,7 +74,7 @@ async function archiveProject(id: string): Promise<Project> {
     method: "POST",
     headers: jsonHeaders(),
   });
-  if (!res.ok) await throwApiError(res, "archiveProject");
+  if (!res.ok) throwApiError(res, "archiveProject");
   return res.json();
 }
 
@@ -83,7 +83,7 @@ async function unarchiveProject(id: string): Promise<Project> {
     method: "POST",
     headers: jsonHeaders(),
   });
-  if (!res.ok) await throwApiError(res, "unarchiveProject");
+  if (!res.ok) throwApiError(res, "unarchiveProject");
   return res.json();
 }
 
@@ -96,7 +96,7 @@ async function createProject(data: {
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) await throwApiError(res, "createProject");
+  if (!res.ok) throwApiError(res, "createProject");
   return res.json();
 }
 
@@ -105,7 +105,7 @@ async function getTasks(projectId?: string): Promise<Task[]> {
     ? `/api/tasks?project_id=${encodeURIComponent(projectId)}`
     : "/api/tasks";
   const res = await apiFetch(url);
-  if (!res.ok) await throwApiError(res, "getTasks");
+  if (!res.ok) throwApiError(res, "getTasks");
   return res.json();
 }
 
@@ -121,7 +121,7 @@ async function createTask(data: {
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) await throwApiError(res, "createTask");
+  if (!res.ok) throwApiError(res, "createTask");
   return res.json();
 }
 
@@ -134,7 +134,7 @@ async function updateTask(
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) await throwApiError(res, "updateTask");
+  if (!res.ok) throwApiError(res, "updateTask");
   return res.json();
 }
 
@@ -143,25 +143,25 @@ async function completeTask(id: string): Promise<Task> {
     method: "POST",
     headers: jsonHeaders(),
   });
-  if (!res.ok) await throwApiError(res, "completeTask");
+  if (!res.ok) throwApiError(res, "completeTask");
   return res.json();
 }
 
 async function getAgents(): Promise<Agent[]> {
   const res = await apiFetch("/api/agents");
-  if (!res.ok) await throwApiError(res, "getAgents");
+  if (!res.ok) throwApiError(res, "getAgents");
   return res.json();
 }
 
 async function getActivity(limit = 50): Promise<ActivityEntry[]> {
   const res = await apiFetch(`/api/activity?limit=${limit}`);
-  if (!res.ok) await throwApiError(res, "getActivity");
+  if (!res.ok) throwApiError(res, "getActivity");
   return res.json();
 }
 
 async function getBlockers(): Promise<Blocker[]> {
   const res = await apiFetch("/api/blockers");
-  if (!res.ok) await throwApiError(res, "getBlockers");
+  if (!res.ok) throwApiError(res, "getBlockers");
   return res.json();
 }
 
@@ -170,7 +170,7 @@ async function getMilestones(projectId?: string): Promise<Milestone[]> {
     ? `/api/milestones?project_id=${encodeURIComponent(projectId)}`
     : "/api/milestones";
   const res = await apiFetch(url);
-  if (!res.ok) await throwApiError(res, "getMilestones");
+  if (!res.ok) throwApiError(res, "getMilestones");
   return res.json();
 }
 
@@ -187,7 +187,7 @@ async function createMilestone(data: {
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) await throwApiError(res, "createMilestone");
+  if (!res.ok) throwApiError(res, "createMilestone");
   return res.json();
 }
 
@@ -200,13 +200,13 @@ async function updateMilestone(
     headers: jsonHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) await throwApiError(res, "updateMilestone");
+  if (!res.ok) throwApiError(res, "updateMilestone");
   return res.json();
 }
 
 async function getProjectTaskDependencies(projectId: string): Promise<TaskDependency[]> {
   const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/task-dependencies`);
-  if (!res.ok) await throwApiError(res, "getProjectTaskDependencies");
+  if (!res.ok) throwApiError(res, "getProjectTaskDependencies");
   return res.json();
 }
 
@@ -214,7 +214,7 @@ async function getProjectTaskDependencies(projectId: string): Promise<TaskDepend
 
 async function getMilestoneProgress(milestoneId: string): Promise<MilestoneProgress> {
   const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/progress`);
-  if (!res.ok) await throwApiError(res, "getMilestoneProgress");
+  if (!res.ok) throwApiError(res, "getMilestoneProgress");
   return res.json();
 }
 
@@ -222,13 +222,13 @@ async function getMilestoneProgress(milestoneId: string): Promise<MilestoneProgr
 
 async function getDependencies(taskId: string): Promise<TaskDependency[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/dependencies`);
-  if (!res.ok) await throwApiError(res, "getDependencies");
+  if (!res.ok) throwApiError(res, "getDependencies");
   return res.json();
 }
 
 async function getBlockingTasks(taskId: string): Promise<Task[]> {
   const res = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/blocking`);
-  if (!res.ok) await throwApiError(res, "getBlockingTasks");
+  if (!res.ok) throwApiError(res, "getBlockingTasks");
   return res.json();
 }
 
@@ -238,7 +238,7 @@ async function addDependency(taskId: string, dependsOnTaskId: string): Promise<T
     headers: jsonHeaders(),
     body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }),
   });
-  if (!res.ok) await throwApiError(res, "addDependency");
+  if (!res.ok) throwApiError(res, "addDependency");
   return res.json();
 }
 
@@ -250,19 +250,19 @@ async function removeDependency(depId: string): Promise<void> {
 
 async function getAgentDetail(agentId: string): Promise<Agent & { health_status: string; completed_today: number; current_task_title: string | null }> {
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}`);
-  if (!res.ok) await throwApiError(res, "getAgentDetail");
+  if (!res.ok) throwApiError(res, "getAgentDetail");
   return res.json();
 }
 
 async function getAgentActivity(agentId: string, limit = 50): Promise<ActivityEntry[]> {
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/activity?limit=${limit}`);
-  if (!res.ok) await throwApiError(res, "getAgentActivity");
+  if (!res.ok) throwApiError(res, "getAgentActivity");
   return res.json();
 }
 
 async function getAgentSessions(agentId: string): Promise<AgentSession[]> {
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/sessions`);
-  if (!res.ok) await throwApiError(res, "getAgentSessions");
+  if (!res.ok) throwApiError(res, "getAgentSessions");
   return res.json();
 }
 
@@ -271,7 +271,7 @@ async function getAgentSessions(agentId: string): Promise<AgentSession[]> {
 async function searchTasks(params: Record<string, string | undefined>): Promise<Task[]> {
   const qs = buildQueryString(params);
   const res = await apiFetch(`/api/tasks/search?${qs}`);
-  if (!res.ok) await throwApiError(res, "searchTasks");
+  if (!res.ok) throwApiError(res, "searchTasks");
   return res.json();
 }
 
@@ -283,7 +283,7 @@ async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknow
     headers: jsonHeaders(),
     body: JSON.stringify({ task_ids: taskIds, updates }),
   });
-  if (!res.ok) await throwApiError(res, "bulkUpdateTasks");
+  if (!res.ok) throwApiError(res, "bulkUpdateTasks");
   return res.json();
 }
 
@@ -292,7 +292,7 @@ async function bulkUpdateTasks(taskIds: string[], updates: Record<string, unknow
 async function getAgentStats(agentId: string, milestoneId?: string): Promise<AgentStats> {
   const qs = milestoneId ? `?milestone_id=${encodeURIComponent(milestoneId)}` : "";
   const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/stats${qs}`);
-  if (!res.ok) await throwApiError(res, "getAgentStats");
+  if (!res.ok) throwApiError(res, "getAgentStats");
   return res.json();
 }
 
@@ -300,7 +300,7 @@ async function getAgentStats(agentId: string, milestoneId?: string): Promise<Age
 
 async function getMilestoneDailyStats(milestoneId: string): Promise<MilestoneDailyStats[]> {
   const res = await apiFetch(`/api/milestones/${encodeURIComponent(milestoneId)}/daily-stats`);
-  if (!res.ok) await throwApiError(res, "getMilestoneDailyStats");
+  if (!res.ok) throwApiError(res, "getMilestoneDailyStats");
   return res.json();
 }
 
@@ -309,7 +309,7 @@ async function getMilestoneDailyStats(milestoneId: string): Promise<MilestoneDai
 async function getActivityHeatmap(projectId?: string): Promise<ActivityHeatmapEntry[]> {
   const url = projectId ? `/api/activity-heatmap?project_id=${encodeURIComponent(projectId)}` : "/api/activity-heatmap";
   const res = await apiFetch(url);
-  if (!res.ok) await throwApiError(res, "getActivityHeatmap");
+  if (!res.ok) throwApiError(res, "getActivityHeatmap");
   return res.json();
 }
 
@@ -319,7 +319,7 @@ async function getActivityStreamApi(params: Record<string, string | undefined> =
   const qs = buildQueryString(params);
   const query = qs ? `?${qs}` : "";
   const res = await apiFetch(`/api/activity-stream${query}`);
-  if (!res.ok) await throwApiError(res, "getActivityStream");
+  if (!res.ok) throwApiError(res, "getActivityStream");
   return res.json();
 }
 
@@ -333,7 +333,7 @@ export type { CostTimeseriesEntry };
 async function getCostTimeseries(params: Record<string, string | undefined> = {}): Promise<CostTimeseriesEntry[]> {
   const qs = buildQueryString({ ...params, groupBy: "day" });
   const res = await apiFetch(`/api/costs?${qs}`);
-  if (!res.ok) await throwApiError(res, "getCostTimeseries");
+  if (!res.ok) throwApiError(res, "getCostTimeseries");
   return res.json();
 }
 
@@ -342,27 +342,27 @@ async function getCostSummary(projectId?: string): Promise<CostSummary> {
     ? buildQueryString({ groupBy: "project", id: projectId })
     : "groupBy=global";
   const res = await apiFetch(`/api/costs?${qs}`);
-  if (!res.ok) await throwApiError(res, "getCostSummary");
+  if (!res.ok) throwApiError(res, "getCostSummary");
   return res.json();
 }
 
 async function getProjectCostSummary(projectId: string): Promise<CostSummary> {
   const res = await apiFetch(`/api/costs?groupBy=project&id=${encodeURIComponent(projectId)}`);
-  if (!res.ok) await throwApiError(res, "getProjectCostSummary");
+  if (!res.ok) throwApiError(res, "getProjectCostSummary");
   return res.json();
 }
 
 async function getCostByModel(params: Record<string, string | undefined> = {}): Promise<CostByModelEntry[]> {
   const qs = buildQueryString({ ...params, groupBy: "model" });
   const res = await apiFetch(`/api/costs?${qs}`);
-  if (!res.ok) await throwApiError(res, "getCostByModel");
+  if (!res.ok) throwApiError(res, "getCostByModel");
   return res.json();
 }
 
 async function getCostByAgent(params: Record<string, string | undefined> = {}): Promise<CostByAgentEntry[]> {
   const qs = buildQueryString({ ...params, groupBy: "agent" });
   const res = await apiFetch(`/api/costs?${qs}`);
-  if (!res.ok) await throwApiError(res, "getCostByAgent");
+  if (!res.ok) throwApiError(res, "getCostByAgent");
   return res.json();
 }
 
@@ -370,19 +370,19 @@ async function getCostByAgent(params: Record<string, string | undefined> = {}): 
 
 async function getAgentPerformance(agentId: string): Promise<AgentPerformance> {
   const res = await apiFetch(`/api/agents/${agentId}/performance`);
-  if (!res.ok) await throwApiError(res, "getAgentPerformance");
+  if (!res.ok) throwApiError(res, "getAgentPerformance");
   return res.json();
 }
 
 async function getAgentComparison(): Promise<AgentComparison> {
   const res = await apiFetch("/api/agents/comparison");
-  if (!res.ok) await throwApiError(res, "getAgentComparison");
+  if (!res.ok) throwApiError(res, "getAgentComparison");
   return res.json();
 }
 
 async function getTaskTypeBreakdown(agentId: string): Promise<TaskTypeBreakdown[]> {
   const res = await apiFetch(`/api/agents/${agentId}/task-type-breakdown`);
-  if (!res.ok) await throwApiError(res, "getTaskTypeBreakdown");
+  if (!res.ok) throwApiError(res, "getTaskTypeBreakdown");
   return res.json();
 }
 
@@ -402,7 +402,7 @@ export interface IngestStatus {
 
 async function getIngestStatus(): Promise<IngestStatus> {
   const res = await apiFetch("/api/ingest/status");
-  if (!res.ok) await throwApiError(res, "getIngestStatus");
+  if (!res.ok) throwApiError(res, "getIngestStatus");
   return res.json();
 }
 
@@ -423,7 +423,7 @@ export interface HealthInfo {
 
 async function getHealth(): Promise<HealthInfo> {
   const res = await apiFetch("/api/health");
-  if (!res.ok) await throwApiError(res, "getHealth");
+  if (!res.ok) throwApiError(res, "getHealth");
   return res.json();
 }
 

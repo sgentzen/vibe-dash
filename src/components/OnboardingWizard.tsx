@@ -123,6 +123,9 @@ export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>
     navigator.clipboard.writeText(MCP_CONFIG_TEMPLATE).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Clipboard permission denied or the document not focused; the config
+      // stays on screen to copy by hand, and the button never claims "Copied!".
     });
   }
 
@@ -177,7 +180,7 @@ export function OnboardingWizard({ onComplete }: Readonly<OnboardingWizardProps>
                   id="onboard-project-name"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleCreateProject(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") void handleCreateProject(); }}
                   placeholder="My AI Project"
                   style={inputStyle}
                 />

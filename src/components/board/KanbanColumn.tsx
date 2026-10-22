@@ -189,7 +189,7 @@ export function KanbanColumn({
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreate();
+                  if (e.key === "Enter") void handleCreate();
                 }}
                 placeholder="Add task\u2026"
                 aria-label={`Add task to ${label}`}

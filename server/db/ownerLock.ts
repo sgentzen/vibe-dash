@@ -293,7 +293,7 @@ export function acquireOwnerLock(dbPath: string, entryPoint: string): () => void
 // threshold.
 const pendingReleases = new Set<() => void>();
 process.once("exit", () => {
-  for (const release of [...pendingReleases]) release();
+  for (const release of pendingReleases) release();
 });
 
 // `exit` alone isn't enough: `docker stop` sends SIGTERM, and this project
@@ -318,7 +318,7 @@ process.once("exit", () => {
 // graceful shutdown PROC-1 describes (draining requests, closing the DB
 // handle, closing MCP transports).
 function releaseLocksAndReraise(signal: NodeJS.Signals): void {
-  for (const release of [...pendingReleases]) release();
+  for (const release of pendingReleases) release();
   process.removeListener(signal, releaseLocksAndReraise);
   process.kill(process.pid, signal);
 }

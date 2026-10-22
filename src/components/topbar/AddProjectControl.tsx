@@ -45,7 +45,7 @@ export function AddProjectControl({ onAdd }: Readonly<AddProjectControlProps>) {
         value={projectName}
         onChange={(e) => setProjectName(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") handleAdd();
+          if (e.key === "Enter") void handleAdd();
           if (e.key === "Escape") { setShowForm(false); setProjectName(""); }
         }}
         placeholder="Project name..."

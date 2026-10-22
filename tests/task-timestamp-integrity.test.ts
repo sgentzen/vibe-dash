@@ -72,26 +72,16 @@ describe("getTimeSpent with unreadable timestamps", () => {
     expect(getTimeSpent(db, id)).toBeNull();
   });
 
-  it("returns null when the task's updated_at cannot be read", () => {
+  it.each([
+    ["cannot be read", "not-a-date"],
+    // The pre-existing `!first?.ts` guard covered a blank activity timestamp by
+    // luck of it being falsy. Nothing covered a blank updated_at, which parses
+    // to NaN exactly like a garbage one.
+    ["is blank", ""],
+    ["is whitespace", " "],
+  ])("returns null when the task's updated_at %s", (_label, corrupt) => {
     const id = doneTask();
-    setUpdatedAt(id, "not-a-date");
-
-    expect(getTimeSpent(db, id)).toBeNull();
-  });
-
-  // The pre-existing `!first?.ts` guard covered a blank activity timestamp by
-  // luck of it being falsy. Nothing covered a blank updated_at, which parses to
-  // NaN exactly like a garbage one.
-  it("returns null when the task's updated_at is blank", () => {
-    const id = doneTask();
-    setUpdatedAt(id, "");
-
-    expect(getTimeSpent(db, id)).toBeNull();
-  });
-
-  it("returns null when the task's updated_at is whitespace", () => {
-    const id = doneTask();
-    setUpdatedAt(id, " ");
+    setUpdatedAt(id, corrupt);
 
     expect(getTimeSpent(db, id)).toBeNull();
   });

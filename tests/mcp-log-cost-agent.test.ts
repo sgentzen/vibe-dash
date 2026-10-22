@@ -13,8 +13,8 @@ const args = {
 };
 
 describe("log_cost agent attribution", () => {
-  it("attaches the session agent when agent_id is omitted", async () => {
-    await handleTool(db, "log_cost", { ...args }, "claude");
+  it("attaches the session agent when agent_id is omitted", () => {
+    handleTool(db, "log_cost", { ...args }, "claude");
 
     const agent = getAgentByName(db, "claude");
     expect(agent).not.toBeNull();
@@ -23,19 +23,19 @@ describe("log_cost agent attribution", () => {
     expect(row.agent_id).toBe(agent!.id);
   });
 
-  it("prefers an explicit agent_id over the session name", async () => {
-    await handleTool(db, "log_cost", { ...args }, "session-agent");
+  it("prefers an explicit agent_id over the session name", () => {
+    handleTool(db, "log_cost", { ...args }, "session-agent");
     const sessionAgent = getAgentByName(db, "session-agent")!;
 
-    await handleTool(db, "log_cost", { ...args, agent_id: sessionAgent.id }, "someone-else");
+    handleTool(db, "log_cost", { ...args, agent_id: sessionAgent.id }, "someone-else");
 
     const rows = db.prepare(`SELECT agent_id FROM cost_entries`).all() as { agent_id: string | null }[];
     expect(rows.every((r) => r.agent_id === sessionAgent.id)).toBe(true);
   });
 
-  it("still writes the row when there is no agent_id and no session name", async () => {
+  it("still writes the row when there is no agent_id and no session name", () => {
     // The documented limitation: unattributable, so unexcludable, but never lost.
-    await handleTool(db, "log_cost", { ...args });
+    handleTool(db, "log_cost", { ...args });
 
     const row = db.prepare(`SELECT agent_id, cost_usd FROM cost_entries`).get() as
       { agent_id: string | null; cost_usd: number };
@@ -43,21 +43,21 @@ describe("log_cost agent attribution", () => {
     expect(row.cost_usd).toBeCloseTo(1, 10);
   });
 
-  it("writes the row instead of throwing when agent_id is an empty string", async () => {
+  it("writes the row instead of throwing when agent_id is an empty string", () => {
     // "" is schema-valid (no .min(1)) and is an FK column. `?? null` treats
     // "" as present, so an unnormalised handler passes it straight to the DB
     // and the FK constraint throws, losing the row entirely.
-    await handleTool(db, "log_cost", { ...args, agent_id: "" });
+    handleTool(db, "log_cost", { ...args, agent_id: "" });
 
     const rows = db.prepare(`SELECT agent_id FROM cost_entries`).all() as { agent_id: string | null }[];
     expect(rows).toHaveLength(1);
     expect(rows[0].agent_id).toBeNull();
   });
 
-  it("writes the row instead of throwing when task_id is an empty string", async () => {
+  it("writes the row instead of throwing when task_id is an empty string", () => {
     // Same defect, same FK-column shape: task_id, milestone_id and project_id
     // all go through the identical `?? null` pattern as agent_id.
-    await handleTool(db, "log_cost", { ...args, task_id: "" });
+    handleTool(db, "log_cost", { ...args, task_id: "" });
 
     const rows = db.prepare(`SELECT task_id FROM cost_entries`).all() as { task_id: string | null }[];
     expect(rows).toHaveLength(1);

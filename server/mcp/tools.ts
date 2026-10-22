@@ -354,12 +354,12 @@ const HANDLERS: Record<string, Handler> = {
   get_project_context: (db, args) => ok(getProjectContext(db, args.project_id as string)),
 };
 
-export async function handleTool(
+export function handleTool(
   db: Database.Database,
   toolName: string,
   args: Args,
   defaultAgentName?: string
-): Promise<ToolResult> {
+): ToolResult {
   // Use the MCP client identity as fallback when agent_name is not provided
   const agentName = (args.agent_name as string | undefined) ?? defaultAgentName;
   const handler = HANDLERS[toolName];
